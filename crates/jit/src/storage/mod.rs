@@ -16,6 +16,7 @@ pub(crate) mod atomic_write;
 pub(crate) mod capability_fs;
 pub mod claim_coordinator;
 pub mod clock;
+pub mod configuration_store;
 #[cfg(test)]
 pub(crate) mod contention_probe;
 pub mod discovery;

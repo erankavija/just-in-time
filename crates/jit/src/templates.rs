@@ -1,33 +1,6 @@
-//! Graph-template data model and `.jit/templates.toml` loader.
-//!
-//! A **graph template** is a named, parameterized subgraph that `jit apply`
-//! instantiates into the work DAG. The first (and, this epic, only) template is
-//! `plan`: the plan-before-fan-out bracket of a planning node `P` and a
-//! breakdown node `B`. The mechanism is generic and domain-agnostic — nothing
-//! here hardcodes `epic` / `planning` / `breakdown`; those strings come from
-//! `.jit/templates.toml`.
-//!
-//! This module defines the MODEL ([`GraphTemplate`], [`TemplateNode`],
-//! [`AnchorSlot`], [`AnchorEdge`], [`Transform`]), the BINDINGS
-//! ([`RoleBindings`], [`AnchorBindings`]) that name the roles and anchor the
-//! bracket tooling reaches for, and the LOADER ([`TemplateRegistry::load`]) with
-//! load-time **structural validation**:
-//!
-//! - node `role`s are unique within a template;
-//! - every `depends_on`, `anchor_edges`, and `transforms` reference resolves to
-//!   a declared node role / anchor name;
-//! - each `applies_to` type exists in the configured `[type_hierarchy].types`;
-//! - each transform `kind` decodes to a [`TransformKind`];
-//! - the internal `depends_on` edges form a DAG (no cycle).
-//!
-//! Following the production rules filesystem boundary
-//! precedent: an absent `templates.toml` loads as an empty registry, and an
-//! invalid file fails at load with a descriptive [`TemplateConfigError`].
-//!
-//! The repository declarations applying a template depends on — node types,
-//! label namespaces, gates, and document areas — are its
-//! [`requirements`](GraphTemplate::requirements), checked together by the apply
-//! engine so one failed application names every unmet one.
+//! Graph-template declarations, structural validation, and interpolation.
+//! Repository configuration supplies the node types, roles, and bindings.
+//! Application checks declared prerequisites through [`GraphTemplate::requirements`].
 
 use crate::config::DocumentationConfig;
 use crate::domain::artifact_directory::{resolve_artifact_directory, ArtifactDirectoryError};
@@ -35,30 +8,15 @@ use crate::domain::identity::{GateKey, IssueId};
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Issue, State};
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::domain::vocabulary::wire_vocabulary;
-use crate::repository_state::{RepositoryLayout, RepositoryLayoutError, VirtualPath};
 
-/// Errors that can occur while loading and validating `.jit/templates.toml`.
+/// Invalid graph-template declarations.
 #[derive(Debug, Error)]
 pub enum TemplateConfigError {
-    /// The repository layout could not resolve the templates path.
-    #[error(transparent)]
-    Layout(#[from] RepositoryLayoutError),
-
-    /// The templates file could not be read from disk.
-    #[error("failed to read templates file '{path}': {source}")]
-    Io {
-        /// Path that failed to read.
-        path: PathBuf,
-        /// Underlying I/O error.
-        source: std::io::Error,
-    },
-
     /// The templates file is not valid TOML or does not match the schema.
     #[error("failed to parse templates file: {0}")]
     Toml(#[from] toml::de::Error),
@@ -241,9 +199,8 @@ impl std::error::Error for TemplatePrerequisitesUnmetError {}
 /// A loaded, validated set of graph templates from `.jit/templates.toml`, plus
 /// the repository's [`RoleBindings`] and [`AnchorBindings`].
 ///
-/// Built by [`TemplateRegistry::load`] (file → registry) or
-/// [`TemplateRegistry::from_toml_str`] (string → registry). An absent file
-/// yields an empty registry with default bindings.
+/// Built by [`TemplateRegistry::from_toml_str`] or configuration assembly.
+/// An empty registry carries default bindings.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TemplateRegistry {
     /// Repository names for the node roles the bracket tooling reaches for
@@ -477,27 +434,6 @@ impl TemplateRegistry {
         self.templates
             .iter()
             .find(|t| t.applies_to.iter().any(|ty| ty == container_type))
-    }
-
-    /// Load and validate `.jit/templates.toml` relative to the given `.jit` root.
-    ///
-    /// Returns an empty registry when the file does not exist. `hierarchy_types`
-    /// is the configured `[type_hierarchy].types` key set, against which
-    /// `applies_to` types are checked; pass an empty slice to skip the type check
-    /// (when no hierarchy is configured).
-    pub fn load<S: AsRef<str>>(
-        layout: &RepositoryLayout,
-        hierarchy_types: &[S],
-    ) -> Result<Self, TemplateConfigError> {
-        let path = layout.resolve(&VirtualPath::TEMPLATES)?;
-        if !path.exists() {
-            return Ok(Self::empty());
-        }
-        let content = std::fs::read_to_string(&path).map_err(|source| TemplateConfigError::Io {
-            path: path.clone(),
-            source,
-        })?;
-        Self::from_toml_str(&content, hierarchy_types)
     }
 
     /// Parse and validate a `templates.toml` string.
@@ -957,7 +893,6 @@ fn extract_hard_criteria(description: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
 
     /// An epic bracketed by a template whose planning node declares a plan
     /// location, with its planning and breakdown nodes.
@@ -1256,43 +1191,9 @@ applies_to  = ["epic"]
         assert!(reg.get("nope").is_none());
     }
 
-    // REGA-02: load-time behavior.
-
     #[test]
-    fn test_load_missing_file_is_empty_registry() {
-        let dir = TempDir::new().unwrap();
-        let reg = TemplateRegistry::load(
-            &crate::test_utils::repository_layout_for_data_root(dir.path()),
-            &HIERARCHY,
-        )
-        .unwrap();
-        assert!(reg.templates.is_empty());
-    }
-
-    #[test]
-    fn test_load_valid_file_from_disk() {
-        let dir = TempDir::new().unwrap();
-        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
-        std::fs::write(
-            layout.resolve(&VirtualPath::TEMPLATES).unwrap(),
-            plan_template_toml(),
-        )
-        .unwrap();
-        let reg = TemplateRegistry::load(&layout, &HIERARCHY).unwrap();
-        assert_eq!(reg.templates.len(), 1);
-        assert_eq!(reg.templates[0].name, "plan");
-    }
-
-    #[test]
-    fn test_malformed_toml_errors() {
-        let dir = TempDir::new().unwrap();
-        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
-        std::fs::write(
-            layout.resolve(&VirtualPath::TEMPLATES).unwrap(),
-            "[[template",
-        )
-        .unwrap();
-        let err = TemplateRegistry::load(&layout, &HIERARCHY).unwrap_err();
+    fn test_from_toml_str_malformed_syntax_is_typed_error() {
+        let err = TemplateRegistry::from_toml_str("[[template", &HIERARCHY).unwrap_err();
         assert!(matches!(err, TemplateConfigError::Toml(_)));
     }
 

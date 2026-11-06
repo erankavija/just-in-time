@@ -4,6 +4,7 @@
 //! directory's basename, idempotency of an already-declared name, and
 //! `jit config validate` rejecting an invalid `[project] name`.
 
+use jit::storage::configuration_store::load_configuration;
 use jit::test_cli::JitCli;
 use std::fs;
 use tempfile::{Builder, TempDir};
@@ -82,7 +83,7 @@ fn test_init_seeded_project_name_round_trips_through_jitconfig_load() {
     );
     cli.run(["init"]).unwrap();
 
-    let config = jit::config::JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+    let config = load_configuration(&jit::test_utils::repository_layout_for_data_root(
         &cli.root().join(".jit"),
     ))
     .unwrap();

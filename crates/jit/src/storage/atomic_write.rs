@@ -1,27 +1,28 @@
 //! The shared file-write primitives: the file publication core
-//! ([`publish_file`]) and its stage writer, durability ([`write_file_synced`],
-//! [`sync_directory`]), and no-replace rename.
+//! ([`publish_file`]) and its stage writer, the control-file entries over it,
+//! directory durability, and no-replace rename.
 //!
-//! A caller that must not proceed until its bytes survive a crash reaches the
-//! synced operations. The module lives in the storage layer because persistence
-//! is storage's responsibility: command/validation/output callers produce
-//! content and hand it here rather than touching the filesystem themselves.
+//! The module lives in the storage layer because persistence is storage's
+//! responsibility: command/validation/output callers produce content and hand
+//! it here rather than touching the filesystem themselves.
 //!
-//! Every item here is `pub(in crate::storage)`. Publication into a repository
-//! root belongs to the mutation-session API, so `crate::commands` must not be
-//! able to name these primitives at all; the compiler, not a source-text guard,
-//! enforces that. Export publication to a caller-chosen path outside the
-//! repository roots lives in [`super::external_publish`], which reaches these
-//! primitives from inside `crate::storage`.
+//! Every item here except [`ControlFile`] and [`publish_control_file`] is
+//! `pub(in crate::storage)`. Publication into a repository root belongs to the
+//! mutation-session API, so `crate::commands` must not be able to name these
+//! primitives at all; the compiler, not a source-text guard, enforces that. The
+//! crate-visible entry writes only the data-root leaves [`ControlFile`] closes
+//! over. Export publication to a caller-chosen path outside the repository roots
+//! lives in [`super::external_publish`], which reaches these primitives from
+//! inside `crate::storage`.
 
-use crate::repository_state::FileMode;
+use crate::repository_state::{FileMode, VirtualPath};
+use crate::storage::worktree_paths::WorktreePaths;
 use anyhow::{Context, Result};
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, OpenOptions};
 use std::ffi::OsStr;
-use std::fs;
-use std::io::{Read, Write};
-use std::path::Path;
+use std::io::Read;
+use std::path::{Component, Path};
 
 /// How much of a publication's durability [`publish_file`] completes itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,6 +31,10 @@ pub(in crate::storage) enum Durability {
     Full,
     /// Sync the staged file; the caller syncs the parent directory.
     Deferred,
+    /// Sync nothing, for tests whose subject is coordination rather than
+    /// crash durability.
+    #[cfg(test)]
+    Unsynced,
 }
 
 /// Replace `leaf` in `parent` with `bytes` under `mode`.
@@ -38,8 +43,9 @@ pub(in crate::storage) enum Durability {
 /// rename that persists names durable bytes, and a crash leaves the target
 /// holding either its previous content or `bytes` (`@/inv/atomic-writes`). The
 /// rename itself persists once the parent directory is synced, which `Full`
-/// does here and `Deferred` leaves to the caller. `before_rename` runs between
-/// the synced stage and the rename: it is the caller's last refusal.
+/// does here and `Deferred` leaves to the caller; a test's `Unsynced` syncs
+/// neither. `before_rename` runs between the synced stage and the rename: it
+/// is the caller's last refusal.
 ///
 /// # Errors
 ///
@@ -55,7 +61,12 @@ pub(in crate::storage) fn publish_file<E: From<std::io::Error>>(
     before_rename: impl FnOnce() -> Result<(), E>,
 ) -> Result<(), E> {
     let stage = unique_stage_name();
-    write_staged_file(parent, &stage, bytes, mode)
+    create_staged_file(parent, &stage, bytes, mode)
+        .and_then(|file| match durability {
+            #[cfg(test)]
+            Durability::Unsynced => Ok(()),
+            _ => file.sync_all(),
+        })
         .map_err(E::from)
         .and_then(|()| before_rename())
         .and_then(|()| {
@@ -69,6 +80,151 @@ pub(in crate::storage) fn publish_file<E: From<std::io::Error>>(
     match durability {
         Durability::Full => sync_capability_directory(parent).map_err(E::from),
         Durability::Deferred => Ok(()),
+        #[cfg(test)]
+        Durability::Unsynced => Ok(()),
+    }
+}
+
+/// A machine-local file jit publishes directly in the data root, outside the
+/// repository state the redo record carries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ControlFile {
+    /// The identity of the data root's one checkout.
+    WorktreeIdentity,
+    /// The running server's process record.
+    ServerPid,
+}
+
+impl ControlFile {
+    fn path(self) -> VirtualPath {
+        match self {
+            Self::WorktreeIdentity => VirtualPath::WORKTREE_IDENTITY,
+            Self::ServerPid => VirtualPath::SERVER_PID,
+        }
+    }
+}
+
+/// Replace `file` in the data root at `data_root` with `bytes`, fully durable.
+///
+/// # Errors
+///
+/// Fails when `data_root` is relative, absent or reached through a link, or
+/// when [`publish_file`] fails.
+pub(crate) fn publish_control_file(
+    data_root: &Path,
+    file: ControlFile,
+    bytes: &[u8],
+) -> Result<()> {
+    let leaf = file.path();
+    let root = super::capability_fs::open_absolute_dir_nofollow(data_root)
+        .with_context(|| format!("opening data root {}", data_root.display()))?;
+    publish_file(
+        &root,
+        leaf.relative().as_path(),
+        bytes,
+        FileMode::Regular,
+        Durability::Full,
+        || Ok::<(), std::io::Error>(()),
+    )
+    .with_context(|| {
+        format!(
+            "publishing {}",
+            data_root.join(leaf.relative().as_path()).display()
+        )
+    })
+}
+
+/// Replace `target`, a file under one of `paths`' git control directories
+/// ([`WorktreePaths::git_control_dirs`]), with `bytes`. Callers pass
+/// `Durability::Full`, or `Unsynced` in a test.
+///
+/// The control directories lie outside every repository root, so the parent is
+/// opened following links; it must exist. `before_rename` is
+/// [`publish_file`]'s last refusal.
+///
+/// # Errors
+///
+/// Fails when `target` lies outside the control directories, its parent is
+/// absent, or [`publish_file`] fails.
+pub(in crate::storage) fn publish_git_control_file(
+    paths: &WorktreePaths,
+    target: &Path,
+    bytes: &[u8],
+    durability: Durability,
+    before_rename: impl FnOnce() -> Result<()>,
+) -> Result<()> {
+    let (parent, leaf) = open_git_control_parent(paths, target)?;
+    publish_file(
+        &parent,
+        leaf,
+        bytes,
+        FileMode::Regular,
+        durability,
+        before_rename,
+    )
+    .with_context(|| format!("publishing {}", target.display()))
+}
+
+/// Remove `target`, a file under one of `paths`' git control directories, and
+/// sync its directory unless `durability` is `Unsynced`; an absent file is
+/// already removed.
+///
+/// # Errors
+///
+/// Fails when `target` lies outside the control directories, its parent is
+/// absent, or the removal or the sync fails.
+pub(in crate::storage) fn remove_git_control_file(
+    paths: &WorktreePaths,
+    target: &Path,
+    durability: Durability,
+) -> Result<()> {
+    let (parent, leaf) = open_git_control_parent(paths, target)?;
+    match parent.remove_file(leaf) {
+        Ok(()) => sync_directory_for(&parent, durability),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
+    .with_context(|| format!("removing {}", target.display()))
+}
+
+/// The parent of `target`, opened following links, and its leaf name, once
+/// `target` is shown to lie beneath one of `paths`' git control directories.
+fn open_git_control_parent<'t>(
+    paths: &WorktreePaths,
+    target: &'t Path,
+) -> Result<(Dir, &'t OsStr)> {
+    let beneath = |dir: &Path| {
+        target.strip_prefix(dir).is_ok_and(|rest| {
+            rest.components().next().is_some()
+                && rest
+                    .components()
+                    .all(|component| matches!(component, Component::Normal(_)))
+        })
+    };
+    let (Some(parent), Some(leaf)) = (target.parent(), target.file_name()) else {
+        anyhow::bail!("{} names no control file", target.display());
+    };
+    if !paths.git_control_dirs().any(|dir| beneath(&dir)) {
+        anyhow::bail!(
+            "{} lies outside the git control directories",
+            target.display()
+        );
+    }
+    let parent =
+        open_dir_following(parent).with_context(|| format!("opening {}", parent.display()))?;
+    Ok((parent, leaf))
+}
+
+/// Open the directory at `path`, following links, as a handle that can be
+/// synced; `Dir::open_ambient_dir` yields one fsync refuses.
+pub(in crate::storage) fn open_dir_following(path: &Path) -> std::io::Result<Dir> {
+    let directory = std::fs::File::open(path)?;
+    match directory.metadata()?.is_dir() {
+        true => Ok(Dir::from_std_file(directory)),
+        false => Err(std::io::Error::new(
+            std::io::ErrorKind::NotADirectory,
+            format!("{} is not a directory", path.display()),
+        )),
     }
 }
 
@@ -94,19 +250,28 @@ pub(in crate::storage) fn is_stage_name(name: &str) -> bool {
         .is_some_and(|id| uuid::Uuid::try_parse(id).is_ok())
 }
 
-/// Write `content` under `mode` as a new file named `leaf` and return once it
-/// is durable. Every staged file in storage is written here, whichever
-/// publication writes it.
+/// [`create_staged_file`], returning once the file is durable.
+pub(in crate::storage) fn write_staged_file(
+    parent: &Dir,
+    leaf: impl AsRef<Path>,
+    content: impl Read,
+    mode: FileMode,
+) -> std::io::Result<()> {
+    create_staged_file(parent, leaf, content, mode)?.sync_all()
+}
+
+/// Write `content` under `mode` as a new file named `leaf`, unsynced. Every
+/// staged file in storage is created here, whichever publication writes it.
 ///
 /// The open creates the file or fails: an occupied name is never opened
 /// through, so no symlink carries the bytes elsewhere and no occupant is
 /// truncated (`@/inv/atomic-writes`).
-pub(in crate::storage) fn write_staged_file(
+fn create_staged_file(
     parent: &Dir,
     leaf: impl AsRef<Path>,
     mut content: impl Read,
     mode: FileMode,
-) -> std::io::Result<()> {
+) -> std::io::Result<cap_std::fs::File> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     options._cap_fs_ext_follow(FollowSymlinks::No);
@@ -116,7 +281,7 @@ pub(in crate::storage) fn write_staged_file(
     file.set_permissions(permissions(mode))?;
     #[cfg(not(unix))]
     let _ = mode;
-    file.sync_all()
+    Ok(file)
 }
 
 /// The permission bits a staged file carries.
@@ -130,37 +295,22 @@ fn permissions(mode: FileMode) -> cap_std::fs::Permissions {
     })
 }
 
-/// Write `content` to `path`, truncating it, and return once those bytes are on
-/// the device.
-///
-/// An interrupted write leaves a prefix of `content`, never a mix with what the
-/// path held. A caller that creates the file needs [`sync_directory`] on the
-/// parent naming it.
-pub(in crate::storage) fn write_file_synced(path: &Path, content: &[u8]) -> Result<()> {
-    let mut file = fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(path)
-        .with_context(|| format!("opening {}", path.display()))?;
-    file.write_all(content)
-        .with_context(|| format!("writing {}", path.display()))?;
-    file.sync_all()
-        .with_context(|| format!("syncing {}", path.display()))
-}
-
-/// Fsync the directory at `path`, so entries created, renamed or removed in it
-/// survive a crash; a file's own bytes need one of the synced writes.
-pub(in crate::storage) fn sync_directory(path: &Path) -> Result<()> {
-    fs::File::open(path)
-        .and_then(|directory| directory.sync_all())
-        .with_context(|| format!("syncing directory {}", path.display()))
-}
-
-/// [`sync_directory`] for a caller holding the directory as a capability rather
-/// than as a path.
+/// Fsync `directory`, so entries created, renamed or removed in it survive a
+/// crash; a file's own bytes need their own sync.
 pub(in crate::storage) fn sync_capability_directory(directory: &Dir) -> std::io::Result<()> {
     directory.try_clone()?.into_std_file().sync_all()
+}
+
+/// [`sync_capability_directory`], skipped for `Unsynced`.
+pub(in crate::storage) fn sync_directory_for(
+    directory: &Dir,
+    durability: Durability,
+) -> std::io::Result<()> {
+    match durability {
+        #[cfg(test)]
+        Durability::Unsynced => Ok(()),
+        _ => sync_capability_directory(directory),
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -446,56 +596,89 @@ mod tests {
         );
     }
 
-    /// A character device the kernel refuses to fsync, so a call reporting that
-    /// refusal is a call that reached fsync rather than one that only opened the
-    /// path. Linux-only: the refusal is this kernel's contract.
-    #[cfg(target_os = "linux")]
-    const UNSYNCABLE: &str = "/dev/null";
-
+    #[cfg(unix)]
     #[test]
-    fn test_write_file_synced_writes_the_bytes_it_was_given() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("redo.record");
-        let content = [0, 159, 146, 150, 255];
+    fn test_publish_control_file_refuses_a_symlinked_data_root() {
+        let directory = TempDir::new().unwrap();
+        let real = directory.path().join("real");
+        std::fs::create_dir(&real).unwrap();
+        let linked = directory.path().join(".jit");
+        std::os::unix::fs::symlink(&real, &linked).unwrap();
 
-        write_file_synced(&path, &content).unwrap();
+        let outcome = publish_control_file(&linked, ControlFile::ServerPid, b"published");
 
-        assert_eq!(std::fs::read(&path).unwrap(), content);
-    }
-
-    #[test]
-    fn test_write_file_synced_leaves_no_bytes_of_a_longer_predecessor() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("redo.record");
-        write_file_synced(&path, b"a considerably longer predecessor").unwrap();
-
-        write_file_synced(&path, b"short").unwrap();
-
-        assert_eq!(std::fs::read(&path).unwrap(), b"short".to_vec());
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn test_write_file_synced_reports_a_sync_the_kernel_refuses() {
         assert!(
-            write_file_synced(Path::new(UNSYNCABLE), b"bytes").is_err(),
-            "the write returned before the bytes were synced"
+            outcome.is_err(),
+            "the publication followed the data root link"
         );
+        assert!(entries(&real).is_empty());
     }
 
     #[test]
-    fn test_sync_directory_accepts_the_directory_it_is_given() {
-        let dir = tempfile::tempdir().unwrap();
+    fn test_publish_control_file_over_an_absent_data_root_creates_nothing() {
+        let directory = TempDir::new().unwrap();
+        let data_root = directory.path().join(".jit");
 
-        sync_directory(dir.path()).unwrap();
+        let outcome = publish_control_file(&data_root, ControlFile::WorktreeIdentity, b"published");
+
+        assert!(outcome.is_err());
+        assert!(!data_root.exists(), "the publication created the data root");
     }
 
-    #[cfg(target_os = "linux")]
+    fn publish_git(paths: &WorktreePaths, target: &Path) -> Result<()> {
+        publish_git_control_file(paths, target, b"published", Durability::Full, || Ok(()))
+    }
+
     #[test]
-    fn test_sync_directory_reports_a_sync_the_kernel_refuses() {
-        assert!(
-            sync_directory(Path::new(UNSYNCABLE)).is_err(),
-            "the directory sync returned without reaching fsync"
+    fn test_publish_git_control_file_refuses_a_target_outside_the_control_directories() {
+        let directory = TempDir::new().unwrap();
+        let paths = crate::test_utils::primary_checkout_paths(directory.path());
+        std::fs::create_dir_all(&paths.shared_jit).unwrap();
+        let outside = [
+            paths.local_jit.join("worktree.json"),
+            paths.common_dir.join("config"),
+            paths.shared_jit.join("../config"),
+            paths.shared_jit.clone(),
+        ];
+
+        for target in outside {
+            assert!(
+                publish_git(&paths, &target).is_err(),
+                "{}",
+                target.display()
+            );
+        }
+        assert!(entries(&paths.shared_jit).is_empty());
+        assert_eq!(entries(&paths.common_dir), HashSet::from(["jit".into()]));
+    }
+
+    #[test]
+    fn test_publish_git_control_file_into_an_absent_directory_creates_nothing() {
+        let directory = TempDir::new().unwrap();
+        let paths = crate::test_utils::primary_checkout_paths(directory.path());
+        std::fs::create_dir_all(&paths.shared_jit).unwrap();
+        let leases = paths.shared_jit.join("leases");
+
+        assert!(publish_git(&paths, &leases.join("lease.json")).is_err());
+        assert!(!leases.exists(), "the publication created its parent");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_publish_git_control_file_follows_a_linked_control_directory() {
+        let directory = TempDir::new().unwrap();
+        let paths = crate::test_utils::primary_checkout_paths(directory.path());
+        let elsewhere = directory.path().join("elsewhere");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        std::fs::create_dir_all(&paths.common_dir).unwrap();
+        std::os::unix::fs::symlink(&elsewhere, &paths.shared_jit).unwrap();
+
+        publish_git(&paths, &paths.shared_jit.join("claims.seq")).unwrap();
+
+        assert_eq!(
+            std::fs::read(elsewhere.join("claims.seq")).unwrap(),
+            b"published"
         );
+        assert_eq!(entries(&elsewhere), HashSet::from(["claims.seq".into()]));
     }
 }

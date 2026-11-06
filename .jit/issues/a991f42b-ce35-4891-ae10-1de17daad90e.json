@@ -9,6 +9,8 @@
   ],
   "description": "Aggregate the storage work: shared captured images, per-record parent handling in redo apply, one no-follow primitive module and one atomic file-publication function.\n\n## Success Criteria\n\n- [hard] REQ-01: Capture rounds and materialization plans share the captured image without copying it, and a session recognises its own image by an identity token.\n- [hard] REQ-02: Redo apply opens each distinct parent directory once per record, and coalesces directory syncs per parent only if the interruption proof holds; otherwise its rustdoc states why per-operation syncs remain.\n- [hard] REQ-03: The no-follow primitives live in one storage module with no import cycle, the leaf-open sequence exists once, and record commit goes through capability handles.\n- [hard] REQ-04: One atomic file-publication function with an explicit durability argument publishes lease records, the claims sequence counter, external exports, worktree identity and the server PID file, each with a unique temporary name.\n",
   "documents": [],
+  "done_at": "2026-11-06T02:52:29.396130564Z",
+  "first_ready_at": "2026-11-06T02:52:03.980752331Z",
   "gates_required": [],
   "gates_status": {},
   "id": "a991f42b-ce35-4891-ae10-1de17daad90e",
@@ -24,7 +26,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Storage primitives exist once and redo apply touches each parent once",
-  "updated_at": "2026-10-24T21:22:37.717854234Z"
+  "updated_at": "2026-11-06T02:52:29.396130564Z"
 }

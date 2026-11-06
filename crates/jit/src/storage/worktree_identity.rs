@@ -7,7 +7,9 @@
 
 use crate::domain::identity::WorktreeId;
 use crate::repository_state::VirtualPath;
-use crate::storage::atomic_write::{sync_directory, write_file_synced};
+use crate::storage::atomic_write::{
+    publish_control_file, publish_git_control_file, ControlFile, Durability,
+};
 use crate::storage::lock::{FileLocker, LockGuard};
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{RepositoryNotFoundError, StorageWarning};
@@ -18,8 +20,6 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The directory under a checkout's git directory holding its identity.
-const GIT_DIR_IDENTITY_DIR: &str = "jit";
 /// Serializes identity changes for one checkout over a store outside every checkout.
 const GIT_DIR_IDENTITY_LOCK: &str = "worktree.lock";
 
@@ -83,7 +83,7 @@ pub fn generate_worktree_id(path: &Path, created_at: DateTime<Utc>) -> Result<Wo
 /// - Update `root` to current path
 /// - Set `relocated_at` timestamp
 /// - Preserve `worktree_id` (stable across moves)
-/// - Write atomically (temp file + rename)
+/// - Publish the record fully durable
 ///
 /// # Arguments
 ///
@@ -122,8 +122,8 @@ pub fn load_or_create_worktree_identity_with_warnings(
     let _guard = lock_git_dir_identity(paths)?;
     let current_root = paths.checkout_top_level().to_string_lossy().to_string();
 
-    if wt_file.exists() {
-        let mut identity = read_identity(&wt_file)?;
+    if wt_file.path().exists() {
+        let mut identity = read_identity(wt_file.path())?;
         if identity.root == current_root {
             return Ok((identity, Vec::new()));
         }
@@ -135,10 +135,10 @@ pub fn load_or_create_worktree_identity_with_warnings(
             }];
             identity.root = current_root;
             identity.relocated_at = Some(Utc::now());
-            write_identity_atomic(&wt_file, &identity)?;
+            write_identity_atomic(paths, &wt_file, &identity)?;
             return Ok((identity, warnings));
         }
-        fs::remove_file(&wt_file).context("Failed to remove copied worktree identity")?;
+        fs::remove_file(wt_file.path()).context("Failed to remove copied worktree identity")?;
     }
 
     let now = Utc::now();
@@ -150,7 +150,7 @@ pub fn load_or_create_worktree_identity_with_warnings(
         created_at: now,
         relocated_at: None,
     };
-    write_identity_atomic(&wt_file, &identity)?;
+    write_identity_atomic(paths, &wt_file, &identity)?;
 
     Ok((identity, Vec::new()))
 }
@@ -176,27 +176,40 @@ fn is_copied_identity(paths: &WorktreePaths, identity: &WorktreeIdentity) -> boo
         })
 }
 
-/// The one resolution of a checkout's identity file; see the module docs.
-fn identity_file(paths: &WorktreePaths) -> Result<PathBuf> {
-    if let Some(git_dir) = paths.checkout_git_dir() {
-        let file = VirtualPath::WORKTREE_IDENTITY;
-        return Ok(git_dir
-            .join(GIT_DIR_IDENTITY_DIR)
-            .join(file.relative().as_str()));
+/// Where a checkout's identity file lives; see the module docs.
+enum IdentityFile {
+    /// Under the checkout's own git directory.
+    GitDir(PathBuf),
+    /// In the data root.
+    DataRoot(PathBuf),
+}
+
+impl IdentityFile {
+    fn path(&self) -> &Path {
+        match self {
+            Self::GitDir(path) | Self::DataRoot(path) => path,
+        }
+    }
+}
+
+/// The one resolution of a checkout's identity file.
+fn identity_file(paths: &WorktreePaths) -> Result<IdentityFile> {
+    let leaf = VirtualPath::WORKTREE_IDENTITY;
+    if let Some(home) = paths.checkout_control_dir() {
+        return Ok(IdentityFile::GitDir(home.join(leaf.relative().as_path())));
     }
     crate::storage::repository_state_store::DataReadSession::open(&paths.local_jit)?;
-    Ok(paths
-        .local_jit
-        .join(VirtualPath::WORKTREE_IDENTITY.relative().as_path()))
+    Ok(IdentityFile::DataRoot(
+        paths.local_jit.join(leaf.relative().as_path()),
+    ))
 }
 
 /// Lock the identity of a checkout keeping it in its git directory, creating
 /// that directory's identity home. Other layouts take no lock.
 fn lock_git_dir_identity(paths: &WorktreePaths) -> Result<Option<LockGuard>> {
     paths
-        .checkout_git_dir()
-        .map(|git_dir| {
-            let home = git_dir.join(GIT_DIR_IDENTITY_DIR);
+        .checkout_control_dir()
+        .map(|home| {
             fs::create_dir_all(&home).context("Failed to create worktree identity directory")?;
             FileLocker::with_configured_timeout().lock_exclusive(&home.join(GIT_DIR_IDENTITY_LOCK))
         })
@@ -220,34 +233,29 @@ pub fn read_worktree_id(paths: &WorktreePaths) -> Result<Option<WorktreeId>> {
         return Ok(None);
     }
     let wt_file = identity_file(paths)?;
-    if !wt_file.exists() {
+    if !wt_file.path().exists() {
         return Ok(None);
     }
-    Ok(Some(read_identity(&wt_file)?.worktree_id))
+    Ok(Some(read_identity(wt_file.path())?.worktree_id))
 }
 
-/// Write worktree identity atomically using temp file + rename pattern.
-///
-/// This ensures the file is never in a partially written state, even if
-/// the process crashes mid-write. The identity outlives a crash: its bytes and
-/// the rename that publishes them go through the shared synced operations.
-fn write_identity_atomic(path: &Path, identity: &WorktreeIdentity) -> Result<()> {
+/// Publish `identity` at `file`, fully durable, through the entry its location
+/// takes.
+fn write_identity_atomic(
+    paths: &WorktreePaths,
+    file: &IdentityFile,
+    identity: &WorktreeIdentity,
+) -> Result<()> {
     let json =
-        serde_json::to_string_pretty(identity).context("Failed to serialize worktree identity")?;
-
-    // Create temp file in the same directory as target (required for atomic rename)
-    let parent = path.parent().context("No parent directory")?;
-    let temp_file =
-        tempfile::NamedTempFile::new_in(parent).context("Failed to create temp file")?;
-
-    write_file_synced(temp_file.path(), json.as_bytes())?;
-
-    // Atomic rename (persist handles cross-filesystem moves if needed)
-    temp_file
-        .persist(path)
-        .context("Failed to persist temp file")?;
-
-    sync_directory(parent)
+        serde_json::to_vec_pretty(identity).context("Failed to serialize worktree identity")?;
+    match file {
+        IdentityFile::GitDir(path) => {
+            publish_git_control_file(paths, path, &json, Durability::Full, || Ok(()))
+        }
+        IdentityFile::DataRoot(_) => {
+            publish_control_file(&paths.local_jit, ControlFile::WorktreeIdentity, &json)
+        }
+    }
 }
 
 /// Hex encoding helper (since we don't want to add hex crate dependency)
@@ -357,15 +365,12 @@ mod tests {
             created_at: Utc::now(),
             relocated_at: None,
         };
-        let layout = crate::storage::discover_repository_layout(temp.path(), &jit_dir).unwrap();
-        let identity_path = layout.resolve(&VirtualPath::WORKTREE_IDENTITY).unwrap();
-        write_identity_atomic(&identity_path, &stored).unwrap();
-
         let new_root = temp.path().to_path_buf();
         let paths = crate::storage::worktree_paths::WorktreePaths::detect_for_data_root(
             &jit_dir, &new_root,
         )
         .unwrap();
+        write_identity_atomic(&paths, &identity_file(&paths).unwrap(), &stored).unwrap();
         let (identity, warnings) =
             load_or_create_worktree_identity_with_warnings(&paths, "main").unwrap();
 

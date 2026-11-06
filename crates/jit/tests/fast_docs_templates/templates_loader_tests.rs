@@ -1,13 +1,12 @@
 //! Integration tests for the `.jit/templates.toml` loader wired into config
 //! load (issue 45e7f203, REGA-02).
 //!
-//! These exercise `JitConfig::load` end-to-end against a tempdir-backed `.jit/`
+//! These exercise `load_configuration` end-to-end against a tempdir-backed `.jit/`
 //! so the full config-load path runs the template registry's load-time
 //! validation. All fixtures live in isolated `TempDir`s — never the production
 //! `.jit/`.
 
-use jit::config::JitConfig;
-use jit::templates::TemplateRegistry;
+use jit::storage::configuration_store::load_configuration;
 use jit::test_utils::declaration_dir;
 
 const CONFIG_WITH_HIERARCHY: &str = r#"
@@ -56,24 +55,17 @@ fn test_config_load_succeeds_with_valid_templates() {
     ])
     .unwrap();
     // Config load runs template validation; a valid file must not error.
-    JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+    let config = load_configuration(&jit::test_utils::repository_layout_for_data_root(
         temp.path(),
     ))
     .expect("valid templates.toml must load");
-
-    // And the registry itself loads with the same hierarchy.
-    let reg = TemplateRegistry::load(
-        &jit::test_utils::repository_layout_for_data_root(temp.path()),
-        &["epic", "planning", "breakdown"],
-    )
-    .unwrap();
-    assert!(reg.get("plan").is_some());
+    assert!(config.templates.get("plan").is_some());
 }
 
 #[test]
 fn test_config_load_succeeds_without_templates_file() {
     let temp = declaration_dir(&[("config.toml", CONFIG_WITH_HIERARCHY)]).unwrap();
-    JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+    load_configuration(&jit::test_utils::repository_layout_for_data_root(
         temp.path(),
     ))
     .expect("absent templates.toml is fine");
@@ -93,7 +85,7 @@ applies_to = ["bogus"]
         ("templates.toml", bad),
     ])
     .unwrap();
-    let err = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+    let err = load_configuration(&jit::test_utils::repository_layout_for_data_root(
         temp.path(),
     ))
     .unwrap_err();
@@ -128,7 +120,7 @@ depends_on = ["a"]
         ("templates.toml", bad),
     ])
     .unwrap();
-    let err = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+    let err = load_configuration(&jit::test_utils::repository_layout_for_data_root(
         temp.path(),
     ))
     .unwrap_err();
@@ -160,7 +152,7 @@ role = "planning"
         ("templates.toml", bad),
     ])
     .unwrap();
-    let err = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+    let err = load_configuration(&jit::test_utils::repository_layout_for_data_root(
         temp.path(),
     ))
     .unwrap_err();
@@ -183,7 +175,7 @@ fn test_config_load_fails_on_malformed_templates_toml() {
     ])
     .unwrap();
     assert!(
-        JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+        load_configuration(&jit::test_utils::repository_layout_for_data_root(
             temp.path()
         ))
         .is_err()

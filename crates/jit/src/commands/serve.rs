@@ -15,6 +15,7 @@ use std::time::{Duration, Instant};
 
 use crate::process;
 use crate::repository_state::{RepositoryLayout, VirtualPath};
+use crate::storage::atomic_write::{publish_control_file, ControlFile};
 use anyhow::{bail, Context, Result};
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -137,14 +138,11 @@ pub fn read_pid_file(layout: &RepositoryLayout) -> Result<Option<ServerPidFile>>
     Ok(Some(pf))
 }
 
-/// Writes the PID file atomically (temp → rename).
+/// Publishes the PID file in the data root, durable once this returns.
 pub fn write_pid_file(layout: &RepositoryLayout, pf: &ServerPidFile) -> Result<()> {
-    let path = pid_file_path(layout)?;
-    let tmp = path.with_extension("pid.tmp");
-    let json = serde_json::to_string_pretty(pf).context("Failed to serialise PID file")?;
-    std::fs::write(&tmp, json).context("Failed to write PID file tmp")?;
-    std::fs::rename(&tmp, &path).context("Failed to rename PID file")?;
-    Ok(())
+    let json = serde_json::to_vec_pretty(pf).context("Failed to serialise PID file")?;
+    publish_control_file(layout.data_root(), ControlFile::ServerPid, &json)
+        .context("Failed to write PID file")
 }
 
 /// Removes the PID file, ignoring "not found" errors.
@@ -908,10 +906,10 @@ mod tests {
     }
 
     #[test]
-    fn test_write_pid_file_is_atomic() {
-        // The tmp file must not linger after a successful write.
+    fn test_write_pid_file_publishes_past_a_leftover_staging_directory() {
         let tmp = TempDir::new().unwrap();
         let data_dir = tmp.path();
+        std::fs::create_dir(test_pid_path(data_dir).with_extension("pid.tmp")).unwrap();
         let pf = ServerPidFile {
             pid: 1,
             port: 3001,
@@ -919,12 +917,10 @@ mod tests {
             data_dir: data_dir.to_path_buf(),
             log_file: test_log_path(data_dir),
         };
+
         write_test_pid_file(data_dir, &pf);
-        let tmp_path = test_pid_path(data_dir).with_extension("pid.tmp");
-        assert!(
-            !tmp_path.exists(),
-            "tmp file should be removed after rename"
-        );
+
+        assert_eq!(read_test_pid_file(data_dir).unwrap(), Some(pf));
     }
 
     #[test]
@@ -1669,26 +1665,29 @@ mod tests {
                 announced_pid.display()
             ),
         );
-        // Block write_pid_file by placing a directory where its atomic write
-        // stages the record. Writing a regular file over a directory fails, so
-        // the start reaches its orphan-cleanup path with the child already
-        // spawned. The blocker sits on the staging path rather than on the
-        // final one, which `start_server` reads before it spawns anything: a
-        // directory there is a PID file it cannot parse, and the start fails at
-        // that first read having spawned nothing at all.
-        let pid_path = test_pid_path(data_dir);
-        let staging_blocker = pid_path.with_extension("pid.tmp");
-        std::fs::create_dir_all(&staging_blocker).unwrap();
-
         // Readiness answers "serving" once the child has announced its PID, so
         // the start reaches the PID write with the child established and the
-        // announcement already readable — no interval separates the two.
+        // announcement already readable — no interval separates the two. It
+        // first puts a non-empty directory in the record's place, which the
+        // publication's rename cannot replace; before the spawn, `start_server`
+        // reads the record, so the blocker cannot exist any earlier.
+        let pid_path = test_pid_path(data_dir);
+        let block_record = || {
+            std::fs::create_dir_all(&pid_path).unwrap();
+            std::fs::write(pid_path.join("held"), b"").unwrap();
+        };
         let child_pid = || {
             std::fs::read_to_string(&announced_pid)
                 .ok()
                 .and_then(|announced| announced.trim().parse::<u32>().ok())
         };
-        let serving_once_announced = |_port: u16| child_pid().is_some();
+        let serving_once_announced = |_port: u16| {
+            let announced = child_pid().is_some();
+            if announced {
+                block_record();
+            }
+            announced
+        };
 
         let result = start_server(
             opts_for(data_dir, fake_server),
@@ -1701,12 +1700,8 @@ mod tests {
             "error should relate to PID persistence, got: {msg}"
         );
         assert!(
-            !pid_path.exists(),
+            pid_path.join("held").exists(),
             "no record may be published when the start could not persist one"
-        );
-        assert!(
-            staging_blocker.is_dir(),
-            "the blocker should still be there — no record was staged past it"
         );
         // The kill is followed by a reap inside `start_server`, so the process
         // is already gone by the time it returns.

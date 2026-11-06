@@ -172,35 +172,6 @@ fn test_relocation_detection_updates_path() {
 }
 
 #[test]
-fn test_atomic_write_on_relocation() {
-    let temp_dir = TempDir::new().unwrap();
-    let jit_dir = temp_dir.path().join(".jit");
-    fs::create_dir_all(&jit_dir).unwrap();
-
-    let branch = "test-branch".to_string();
-
-    // Create identity
-    let paths = identity_paths(&temp_dir);
-    let mut identity = load_or_create_worktree_identity(&paths, &branch).unwrap();
-    identity.root = "/old/path".to_string();
-
-    let wt_file = jit_dir.join("worktree.json");
-    let json = serde_json::to_string_pretty(&identity).unwrap();
-    fs::write(&wt_file, json).unwrap();
-
-    // Load should update atomically
-    let _relocated = load_or_create_worktree_identity(&paths, &branch).unwrap();
-
-    // Verify no .tmp file left behind
-    let tmp_file = jit_dir.join("worktree.json.tmp");
-    assert!(!tmp_file.exists(), "Temp file should be cleaned up");
-
-    // Verify final file is valid JSON
-    let content = fs::read_to_string(&wt_file).unwrap();
-    let _parsed: WorktreeIdentity = serde_json::from_str(&content).unwrap();
-}
-
-#[test]
 fn test_init_removes_copied_worktree_json_with_wrong_path() {
     // Simulate git worktree add copying .jit/worktree.json with wrong path
     let cli = JitCli::uninitialised().unwrap();
