@@ -373,8 +373,15 @@ impl<S: IssueStore> IssueOps<'_, S> {
                         let fresh = active.iter().find(|issue| issue.id == candidate.id)?;
                         let request =
                             CapturedFieldUpdate::bulk(fresh.id.clone(), operations, force).ok()?;
-                        let derived = derive_field_update(
+                        let projected = super::project_field_update(
                             fresh.clone(),
+                            &request,
+                            &graph.declarations.gates,
+                            &context,
+                        )
+                        .ok()?;
+                        let derived = derive_field_update(
+                            projected,
                             &request,
                             CapturedTransitionEvidence {
                                 issues: &active,

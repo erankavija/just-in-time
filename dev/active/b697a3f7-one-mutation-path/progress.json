@@ -2,7 +2,7 @@
   "epic_id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
   "epic_short_id": "b697a3f7",
   "lead_agent_id": "agent:b697a3f7-lead",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
@@ -73,7 +73,7 @@
           "title": "One pure gate-preset catalog serves every preset reader",
           "classification": "implementation",
           "worker": "codex gpt-6.1-sol high",
-          "status": "pending",
+          "status": "done",
           "note": "shares gate.rs/template.rs with c2b3cefa"
         }
       ]
@@ -111,16 +111,16 @@
           "short_id": "d2acb105",
           "title": "One state derivation for update and lifecycle transitions",
           "classification": "implementation",
-          "worker": "tbd",
-          "status": "pending"
+          "worker": "claude opus",
+          "status": "rework-1 (prechecks from projected gates)"
         },
         {
           "id": "7fefd776-6e85-428d-a386-a1512c0a94a1",
           "short_id": "7fefd776",
           "title": "One atomic file publication with a durability argument serves the redo put and external exports",
           "classification": "implementation",
-          "worker": "tbd",
-          "status": "pending"
+          "worker": "claude opus",
+          "status": "dispatched (claude opus)"
         }
       ]
     },
@@ -133,8 +133,8 @@
           "short_id": "905364c1",
           "title": "Document and gate definition writes check their leases in their publishing session",
           "classification": "implementation",
-          "worker": "tbd",
-          "status": "pending"
+          "worker": "codex gpt-6-luna xhigh",
+          "status": "done"
         }
       ]
     }
@@ -174,14 +174,15 @@
     "f6477007": 3,
     "4334df62": 1,
     "9a2563fd": 1,
-    "c2b3cefa": 2
+    "c2b3cefa": 2,
+    "d2acb105": 1
   },
   "surfaced_pitfalls": [
     {
       "found_in": "c2b3cefa review",
       "subject": "pre-session lease checks with no owning issue",
       "detail": "After c2b3cefa and planned d3c94dc5, the read form refuse_foreign_lease is still called before the publishing session by dispatch/gate.rs evaluate_many (batch pre-check), commands/document.rs:228 and :546 (document writes) and commands/validate.rs:234. Epic REQ-04 says no pre-session lease check remains, so this is a criterion gap to close with a remediation task inside the epic before the epic gate, not a follow-up. Also dispatch/gate.rs preset_apply discards the read-form result (c2b3cefa rework report); evaluate_many and preset_apply both drop warn-mode findings from that pre-check.",
-      "status": "tracked by 905364c1"
+      "status": "closed by 905364c1 (bulk and dep remain with d3c94dc5)"
     }
   ],
   "started_at": "2026-11-06T01:20:00+02:00",
@@ -201,5 +202,8 @@
       "item": "external chain",
       "decision": "c140921c after a273667c and 5046408a; then d9ba0029, 7cd27db8, e6ec58f3; that lead notifies on each landing"
     }
+  ],
+  "notes": [
+    "Wave 1 leaves 12064c7b, 4334df62, 9a2563fd, c2b3cefa, f6477007, 4d834432 done; worktrees reclaimed. 1a737bb4 (W1b) and wave 2 (d2acb105, 7fefd776, 905364c1) in flight; dispatched together because all are dependency-ready and their shared files are in disjoint functions."
   ]
 }

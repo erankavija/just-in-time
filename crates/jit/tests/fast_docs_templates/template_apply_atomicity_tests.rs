@@ -18,7 +18,6 @@ use jit::commands::test_helpers::{memory_executor_wrapping, MemoryDeclarations};
 use jit::declarations::{GateChecker, GateMode, GateRegistry, GateStage};
 use jit::domain::identity::IssueId;
 use jit::domain::{Event, Issue, Priority};
-use jit::gate_presets::{GatePresetDefinition, PresetInfo};
 use jit::repository_state::{CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath};
 use jit::storage::claim_coordinator::ClaimCoordinator;
 use jit::storage::{
@@ -201,12 +200,6 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     }
     fn read_repo_file(&self, rel_path: &str) -> Result<Option<String>, PathReadError> {
         self.inner.read_repo_file(rel_path)
-    }
-    fn list_gate_presets(&self) -> Result<Vec<PresetInfo>> {
-        self.inner.list_gate_presets()
-    }
-    fn get_gate_preset(&self, name: &str) -> Result<GatePresetDefinition> {
-        self.inner.get_gate_preset(name)
     }
     fn read_path_bytes(
         &self,
