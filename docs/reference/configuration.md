@@ -391,6 +391,9 @@ A binding names a role or anchor; it never invents one. If `roles.breakdown` nam
 a role no template node declares, that template simply has no breakdown node, and
 the commands that need one say so.
 
+A template names its gates; see
+[Graph Template Registry](storage-format.md#graph-template-registry).
+
 These bindings are the only names the bracket tooling reads from configuration.
 Everything else a template refers to by role names it in place: a
 `[[template.transforms]]` entry carries its own `role` field naming the node it

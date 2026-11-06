@@ -1,6 +1,7 @@
 use jit::commands::IssueLocalUpdate;
 use jit::domain::identity::IssueIdPrefix;
-use jit::domain::Issue;
+use jit::domain::{Assignee, EventBody, Issue};
+use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
 fn assert_persisted(h: &TestHarness, issue: Issue) {
@@ -60,9 +61,68 @@ fn test_release_issue_returns_updated_issue() {
     let issue = h
         .executor
         .issues()
-        .release_issue(&prefix, "finished attempt")
+        .release_issue_as(
+            &prefix,
+            "finished attempt",
+            "human:reviewer".parse().unwrap(),
+        )
         .unwrap();
     assert_persisted(&h, issue);
+}
+
+#[test]
+fn test_release_issue_as_records_actor_independently_of_previous_assignee() {
+    let h = TestHarness::new();
+    let id = h.create_ready_issue("Task");
+    let prefix = IssueIdPrefix::from(&id);
+    let assignee: Assignee = "agent:worker".parse().unwrap();
+    let actor: Assignee = "human:reviewer".parse().unwrap();
+    h.executor
+        .issues()
+        .claim_issue(&prefix, assignee.clone())
+        .unwrap();
+
+    h.executor
+        .issues()
+        .release_issue_as(&prefix, "handoff", actor.clone())
+        .unwrap();
+
+    let releases: Vec<_> = h
+        .storage
+        .read_events()
+        .unwrap()
+        .into_iter()
+        .filter_map(|event| match event.body().clone() {
+            EventBody::IssueReleased {
+                issue_id,
+                assignee,
+                reason,
+                released_by,
+            } => Some((issue_id, assignee, reason, released_by)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        releases,
+        vec![(id, assignee, "handoff".into(), Some(actor))]
+    );
+}
+
+#[test]
+fn test_release_issue_resolves_missing_issue_before_acting_identity() {
+    let h = TestHarness::new();
+    let prefix: IssueIdPrefix = "00000000".parse().unwrap();
+    let lookup_error = h.storage.resolve_issue_id(&prefix).unwrap_err();
+    let events_before = h.storage.read_events().unwrap();
+
+    let error = h
+        .executor
+        .issues()
+        .release_issue(&prefix, "handoff")
+        .unwrap_err();
+
+    assert_eq!(error.to_string(), lookup_error.to_string());
+    assert_eq!(h.storage.read_events().unwrap(), events_before);
 }
 
 #[test]

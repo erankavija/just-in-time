@@ -27,8 +27,9 @@ types and no `plan` template has no template for `jit apply plan` to apply, and 
 issues carry no bracket. Adopting it is opt-in: declare the `planning` and `breakdown`
 types in the type hierarchy and add a `plan` template to `.jit/templates.toml`
 (plus the two coverage rules), then `jit apply plan <C>` on a container scaffolds
-the bracket. Issues stay untouched until you bracket them. The
-[how-to guide](../how-to/adopt-planning-bracket.md) walks through every block.
+the bracket. Issues stay untouched until you bracket them. A template names its
+gates; see [Graph Template Registry](../reference/storage-format.md#graph-template-registry).
+The [how-to guide](../how-to/adopt-planning-bracket.md) walks through every block.
 
 ## The problem it solves
 
@@ -140,7 +141,9 @@ That shapes the spine edges:
 - **Retrofit moves upstream deps onto `P`.** When you bracket a container
   (`jit apply plan <C>`), `C`'s pre-existing upstream dependencies **move onto
   `P`** — planning waits on that upstream work, and `C` becomes the pure closure
-  node at the back of its own bracket.
+  node at the back of its own bracket. The move cannot tell children from
+  prerequisites, so on a populated container `jit apply` reports each moved
+  edge; re-home the children that do not gate planning.
 
 ## The three gates
 
