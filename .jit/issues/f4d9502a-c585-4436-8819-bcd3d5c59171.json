@@ -374,14 +374,28 @@
       "format": "markdown",
       "label": "User wind-down handoff",
       "path": "dev/active/f4d9502a-git-cli-module/handoff-5.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f4d9502a-git-cli-module/completion-report.md"
     }
   ],
+  "done_at": "2026-11-06T06:05:08.977269368Z",
   "first_ready_at": "2026-10-20T20:12:37.009914436Z",
   "gates_required": [
     "repo-validate",
     "holistic-review"
   ],
   "gates_status": {
+    "holistic-review": {
+      "run_id": "1d140d56-3277-4d19-92b0-bcf189965f88",
+      "status": "passed",
+      "updated_at": "2026-11-06T06:04:13.074972894Z",
+      "updated_by": "auto:executor"
+    },
     "repo-validate": {
       "run_id": "de736d35-9b44-4cc1-a5d8-644c44d944a1",
       "status": "passed",
@@ -402,7 +416,7 @@
     "type:epic"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Reach git through one storage-owned CLI module instead of libgit2",
-  "updated_at": "2026-11-06T05:57:53.766234792Z"
+  "updated_at": "2026-11-06T06:05:08.977269368Z"
 }

@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7d6fa1818a0391a9e91c7ad4df3c97c0414e68ee",
+  "completed_at": "2026-11-06T06:04:13.064560376Z",
+  "duration_ms": 379275,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f4d9502a-git-cli-module/handoff-5.md",
+        "id": "F1",
+        "line": 16,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "Historical disk and inode capacity figures are self-attested without a reproducible recorded measurement."
+      }
+    ],
+    "summary": "All hard criteria are verifiably met by the current source, focused tests, and recorded CI evidence; one historical resource measurement is unsubstantiated.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "f4d9502a-c585-4436-8819-bcd3d5c59171",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1d140d56-3277-4d19-92b0-bcf189965f88",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T05:57:53.789300999Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. [Low, advisory] `handoff-5.md:16` self-attests disk/inode capacity figures without a recorded command output or archive artifact to substantiate them. This does not affect a hard criterion or current implementation.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are verifiably met by the current source, focused tests, and recorded CI evidence; one historical resource measurement is unsubstantiated.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Historical disk and inode capacity figures are self-attested without a reproducible recorded measurement.\",\"file\":\"dev/active/f4d9502a-git-cli-module/handoff-5.md\",\"line\":16}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
