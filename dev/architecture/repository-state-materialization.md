@@ -365,19 +365,31 @@ handle it verified, so a root rebound by path never receives the record. The syn
 is the mutation's commit point: before it the repository is unchanged; after it
 the record is the mutation.
 
-`RedoApplier` (`storage/redo_apply.rs`) applies a record in one forward pass:
+`RedoApplier` (`storage/redo_apply.rs`) applies a record in one forward pass.
+Before the first live write it opens every existing ancestor directory of every
+target once, no-follow, into one handle map per root, refusing a symlinked or
+non-directory ancestor; each operation takes its parent from that map, and a
+directory an operation creates joins it.
 
-1. Make each directory, tolerating one already there.
-2. Put each file: write a synced `.tmp` stage beside the target, rename it into
-   place, and sync the parent (`@/inv/atomic-writes`).
+1. Make each directory, creating missing ancestors and tolerating one already
+   there.
+2. Put each file: write a synced `.tmp` stage beside the target and rename it
+   into place (`@/inv/atomic-writes`).
 3. Delete each path, tolerating its absence.
 4. Write the event append at its offset (seek, write, truncate to offset plus
    length, sync); positioned writing rather than append mode makes a repeated
    write land in the same place.
-5. Remove the record.
+5. Fsync each changed directory once: every directory a make-directory or put
+   walks, since some application of the record may have created the next
+   component, and the parent of each delete and of the event log.
+6. Remove the record.
 
 Every step converges when repeated, so re-applying a record after an interruption
-at any point reaches the same state. The same pass serves a session's own apply
+at any point reaches the same state. Directory syncs coalesce because replay also
+converges from any subset of a pass's unsynced entries a crash keeps
+(`prop_replay_converges_from_any_subset_of_persisted_operations`): operations are
+pairwise path-disjoint and each is idempotent, and the record stays until every
+changed directory is synced. The same pass serves a session's own apply
 and a session open over a leftover record. `MemoryRedoApplier` steps the same
 operations over the in-memory backend.
 

@@ -1,19 +1,22 @@
 //! Applying a redo record to the repository's filesystem roots.
 //!
-//! One forward pass over the record's operations, then the record is removed.
-//! Re-application is the same pass: a made directory tolerates a directory
-//! already there, a put overwrites, a delete tolerates absence, the append
-//! rewrites its bytes at its offset, so a record applied twice converges. A
-//! session's apply writes one and applies it; a session open applies the one a
-//! crash left.
+//! One forward pass over the record's operations through one directory-handle
+//! map per root, opened before the first live write, then one fsync per changed
+//! directory, then the record is removed. Re-application is the same pass: a
+//! made directory tolerates a directory already there, a put overwrites, a
+//! delete tolerates absence, the append rewrites its bytes at its offset, so a
+//! record applied twice converges, and it converges from whatever subset of
+//! unsynced entries a crash keeps, which is why directory syncs wait for the
+//! pass's end. Staged-file and event-log data syncs stay per operation, so a
+//! rename that persists names durable bytes. A session's apply writes one record
+//! and applies it; a session open applies the one a crash left.
 
 use crate::repository_state::{
     CaptureError, FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
 use crate::storage::atomic_write::sync_capability_directory;
 use crate::storage::capability_fs::{
-    open_capability_parent, open_child_dir_nofollow, open_or_create_capability_parent,
-    CapabilityFsError, CapabilityRoots, DataRoot,
+    open_child_dir_nofollow, CapabilityFsError, CapabilityRoots, DataRoot, DirectoryHandles,
 };
 use crate::storage::redo_record::{
     EventAppend, PutFile, RedoRecord, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
@@ -177,21 +180,24 @@ impl RedoApplier {
         check_interruption(injector, RedoPoint::AfterApply)
     }
 
-    /// The forward pass over every operation, before the record is consumed.
-    fn apply_operations(
+    /// The forward pass over every operation, before the record is consumed,
+    /// returning the handles it ran through once every directory it changed is
+    /// synced.
+    fn apply_operations<'r>(
         &self,
-        roots: &CapabilityRoots,
+        roots: &'r CapabilityRoots,
         record: &RedoRecord,
-    ) -> Result<(), RedoApplyError> {
+    ) -> Result<PassHandles<'r>, RedoApplyError> {
         let injector = &*self.injector;
         let event_log = VirtualPath::EVENTS;
+        let mut handles = PassHandles::new(roots);
         record
             .make_directories()
             .iter()
             .chain(record.puts().iter().map(|put| &put.path))
             .chain(record.deletes().iter())
             .chain(record.event_append().iter().map(|_| &event_log))
-            .try_for_each(|path| resolve(roots, path).map(|_| ()))?;
+            .try_for_each(|path| handles.resolve(path))?;
         check_interruption(injector, RedoPoint::BeforeApply)?;
         record
             .make_directories()
@@ -199,7 +205,7 @@ impl RedoApplier {
             .enumerate()
             .try_for_each(|(index, path)| {
                 check_interruption(injector, RedoPoint::BeforeMakeDirectory { index })?;
-                make_directory(roots, path)
+                make_directory(handles.of(path)?, path)
             })?;
         record
             .puts()
@@ -207,7 +213,7 @@ impl RedoApplier {
             .enumerate()
             .try_for_each(|(index, put)| {
                 check_interruption(injector, RedoPoint::BeforePut { index })?;
-                put_file(roots, put)
+                put_file(handles.of(&put.path)?, put)
             })?;
         record
             .deletes()
@@ -215,15 +221,71 @@ impl RedoApplier {
             .enumerate()
             .try_for_each(|(index, path)| {
                 check_interruption(injector, RedoPoint::BeforeDelete { index })?;
-                delete_file(roots, path)
+                delete_file(handles.of(path)?, path)
             })?;
-        match record.event_append() {
-            Some(append) => {
-                check_interruption(injector, RedoPoint::BeforeEventAppend)?;
-                append_events(roots, append)
-            }
-            None => Ok(()),
+        if let Some(append) = record.event_append() {
+            check_interruption(injector, RedoPoint::BeforeEventAppend)?;
+            append_events(handles.of(&VirtualPath::EVENTS)?, append)?;
         }
+        handles.sync_changed()?;
+        Ok(handles)
+    }
+}
+
+/// One pass's directory handles over each root it addresses.
+struct PassHandles<'r> {
+    worktree: Option<DirectoryHandles<'r>>,
+    data: Option<DirectoryHandles<'r>>,
+}
+
+impl<'r> PassHandles<'r> {
+    fn new(roots: &'r CapabilityRoots) -> Self {
+        Self {
+            worktree: roots
+                .root(RepositoryRootClass::Worktree)
+                .map(DirectoryHandles::new),
+            data: roots
+                .root(RepositoryRootClass::Data)
+                .map(DirectoryHandles::new),
+        }
+    }
+
+    /// The handles of the root `path` is addressed within.
+    fn of(&mut self, path: &VirtualPath) -> Result<&mut DirectoryHandles<'r>, RedoApplyError> {
+        match path.root_class() {
+            RepositoryRootClass::Worktree => self.worktree.as_mut(),
+            RepositoryRootClass::Data => self.data.as_mut(),
+        }
+        .ok_or_else(|| unaddressable(path))
+    }
+
+    /// Open the existing ancestors of `path`.
+    ///
+    /// The parent chain is walked no-follow here rather than at the write, so a
+    /// symlinked ancestor — the one escape a canonical identity cannot carry — is
+    /// refused while the repository is still untouched.
+    fn resolve(&mut self, path: &VirtualPath) -> Result<(), RedoApplyError> {
+        self.of(path)?.open_parent(path.relative().as_path())?;
+        Ok(())
+    }
+
+    /// Each root's handles, mutably.
+    fn each(&mut self) -> impl Iterator<Item = &mut DirectoryHandles<'r>> {
+        self.worktree.iter_mut().chain(self.data.iter_mut())
+    }
+
+    fn sync_changed(&mut self) -> std::io::Result<()> {
+        self.each().try_for_each(DirectoryHandles::sync_changed)
+    }
+
+    #[cfg(test)]
+    fn opens(&mut self) -> usize {
+        self.each().map(|handles| handles.opens()).sum()
+    }
+
+    #[cfg(test)]
+    fn syncs(&mut self) -> usize {
+        self.each().map(|handles| handles.syncs()).sum()
     }
 }
 
@@ -239,33 +301,19 @@ pub(in crate::storage) fn check_interruption(
         .map_err(|source| RedoApplyError::Interrupted { point, source })
 }
 
-/// The root handle a path is addressed within, with its root-relative portion.
-///
-/// The parent chain is walked no-follow here rather than at the write, so a
-/// symlinked ancestor — the one escape a canonical identity cannot carry — is
-/// refused while the repository is still untouched.
-fn resolve<'a>(
-    roots: &'a CapabilityRoots,
-    path: &'a VirtualPath,
-) -> Result<(&'a Dir, &'a Path), RedoApplyError> {
-    let root = roots
-        .root(path.root_class())
-        .ok_or_else(|| unaddressable(path))?;
-    open_capability_parent(root, path.relative().as_path())?;
-    Ok((root, path.relative().as_path()))
-}
-
 /// Make one directory, creating the directories it needs.
 ///
 /// A directory already there is the re-application case and succeeds; any other
 /// occupant is refused, because a record whose directory a regular file or a
 /// symlink occupies can never apply (OD-7). The occupant is read no-follow, so a
 /// link to a directory is that other occupant rather than the directory it names.
-fn make_directory(roots: &CapabilityRoots, path: &VirtualPath) -> Result<(), RedoApplyError> {
-    let (root, relative) = resolve(roots, path)?;
-    let (parent, leaf) = open_or_create_capability_parent(root, relative)?;
+fn make_directory(
+    handles: &mut DirectoryHandles,
+    path: &VirtualPath,
+) -> Result<(), RedoApplyError> {
+    let (parent, leaf) = handles.open_or_create_parent(path.relative().as_path())?;
     match parent.create_dir(&leaf) {
-        Ok(()) => sync_capability_directory(&parent).map_err(Into::into),
+        Ok(()) => Ok(()),
         Err(error) if error.kind() == ErrorKind::AlreadyExists => {
             match parent.symlink_metadata(&leaf)?.is_dir() {
                 true => Ok(()),
@@ -278,16 +326,14 @@ fn make_directory(roots: &CapabilityRoots, path: &VirtualPath) -> Result<(), Red
 
 /// Replace a put's path with its bytes, creating the directories it needs.
 ///
-/// Every directory the put creates is durable before the pass reaches
-/// [`RedoPoint::BeforeRecordRemoval`], so a crash cannot drop an ancestor entry
-/// while removing the record that would replay the put.
-fn put_file(roots: &CapabilityRoots, put: &PutFile) -> Result<(), RedoApplyError> {
-    let (root, relative) = resolve(roots, &put.path)?;
-    let (parent, leaf) = open_or_create_capability_parent(root, relative)?;
+/// The staged bytes are synced before the rename, so a rename that persists
+/// names durable bytes; the entries the put writes are synced with the pass's
+/// other changed directories.
+fn put_file(handles: &mut DirectoryHandles, put: &PutFile) -> Result<(), RedoApplyError> {
+    let (parent, leaf) = handles.open_or_create_parent(put.path.relative().as_path())?;
     let staged = staged_name();
-    write_staged_file(&parent, &staged, &put.bytes, put.mode)?;
-    parent.rename(&staged, &parent, &leaf)?;
-    sync_capability_directory(&parent).map_err(Into::into)
+    write_staged_file(parent, &staged, &put.bytes, put.mode)?;
+    parent.rename(&staged, parent, &leaf).map_err(Into::into)
 }
 
 /// A stage name beside the target: random, so nothing can be waiting at it, and
@@ -338,16 +384,20 @@ fn set_mode(_file: &File, _mode: FileMode) -> Result<(), RedoApplyError> {
 
 /// Remove a deleted path, tolerating a target a previous application already
 /// removed.
-fn delete_file(roots: &CapabilityRoots, path: &VirtualPath) -> Result<(), RedoApplyError> {
-    let (root, relative) = resolve(roots, path)?;
-    let Some((parent, leaf)) = open_capability_parent(root, relative)? else {
+///
+/// The parent is marked changed even then: the application that removed it
+/// may never have synced it.
+fn delete_file(handles: &mut DirectoryHandles, path: &VirtualPath) -> Result<(), RedoApplyError> {
+    let relative = path.relative().as_path();
+    let Some((parent, leaf)) = handles.open_parent(relative)? else {
         return Ok(());
     };
     match parent.remove_file(&leaf) {
-        Ok(()) => sync_capability_directory(&parent).map_err(Into::into),
-        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(error.into()),
+        Err(error) if error.kind() != ErrorKind::NotFound => return Err(error.into()),
+        _ => {}
     }
+    handles.mark_parent_changed(relative);
+    Ok(())
 }
 
 /// Write the appended bytes at their offset.
@@ -355,12 +405,17 @@ fn delete_file(roots: &CapabilityRoots, path: &VirtualPath) -> Result<(), RedoAp
 /// The log is opened for positioned writing rather than in append mode, which
 /// ignores the offset and would append the bytes a second time, and it is
 /// truncated to the offset plus their length, so a log a previous application
-/// already extended converges.
-fn append_events(roots: &CapabilityRoots, append: &EventAppend) -> Result<(), RedoApplyError> {
+/// already extended converges. Its parent is marked changed, since an
+/// application may have created the log.
+fn append_events(
+    handles: &mut DirectoryHandles,
+    append: &EventAppend,
+) -> Result<(), RedoApplyError> {
     let log = VirtualPath::EVENTS;
-    let (root, relative) = resolve(roots, &log)?;
-    let (parent, leaf) =
-        open_capability_parent(root, relative)?.ok_or_else(|| unaddressable(&log))?;
+    let relative = log.relative().as_path();
+    let (parent, leaf) = handles
+        .open_parent(relative)?
+        .ok_or_else(|| unaddressable(&log))?;
     let mut options = OpenOptions::new();
     options.write(true).create(true);
     options._cap_fs_ext_follow(FollowSymlinks::No);
@@ -368,7 +423,9 @@ fn append_events(roots: &CapabilityRoots, append: &EventAppend) -> Result<(), Re
     file.seek(SeekFrom::Start(append.offset))?;
     file.write_all(&append.bytes)?;
     file.set_len(append.offset + append.bytes.len() as u64)?;
-    file.sync_all().map_err(Into::into)
+    file.sync_all()?;
+    handles.mark_parent_changed(relative);
+    Ok(())
 }
 
 /// Remove the applied record, tolerating one a previous application already
@@ -977,11 +1034,70 @@ mod tests {
         let target = VirtualPath::data("templates").unwrap();
         std::os::unix::fs::symlink(outside.path(), data_root(&worktree).join("templates")).unwrap();
 
-        let outcome = make_directory(&roots, &target);
+        let mut handles = PassHandles::new(&roots);
+        let outcome = make_directory(handles.of(&target).unwrap(), &target);
 
         assert!(
             matches!(outcome, Err(RedoApplyError::OccupiedDirectory { .. })),
             "the link was taken for the directory the record makes: {outcome:?}"
+        );
+    }
+
+    /// Targets sharing ancestors are reached through one handle per ancestor,
+    /// whichever operations and the pre-pass walk through it.
+    #[test]
+    fn test_redo_applier_apply_opens_each_shared_ancestor_directory_once() {
+        let (worktree, roots) = repository();
+        std::fs::create_dir_all(data_root(&worktree).join("issues/2026")).unwrap();
+        std::fs::write(data_root(&worktree).join("issues/stale.json"), b"stale").unwrap();
+        std::fs::write(data_root(&worktree).join("events.jsonl"), CAPTURED_LOG).unwrap();
+        let record = RedoRecord::new(
+            vec![VirtualPath::data("issues/2026/09").unwrap()],
+            vec![
+                put(VirtualPath::data("issues/2026/a.json").unwrap(), b"a"),
+                put(VirtualPath::data("issues/2026/b.json").unwrap(), b"b"),
+                put(VirtualPath::data("issues/c.json").unwrap(), b"c"),
+            ],
+            vec![VirtualPath::data("issues/stale.json").unwrap()],
+            Some(EventAppend {
+                offset: CAPTURED_LOG.len() as u64,
+                bytes: b"{\"tag\":\"issue_claimed\"}\n".to_vec(),
+            }),
+        )
+        .unwrap();
+        let ancestors = ["issues", "issues/2026"].len();
+
+        let mut handles = uninterrupted().apply_operations(&roots, &record).unwrap();
+
+        assert_eq!(
+            handles.opens(),
+            ancestors,
+            "an ancestor several targets share was opened more than once"
+        );
+    }
+
+    /// Puts sharing a parent cost that parent one fsync, after the last of them.
+    #[test]
+    fn test_redo_applier_apply_syncs_a_parent_its_puts_share_once() {
+        let (_worktree, roots) = repository();
+        let record = RedoRecord::new(
+            Vec::new(),
+            vec![
+                put(VirtualPath::data("index.json").unwrap(), b"index"),
+                put(VirtualPath::data("config.toml").unwrap(), b"config"),
+                put(VirtualPath::data("gates.toml").unwrap(), b"gates"),
+            ],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+
+        let mut handles = uninterrupted().apply_operations(&roots, &record).unwrap();
+
+        assert_eq!(
+            handles.syncs(),
+            1,
+            "the data root was synced once per put rather than once per application"
         );
     }
 
