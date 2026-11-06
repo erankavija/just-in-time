@@ -6,6 +6,9 @@ use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
+#[cfg(unix)]
+use jit::test_harness::git::GitStandIn;
+
 #[test]
 fn test_snapshot_export_help() {
     let cli = JitCli::uninitialised().unwrap();
@@ -80,6 +83,195 @@ fn test_snapshot_export_all_directory() {
         documents["count"].as_u64().unwrap(),
         documents["items"].as_array().unwrap().len() as u64
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_snapshot_export_git_mode_reads_all_documents_and_assets_through_one_object_reader() {
+    let temp = JitCli::initialised().unwrap();
+    temp.init_git().unwrap();
+
+    fs::create_dir_all(temp.root().join("docs")).unwrap();
+    fs::write(
+        temp.root().join("docs/one.md"),
+        "# One\n\n![One](one.png)\n",
+    )
+    .unwrap();
+    fs::write(temp.root().join("docs/one.png"), b"one image").unwrap();
+    fs::write(
+        temp.root().join("docs/two.md"),
+        "# Two\n\n![Two](two.png)\n",
+    )
+    .unwrap();
+    fs::write(temp.root().join("docs/two.png"), b"two image").unwrap();
+
+    let issue = temp.create_issue(["--title", "Snapshot source"]).unwrap();
+    for path in ["docs/one.md", "docs/two.md"] {
+        temp.command(["doc", "add", &issue, path])
+            .assert()
+            .success();
+    }
+    temp.commit("snapshot source").unwrap();
+
+    let paths = ["docs/one.md", "docs/one.png", "docs/two.md", "docs/two.png"];
+    let expected_blobs = paths
+        .iter()
+        .map(|path| {
+            (
+                *path,
+                temp.git(["rev-parse", &format!("HEAD:{path}")])
+                    .unwrap()
+                    .trim()
+                    .to_owned(),
+            )
+        })
+        .collect::<std::collections::HashMap<_, _>>();
+    let expected_commit = temp.git(["rev-parse", "HEAD"]).unwrap().trim().to_owned();
+
+    let stand_in = GitStandIn::new();
+    let mut command = temp.command([
+        "snapshot", "export", "--at", "HEAD", "--force", "--out", "snapshot", "--json",
+    ]);
+    command.env("PATH", stand_in.search_path());
+    command.assert().success();
+
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(temp.root().join("snapshot/manifest.json")).unwrap())
+            .unwrap();
+    let documents = manifest["documents"]["items"].as_array().unwrap();
+    assert_eq!(documents.len(), 2);
+    let captured = documents
+        .iter()
+        .flat_map(|document| {
+            std::iter::once(document)
+                .chain(document["assets"].as_array().unwrap().iter())
+                .map(|file| {
+                    (
+                        file["path"].as_str().unwrap().to_owned(),
+                        file["source"].clone(),
+                    )
+                })
+        })
+        .collect::<std::collections::HashMap<_, _>>();
+    assert_eq!(captured.len(), paths.len());
+    paths.iter().for_each(|path| {
+        assert_eq!(
+            captured[*path]["blob_sha"].as_str(),
+            expected_blobs.get(path).map(String::as_str),
+            "incorrect Git blob id for {path}"
+        );
+        assert_eq!(
+            captured[*path]["commit"].as_str(),
+            Some(expected_commit.as_str()),
+            "incorrect Git commit for {path}"
+        );
+    });
+    assert_eq!(
+        stand_in
+            .invocations()
+            .iter()
+            .filter(|invocation| invocation.args() == ["cat-file", "--batch", "-Z"])
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn test_snapshot_export_git_mode_fails_with_not_found_for_a_missing_document() {
+    let temp = JitCli::initialised().unwrap();
+    temp.init_git().unwrap();
+    let issue = temp
+        .create_issue(["--title", "Missing snapshot document"])
+        .unwrap();
+    let issue_path = fs::read_dir(temp.root().join(".jit/issues"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| path.file_stem().is_some_and(|stem| stem == issue.as_str()))
+        .unwrap();
+    let mut issue_record: serde_json::Value =
+        serde_json::from_slice(&fs::read(&issue_path).unwrap()).unwrap();
+    issue_record["documents"] = serde_json::json!([{
+        "path": "docs/missing.md",
+        "commit": null,
+        "label": null,
+        "doc_type": null,
+        "format": "markdown",
+        "assets": []
+    }]);
+    fs::write(
+        &issue_path,
+        serde_json::to_vec_pretty(&issue_record).unwrap(),
+    )
+    .unwrap();
+    temp.commit("missing snapshot document").unwrap();
+
+    let output = temp
+        .command([
+            "snapshot", "export", "--at", "HEAD", "--force", "--out", "snapshot",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(3),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stderr)
+        .contains("Path 'docs/missing.md' not found in commit"));
+}
+
+#[test]
+fn test_snapshot_export_git_mode_fails_with_not_found_for_a_missing_asset() {
+    let temp = JitCli::initialised().unwrap();
+    temp.init_git().unwrap();
+    fs::create_dir_all(temp.root().join("docs")).unwrap();
+    fs::write(
+        temp.root().join("docs/present.md"),
+        "# Present\n\n![Missing](missing.png)\n",
+    )
+    .unwrap();
+    let issue = temp
+        .create_issue(["--title", "Missing snapshot asset"])
+        .unwrap();
+    let issue_path = fs::read_dir(temp.root().join(".jit/issues"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| path.file_stem().is_some_and(|stem| stem == issue.as_str()))
+        .unwrap();
+    let mut issue_record: serde_json::Value =
+        serde_json::from_slice(&fs::read(&issue_path).unwrap()).unwrap();
+    issue_record["documents"] = serde_json::json!([{
+        "path": "docs/present.md",
+        "commit": null,
+        "label": null,
+        "doc_type": null,
+        "format": "markdown",
+        "assets": []
+    }]);
+    fs::write(
+        &issue_path,
+        serde_json::to_vec_pretty(&issue_record).unwrap(),
+    )
+    .unwrap();
+    temp.commit("missing snapshot asset").unwrap();
+
+    let output = temp
+        .command([
+            "snapshot", "export", "--at", "HEAD", "--force", "--out", "snapshot",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(3),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stderr)
+        .contains("Path 'docs/missing.png' not found in commit"));
 }
 
 #[test]

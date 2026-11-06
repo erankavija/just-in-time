@@ -9,9 +9,8 @@ Complete CLI reference for `jit claim` subcommands used in lease-based claim coo
 
 The `jit claim` command family manages exclusive advisory leases on issues for
 parallel work coordination. Lease acquisition is serialized by the claims
-coordinator. Whether a lease refuses other agents' writes to the issue is
-controlled by `[worktree].enforce_leases`; a write to an unleased issue needs no
-lease, and `off` blocks nothing.
+coordinator. The writes governed by `[worktree].enforce_leases` are described
+in the [configuration reference](configuration.md#enforce_leases).
 
 Each lease lives in `.git/jit/leases/<issue-id>.json`, shared across worktrees.
 Lease commands take the issue ID; the lease UUID in output identifies the

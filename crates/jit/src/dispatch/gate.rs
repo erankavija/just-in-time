@@ -714,7 +714,7 @@ command_group! {
 mod tests {
     use super::*;
     use crate::commands::test_helpers::{
-        memory_executor, seed_gate_registry, seed_issue, seed_repo_file, ExecutorTestAccess,
+        memory_executor, seed_gate_registry, seed_issue, ExecutorTestAccess,
     };
     use crate::commands::CommandExecutor;
     use crate::declarations::{GateDefinition as Declared, GateMode, GateStage};
@@ -722,6 +722,7 @@ mod tests {
     use crate::output::{ExitCode, OutputMode, RunStatus};
     use crate::schema::OutputSchema;
     use crate::storage::InMemoryStorage;
+    use crate::test_harness::seed_memory_repository_file;
 
     /// An executor whose one issue requires the manual gate `tests`; returns the issue id.
     fn requiring_manual_gate() -> (CommandExecutor<InMemoryStorage>, String) {
@@ -839,7 +840,7 @@ mod tests {
         ] {
             let (executor, id) = requiring_manual_gate();
             if corrupt_registry {
-                seed_repo_file(executor.storage(), ".jit/gates.toml", "gates = [");
+                seed_memory_repository_file(executor.storage(), ".jit/gates.toml", "gates = [");
             } else {
                 let mut registry = executor.storage().load_gate_registry().unwrap();
                 registry.gates.clear();

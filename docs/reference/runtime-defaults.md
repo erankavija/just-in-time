@@ -16,7 +16,7 @@ these values.
 | Claim stale threshold | 3600 seconds | Time without a heartbeat after which an indefinite lease is stale. A stale lease no longer refuses other agents' writes, and `jit recover` reclaims it. |
 | Indefinite leases per agent | 2 | Default maximum concurrent indefinite (`--ttl 0`) leases one agent holds; `jit claim acquire` refuses beyond it. Overridden by `[coordination] max_indefinite_leases_per_agent`. |
 | Indefinite leases per repository | 10 | Default maximum concurrent indefinite leases across the repository. Overridden by `[coordination] max_indefinite_leases_per_repo`. |
-| Lease enforcement mode | strict | Mode applied when the repository's `[worktree]` section omits `enforce_leases`. In `strict` a write is refused only when another agent holds an active lease on the issue. A repository with no `[worktree]` section enforces no leases. |
+| Lease enforcement mode | strict | Mode applied when the repository's `[worktree]` section omits `enforce_leases`. See the [Configuration Reference](configuration.md#enforce_leases) for the rule and its scope. |
 | Linked-checkout write policy | refuse | Stance on state-mutating commands run inside a linked non-primary checkout when the repository declares no `[worktree] write_policy`, whether the key or the whole section is absent. The `JIT_WORKTREE_WRITE_POLICY` environment variable outranks it for one invocation. |
 | Validation strictness | loose | Level applied when the repository declares no `[validation] strictness`. |
 | Content format | markdown | Body parser applied to an issue that declares no `content_format` when the repository declares no `[validation] content_format`. |

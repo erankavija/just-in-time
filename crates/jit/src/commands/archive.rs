@@ -1,7 +1,7 @@
 //! Unified dependency-aware archive planning and coordinated execution.
 
 use super::CommandExecutor;
-use super::{capture_or_retry, with_mutation_session, SessionStep};
+use super::{capture_or_retry, with_mutation_session, with_read_session, SessionStep};
 use crate::domain::artifact_classifier::{
     artifact_destination_root, classification_facts_from_evidence, classify_artifacts,
     preferred_container_destination_root,
@@ -19,23 +19,20 @@ use crate::domain::artifact_execution::{
 };
 use crate::domain::artifact_inventory::{
     inventory_explicit_roots, member_derived_documents, member_document_directories,
-    pinned_root_requests, ExplicitRootTarget, PinnedRootEvidence, PinnedRootEvidenceMap,
+    pinned_root_requests, ExplicitRootTarget, PinnedRootEvidence,
 };
 use crate::domain::artifact_plan::{
-    normalize_artifact_path, ArchiveCandidates, ArtifactPlan, ArtifactVersion, BlockerCode,
-    PlanBlocker, PlanTarget,
+    normalize_artifact_path, ArchiveCandidates, ArtifactPlan, BlockerCode, PlanBlocker, PlanTarget,
 };
 #[cfg(test)]
 use crate::domain::artifact_plan::{ArtifactAction, WarningCode};
 use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::Issue;
-use crate::storage::artifact_planning::inspect_artifact_evidence;
-use crate::storage::git::{CommitResolution, GitCheckout, GitObjectType};
+use crate::storage::artifact_inspection::collect_citation_scan_evidence;
 use crate::storage::{
-    collect_artifact_classification_facts, discover_archive_artifacts,
-    resolve_container_destination, validate_repo_relative_path, IssueStore, JsonFileStorage,
-    RepositoryMutationSession,
+    validate_repo_relative_path, IssueStore, JsonFileStorage, RepositoryReadSession,
+    RepositoryStateStore,
 };
 use anyhow::{bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
@@ -105,35 +102,6 @@ fn remap_archived_references(issues: &mut [Issue], destination_root: &str, devel
     });
 }
 
-fn inventory_issues_pinned_evidence(
-    requests: impl IntoIterator<Item = (String, String)>,
-    checkout: Option<&GitCheckout>,
-) -> PinnedRootEvidenceMap {
-    let mut requests = requests.into_iter().peekable();
-    let mut reader = requests
-        .peek()
-        .and(checkout)
-        .and_then(|checkout| checkout.object_reader().ok());
-    requests
-        .map(|(revision, path)| {
-            let evidence = (|| {
-                validate_repo_relative_path(&path).ok()?;
-                let reader = reader.as_mut()?;
-                let CommitResolution::Commit(commit) = reader.resolve_commit(&revision).ok()?
-                else {
-                    return None;
-                };
-                let object = reader.read(&format!("{}:{path}", commit.as_str())).ok()??;
-                (object.object_type() == GitObjectType::Blob).then_some(
-                    PinnedRootEvidence::Resolved(ArtifactVersion::Pinned(commit)),
-                )
-            })()
-            .unwrap_or(PinnedRootEvidence::Unavailable);
-            ((revision, path), evidence)
-        })
-        .collect()
-}
-
 fn apply_recorded_residue_identities(
     locations: &mut BTreeMap<String, ArtifactLocationFacts>,
     target: &PlanTarget,
@@ -176,207 +144,10 @@ fn apply_recorded_residue_identities(
     });
 }
 
-impl<S: IssueStore> ArchiveOps<'_, S> {
-    /// Fully evaluate every effectively terminal configured non-leaf container
-    /// without mutation.
-    pub fn archive_candidates(&self) -> Result<ArchiveCandidates> {
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
-        let issues = self.exec.storage.list_issues()?;
-        let plans = effectively_terminal_container_ids(&issues, &hierarchy)
-            .into_iter()
-            .map(|id| self.plan_archive_target(ArchiveTarget::Container(&id)))
-            .collect::<Result<Vec<_>>>()?;
-        Ok(ArchiveCandidates::new(plans))
-    }
-
-    /// Build a complete non-mutating plan for one arbitrary repository document.
-    pub fn preview_archive_document(&self, path: &str) -> Result<ArtifactPlan> {
-        self.plan_archive_target(ArchiveTarget::Document(path))
-    }
-
-    /// Build a complete non-mutating plan for one resolved container subtree.
-    pub fn preview_archive_container(&self, id: &IssueId) -> Result<ArtifactPlan> {
-        self.plan_archive_target(ArchiveTarget::Container(id))
-    }
-
-    fn plan_archive_target(&self, target: ArchiveTarget<'_>) -> Result<ArtifactPlan> {
-        let config = self.exec.config_manager.load()?;
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
-        let issues = self.exec.storage.list_issues()?;
-        let checkout = self.exec.require_worktree_paths()?.code_checkout();
-
-        let root_container_id = match target {
-            ArchiveTarget::Document(_) => None,
-            ArchiveTarget::Container(id) => Some(id.clone()),
-        };
-        let policy =
-            ArtifactClassificationPolicy::from_documentation(config.documentation.as_ref());
-        let target_for_layout = match &target {
-            ArchiveTarget::Document(path) => PlanTarget::Document {
-                path: normalize_artifact_path(path),
-            },
-            ArchiveTarget::Container(_) => PlanTarget::Container {
-                id: root_container_id
-                    .as_ref()
-                    .context("container id was not resolved")?
-                    .clone(),
-            },
-        };
-        let legacy_root = artifact_destination_root(&target_for_layout, &policy.archive_root);
-        let (destination_root, destination_conflicts) = match root_container_id.as_ref() {
-            Some(container_id) => {
-                let issue = issues
-                    .iter()
-                    .find(|issue| &issue.id == container_id)
-                    .context("resolved archive container is missing from issue inventory")?;
-                let preferred_root =
-                    preferred_container_destination_root(issue, &hierarchy, &policy.archive_root);
-                if policy.archive_root.is_empty() {
-                    (preferred_root, Vec::new())
-                } else {
-                    let resolved = resolve_container_destination(
-                        &self.exec.storage,
-                        &preferred_root,
-                        &legacy_root,
-                        container_id,
-                    )?;
-                    (resolved.destination_root, resolved.conflicting_roots)
-                }
-            }
-            None => (legacy_root, Vec::new()),
-        };
-        // Feed inverse-mirror sources to inventory while retaining the real
-        // durable issue records for exact apply/observe decisions below.
-        let mut inventory_issues = issues.clone();
-        remap_archived_references(
-            &mut inventory_issues,
-            &destination_root,
-            &policy.development_root,
-        );
-        let explicit_target = match &target {
-            ArchiveTarget::Document(path) => ExplicitRootTarget::Document(path),
-            ArchiveTarget::Container(_) => ExplicitRootTarget::Container(
-                root_container_id
-                    .as_ref()
-                    .context("container id was not resolved")?,
-            ),
-        };
-        let pinned = inventory_issues_pinned_evidence(
-            pinned_root_requests(&inventory_issues, &hierarchy, explicit_target)?,
-            checkout.as_ref(),
-        );
-        let inventory =
-            inventory_explicit_roots(&inventory_issues, &hierarchy, explicit_target, &pinned)?;
-        let inventory = match root_container_id.as_ref() {
-            Some(root) => {
-                let documentation = config.documentation.clone().unwrap_or_default();
-                let files = member_document_directories(
-                    &inventory_issues,
-                    &hierarchy,
-                    root,
-                    &documentation,
-                )
-                .into_iter()
-                .map(|directory| {
-                    match inspect_artifact_evidence(
-                        &self.exec.storage,
-                        &directory,
-                        ArtifactListingScope::RecursiveFiles,
-                    )? {
-                        ArtifactEvidence::Directory { entries, .. } => Ok(entries),
-                        _ => Ok(Vec::new()),
-                    }
-                })
-                .collect::<Result<Vec<_>>>()?
-                .concat();
-                inventory.with_unlinked_roots(member_derived_documents(
-                    &inventory_issues,
-                    &hierarchy,
-                    root,
-                    &files,
-                    &documentation,
-                ))?
-            }
-            None => inventory,
-        };
-        let archive_evidence = self
-            .exec
-            .storage
-            .read_archive_evidence_record(&target_for_layout)?
-            .unwrap_or_else(|| ArchiveEvidenceRecord {
-                target: target_for_layout.clone(),
-                executions: Vec::new(),
-            });
-        if archive_evidence.target != target_for_layout
-            || archive_evidence
-                .executions
-                .iter()
-                .any(|execution| execution.target != archive_evidence.target)
-        {
-            bail!("Archive evidence record does not match target {target_for_layout:?}");
-        }
-        let archive_executions = archive_evidence.executions;
-        let (discovered, embedded_owners) = discover_archive_artifacts(
-            &self.exec.storage,
-            inventory,
-            &issues,
-            &policy,
-            recorded_archived_copies(&archive_executions, &target_for_layout),
-        )?;
-        let plan_target = discovered.target;
-        let artifacts = discovered.artifacts;
-        let mut blockers = discovered.blockers;
-        blockers.extend(
-            destination_conflicts
-                .into_iter()
-                .map(|root| PlanBlocker::new(BlockerCode::DestinationConflict, Some(root))),
-        );
-
-        if let Some(container_id) = root_container_id.as_ref() {
-            // Coupled retirement (`jit:45a140ae`): artifact archival requires an
-            // effectively terminal container (Done/Rejected, or already Archived
-            // from one of those for an idempotent rerun). An Archived container
-            // retired from a non-terminal state, or any active state, is blocked.
-            if issues
-                .iter()
-                .find(|issue| &issue.id == container_id)
-                .is_some_and(|issue| !issue.is_effectively_terminal())
-            {
-                blockers.push(PlanBlocker::new(
-                    BlockerCode::NonTerminalTarget,
-                    None::<String>,
-                ));
-            }
-        }
-
-        let mut facts = collect_artifact_classification_facts(
-            &self.exec.storage,
-            &plan_target,
-            &destination_root,
-            &artifacts,
-            &policy,
-            embedded_owners,
-        )?;
-        apply_recorded_residue_identities(
-            &mut facts.locations,
-            &plan_target,
-            &destination_root,
-            &archive_executions,
-        );
-        classify_artifacts(
-            ArtifactClassificationInventory::new(plan_target, artifacts, blockers)
-                .with_destination_root(destination_root),
-            policy,
-            facts,
-        )
-        .map_err(Into::into)
-    }
-}
-
 /// Grow `image` by the requests `add` puts in its spec, reading only those;
 /// `false` is a retryable conflict.
 fn capture_more(
-    session: &mut dyn RepositoryMutationSession,
+    session: &mut (dyn RepositoryReadSession + '_),
     image: &mut crate::repository_state::RepositoryImage,
     add: impl FnOnce(&mut crate::repository_state::CaptureSpec) -> Result<()>,
 ) -> Result<bool> {
@@ -396,7 +167,7 @@ fn capture_more(
 
 /// [`capture_more`] of `paths`.
 fn capture_paths(
-    session: &mut dyn RepositoryMutationSession,
+    session: &mut (dyn RepositoryReadSession + '_),
     image: &mut crate::repository_state::RepositoryImage,
     paths: impl IntoIterator<Item = crate::repository_state::VirtualPath>,
 ) -> Result<bool> {
@@ -474,7 +245,7 @@ fn image_evidence(
 }
 
 fn capture_artifact_evidence(
-    session: &mut dyn RepositoryMutationSession,
+    session: &mut (dyn RepositoryReadSession + '_),
     image: &mut crate::repository_state::RepositoryImage,
     paths: impl IntoIterator<Item = String>,
     evidence: &mut ArtifactEvidenceMap,
@@ -536,7 +307,7 @@ fn capture_artifact_evidence(
 }
 
 fn capture_directory_tree(
-    session: &mut dyn RepositoryMutationSession,
+    session: &mut (dyn RepositoryReadSession + '_),
     image: crate::repository_state::RepositoryImage,
     root: &str,
 ) -> Result<Option<crate::repository_state::RepositoryImage>> {
@@ -574,10 +345,44 @@ fn capture_directory_tree(
     })
 }
 
-impl ArchiveOps<'_, JsonFileStorage> {
+impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
+    /// Fully evaluate every effectively terminal configured non-leaf container
+    /// without mutation.
+    pub fn archive_candidates(&self) -> Result<ArchiveCandidates> {
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
+        let issues = self.exec.storage.list_issues()?;
+        let plans = effectively_terminal_container_ids(&issues, &hierarchy)
+            .into_iter()
+            .map(|id| self.preview_archive_target(ArchiveTarget::Container(&id)))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(ArchiveCandidates::new(plans))
+    }
+
+    /// Build a complete non-mutating plan for one arbitrary repository document.
+    pub fn preview_archive_document(&self, path: &str) -> Result<ArtifactPlan> {
+        self.preview_archive_target(ArchiveTarget::Document(path))
+    }
+
+    /// Build a complete non-mutating plan for one resolved container subtree.
+    pub fn preview_archive_container(&self, id: &IssueId) -> Result<ArtifactPlan> {
+        self.preview_archive_target(ArchiveTarget::Container(id))
+    }
+
+    /// The plan execution would apply over the admitted image (`@/charter/D-20`).
+    fn preview_archive_target(&self, target: ArchiveTarget<'_>) -> Result<ArtifactPlan> {
+        let layout = self.exec.require_layout()?;
+        with_read_session(&self.exec.storage, &layout, "archive preview", |session| {
+            Ok(self
+                .capture_archive_plan(session, target)?
+                .map(|(_, plan, _)| plan))
+        })
+    }
+
+    /// Capture the image `target`'s plan reads and derive that plan; `None` is
+    /// a retryable conflict.
     fn capture_archive_plan(
         &self,
-        session: &mut dyn RepositoryMutationSession,
+        session: &mut (dyn RepositoryReadSession + '_),
         target: ArchiveTarget<'_>,
     ) -> Result<
         Option<(
@@ -797,10 +602,13 @@ impl ArchiveOps<'_, JsonFileStorage> {
                         request.1, request.0
                     )
                 })?;
+                // Only an ordinary file at a resolved commit is a pinned
+                // artifact; a missing or directory target is unreadable.
                 let fact = match captured.commit_oid() {
-                    Some(oid) => PinnedRootEvidence::Resolved(
+                    Some(oid) if captured.exists() => PinnedRootEvidence::Resolved(
                         crate::domain::artifact_plan::ArtifactVersion::pinned(oid)?,
                     ),
+                    Some(_) => PinnedRootEvidence::Unavailable,
                     None if captured.unavailable_reason().is_some() => {
                         PinnedRootEvidence::Unavailable
                     }
@@ -949,7 +757,7 @@ impl ArchiveOps<'_, JsonFileStorage> {
         // Citation warnings are advisory and no write derives from them, so the
         // scan reads the files directly, one at a time, rather than charging
         // them to the guarded image and its capture budget.
-        facts.citations = crate::storage::collect_citation_scan_evidence(
+        facts.citations = collect_citation_scan_evidence(
             &self.exec.storage,
             &policy.citation_scan_roots,
             artifacts
@@ -970,7 +778,9 @@ impl ArchiveOps<'_, JsonFileStorage> {
         )?;
         Ok(Some((image, plan, archive_evidence)))
     }
+}
 
+impl ArchiveOps<'_, JsonFileStorage> {
     /// Execute a freshly recomputed document archive plan under one write guard.
     pub fn execute_archive_document(&self, path: &str) -> Result<ArchiveExecutionResult> {
         self.execute_archive_target(ArchiveTarget::Document(path))
@@ -1098,7 +908,14 @@ mod tests {
             .unwrap()
             .with_worktree_root(code.path())
             .unwrap();
-        let executor = executor(data.path()).with_worktree_paths(paths.clone());
+        // Production binds the selected checkout to both the executor and its
+        // store, whose captures resolve pinned evidence.
+        let bound_executor = |paths: crate::storage::WorktreePaths| {
+            let executor = executor(data.path()).with_worktree_paths(paths.clone());
+            executor.storage.configure_worktree_paths(&paths);
+            executor
+        };
+        let executor = bound_executor(paths.clone());
         let mut container =
             crate::test_utils::fixture_issue("Pinned container".into(), String::new());
         container.state = State::Done;
@@ -1136,8 +953,7 @@ mod tests {
         );
 
         let outside = tempfile::TempDir::new().unwrap();
-        let executor =
-            executor.with_worktree_paths(paths.with_worktree_root(outside.path()).unwrap());
+        let executor = bound_executor(paths.with_worktree_root(outside.path()).unwrap());
         let plan = executor.archive().preview_archive_container(&id).unwrap();
         assert!(plan.artifacts().is_empty());
         assert_eq!(
@@ -2158,6 +1974,118 @@ mod tests {
             stored_archive_executions(&executor.storage).len(),
             event_count
         );
+    }
+
+    /// A preview reports the plan execution applies: over one unchanged
+    /// repository, each previewed destination root, relocated sources and
+    /// removed sources are what the execution result records.
+    #[test]
+    fn test_preview_archive_target_reports_the_plan_execution_applies() {
+        let taxonomy = test_taxonomy();
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"workspace\"\nmanaged_paths = [\"workspace/active\"]\npermanent_paths = []\narchive_root = \"workspace/archive\"\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let mut container =
+            crate::test_utils::fixture_issue("Archived container".into(), String::new());
+        container.state = State::Done;
+        let container_type = taxonomy.type_at_level(1);
+        let namespace = taxonomy
+            .label_associations
+            .get(container_type)
+            .expect("taxonomy declares a membership namespace for level one");
+        container.labels = vec![
+            format!("type:{container_type}"),
+            format!("{namespace}:parity"),
+        ];
+        let owner = format!("workspace/active/{}-parity", container.short_id());
+        let plan_path = format!("{owner}/plan.md");
+        let shared_path = format!("{owner}/shared.md");
+        let files = [
+            (plan_path.clone(), "[shared](shared.md)\n".to_string()),
+            (shared_path.clone(), "# Shared\n".to_string()),
+            (
+                "workspace/notes/other.md".to_string(),
+                format!("[shared](../../{shared_path})\n"),
+            ),
+            (
+                "workspace/active/standalone.md".to_string(),
+                "![figure](figure.svg)\n".to_string(),
+            ),
+            ("workspace/active/figure.svg".to_string(), "<svg/>".into()),
+        ];
+        files.iter().for_each(|(path, content)| {
+            let file = repo.path().join(path);
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(file, content).unwrap();
+        });
+        container.documents = vec![document_reference(&plan_path)];
+        let container_id = container.id.clone();
+        seed_archive_issue_precondition(&executor.storage, container);
+        for path in ["workspace/notes/other.md", "workspace/active/standalone.md"] {
+            let mut issue =
+                crate::test_utils::fixture_issue(format!("Owner of {path}"), String::new());
+            issue.state = State::Done;
+            issue.documents = vec![document_reference(path)];
+            seed_archive_issue_precondition(&executor.storage, issue);
+        }
+
+        let document_preview = executor
+            .archive()
+            .preview_archive_document("workspace/active/standalone.md")
+            .unwrap();
+        let container_preview = executor
+            .archive()
+            .preview_archive_container(&container_id)
+            .unwrap();
+        let document_execution = executor
+            .archive()
+            .execute_archive_document("workspace/active/standalone.md")
+            .unwrap();
+        let container_execution = executor
+            .archive()
+            .execute_archive_container(&container_id)
+            .unwrap();
+
+        let sources = |plan: &ArtifactPlan, actions: &[ArtifactAction]| {
+            plan.artifacts()
+                .iter()
+                .filter(|artifact| actions.contains(&artifact.action()))
+                .map(|artifact| artifact.source().to_string())
+                .collect::<BTreeSet<_>>()
+        };
+        let actions = [container_preview.artifacts(), document_preview.artifacts()]
+            .concat()
+            .iter()
+            .map(|artifact| artifact.action())
+            .collect::<BTreeSet<_>>();
+        assert!(
+            actions.contains(&ArtifactAction::Move) && actions.contains(&ArtifactAction::Copy),
+            "the fixture previews both relocations and copies: {actions:?}"
+        );
+        for (preview, execution) in [
+            (&document_preview, &document_execution),
+            (&container_preview, &container_execution),
+        ] {
+            assert_eq!(preview.destination_root(), execution.destination_root);
+            assert_eq!(
+                sources(preview, &[ArtifactAction::Move, ArtifactAction::Copy]),
+                execution
+                    .publications
+                    .iter()
+                    .filter_map(|publication| publication.source.clone())
+                    .collect::<BTreeSet<_>>()
+            );
+            assert_eq!(
+                sources(preview, &[ArtifactAction::Move]),
+                execution
+                    .planned_deletions
+                    .iter()
+                    .map(|deletion| deletion.source.clone())
+                    .collect::<BTreeSet<_>>()
+            );
+        }
     }
 
     #[test]

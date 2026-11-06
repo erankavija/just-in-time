@@ -506,8 +506,9 @@ impl<S: IssueStore> ItemOps<'_, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::{seed_issue, seed_repo_file, MemoryDeclarations};
+    use crate::commands::test_helpers::{seed_issue, MemoryDeclarations};
     use crate::storage::InMemoryStorage;
+    use crate::test_harness::seed_memory_repository_file;
 
     fn issue_with_criteria(title: &str, body: &str) -> Issue {
         crate::test_utils::fixture_issue(title.to_string(), body.to_string())
@@ -697,7 +698,7 @@ mod tests {
         // REQ-01: `@/<kind>/<self-id>` resolves through the config-driven path with
         // the source served by the storage boundary (in-memory repo-file map, no fs).
         let storage = InMemoryStorage::new();
-        seed_repo_file(
+        seed_memory_repository_file(
             &storage,
             "project-items.md",
             "## Success Criteria\n\n- GLOSS-01: all writes are atomic\n",
@@ -722,7 +723,7 @@ mod tests {
     fn test_show_item_project_scope_missing_self_id_errors() {
         // An unresolvable project-scope id is reported, never silently dropped.
         let storage = InMemoryStorage::new();
-        seed_repo_file(
+        seed_memory_repository_file(
             &storage,
             "project-items.md",
             "## Success Criteria\n\n- GLOSS-01: x\n",
@@ -768,7 +769,7 @@ mod tests {
         let short = issue.short_id();
         // A custom issue-scope kind must also see GLOSS-* ids.
         let storage = InMemoryStorage::new();
-        seed_repo_file(
+        seed_memory_repository_file(
             &storage,
             "project-items.md",
             "## Success Criteria\n\n- GLOSS-01: project one\n",
@@ -807,12 +808,12 @@ mod tests {
         // project scope each resolve to their OWN distinct item via the explicit
         // `@/<kind>/<self-id>` address, never a silent first-match.
         let storage = InMemoryStorage::new();
-        seed_repo_file(
+        seed_memory_repository_file(
             &storage,
             "rules.md",
             "## Success Criteria\n\n- coverage-preview: the rule form\n",
         );
-        seed_repo_file(
+        seed_memory_repository_file(
             &storage,
             "gates.md",
             "## Success Criteria\n\n- coverage-preview: the gate form\n",
@@ -855,12 +856,12 @@ mod tests {
         // scope is a clear not-found error, never a silent fallback to the kind that
         // DOES own it.
         let storage = InMemoryStorage::new();
-        seed_repo_file(
+        seed_memory_repository_file(
             &storage,
             "rules.md",
             "## Success Criteria\n\n- only-rule: exists only as a rule\n",
         );
-        seed_repo_file(
+        seed_memory_repository_file(
             &storage,
             "gates.md",
             "## Success Criteria\n\n- other-gate: an unrelated gate\n",
@@ -899,7 +900,7 @@ mod tests {
         // through `AddressScope::bind_local` and resolves identically to the
         // bare-`@/<kind>/<self-id>` form when the repo declares that name.
         let storage = InMemoryStorage::new();
-        seed_repo_file(
+        seed_memory_repository_file(
             &storage,
             "project-items.md",
             "## Success Criteria\n\n- GLOSS-01: all writes are atomic\n",
@@ -926,7 +927,7 @@ mod tests {
         // `ItemError::NotResolvable`, which names the unresolvable project and
         // states resolution is local-only.
         let storage = InMemoryStorage::new();
-        seed_repo_file(
+        seed_memory_repository_file(
             &storage,
             "project-items.md",
             "## Success Criteria\n\n- GLOSS-01: all writes are atomic\n",
@@ -997,7 +998,7 @@ mod tests {
         // REQ-01: project-scoped items surface in the cross-repo list alongside
         // issue-scoped ones.
         let storage = InMemoryStorage::new();
-        seed_repo_file(
+        seed_memory_repository_file(
             &storage,
             "project-items.md",
             "## Success Criteria\n\n- GLOSS-01: project gloss\n",
@@ -1094,7 +1095,7 @@ statement = \"Every dependency edge stays acyclic.\"
         // the toml read going through the storage boundary and link-fields surfacing
         // as namespace-qualified link labels.
         let storage = InMemoryStorage::new();
-        seed_repo_file(&storage, "policies.toml", TWO_POLICIES);
+        seed_memory_repository_file(&storage, "policies.toml", TWO_POLICIES);
         let exec = crate::commands::test_helpers::memory_executor_declaring(
             storage,
             MemoryDeclarations {

@@ -10,6 +10,7 @@
   ],
   "description": "Remove the `git2` dependency from both crates and its build prerequisites, and pin its absence with a dependency-policy test.\n\n## Background\n\n- `git2 = \"0.21\"` is declared at `crates/jit/Cargo.toml:34` and `crates/server/Cargo.toml:61`; no server source uses it. `Cargo.lock` holds `git2` (`Cargo.lock:929`) and `libgit2-sys` (`Cargo.lock:1447`), and `libz-sys` and `pkg-config` reach the graph only through them.\n- `ldd` on the built binary lists the system `libgit2`, which links `libssl`, `libcrypto` and `libssh2`.\n- The `ureq` comment (`crates/jit/Cargo.toml:68`) contrasts Rustls with \"the system OpenSSL that git2 links for its own purposes\".\n- The Dockerfile builder stage installs `libssl-dev` and `pkg-config` (`Dockerfile:14`). No `openssl-sys` is in the lock, and `pkg-config` serves only the `libgit2-sys` and `libz-sys` build scripts.\n- `crates/jit/tests/scratch_build/dependency_feature_policy_tests.rs` owns the workspace's dependency-graph policy.\n\n## Success Criteria\n\n- [hard] REQ-01: Neither crate manifest names `git2` as a normal, build or dev dependency, no source names `git2`, and `Cargo.lock` holds no `git2`, `libgit2-sys`, `libssh2-sys` or `openssl-sys` package.\n- [hard] REQ-02: A test in `dependency_feature_policy_tests.rs` asserts REQ-01's manifest and lock facts; against the tree before this change its lock assertion fails on `git2`.\n- [hard] REQ-03: The `ureq` comment states why Rustls is the one TLS backend without naming git2 or system OpenSSL, and the Dockerfile builder stage installs neither `libssl-dev` nor `pkg-config`.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-06T04:24:43.216641719Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -32,7 +33,7 @@
     "satisfies:f4d9502a/REQ-13"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove the libgit2 binding from the workspace",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-06T04:24:43.216641719Z"
 }

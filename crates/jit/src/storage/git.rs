@@ -549,7 +549,7 @@ pub enum CommitResolution {
 }
 
 impl CommitResolution {
-    fn into_version(self, revision: &str) -> Result<ArtifactVersion, GitError> {
+    pub(crate) fn into_version(self, revision: &str) -> Result<ArtifactVersion, GitError> {
         let reason = match self {
             Self::Commit(commit) => return Ok(ArtifactVersion::Pinned(commit)),
             Self::Missing => "revision does not identify an object",

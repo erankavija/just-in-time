@@ -1,18 +1,9 @@
-//! No-follow filesystem evidence acquisition for pure archive planning.
+//! No-follow inspection of repository paths, and the advisory citation scan
+//! built on it.
 
-use crate::domain::artifact_classifier::{
-    classification_facts_from_evidence, contains_path,
-    resolve_container_destination as derive_container_destination, ArchiveLayout,
-    ArtifactClassificationFacts, ArtifactClassificationPolicy, CitationScanEvidence,
-    CitationScanner, EmbeddedArtifactOwner, ResolvedContainerDestination,
-};
-use crate::domain::artifact_discovery::{
-    ArtifactEvidence, ArtifactEvidenceMap, ArtifactListingScope,
-};
-use crate::domain::artifact_plan::{
-    normalize_artifact_path, ArtifactPlanEntry, ArtifactVersion, PlanTarget,
-};
-use crate::domain::identity::IssueId;
+use crate::domain::artifact_classifier::{contains_path, CitationScanEvidence, CitationScanner};
+use crate::domain::artifact_discovery::{ArtifactEvidence, ArtifactListingScope};
+use crate::domain::artifact_plan::normalize_artifact_path;
 use crate::domain::relative_path::RootRelativePath;
 use crate::storage::capability_fs::{
     open_absolute_dir_nofollow, open_child_dir_nofollow, open_regular_file_nofollow,
@@ -22,134 +13,10 @@ use crate::storage::repository_state_store::{
     is_advisory_permission_denied, RepositoryStateStoreError,
 };
 use crate::storage::{validate_repo_relative_path, IssueStore, PathReadError};
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use cap_std::fs::Dir;
 use std::collections::BTreeSet;
 use std::io::{ErrorKind, Read};
-use std::path::Path;
-
-/// Acquire the exact marker, child, and legacy evidence needed to resolve a destination.
-pub fn resolve_container_destination<S: IssueStore>(
-    storage: &S,
-    preferred_root: &str,
-    legacy_root: &str,
-    container_id: &IssueId,
-) -> Result<ResolvedContainerDestination> {
-    validate_repo_relative_path(preferred_root)?;
-    validate_repo_relative_path(legacy_root)?;
-    let archive_root = Path::new(legacy_root)
-        .parent()
-        .ok_or_else(|| anyhow!("container archive destination has no archive root"))?;
-    let archive_root = normalize_artifact_path(&archive_root.to_string_lossy());
-    validate_repo_relative_path(&archive_root)?;
-
-    let mut evidence = ArtifactEvidenceMap::new();
-    let archive = inspect_artifact_evidence(
-        storage,
-        &archive_root,
-        ArtifactListingScope::ImmediateChildren,
-    )?;
-    if let ArtifactEvidence::Directory { entries, .. } = &archive {
-        for child in entries {
-            let child_evidence =
-                inspect_artifact_evidence(storage, child, ArtifactListingScope::MetadataOnly)?;
-            if matches!(child_evidence, ArtifactEvidence::Directory { .. }) {
-                let marker = format!("{child}/.jit-container");
-                evidence.insert(
-                    marker.clone(),
-                    inspect_artifact_evidence(
-                        storage,
-                        &marker,
-                        ArtifactListingScope::MetadataOnly,
-                    )?,
-                );
-            }
-            evidence.insert(child.clone(), child_evidence);
-        }
-    }
-    evidence.insert(archive_root, archive);
-    if !evidence.contains_key(legacy_root) {
-        evidence.insert(
-            legacy_root.to_string(),
-            inspect_artifact_evidence(storage, legacy_root, ArtifactListingScope::MetadataOnly)?,
-        );
-    }
-    Ok(derive_container_destination(
-        preferred_root,
-        legacy_root,
-        container_id,
-        &evidence,
-    )?)
-}
-
-/// Acquire every source, mirror, marker, and destination listing used by
-/// classification, plus the text of the declared citation scan universe.
-pub fn collect_artifact_classification_facts<S: IssueStore>(
-    storage: &S,
-    target: &PlanTarget,
-    destination_root: &str,
-    artifacts: &[ArtifactPlanEntry],
-    policy: &ArtifactClassificationPolicy,
-    embedded_owners: Vec<EmbeddedArtifactOwner>,
-) -> Result<ArtifactClassificationFacts> {
-    let inspect_destinations = !policy.archive_root.is_empty();
-    let layout = ArchiveLayout::new(target, destination_root, policy, artifacts);
-    let mut evidence = ArtifactEvidenceMap::new();
-    for artifact in artifacts
-        .iter()
-        .filter(|artifact| artifact.version() == &ArtifactVersion::WorkingTree)
-    {
-        let source = artifact.source();
-        evidence.insert(
-            source.to_string(),
-            inspect_artifact_evidence(storage, source, ArtifactListingScope::MetadataOnly)?,
-        );
-        if inspect_destinations {
-            if let Some(destination) = layout.destination(source) {
-                evidence.insert(
-                    destination.clone(),
-                    inspect_artifact_evidence(
-                        storage,
-                        &destination,
-                        ArtifactListingScope::MetadataOnly,
-                    )?,
-                );
-            }
-        }
-    }
-    if matches!(target, PlanTarget::Container { .. }) && inspect_destinations {
-        let destination = inspect_artifact_evidence(
-            storage,
-            destination_root,
-            ArtifactListingScope::RecursiveFiles,
-        )?;
-        if matches!(destination, ArtifactEvidence::Directory { .. }) {
-            let marker = format!("{destination_root}/.jit-container");
-            evidence.insert(
-                marker.clone(),
-                inspect_artifact_evidence(storage, &marker, ArtifactListingScope::MetadataOnly)?,
-            );
-        }
-        evidence.insert(destination_root.to_string(), destination);
-    }
-    Ok(ArtifactClassificationFacts {
-        citations: collect_citation_scan_evidence(
-            storage,
-            &policy.citation_scan_roots,
-            artifacts
-                .iter()
-                .map(|artifact| artifact.source().to_string()),
-        )?,
-        ..classification_facts_from_evidence(
-            target,
-            destination_root,
-            artifacts,
-            policy,
-            embedded_owners,
-            &evidence,
-        )?
-    })
-}
 
 /// Scan every file the declared citation scan roots reach for citations of
 /// `sources`, holding one file's bytes at a time.
@@ -161,9 +28,8 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
 /// file beneath it; a root nested in another declared root is walked once.
 ///
 /// The walk is [`inspect_artifact_evidence`]'s recursive listing, which opens
-/// every component with the no-follow directory handles the rest of the planner
-/// uses, so the scan escapes the repository through no symbolic link and starts
-/// no external process.
+/// every component with no-follow directory handles, so the scan escapes the
+/// repository through no symbolic link and starts no external process.
 pub(crate) fn collect_citation_scan_evidence<S: IssueStore>(
     storage: &S,
     roots: &[String],
@@ -459,9 +325,14 @@ fn other(error: impl Into<anyhow::Error>) -> PathReadError {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
-    use crate::domain::artifact_classifier::{classify_artifacts, ArtifactClassificationInventory};
+    use crate::domain::artifact_classifier::{
+        classification_facts_from_evidence, classify_artifacts, ArchiveLayout,
+        ArtifactClassificationFacts, ArtifactClassificationInventory, ArtifactClassificationPolicy,
+    };
+    use crate::domain::artifact_discovery::ArtifactEvidenceMap;
     use crate::domain::artifact_plan::{
-        ArtifactAction, ArtifactOwner, ArtifactPlan, ArtifactProvenance, WarningCode,
+        ArtifactAction, ArtifactOwner, ArtifactPlan, ArtifactPlanEntry, ArtifactProvenance,
+        ArtifactVersion, PlanTarget, WarningCode,
     };
     use crate::domain::State;
     use crate::storage::JsonFileStorage;
@@ -505,8 +376,7 @@ mod tests {
     }
 
     /// Plan the relocation of one cited artifact with `roots` declared as the
-    /// citation scan universe, acquiring evidence exactly as an archive preview
-    /// does.
+    /// citation scan universe.
     fn plan_with_scan(storage: &JsonFileStorage, roots: &[&str]) -> ArtifactPlan {
         let target = PlanTarget::Container {
             id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12),
@@ -527,15 +397,34 @@ mod tests {
             selected_for_relink: false,
         }])];
         let policy = scan_policy(roots);
-        let facts = collect_artifact_classification_facts(
-            storage,
-            &target,
-            DESTINATION_ROOT,
-            &artifacts,
-            &policy,
-            Vec::new(),
-        )
-        .unwrap();
+        let layout = ArchiveLayout::new(&target, DESTINATION_ROOT, &policy, &artifacts);
+        let evidence = std::iter::once(CITED_SOURCE.to_string())
+            .chain(layout.destination(CITED_SOURCE))
+            .chain(std::iter::once(DESTINATION_ROOT.to_string()))
+            .map(|path| {
+                let fact =
+                    inspect_artifact_evidence(storage, &path, ArtifactListingScope::MetadataOnly)
+                        .unwrap();
+                (path, fact)
+            })
+            .collect::<ArtifactEvidenceMap>();
+        let facts = ArtifactClassificationFacts {
+            citations: collect_citation_scan_evidence(
+                storage,
+                &policy.citation_scan_roots,
+                [CITED_SOURCE.to_string()],
+            )
+            .unwrap(),
+            ..classification_facts_from_evidence(
+                &target,
+                DESTINATION_ROOT,
+                &artifacts,
+                &policy,
+                Vec::new(),
+                &evidence,
+            )
+            .unwrap()
+        };
         classify_artifacts(
             ArtifactClassificationInventory::new(target, artifacts, Vec::new())
                 .with_destination_root(DESTINATION_ROOT),
@@ -633,6 +522,41 @@ mod tests {
                 ],
             }
         );
+    }
+
+    #[test]
+    fn test_inspect_artifact_evidence_does_not_follow_leaf_or_traversal_symlinks() {
+        let (repo, storage) = repository();
+        write(&repo, "real/file.md", "content");
+        fs::create_dir(repo.path().join("directory-artifact")).unwrap();
+        symlink(
+            repo.path().join("real/file.md"),
+            repo.path().join("leaf.md"),
+        )
+        .unwrap();
+        symlink(repo.path().join("real"), repo.path().join("linked-dir")).unwrap();
+        let inspect = |path: &str| {
+            inspect_artifact_evidence(&storage, path, ArtifactListingScope::MetadataOnly)
+        };
+
+        assert_eq!(inspect("leaf.md").unwrap(), ArtifactEvidence::Symlink);
+        assert_eq!(
+            inspect("linked-dir/file.md").unwrap(),
+            ArtifactEvidence::Symlink
+        );
+        assert_eq!(inspect("missing.md").unwrap(), ArtifactEvidence::Missing);
+        assert_eq!(
+            inspect("real/file.md").unwrap(),
+            ArtifactEvidence::File(b"content".to_vec())
+        );
+        assert!(matches!(
+            inspect("directory-artifact").unwrap(),
+            ArtifactEvidence::Directory { .. }
+        ));
+        assert!(matches!(
+            inspect("real/file.md/child"),
+            Err(PathReadError::Other(_))
+        ));
     }
 
     #[test]

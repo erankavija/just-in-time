@@ -279,62 +279,6 @@ type Index = RepositoryIndex;
 pub(crate) type PinnedEvidenceCache =
     BTreeMap<(String, String), crate::repository_state::PinnedDocumentEvidence>;
 
-#[cfg(all(test, unix))]
-mod artifact_location_tests {
-    use super::*;
-    use crate::domain::artifact_classifier::ArtifactLocation;
-    use std::os::unix::fs::symlink;
-    use tempfile::TempDir;
-
-    #[test]
-    fn test_inspect_artifact_location_does_not_follow_leaf_or_traversal_symlinks() {
-        let repo = TempDir::new().unwrap();
-        fs::create_dir_all(repo.path().join(".jit")).unwrap();
-        fs::create_dir_all(repo.path().join("real")).unwrap();
-        fs::create_dir_all(repo.path().join("directory-artifact")).unwrap();
-        fs::write(repo.path().join("real/file.md"), b"content").unwrap();
-        symlink(
-            repo.path().join("real/file.md"),
-            repo.path().join("leaf.md"),
-        )
-        .unwrap();
-        symlink(repo.path().join("real"), repo.path().join("linked-dir")).unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let layout =
-            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        storage.configure_repository_layout(&layout).unwrap();
-
-        assert_eq!(
-            storage.inspect_artifact_location("leaf.md").unwrap(),
-            ArtifactLocation::Symlink
-        );
-        assert_eq!(
-            storage
-                .inspect_artifact_location("linked-dir/file.md")
-                .unwrap(),
-            ArtifactLocation::Symlink
-        );
-        assert_eq!(
-            storage.inspect_artifact_location("missing.md").unwrap(),
-            ArtifactLocation::Missing
-        );
-        assert!(matches!(
-            storage.inspect_artifact_location("real/file.md").unwrap(),
-            ArtifactLocation::Regular(_)
-        ));
-        assert_eq!(
-            storage
-                .inspect_artifact_location("directory-artifact")
-                .unwrap(),
-            ArtifactLocation::Unsupported
-        );
-        assert!(matches!(
-            storage.inspect_artifact_location("real/file.md/child"),
-            Err(crate::storage::PathReadError::Other(_))
-        ));
-    }
-}
-
 /// The tombstones of the index at `path`; an absent index holds none.
 fn read_tombstones(path: &Path) -> Result<Vec<IssueId>> {
     match fs::read(path) {
@@ -558,11 +502,18 @@ impl JsonFileStorage {
             .pinned_target_cache
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let paths = self.configured_worktree_paths().ok();
-        let top = paths
-            .as_ref()
-            .and_then(WorktreePaths::code_checkout_top_level)
-            .unwrap_or(repo_root);
+        // A selected code root outside Git reads no history, not the data
+        // checkout's; an unselected one reads the repository root's.
+        let selected = self
+            .worktree_paths
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
+        let top = selected.as_ref().map_or(repo_root, |paths| {
+            paths
+                .code_checkout_top_level()
+                .unwrap_or(&paths.worktree_root)
+        });
         let prefix = repo_root
             .strip_prefix(top)
             .unwrap_or_else(|_| Path::new(""));
@@ -778,40 +729,6 @@ impl JsonFileStorage {
     pub fn validate(&self) -> Result<()> {
         self.load_index()?;
         Ok(())
-    }
-
-    /// Inspect one working-tree artifact without following symbolic links.
-    ///
-    /// Every existing path component is checked with `symlink_metadata` before
-    /// bytes are read. This is stricter than general repository reads, which
-    /// permit in-repository symlinks, because archival planning must classify
-    /// roots, destinations, and traversals as `symlink-artifact` rather than
-    /// silently operating on their referents. Existing non-regular leaves are
-    /// returned as `Unsupported`; metadata and traversal failures remain typed
-    /// storage errors.
-    pub fn inspect_artifact_location(
-        &self,
-        path: &str,
-    ) -> Result<crate::domain::artifact_classifier::ArtifactLocation, crate::storage::PathReadError>
-    {
-        use crate::domain::artifact_classifier::ArtifactLocation;
-        use crate::domain::artifact_discovery::{ArtifactEvidence, ArtifactListingScope};
-        use crate::domain::artifact_plan::ContentIdentity;
-        crate::storage::validate_repo_relative_path(path)?;
-        match crate::storage::artifact_planning::inspect_artifact_evidence(
-            self,
-            path,
-            ArtifactListingScope::MetadataOnly,
-        )? {
-            ArtifactEvidence::Missing => Ok(ArtifactLocation::Missing),
-            ArtifactEvidence::Symlink => Ok(ArtifactLocation::Symlink),
-            ArtifactEvidence::File(bytes) => Ok(ArtifactLocation::Regular(
-                ContentIdentity::from_bytes(&bytes),
-            )),
-            ArtifactEvidence::Directory { .. }
-            | ArtifactEvidence::Unsupported
-            | ArtifactEvidence::InvalidPath => Ok(ArtifactLocation::Unsupported),
-        }
     }
 
     fn read_issue_record(&self, path: &Path) -> Result<Issue> {
@@ -1260,35 +1177,6 @@ impl IssueStore for JsonFileStorage {
         // Lock-free (`@/charter/D-22`): the parser ignores a partly written final line.
         let contents = fs::read(&events_path).context("Failed to read events file")?;
         parse_known_events(&contents).context("Failed to deserialize event log")
-    }
-
-    fn read_archive_evidence_record(
-        &self,
-        target: &crate::domain::artifact_plan::PlanTarget,
-    ) -> Result<Option<crate::domain::artifact_execution::ArchiveEvidenceRecord>> {
-        let path = VirtualPath::archive_evidence_record(target);
-        let contents = match crate::storage::capability_fs::read_repository_file_confined(
-            &self.root,
-            path.relative(),
-        ) {
-            Ok(contents) => contents,
-            Err(super::capability_fs::CapabilityFsError::Io(error))
-                if error.kind() == std::io::ErrorKind::NotFound =>
-            {
-                None
-            }
-            Err(error) => return Err(error.into()),
-        };
-        contents
-            .map(|contents| {
-                serde_json::from_slice(&contents).with_context(|| {
-                    format!(
-                        "Failed to deserialize archive evidence record at {}",
-                        path.relative().as_path().display()
-                    )
-                })
-            })
-            .transpose()
     }
 
     fn load_gate_run_result(

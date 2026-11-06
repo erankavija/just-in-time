@@ -739,8 +739,8 @@ pub fn render_reference_markdown() -> Result<String> {
          `{document_evidence_path}`, where the digest is SHA-256 over the normalized\n\
          repository-relative document path. The archive execution finalizer\n\
          (`finalize_archive_execution`) appends the execution to this record in the same\n\
-         redo record as the archive event. The archive preview reader,\n\
-         `IssueStore::read_archive_evidence_record(target)`, loads it by target.\n\
+         redo record as the archive event. Preview and execution share one planner,\n\
+         `capture_archive_plan`, which captures it by target.\n\
          \n\
          ```json\n\
          {example_archive_evidence}\n\
@@ -931,7 +931,7 @@ mod tests {
             "`target`",
             "`executions`",
             "captured_reusable_gate_run",
-            "read_archive_evidence_record",
+            "capture_archive_plan",
             "finalize_archive_execution",
         ] {
             assert!(page.contains(required), "reference is missing `{required}`");
