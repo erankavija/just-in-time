@@ -22,11 +22,11 @@
 //! of the underlying walk never enter it — a checkout that rewrites timestamps
 //! without changing bytes digests to the same value.
 
+use crate::domain::relative_path::RootRelativePath;
 use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use std::fmt;
-use std::path::{Component, Path};
 
 /// Domain separator opening every [`InputsDigest`] computation.
 ///
@@ -104,7 +104,12 @@ impl TryFrom<&str> for DeclaredRoot {
     type Error = DeclaredRootError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        if value == WORKTREE_ROOT || is_safe_relative_path(value) {
+        if value == WORKTREE_ROOT
+            || matches!(
+                RootRelativePath::parse(value),
+                Ok(RootRelativePath::Descendant(_))
+            )
+        {
             Ok(Self(value.to_string()))
         } else {
             Err(DeclaredRootError(value.to_string()))
@@ -496,30 +501,6 @@ impl InputsDigestBuilder {
     }
 }
 
-/// Whether `path` is a relative path of ordinary segments, safe to join to a
-/// repository or package root on any platform.
-///
-/// One rule for every declared path: the sources and targets the profile
-/// package model validates, the live-source roots a manifest declares, and the
-/// roots a repository input set declares besides the worktree root `.`
-/// (`@/invariant/convention-convergence`).
-pub(crate) fn is_safe_relative_path(path: &str) -> bool {
-    let parsed = Path::new(path);
-    let has_windows_prefix = path.as_bytes().get(1) == Some(&b':')
-        && path.as_bytes().first().is_some_and(u8::is_ascii_alphabetic);
-    !path.is_empty()
-        && !path.contains('\\')
-        && !path.contains(':')
-        && !path.chars().any(char::is_control)
-        && !has_windows_prefix
-        && has_ordinary_segments(path)
-        && !parsed.is_absolute()
-        && parsed.components().all(|component| match component {
-            Component::Normal(value) => value != "." && value != "..",
-            _ => false,
-        })
-}
-
 /// Whether `value` splits on `/` into non-empty segments that are neither `.`
 /// nor `..`, which rejects a leading or trailing separator and a doubled one.
 fn has_ordinary_segments(value: &str) -> bool {
@@ -605,6 +586,7 @@ mod tests {
 
     #[test]
     fn test_declared_root_rejects_paths_that_cannot_be_joined_to_a_worktree() {
+        assert!(DeclaredRoot::try_from("").is_err());
         for rejected in [
             "/absolute",
             "..",
