@@ -23,7 +23,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "ec12e7db-c5e2-42f8-b045-2392a13c7514",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:43:23.845216920Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "34851181-7812-4cef-9347-9b80c7fd288f",
   "labels": [
     "type:task",
@@ -41,5 +48,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Trim the layout and git module surface to production callers",
-  "updated_at": "2026-11-06T05:20:40.635410991Z"
+  "updated_at": "2026-11-06T05:43:23.845216920Z"
 }
