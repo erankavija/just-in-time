@@ -1283,7 +1283,7 @@ pub enum EventBody {
     IssueUpdated {
         /// Issue that was updated
         issue_id: IssueId,
-        /// Who updated it (e.g., "bulk-update", "human:alice", "agent:copilot")
+        /// Who updated it (e.g., "issue-update", "issue-unassign")
         updated_by: String,
         /// Fields that changed
         fields: Vec<String>,
@@ -2896,9 +2896,9 @@ mod tests {
         fn test_event_actor_rejected_before_construction() {
             // The constructors only accept an already-parsed `Assignee`, so a
             // malformed actor is rejected at parse time and can never reach an
-            // event. (`"bulk-update"` is the kind of non-assignee actor that the
+            // event. (`"issue-update"` is the kind of non-assignee actor that the
             // string-typed `IssueUpdated.updated_by` still carries.)
-            assert!(Assignee::from_str("bulk-update").is_err());
+            assert!(Assignee::from_str("issue-update").is_err());
             assert!("nocolon".parse::<Assignee>().is_err());
         }
 
