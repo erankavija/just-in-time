@@ -73,7 +73,7 @@
           "title": "One pure gate-preset catalog serves every preset reader",
           "classification": "implementation",
           "worker": "codex gpt-6.1-sol high",
-          "status": "dispatched (codex gpt-6.1-sol high)",
+          "status": "landing 7e24a0c93",
           "note": "shares gate.rs/template.rs with c2b3cefa"
         }
       ]
@@ -112,7 +112,7 @@
           "title": "One state derivation for update and lifecycle transitions",
           "classification": "implementation",
           "worker": "claude opus",
-          "status": "dispatched (claude opus)"
+          "status": "rework-1 (prechecks from projected gates)"
         },
         {
           "id": "7fefd776-6e85-428d-a386-a1512c0a94a1",
@@ -174,7 +174,8 @@
     "f6477007": 3,
     "4334df62": 1,
     "9a2563fd": 1,
-    "c2b3cefa": 2
+    "c2b3cefa": 2,
+    "d2acb105": 1
   },
   "surfaced_pitfalls": [
     {
