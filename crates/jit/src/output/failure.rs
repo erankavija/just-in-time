@@ -142,6 +142,15 @@ fn derive_guidance(error: &anyhow::Error) -> Guidance {
             )],
         };
     }
+    if let Some(failure) = error.downcast_ref::<crate::errors::InvalidWorktreeRootError>() {
+        return Guidance {
+            details: Some(serde_json::json!({
+                "setting": failure.setting, "supplied": failure.supplied,
+                "resolved": failure.resolved, "reason": failure.reason,
+            })),
+            suggestions: Vec::new(),
+        };
+    }
     if let Some(refusal) = error.downcast_ref::<LinkedCheckoutWriteRefusedError>() {
         // The checkout, the stance that refused it, and how to permit the
         // operation (jit:f52567ed REQ-02).
@@ -248,6 +257,10 @@ pub(super) fn id_resolution_error(error: &anyhow::Error) -> Option<JsonError> {
 /// The registered code of a failure. Human message text is deliberately absent
 /// from this cascade, and its order is semantic.
 fn classify_code(error: &anyhow::Error) -> ErrorCode {
+    if error.is::<crate::errors::InvalidWorktreeRootError>() {
+        return ErrorCode::InvalidArgument;
+    }
+
     if let Some(failed) = error.downcast_ref::<crate::commands::serve::ServeActionFailed>() {
         return classify_code(&failed.cause);
     }
@@ -762,6 +775,27 @@ mod exit_code_projection_tests {
     use crate::declarations::GateStage;
     use crate::domain::{GateRunResult, GateRunStatus};
     use crate::output::ErrorCode;
+
+    #[test]
+    fn test_invalid_worktree_root_serializes_the_explicit_source_and_paths() {
+        let supplied = std::path::PathBuf::from("missing");
+        let resolved = tempfile::tempdir().unwrap().path().join(&supplied);
+        let error = crate::errors::InvalidWorktreeRootError {
+            setting: crate::errors::WorktreeRootSource::Environment,
+            supplied: supplied.clone(),
+            resolved: resolved.clone(),
+            reason: "missing directory".into(),
+        };
+        let classified = classify(&error.into());
+        assert_eq!(classified.error.code, ErrorCode::InvalidArgument);
+        let details = classified.error.details.unwrap();
+        assert_eq!(details["supplied"], serde_json::json!(supplied));
+        assert_eq!(details["resolved"], serde_json::json!(resolved));
+        assert_eq!(
+            details["setting"],
+            serde_json::json!(crate::errors::WorktreeRootSource::Environment)
+        );
+    }
 
     /// Build a `gate evaluate` checker failure carrying `status`, which
     /// `classify` splits into checker verdict `4` and runner error `10`.

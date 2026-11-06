@@ -406,7 +406,14 @@ fn gitattributes_claim(
     let Ok(relative) = layout.data_root().strip_prefix(worktree) else {
         return GitattributesClaim::NotApplicable;
     };
-    if relative.as_os_str().is_empty() || !paths.is_git_repository() {
+    if relative.as_os_str().is_empty()
+        || paths
+            .git()
+            .as_ref()
+            .map(|checkout| checkout.worktree_root())
+            != paths.code_checkout_top_level()
+        || !paths.is_git_repository()
+    {
         return GitattributesClaim::NotApplicable;
     }
     GitattributesClaim::Eligible {
@@ -478,6 +485,23 @@ mod tests {
 
         assert_eq!(result.gitattributes, GitattributesStatus::NotApplicable);
         assert!(!repo.path().join(".gitattributes").exists());
+    }
+
+    #[test]
+    fn test_gitattributes_claim_rejects_nested_independent_data_checkout() {
+        let repo = TempDir::new().unwrap();
+        crate::test_harness::git::GitRepository::init(repo.path());
+        let data = repo.path().join(".jit");
+        crate::test_harness::git::GitRepository::init(&data);
+        let layout = discover_repository_layout(repo.path(), &data).unwrap();
+        let paths = WorktreePaths::detect_for_data_root(&data, repo.path())
+            .unwrap()
+            .with_worktree_root(repo.path())
+            .unwrap();
+        assert!(matches!(
+            gitattributes_claim(&layout, &paths),
+            GitattributesClaim::NotApplicable
+        ));
     }
 
     #[test]

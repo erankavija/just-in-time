@@ -273,3 +273,32 @@ fn test_deletion_requires_env_var() {
         "Issue should be deleted after env var check passed"
     );
 }
+
+#[test]
+fn test_nested_data_repository_opens_with_separate_code_authority() {
+    let cli = JitCli::initialised().unwrap();
+    jit::test_harness::git::GitRepository::init(cli.root());
+    jit::test_harness::git::GitRepository::init(cli.root().join(".jit"));
+    let created = cli
+        .command([
+            "issue",
+            "create",
+            "--title",
+            "Nested data repository",
+            "--json",
+        ])
+        .env("JIT_WORKTREE_ROOT", cli.root())
+        .output()
+        .unwrap();
+    assert!(created.status.success(), "{created:?}");
+    let issue =
+        jit::test_cli::created_issue_id(&serde_json::from_slice(&created.stdout).unwrap()).unwrap();
+    let output = cli
+        .command(["issue", "show", &issue, "--json"])
+        .env("JIT_WORKTREE_ROOT", cli.root())
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    let found: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(found["title"], "Nested data repository");
+}

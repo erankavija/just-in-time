@@ -1208,3 +1208,58 @@ fn test_issue_responses_do_not_open_unreferenced_gate_runs() {
         cli.run_json(args).unwrap();
     }
 }
+
+#[test]
+fn test_gate_evaluate_uses_selected_code_root_and_head() {
+    let data = JitCli::initialised().unwrap();
+    let issue = add_auto_gate_issue(&data, "code-root", "test -f code-marker");
+    data.init_git().unwrap().commit("data commit").unwrap();
+    let code = JitCli::initialised().unwrap();
+    code.init_git().unwrap();
+    fs::write(code.root().join("code-marker"), "code").unwrap();
+    code.commit("code commit").unwrap();
+    let head = code.git(["rev-parse", "HEAD"]).unwrap();
+    data.command(["gate", "evaluate", &issue, "code-root"])
+        .env("JIT_WORKTREE_ROOT", code.root())
+        .assert()
+        .success();
+    let stored: serde_json::Value = serde_json::from_slice(
+        &fs::read(data.root().join(format!(".jit/issues/{issue}.json"))).unwrap(),
+    )
+    .unwrap();
+    let run_id =
+        serde_json::from_value(stored["gates_status"]["code-root"]["run_id"].clone()).unwrap();
+    let run_path =
+        jit::repository_state::VirtualPath::gate_run_record(&issue.parse().unwrap(), &run_id);
+    let run: serde_json::Value = serde_json::from_slice(
+        &fs::read(data.root().join(".jit").join(run_path.relative().as_path())).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(run["commit"], head.trim());
+}
+
+#[test]
+fn test_gate_evaluate_non_git_code_does_not_inherit_data_evidence() {
+    let data = JitCli::initialised().unwrap();
+    let issue = add_auto_gate_issue(&data, "no-code-git", "exit 0");
+    data.init_git().unwrap().commit("data commit").unwrap();
+    let code = tempfile::tempdir().unwrap();
+    data.command(["gate", "evaluate", &issue, "no-code-git"])
+        .env("JIT_WORKTREE_ROOT", code.path())
+        .assert()
+        .success();
+    let stored: serde_json::Value = serde_json::from_slice(
+        &fs::read(data.root().join(format!(".jit/issues/{issue}.json"))).unwrap(),
+    )
+    .unwrap();
+    let run_id =
+        serde_json::from_value(stored["gates_status"]["no-code-git"]["run_id"].clone()).unwrap();
+    let run_path =
+        jit::repository_state::VirtualPath::gate_run_record(&issue.parse().unwrap(), &run_id);
+    let run: serde_json::Value = serde_json::from_slice(
+        &fs::read(data.root().join(".jit").join(run_path.relative().as_path())).unwrap(),
+    )
+    .unwrap();
+    assert!(run["commit"].is_null());
+    assert!(run["branch"].is_null());
+}

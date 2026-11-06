@@ -233,3 +233,31 @@ fn test_external_traversal_from_subdirectory_reuses_moved_checkout_layout_regard
         previous_counts = Some(counts);
     }
 }
+
+#[test]
+fn test_issue_read_probes_selected_code_and_data_contexts_once() {
+    let cli = JitCli::uninitialised().unwrap();
+    GitRepository::init(cli.root());
+    cli.run(["init"]).unwrap();
+    let id = create_ready_issue(&cli);
+    let code_dir = tempfile::tempdir().unwrap();
+    GitRepository::init(code_dir.path());
+    let stand_in = GitStandIn::new();
+    let output = cli
+        .command_with_env(
+            ["issue", "show", &id, "--json"],
+            [
+                ("JIT_WORKTREE_ROOT", code_dir.path().as_os_str()),
+                ("PATH", stand_in.search_path().as_os_str()),
+            ],
+        )
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    let calls = stand_in.invocations();
+    let layouts = calls
+        .iter()
+        .filter(|call| call.args().iter().any(|arg| arg == "--git-common-dir"))
+        .count();
+    assert_eq!(layouts, 2, "{calls:#?}");
+}

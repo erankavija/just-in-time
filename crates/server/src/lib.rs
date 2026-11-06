@@ -79,9 +79,22 @@ fn listener_from(
 /// # Errors
 /// Returns the shared repository bootstrap's discovery, recovery, or validation error.
 pub fn prepare_server_repository(data_dir: &Path, current_dir: &Path) -> Result<OpenedRepository> {
+    prepare_server_repository_with_root(
+        data_dir,
+        current_dir,
+        std::env::var_os("JIT_WORKTREE_ROOT").map(std::path::PathBuf::from),
+    )
+}
+
+fn prepare_server_repository_with_root(
+    data_dir: &Path,
+    current_dir: &Path,
+    worktree_root_override: Option<std::path::PathBuf>,
+) -> Result<OpenedRepository> {
     open_repository(RepositoryInvocation {
         current_dir: current_dir.to_path_buf(),
         data_dir_override: Some(data_dir.to_path_buf()),
+        worktree_root_override,
         is_init: false,
         opens_mutation_session: true,
         coordinates_claims_first: false,
@@ -97,6 +110,19 @@ mod repository_startup_tests {
     use super::*;
     use jit::repository_state::{FileMode, VirtualPath};
     use jit::storage::{commit_redo_record, DataRoot, PutFile, RedoRecord};
+
+    #[test]
+    fn test_server_startup_passes_explicit_code_root_to_shared_bootstrap() {
+        let (temp, _) = jit::test_utils::setup_test_repo().unwrap();
+        let code = tempfile::tempdir().unwrap();
+        let opened = prepare_server_repository_with_root(
+            &temp.path().join(".jit"),
+            temp.path(),
+            Some(code.path().to_path_buf()),
+        )
+        .unwrap();
+        assert_eq!(opened.layout.worktree_root(), code.path());
+    }
 
     #[test]
     fn test_server_startup_selects_the_data_roots_checkout_from_an_outside_directory() {

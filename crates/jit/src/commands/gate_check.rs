@@ -1284,7 +1284,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             crate::declarations::GateChecker::Exec { .. } => {
                 let head = self
                     .require_worktree_paths()?
-                    .git()
+                    .code_checkout()
                     .map(|git| git.head())
                     .transpose()?
                     .flatten();

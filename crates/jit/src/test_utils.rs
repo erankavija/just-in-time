@@ -1603,6 +1603,7 @@ pub fn linked_checkout_paths(
     let (primary, checkout) = (primary.as_ref(), checkout.as_ref());
     let mut paths = WorktreePaths::non_git(&checkout.join(".jit"), checkout);
     paths.git_repository = true;
+    paths.code_git = true;
     paths.common_dir = primary.join(".git");
     paths.shared_jit = primary.join(".git/jit");
     paths

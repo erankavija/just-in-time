@@ -67,9 +67,27 @@ pub struct ExactStoreSnapshot {
 /// Returns an error when the selected root contains an unsafe filesystem entry,
 /// a record cannot be read, or a physical issue/current event cannot be parsed.
 pub fn read_exact_store(layout: &RepositoryLayout) -> Result<ExactStoreSnapshot> {
-    let data_root = layout.data_root();
-    let issues_path = layout.resolve(&VirtualPath::ISSUES)?;
-    let events_path = layout.resolve(&VirtualPath::EVENTS)?;
+    read_exact_data_store(layout.data_root())
+}
+
+/// Read one data root without inventing a code-root authority.
+pub fn read_exact_data_store(data_root: &Path) -> Result<ExactStoreSnapshot> {
+    use crate::storage::repository_state_store::{
+        retry_optimistic_reads, DataReadSession, ReadAdmission,
+    };
+    retry_optimistic_reads("exact data store", || {
+        let session = DataReadSession::open(data_root)?;
+        if session.admit()? != ReadAdmission::Granted {
+            return Ok(None);
+        }
+        let result = read_exact_data_store_contents(data_root);
+        Ok((session.admit()? == ReadAdmission::Granted).then_some(result))
+    })
+}
+
+fn read_exact_data_store_contents(data_root: &Path) -> Result<ExactStoreSnapshot> {
+    let issues_path = data_root.join(VirtualPath::ISSUES.relative().as_path());
+    let events_path = data_root.join(VirtualPath::EVENTS.relative().as_path());
     let data = match super::capability_fs::open_absolute_dir_nofollow(data_root) {
         Ok(data) => data,
         Err(super::capability_fs::CapabilityFsError::Io(error))
@@ -369,6 +387,33 @@ pub(crate) fn parse_repository_index(bytes: &[u8]) -> Result<Index> {
     }
 }
 
+/// Validate initialized-store facts from the same capture as its consumers.
+pub(crate) fn validate_captured_index(
+    root: &Path,
+    exists: bool,
+    index: &crate::repository_state::RepositoryEntry,
+) -> Result<Index> {
+    use crate::repository_state::RepositoryEntry;
+    if !exists {
+        return Err(RepositoryNotFoundError::new(root.display().to_string()).into());
+    }
+    match index {
+        RepositoryEntry::Absent => anyhow::bail!(
+            "JIT repository at '{}' is not properly initialized (missing index.json)\n\n\
+             Initialize with: jit init",
+            root.display()
+        ),
+        RepositoryEntry::File { content, .. } => parse_repository_index(content.bytes()),
+        _ => Err(
+            crate::storage::RepositoryStateStoreError::UnsafeTarget(format!(
+                "{:?}",
+                VirtualPath::INDEX
+            ))
+            .into(),
+        ),
+    }
+}
+
 /// File-backed repository reader and mutation-session provider.
 ///
 /// This implementation stores each issue as a separate JSON file in `.jit/issues/`,
@@ -411,6 +456,8 @@ pub struct JsonFileStorage {
     active_mutation_layout: Arc<crate::storage::repository_state_store::ActiveLayoutTracker>,
     /// Explicit worktree/data-root authority for repository-relative readers.
     repository_layout: Arc<Mutex<Option<RepositoryLayout>>>,
+    pub(crate) bootstrap_selection:
+        Arc<Mutex<Option<crate::storage::repository_state_store::BootstrapSelection>>>,
     #[cfg(test)]
     issue_read_hook: Arc<Mutex<Option<IssueReadHook>>>,
     /// Authoritative Git/non-Git classification for the selected data root.
@@ -469,6 +516,7 @@ impl JsonFileStorage {
             mutation_interruptions: Arc::new(crate::storage::NoMutationInterruptions),
             active_mutation_layout: Arc::new(Default::default()),
             repository_layout: Arc::new(Mutex::new(None)),
+            bootstrap_selection: Arc::new(Mutex::new(None)),
             #[cfg(test)]
             issue_read_hook: Arc::new(Mutex::new(None)),
             worktree_paths: Arc::new(Mutex::new(None)),
@@ -510,8 +558,36 @@ impl JsonFileStorage {
             .pinned_target_cache
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        GitCheckout::new(self.git.clone(), repo_root.to_path_buf())
-            .inspect_pinned_targets(requests, kind_only, &mut cache)
+        let paths = self.configured_worktree_paths().ok();
+        let top = paths
+            .as_ref()
+            .and_then(WorktreePaths::code_checkout_top_level)
+            .unwrap_or(repo_root);
+        let prefix = repo_root
+            .strip_prefix(top)
+            .unwrap_or_else(|_| Path::new(""));
+        let translate = |request: &(String, String)| {
+            let path = if prefix.as_os_str().is_empty()
+                || crate::storage::validate_repo_relative_path(&request.1).is_err()
+            {
+                request.1.clone()
+            } else {
+                prefix.join(&request.1).to_string_lossy().replace('\\', "/")
+            };
+            (request.0.clone(), path)
+        };
+        let mapped = requests.iter().map(translate).collect();
+        let kinds = kind_only.iter().map(translate).collect();
+        let mut answers = GitCheckout::new(self.git.clone(), top.to_path_buf())
+            .inspect_pinned_targets(&mapped, &kinds, &mut cache);
+        requests
+            .iter()
+            .filter_map(|request| {
+                answers
+                    .remove(&translate(request))
+                    .map(|answer| (request.clone(), answer))
+            })
+            .collect()
     }
 
     /// Exclusive access to the pinned-evidence cache for one capture.
@@ -575,17 +651,8 @@ impl JsonFileStorage {
         })
     }
 
-    fn primary_layout(&self) -> Result<Option<RepositoryLayout>> {
-        let paths = self.configured_worktree_paths()?;
-        let Some(worktree_root) = paths.primary_worktree_root()? else {
-            return Ok(None);
-        };
-        let Some(data_root) = paths.primary_data_root()? else {
-            return Ok(None);
-        };
-        super::discover_repository_layout(worktree_root, data_root)
-            .map(Some)
-            .map_err(Into::into)
+    fn primary_data_root(&self) -> Result<Option<PathBuf>> {
+        self.configured_worktree_paths()?.primary_data_root()
     }
 
     /// Bind the invocation's authoritative classification of the selected store.
@@ -709,23 +776,7 @@ impl JsonFileStorage {
     /// Check if the storage directory exists and is initialized.
     /// Returns an error with a helpful message if not.
     pub fn validate(&self) -> Result<()> {
-        if !self.root.exists() {
-            return Err(RepositoryNotFoundError::new(self.root.display().to_string()).into());
-        }
-
-        let index_path = self.resolve_virtual_path(&VirtualPath::INDEX)?;
-        if !index_path.exists() {
-            anyhow::bail!(
-                "JIT repository at '{}' is not properly initialized (missing index.json)\n\n\
-                 Initialize with: jit init",
-                self.root.display()
-            );
-        }
-
-        // `validate()` runs for every non-init command, so this version check guards
-        // even commands that never load the index themselves (jit:def64ac4).
         self.load_index()?;
-
         Ok(())
     }
 
@@ -771,10 +822,22 @@ impl JsonFileStorage {
     }
 
     fn load_index(&self) -> Result<Index> {
-        let index_path = self.resolve_virtual_path(&VirtualPath::INDEX)?;
-        let bytes = fs::read(&index_path)
-            .with_context(|| format!("Failed to read file: {}", index_path.display()))?;
-        parse_repository_index(&bytes)
+        use crate::storage::repository_state_store::{
+            retry_optimistic_reads, DataReadSession, ReadAdmission,
+        };
+        retry_optimistic_reads("initialized store", || {
+            let session = DataReadSession::open(&self.root)?;
+            let index = session.read(
+                &VirtualPath::INDEX,
+                crate::repository_state::ReadMode::Whole,
+            );
+            if session.admit()? != ReadAdmission::Granted {
+                return Ok(None);
+            }
+            Ok(Some(index.map_err(Into::into).and_then(|index| {
+                validate_captured_index(&self.root, session.has_data_root(), &index)
+            })))
+        })
     }
 
     /// The active ids of this checkout's store layered over the primary checkout's.
@@ -784,10 +847,10 @@ impl JsonFileStorage {
     /// survives any tombstone. Only an absent file or directory is skipped; any
     /// other failure aborts rather than exposing a plausible but incomplete set.
     fn load_aggregated_issue_ids(&self) -> Result<Vec<IssueId>> {
-        self.load_issue_ids_from(self.primary_layout()?.as_ref())
+        self.load_issue_ids_from(self.primary_data_root()?.as_deref())
     }
 
-    fn load_issue_ids_from(&self, primary: Option<&RepositoryLayout>) -> Result<Vec<IssueId>> {
+    fn load_issue_ids_from(&self, primary: Option<&Path>) -> Result<Vec<IssueId>> {
         let mut membership = BTreeMap::new();
         merge_store_membership(
             &self.resolve_virtual_path(&VirtualPath::INDEX)?,
@@ -796,8 +859,8 @@ impl JsonFileStorage {
         )?;
         if let Some(primary) = primary {
             merge_store_membership(
-                &primary.resolve(&VirtualPath::INDEX)?,
-                &primary.resolve(&VirtualPath::ISSUES)?,
+                &primary.join(VirtualPath::INDEX.relative().as_path()),
+                &primary.join(VirtualPath::ISSUES.relative().as_path()),
                 &mut membership,
             )?;
         }
@@ -826,7 +889,7 @@ impl JsonFileStorage {
     }
 
     /// Load the issues named by the pinned source set.
-    fn read_member_issues(&self, primary: Option<&RepositoryLayout>) -> Result<Vec<Issue>> {
+    fn read_member_issues(&self, primary: Option<&Path>) -> Result<Vec<Issue>> {
         let ids = self.load_issue_ids_from(primary)?;
         #[cfg(test)]
         self.run_issue_read_hook(IssueReadPhase::Membership);
@@ -834,7 +897,7 @@ impl JsonFileStorage {
             .filter_map(|id| {
                 #[cfg(test)]
                 self.run_issue_read_hook(IssueReadPhase::Record);
-                match self.load_issue_with_primary(id, || Ok(primary.cloned())) {
+                match self.load_issue_with_primary(id, || Ok(primary.map(Path::to_path_buf))) {
                     Err(error) if error.downcast_ref::<IssueNotFoundError>().is_some() => None,
                     loaded => Some(loaded),
                 }
@@ -845,13 +908,13 @@ impl JsonFileStorage {
     fn load_issue_with_primary(
         &self,
         id: &IssueId,
-        primary: impl FnOnce() -> Result<Option<RepositoryLayout>>,
+        primary: impl FnOnce() -> Result<Option<PathBuf>>,
     ) -> Result<Issue> {
         let path = self.resolve_virtual_path(&VirtualPath::issue_record(id))?;
         if path.exists() {
             return self.read_issue_record(&path);
         }
-        self.load_issue_from_primary(id, primary()?.as_ref())?
+        self.load_issue_from_primary(id, primary()?.as_deref())?
             .ok_or_else(|| IssueNotFoundError::across_sources(id).into())
     }
 
@@ -863,13 +926,13 @@ impl JsonFileStorage {
     /// non-standard layout), and `Err` for genuine I/O or parse failures on a file
     /// that does exist.
     fn load_issue_from_main_worktree(&self, id: &IssueId) -> Result<Option<Issue>> {
-        self.load_issue_from_primary(id, self.primary_layout()?.as_ref())
+        self.load_issue_from_primary(id, self.primary_data_root()?.as_deref())
     }
 
     fn load_issue_from_primary(
         &self,
         id: &IssueId,
-        primary: Option<&RepositoryLayout>,
+        primary: Option<&Path>,
     ) -> Result<Option<Issue>> {
         let Some(layout) = primary else {
             return Ok(None);
@@ -877,7 +940,7 @@ impl JsonFileStorage {
         if read_tombstones(&self.resolve_virtual_path(&VirtualPath::INDEX)?)?.contains(id) {
             return Ok(None);
         }
-        let main_issue_path = layout.resolve(&VirtualPath::issue_record(id))?;
+        let main_issue_path = layout.join(VirtualPath::issue_record(id).relative().as_path());
 
         if !main_issue_path.exists() {
             return Ok(None); // issue absent from main worktree
@@ -1096,7 +1159,7 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn load_issue(&self, id: &IssueId) -> Result<Issue> {
-        self.load_issue_with_primary(id, || self.primary_layout())
+        self.load_issue_with_primary(id, || self.primary_data_root())
     }
 
     fn load_issue_or_not_found(
@@ -1148,23 +1211,15 @@ impl IssueStore for JsonFileStorage {
                 }
                 Err(error) => return Err(error.into()),
             };
-            let primary = match self.primary_layout() {
+            let primary = match self.primary_data_root() {
                 Ok(primary) => primary,
                 Err(error) => {
                     return Ok(admit_read_sources([selected.admit()])?.map(|()| Err(error)));
                 }
             };
-            let primary_store = primary
-                .as_ref()
-                .map(|layout| JsonFileStorage::new(layout.data_root()));
-            let primary_session = match primary_store.as_ref().zip(primary.as_ref()) {
-                Some((store, layout)) => {
-                    if let Err(error) = store.configure_repository_layout(layout) {
-                        return Ok(
-                            admit_read_sources([selected.admit()])?.map(|()| Err(error.into()))
-                        );
-                    }
-                    match store.open_read_session(layout.clone()) {
+            let primary_session = match primary.as_deref() {
+                Some(data_root) => {
+                    match crate::storage::repository_state_store::DataReadSession::open(data_root) {
                         Ok(session) => Some(session),
                         Err(crate::storage::RepositoryStateStoreError::RetryableConflict {
                             ..
@@ -1175,13 +1230,13 @@ impl IssueStore for JsonFileStorage {
                         Err(error) => {
                             return Ok(
                                 admit_read_sources([selected.admit()])?.map(|()| Err(error.into()))
-                            );
+                            )
                         }
                     }
                 }
                 None => None,
             };
-            let result = self.read_member_issues(primary.as_ref());
+            let result = self.read_member_issues(primary.as_deref());
             #[cfg(test)]
             self.run_issue_read_hook(IssueReadPhase::AfterRead);
             let admissions = std::iter::once(selected.admit())
@@ -1300,43 +1355,72 @@ impl IssueStore for JsonFileStorage {
         let layout = self.configured_layout().map_err(PathReadError::Other)?;
         let repo_root = layout.worktree_root();
 
-        if let Some(commit_ref) = at_commit {
-            use git2::Repository;
+        let selection = self
+            .selection_observation(false)
+            .map_err(|error| PathReadError::Other(error.into()))?;
+        let result = (|| {
+            if let Some(commit_ref) = at_commit {
+                use git2::Repository;
 
-            let repo = Repository::open(repo_root).map_err(|e| {
-                PathReadError::Other(anyhow!("Failed to open git repository: {}", e))
-            })?;
+                let paths = self
+                    .configured_worktree_paths()
+                    .map_err(PathReadError::Other)?;
+                let top = paths.code_checkout_top_level().unwrap_or(repo_root);
+                let repo = Repository::open(top).map_err(|e| {
+                    PathReadError::Other(anyhow!("Failed to open git repository: {}", e))
+                })?;
 
-            let commit_obj = repo
-                .revparse_single(commit_ref)
-                .map_err(|_| PathReadError::CommitNotFound(commit_ref.to_string()))?;
+                let commit_obj = repo
+                    .revparse_single(commit_ref)
+                    .map_err(|_| PathReadError::CommitNotFound(commit_ref.to_string()))?;
 
-            let commit = commit_obj
-                .peel_to_commit()
-                .map_err(|e| PathReadError::Other(anyhow!("Failed to peel to commit: {}", e)))?;
+                let commit = commit_obj.peel_to_commit().map_err(|e| {
+                    PathReadError::Other(anyhow!("Failed to peel to commit: {}", e))
+                })?;
 
-            let tree = commit
-                .tree()
-                .map_err(|e| PathReadError::Other(anyhow!("Failed to get commit tree: {}", e)))?;
+                let tree = commit.tree().map_err(|e| {
+                    PathReadError::Other(anyhow!("Failed to get commit tree: {}", e))
+                })?;
 
-            let entry = tree
-                .get_path(std::path::Path::new(path))
-                .map_err(|_| PathReadError::NotFound(path.to_string()))?;
+                let entry = tree
+                    .get_path(
+                        &repo_root
+                            .strip_prefix(top)
+                            .unwrap_or_else(|_| Path::new(""))
+                            .join(path),
+                    )
+                    .map_err(|_| PathReadError::NotFound(path.to_string()))?;
 
-            let blob = repo
-                .find_blob(entry.id())
-                .map_err(|e| PathReadError::Other(anyhow!("Failed to read blob: {}", e)))?;
+                let blob = repo
+                    .find_blob(entry.id())
+                    .map_err(|e| PathReadError::Other(anyhow!("Failed to read blob: {}", e)))?;
 
-            let short_hash = format!("{:.7}", commit.id());
-            Ok((blob.content().to_vec(), short_hash))
-        } else {
-            let relative = crate::domain::relative_path::RootRelativePath::parse(path)
-                .map_err(|error| PathReadError::InvalidPath(error.to_string()))?;
-            crate::storage::capability_fs::read_repository_file_confined(repo_root, &relative)
-                .map_err(|error| map_confined_read_error(error, path))?
-                .map(|bytes| (bytes, "working-tree".to_string()))
-                .ok_or_else(|| PathReadError::NotFound(path.to_string()))
+                let short_hash = format!("{:.7}", commit.id());
+                Ok((blob.content().to_vec(), short_hash))
+            } else {
+                let relative = crate::domain::relative_path::RootRelativePath::parse(path)
+                    .map_err(|error| PathReadError::InvalidPath(error.to_string()))?;
+                crate::storage::capability_fs::read_repository_file_confined(repo_root, &relative)
+                    .map_err(|error| map_confined_read_error(error, path))?
+                    .map(|bytes| (bytes, "working-tree".to_string()))
+                    .ok_or_else(|| PathReadError::NotFound(path.to_string()))
+            }
+        })();
+        if let Some(selection) = selection {
+            if selection
+                .admit()
+                .map_err(|error| PathReadError::Other(error.into()))?
+                != crate::storage::ReadAdmission::Granted
+            {
+                return Err(PathReadError::Other(
+                    crate::storage::RepositoryStateStoreError::RetryableConflict {
+                        path: "document root selection".into(),
+                    }
+                    .into(),
+                ));
+            }
         }
+        result
     }
 }
 
@@ -2703,6 +2787,55 @@ mod tests {
 
             assert_eq!(storage.load_index().unwrap().deleted_ids, vec![tombstone]);
         }
+    }
+
+    #[test]
+    fn test_read_exact_data_store_absent_ancestry_is_empty_without_publication() {
+        let root = TempDir::new().unwrap();
+        let data = root.path().join("missing/ancestor/data");
+        assert_eq!(
+            read_exact_data_store(&data).unwrap(),
+            ExactStoreSnapshot::default()
+        );
+        assert!(fs::read_dir(root.path()).unwrap().next().is_none());
+    }
+
+    #[test]
+    fn test_document_reads_use_selected_code_subdirectory_for_current_and_pinned_bytes() {
+        let data = TempDir::new().unwrap();
+        let code_dir = TempDir::new().unwrap();
+        let code = crate::test_harness::git::GitRepository::init(code_dir.path());
+        let selected = code.root().join("sub");
+        code.write("note.md", b"outside selected root")
+            .write("sub/note.md", b"committed code")
+            .commit("code document");
+        code.write("sub/note.md", b"current code");
+        let storage = JsonFileStorage::new(data.path());
+        let layout = crate::storage::discover_repository_layout(&selected, data.path()).unwrap();
+        storage.configure_repository_layout(&layout).unwrap();
+        let paths = WorktreePaths::detect_for_data_root(data.path(), code.root())
+            .unwrap()
+            .with_worktree_root(&selected)
+            .unwrap();
+        storage.configure_worktree_paths(&paths);
+        assert_eq!(
+            storage.read_path_bytes("note.md", None).unwrap().0,
+            b"current code"
+        );
+        assert_eq!(
+            storage.read_path_bytes("note.md", Some("HEAD")).unwrap().0,
+            b"committed code"
+        );
+        let request = ("HEAD".to_string(), "note.md".to_string());
+        let pinned = storage.inspect_pinned_targets(
+            &selected,
+            &BTreeSet::from([request.clone()]),
+            &BTreeSet::new(),
+        );
+        assert_eq!(
+            pinned[&request].as_ref().unwrap().bytes(),
+            Some(&b"committed code"[..])
+        );
     }
 
     #[cfg(unix)]
