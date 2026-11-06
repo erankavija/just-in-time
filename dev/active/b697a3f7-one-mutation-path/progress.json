@@ -88,7 +88,7 @@
           "title": "Storage reads configuration files and the registry file loaders are gone",
           "classification": "implementation",
           "worker": "tbd",
-          "status": "dispatched (codex gpt-6.1-sol high) after 5046408a landed a652f3dff",
+          "status": "done",
           "note": "held: rewrites JitConfig::load/config validate, which the frozen f4d9502a 5046408a patch also rewrites"
         },
         {

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9272c3b78cd955bef9e93e10c0187b332edca4b0",
+  "completed_at": "2026-11-06T02:44:50.245962474Z",
+  "duration_ms": 247980,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed configuration-loader refactor satisfies the issue criteria with covered cargo-ci evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cfc87a55-063d-4080-8305-ffdfbcae21a8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "059658df-64dd-4bd5-871b-8fbefc9bd278",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T02:40:42.265464648Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: bca3d1b1bce434eae16864d934659269797e3d00 (`jit:cfc87a55`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/b697a3f7/requirement/REQ-20 (issue success criteria); @/invariant/architecture-dependency-direction (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-06T02:38:52Z); ancestry confirms it covers bca3d1b1bce434eae16864d934659269797e3d00\nTruncation recovery: narrowed per-commit patches and current-source reads; excluded historical documentation-only search matches outside the impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed configuration-loader refactor satisfies the issue criteria with covered cargo-ci evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
