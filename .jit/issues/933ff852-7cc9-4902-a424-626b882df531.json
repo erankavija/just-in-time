@@ -15,7 +15,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6e45f113-d7b8-4f01-92cb-5fd794a7f10b",
+      "status": "passed",
+      "updated_at": "2026-11-06T04:09:12.401820809Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e048f32a-4194-4ff2-9fdd-24490f178c0f",
+      "status": "passed",
+      "updated_at": "2026-11-06T04:12:28.152415556Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "933ff852-7cc9-4902-a424-626b882df531",
   "labels": [
     "type:task",
@@ -31,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Document diff reads both versions through one git process",
-  "updated_at": "2026-11-06T03:25:36.666723407Z"
+  "updated_at": "2026-11-06T04:12:28.152415556Z"
 }

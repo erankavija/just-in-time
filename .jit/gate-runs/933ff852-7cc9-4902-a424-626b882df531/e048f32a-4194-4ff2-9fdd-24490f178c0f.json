@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-933ff852",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "36216aeebc08f6f7af0cbe318adf6d50dff36aba",
+  "completed_at": "2026-11-06T04:12:28.150578896Z",
+  "duration_ms": 195495,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "933ff852-7cc9-4902-a424-626b882df531",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e048f32a-4194-4ff2-9fdd-24490f178c0f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T04:09:12.654887958Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a433457bc, b1fc2e121, 36216aeeb\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/933ff852/requirement/REQ-01, REQ-02, REQ-03 and @/issue/f4d9502a/requirement/REQ-01, REQ-10 (.jit/issues); @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed, exit 0 (run c716970; contains a433457bc and b1fc2e121, not 36216aeeb); code-review pending\nTruncation recovery: recovered relevant patches, object-reader contract, server route/tests, and stand-in in narrower reads; omitted unrelated parent asset inventory\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
