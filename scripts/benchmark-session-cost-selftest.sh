@@ -170,4 +170,42 @@ temp_count=$(find "$out" -maxdepth 1 -name '.session-cost.json.*' -print | wc -l
 }
 echo "benchmark-session-cost collision: PASS (existing bytes preserved, no staged leak)"
 
+# Fixture mode hands the generated pristine repository to another harness:
+# the target id on stdout, the fixture at the requested path, and no timing
+# runs or artifact.
+fixture="$scratch/fixture"
+: >"$MOCK_JIT_LOG"
+fixture_target=$(
+  SESSION_BENCH_BIN="$mock_jit" \
+  SESSION_BENCH_ISSUE_COUNT=2 \
+  SESSION_BENCH_OUT_DIR="$scratch/fixture-out" \
+  SESSION_BENCH_WORK_DIR="$work" \
+  SESSION_BENCH_FIXTURE_DIR="$fixture" \
+    "$harness"
+)
+[[ "$fixture_target" == fixture-0 ]] || {
+  echo "selftest: fixture mode printed '$fixture_target', not the target id" >&2
+  exit 1
+}
+fixture_issues=$(find "$fixture/.jit/issues" -name '*.json' | wc -l | tr -d ' ')
+[[ "$fixture_issues" -eq 2 ]] || {
+  echo "selftest: fixture mode generated $fixture_issues issues, expected 2" >&2
+  exit 1
+}
+if [[ -e "$scratch/fixture-out" ]] || grep -qv '^issue create \|^init \|^--version$' "$MOCK_JIT_LOG"; then
+  echo "selftest: fixture mode ran more than the fixture generator" >&2
+  exit 1
+fi
+set +e
+SESSION_BENCH_BIN="$mock_jit" SESSION_BENCH_ISSUE_COUNT=2 \
+SESSION_BENCH_WORK_DIR="$work" SESSION_BENCH_FIXTURE_DIR="$fixture" \
+  "$harness" >/dev/null 2>"$scratch/fixture-collision.stderr"
+fixture_rc=$?
+set -e
+[[ "$fixture_rc" -eq 2 ]] || {
+  echo "selftest: fixture mode over an existing path exited $fixture_rc, expected 2" >&2
+  exit 1
+}
+echo "benchmark-session-cost fixture mode: PASS"
+
 echo "benchmark-session-cost selftest: PASS"

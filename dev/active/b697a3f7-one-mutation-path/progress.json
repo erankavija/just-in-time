@@ -2,7 +2,7 @@
   "epic_id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
   "epic_short_id": "b697a3f7",
   "lead_agent_id": "agent:b697a3f7-lead",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -97,7 +97,7 @@
           "title": "Benchmark: concurrent readers beside a continuous writer",
           "classification": "research",
           "worker": "tbd",
-          "status": "pending",
+          "status": "done",
           "note": "needs a quiet host (load < 2.0); run when no builds are active"
         }
       ]
@@ -151,6 +151,20 @@
           "status": "done"
         }
       ]
+    },
+    {
+      "wave_number": 7,
+      "label": "4",
+      "issues": [
+        {
+          "short_id": "d3c94dc5",
+          "status": "dispatched (codex gpt-6-luna xhigh)"
+        },
+        {
+          "short_id": "700a96dd",
+          "status": "rework-1 (REQ-05 registry in return value and record comparison)"
+        }
+      ]
     }
   ],
   "later_chain_note": "After wave 2: fe9147fa, 1b7f58ae -> 693a2fdd, a991f42b -> d3c94dc5, 700a96dd -> 850eaad3 -> 93e3f1ad. Blocked externally by f4d9502a (parked): 7cd27db8 -> 30334066 -> 030df4b1, 9623fe6a; d9ba0029 -> 65aafaba -> c0775a83 -> 4e2bed35 -> e73ad8bc, 42046050, 45d0a971; e6ec58f3 -> b2c28ec1.",
@@ -196,7 +210,8 @@
     "4334df62": 1,
     "9a2563fd": 1,
     "c2b3cefa": 2,
-    "d2acb105": 1
+    "d2acb105": 1,
+    "700a96dd": 1
   },
   "surfaced_pitfalls": [
     {
@@ -204,6 +219,12 @@
       "subject": "pre-session lease checks with no owning issue",
       "detail": "After c2b3cefa and planned d3c94dc5, the read form refuse_foreign_lease is still called before the publishing session by dispatch/gate.rs evaluate_many (batch pre-check), commands/document.rs:228 and :546 (document writes) and commands/validate.rs:234. Epic REQ-04 says no pre-session lease check remains, so this is a criterion gap to close with a remediation task inside the epic before the epic gate, not a follow-up. Also dispatch/gate.rs preset_apply discards the read-form result (c2b3cefa rework report); evaluate_many and preset_apply both drop warn-mode findings from that pre-check.",
       "status": "closed by 905364c1 (bulk and dep remain with d3c94dc5)"
+    },
+    {
+      "found_in": "bb596228 benchmark",
+      "subject": "lock-free read conflicts under a continuous writer",
+      "detail": "Tip doc check-links reads exit 12 (RETRYABLE_CONFLICT) in 5.1% of N=1 and 3.2% of N=8 reads beside a back-to-back writer; 1,356 of 1,593 failures report 'Failed to read configuration' although the writer never changes configuration. Reconcile against epic REQ-21 (bounded refused attempts, then locked fallback vs D-25 retryable conflict) before the epic gate; at minimum the diagnostic misattributes the cause.",
+      "status": "open"
     }
   ],
   "started_at": "2026-11-06T01:20:00+02:00",
@@ -243,6 +264,10 @@
     {
       "issue": "693a2fdd",
       "decision": "A Done request diverted to Gated stays reported in errors only (today's behaviour): REQ-03's parenthetical '(modified and failed), as today' contradicts today's code, and REQ-01 requires test_apply_bulk_update_best_effort (errors-only) to pass unchanged."
+    },
+    {
+      "issue": "bb596228",
+      "decision": "Accept base-ratio premise difference (base R(8)/R(1)=16.6 because a single base reader waits behind the writer); README records it; tip verdict passes on the fixed thresholds."
     }
   ]
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8922692000c6e0542c22ecafe7c1c7f32bbbe562",
+  "completed_at": "2026-11-06T03:38:29.246065Z",
+  "duration_ms": 298494,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable benchmark harness and recorded evidence satisfy the issue criteria; raw-derived validation and checksum verification pass.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "bb596228-fad0-4415-a131-54db05df0ddd",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b6f55746-9aae-446f-91b9-e6e34fc2f7df",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T03:33:30.751295281Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 859f20c3, 8070b5bb, 06609ab5, f8808fe9\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-22 and @/charter/D-25 (dev/vision/9db27a3a-charter.md); @/issue/b697a3f7/requirement/REQ-21 (issue description); @/invariant/essential-code-prose and @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-06T03:33:05Z; run 89226920 covers all four attributable commits\nTruncation recovery: narrowed issue/source reads; bounded aggregate and per-arm raw-evidence reads; bounded retry implementation read\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable benchmark harness and recorded evidence satisfy the issue criteria; raw-derived validation and checksum verification pass.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
