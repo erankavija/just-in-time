@@ -399,8 +399,8 @@ fn derive_captured_template_apply(
     let bindings = captured_anchor_bindings(request, config, container_id, anchor_bindings);
     let issues = parse_template_issues(image)?;
     let presets = GatePresetCatalog::from_image(image)?;
-    let registry = parse_template_gate_registry(image)?;
-    let graph = super::CapturedGraphEvidence::capture(image, &issues, context)?;
+    let registry = declarations.gates.clone();
+    let graph = super::CapturedGraphEvidence::capture(&declarations, image, &issues, context)?;
     let derived = derive_template_apply(
         &template,
         container_id,
