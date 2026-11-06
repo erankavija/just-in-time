@@ -735,6 +735,14 @@ fn invoke_serve_foreground_exit(json: bool) -> Vec<Output> {
 }
 
 /// `jit dep add` when the edge would close a cycle.
+/// `apply` and `dep add` closing a dependency cycle: they share one row.
+fn invoke_apply_and_dep_add_cycle(json: bool) -> Vec<Output> {
+    [invoke_apply_prospective_cycle, invoke_dep_add_cycle]
+        .iter()
+        .flat_map(|invoke| invoke(json))
+        .collect()
+}
+
 fn invoke_dep_add_cycle(json: bool) -> Vec<Output> {
     let cli = JitCli::initialised().unwrap();
     let first = cli.create_issue(["--title", "First"]).unwrap();
@@ -1024,10 +1032,9 @@ row_bindings! {
     test_command_exit_codes_unsupported_format_emits_10: ("*", 10, false) => invoke_unsupported_format;
     test_command_exit_codes_expired_lock_wait_emits_11: ("*", 11, false) => invoke_expired_lock_wait;
     test_command_exit_codes_broken_pipe_emits_141: ("*", 141, true) => invoke_broken_pipe;
-    test_command_exit_codes_apply_prospective_cycle_emits_4: ("apply", 4, false) => invoke_apply_prospective_cycle;
     test_command_exit_codes_commands_without_git_emit_10: ("claim acquire, claim release, claim renew, claim heartbeat, claim status, claim list, claim force-evict, hooks install, worktree info, worktree list", 10, false) => invoke_commands_without_git;
     test_command_exit_codes_config_validate_invalid_value_emits_4: ("config validate", 4, true) => invoke_config_validate;
-    test_command_exit_codes_dep_add_cycle_emits_4: ("dep add", 4, false) => invoke_dep_add_cycle;
+    test_command_exit_codes_apply_and_dep_add_cycle_emit_4: ("apply, dep add", 4, false) => invoke_apply_and_dep_add_cycle;
     test_command_exit_codes_doc_check_links_emits_4: ("doc check-links", 4, true) => invoke_doc_check_links;
     test_command_exit_codes_occupied_target_emits_6: ("gate define, profile pack, snapshot export", 6, false) => invoke_occupied_target;
     test_command_exit_codes_gate_preset_apply_missing_target_emits_3: ("gate preset apply", 3, true) => invoke_gate_preset_apply_missing_target;

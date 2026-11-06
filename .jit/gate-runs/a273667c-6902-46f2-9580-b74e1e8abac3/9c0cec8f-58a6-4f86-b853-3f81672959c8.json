@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-a273667c",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2e51395b46f00cf0ac77815300fd2651eba77d6d",
+  "completed_at": "2026-11-05T04:06:00.772716530Z",
+  "duration_ms": 312254,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; the prior newline-path defect is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a273667c-6902-46f2-9580-b74e1e8abac3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9c0cec8f-58a6-4f86-b853-3f81672959c8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T04:00:48.518321247Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:a273667c commits f72d44c, a01cd144, 4945a637, a64bf9d, 9f96bc37\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/a273667c/requirement/REQ-01, REQ-02, REQ-03 (.jit/issues/a273667c-6902-46f2-9580-b74e1e8abac3.json); @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-05T03:59:18Z; its recorded ancestry contains all attributable commits\nTruncation recovery: narrowed merge and source/test patches to the storage path-read impact cone; unrelated merged web/benchmark output was outside that cone\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior newline-path defect is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

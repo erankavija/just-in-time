@@ -15,6 +15,108 @@ use std::thread;
 use std::time::Duration;
 use tempfile::TempDir;
 
+#[test]
+fn test_preset_readers_agree_across_backends_and_apply_the_shown_gates() {
+    use jit::gate_presets::{GatePresetDefinition, GateTemplate, PresetInfo};
+    use jit::repository_state::VirtualPath;
+    use jit::storage::RepositoryStateStore;
+    use jit::test_harness::TestHarness;
+
+    fn read_and_apply<S: IssueStore + RepositoryStateStore>(
+        executor: &CommandExecutor<S>,
+    ) -> (Vec<PresetInfo>, Vec<GatePresetDefinition>) {
+        let listed = executor.gates().list_gate_presets().unwrap();
+        let shown = listed
+            .iter()
+            .map(|info| {
+                let preset = executor.gates().show_gate_preset(&info.name).unwrap();
+                let target = executor
+                    .issues()
+                    .create_issue(
+                        format!("Apply {}", preset.name),
+                        String::new(),
+                        Priority::Normal,
+                        vec![],
+                        vec![],
+                        None,
+                        None,
+                        false,
+                    )
+                    .unwrap()
+                    .issue
+                    .id;
+                executor
+                    .gates()
+                    .apply_gate_preset(&target, &info.name, None, false, false, &[])
+                    .unwrap();
+                let attached = executor
+                    .storage()
+                    .load_issue(&target)
+                    .unwrap()
+                    .gates_required;
+                let expected = preset
+                    .gates
+                    .iter()
+                    .map(|gate| gate.key.clone())
+                    .collect::<std::collections::BTreeSet<_>>();
+                assert_eq!(
+                    attached
+                        .into_iter()
+                        .collect::<std::collections::BTreeSet<_>>(),
+                    expected
+                );
+                preset
+            })
+            .collect();
+        (listed, shown)
+    }
+
+    let memory = TestHarness::new();
+    let (_temp, file) = jit::test_utils::setup_test_repo_with_config("").unwrap();
+    let presets = ["zeta-checks", "alpha-checks"].map(|name| GatePresetDefinition {
+        name: name.into(),
+        description: format!("{name} bundle"),
+        gates: vec![GateTemplate {
+            key: format!("{name}-gate").parse().unwrap(),
+            title: format!("{name} gate"),
+            description: String::new(),
+            stage: GateStage::Postcheck,
+            mode: GateMode::Manual,
+            checker: None,
+        }],
+    });
+    for preset in &presets {
+        let path = VirtualPath::data(
+            VirtualPath::GATE_PRESETS
+                .relative()
+                .as_path()
+                .join(format!("{}.json", preset.name)),
+        )
+        .unwrap();
+        let contents = serde_json::to_string(preset).unwrap();
+        memory
+            .storage
+            .add_data_file(path.relative().as_path(), &contents);
+        let physical = file.storage().root().join(path.relative().as_path());
+        std::fs::create_dir_all(physical.parent().unwrap()).unwrap();
+        std::fs::write(physical, contents).unwrap();
+    }
+    let (memory_list, memory_shown) = read_and_apply(&memory.executor);
+    let (file_list, file_shown) = read_and_apply(&file);
+    assert_eq!(
+        serde_json::to_value(memory_list).unwrap(),
+        serde_json::to_value(file_list).unwrap()
+    );
+    assert_eq!(memory_shown, file_shown);
+    let by_name = |presets: Vec<GatePresetDefinition>| {
+        presets
+            .into_iter()
+            .map(|preset| (preset.name.clone(), preset))
+            .collect::<std::collections::BTreeMap<_, _>>()
+    };
+    assert_eq!(by_name(memory_shown), by_name(presets.to_vec()));
+}
+
 /// Define `key` as a manual postcheck gate in the repository's own registry.
 fn define_gate(executor: &CommandExecutor<JsonFileStorage>, key: &jit::domain::identity::GateKey) {
     executor

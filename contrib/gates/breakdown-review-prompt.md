@@ -40,8 +40,8 @@ Not a finding: preferring a different decision, or a shape the cited decision fi
 Recheck contract modes, unique producer reachability, and all footprint
 creates/touches, uncertainties, and overlap advisories against the created graph.
 
-Check `run_history` cumulatively. Superseded prose/issues must be replaced, not
-accumulated. A minor issue of a kind that existed unchanged in a previously
+Check `run_history` cumulatively. Superseded prose/issues must be replaced or
+merged, not accumulated. A minor issue of a kind that existed unchanged in a previously
 reviewed revision is advisory.
 
 ## User decisions
@@ -54,8 +54,10 @@ Every finding must include `disposition` (`blocking` or `advisory`) and
 `origin` (`issue-impact` or `pre-existing`). A finding is blocking only if the
 created graph as it stands would diverge from the authoritative manifest,
 violate a container criterion or a cited invariant, break the dependency graph
-or a green intermediate state, lose or weaken semantic coverage, or leave an
-issue one worker cannot complete in one focused cycle. Wording and
+or a green intermediate state, lose or weaken semantic coverage, leave an
+issue one worker cannot complete in one focused cycle, or over-split work into
+chain-link issues, bridge producer and remover pairs, or a graph over the issue
+budget. Wording and
 rationale-text mismatches, redundant-but-harmless edges, citation typos, and
 improvable phrasing are advisory. A defect introduced outside this bracket is
 `pre-existing` and cannot fail this review. The verdict is `FAIL` if and only
@@ -64,8 +66,9 @@ verdict may therefore contain advisory findings; passing with advisories is a
 successful review, not a lenient one. Do not perform an exhaustive
 presentation audit.
 
-For each blocking finding give the exact manifest correction and any
-graph reconciliation; shared-contract changes must return to plan-review. End
+Report the created issue count and its change from the prior round. For each
+blocking finding give the exact manifest correction, replacing or merging
+issues, and any graph reconciliation; shared-contract changes must return to plan-review. End
 with exactly one line and no following text:
 
 `VERDICT: PASS`

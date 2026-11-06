@@ -381,9 +381,6 @@ impl GitCheckout {
         Ok(Some(url.to_owned()))
     }
 
-    // Temporary @/inv/convention-convergence exception: branch comparisons
-    // converge here when fb5e8e8d (check_branch_divergence) and 47d62472
-    // (validate_branch_drift) migrate their consumers.
     /// Compare this checkout's HEAD with a caller-selected base revision.
     ///
     /// # Errors
@@ -542,7 +539,8 @@ pub struct GitObjectReader {
 
 impl GitObjectReader {
     /// Read another name, including names discovered from an earlier answer.
-    /// Missing names return `None`; newline or NUL input is rejected before sending.
+    /// Missing names and gitlinks without a readable object return `None`;
+    /// NUL input is rejected before sending.
     /// I/O or protocol errors end the session and return [`GitError::UnexpectedOutput`].
     pub fn read(&mut self, name: &str) -> Result<Option<GitObject>, GitError> {
         let Some(header) = self.process.request(name)? else {
@@ -554,7 +552,7 @@ impl GitObjectReader {
             output.take(header.size).read_to_end(&mut bytes)?;
             let mut separator = [0];
             output.read_exact(&mut separator)?;
-            if bytes.len() as u64 != header.size || separator[0] != b'\n' {
+            if bytes.len() as u64 != header.size || separator[0] != b'\0' {
                 return Err(invalid_object_output("invalid object body framing"));
             }
             Ok(bytes)
@@ -569,7 +567,7 @@ impl GitObjectReader {
 }
 
 impl GitCheckout {
-    /// Start one `cat-file --batch` process for any number of incremental reads.
+    /// Start one `cat-file --batch -Z` process for any number of incremental reads.
     /// Returns [`GitError::GitUnavailable`] when the executable cannot start.
     pub fn object_reader(&self) -> Result<GitObjectReader, GitError> {
         Ok(GitObjectReader {
@@ -577,8 +575,9 @@ impl GitCheckout {
         })
     }
 
-    /// Look up object kinds in input order through one `cat-file --batch-check`.
-    /// Missing names return `None`. Every name is validated before starting Git.
+    /// Look up object kinds in input order through one `cat-file --batch-check -Z`.
+    /// Missing names and gitlinks without a readable object return `None`.
+    /// Every name is validated before starting Git.
     /// Startup, I/O and protocol failures use the module's typed errors.
     pub fn object_types(
         &self,
@@ -638,7 +637,7 @@ impl CatFileProcess {
     fn start(checkout: &GitCheckout, mode: CatFileMode) -> Result<Self, GitError> {
         let mut child = checkout
             .git
-            .command(&checkout.worktree_root, ["cat-file", mode.argument()])
+            .command(&checkout.worktree_root, ["cat-file", mode.argument(), "-Z"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -684,10 +683,11 @@ impl CatFileProcess {
                 .stdin
                 .as_mut()
                 .ok_or_else(|| io::Error::other("git object session is closed"))?;
-            writeln!(input, "{name}")?;
+            input.write_all(name.as_bytes())?;
+            input.write_all(b"\0")?;
             input.flush()?;
             let mut header = Vec::new();
-            self.output()?.read_until(b'\n', &mut header)?;
+            self.output()?.read_until(b'\0', &mut header)?;
             parse_object_header(name, &header)
         })();
         answer.map_err(|error| self.fail(error))
@@ -737,7 +737,7 @@ impl CatFileProcess {
             Err(error) => error.to_string(),
         };
         GitError::UnexpectedOutput {
-            command: format!("cat-file {}", self.mode.argument()),
+            command: format!("cat-file {} -Z", self.mode.argument()),
             output: format!("{error}: {diagnostic}"),
         }
     }
@@ -751,9 +751,9 @@ impl Drop for CatFileProcess {
 }
 
 fn validate_object_name(name: &str) -> Result<(), GitError> {
-    if name.contains(['\n', '\0']) {
+    if name.contains('\0') {
         Err(GitError::InvalidPath(
-            "git object names cannot contain a newline or NUL".into(),
+            "git object names cannot contain NUL".into(),
         ))
     } else {
         Ok(())
@@ -773,9 +773,13 @@ fn parse_object_header(name: &str, bytes: &[u8]) -> io::Result<Option<ObjectHead
     };
     let line = std::str::from_utf8(bytes)
         .ok()
-        .and_then(|header| header.strip_suffix('\n'))
+        .and_then(|header| header.strip_suffix('\0'))
         .ok_or_else(malformed)?;
-    if line.strip_suffix(" missing") == Some(name) {
+    if line.strip_suffix(" missing") == Some(name)
+        || line
+            .strip_suffix(" submodule")
+            .is_some_and(|id| GitObjectId::parse(id).is_some())
+    {
         return Ok(None);
     }
     let mut fields = line.split(' ');

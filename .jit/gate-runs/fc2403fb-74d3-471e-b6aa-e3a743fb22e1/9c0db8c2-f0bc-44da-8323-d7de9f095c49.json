@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cb5e6f6f0bc83349b301cf24c67ad8f4b37c646e",
+  "completed_at": "2026-11-05T23:52:15.675528054Z",
+  "duration_ms": 257954,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are implemented and covered within the attributed footprint.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fc2403fb-74d3-471e-b6aa-e3a743fb22e1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9c0db8c2-f0bc-44da-8323-d7de9f095c49",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T23:47:57.720787603Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c7eef37, d3941557, 25b6b0ff\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-3 (dev/vision/9db27a3a-charter.md); @/invariant/{architecture-dependency-direction,domain-agnostic,essential-code-prose,orthogonal-tests,semantic-test-assertions,semantic-types,shared-test-contracts} (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0; run 3ca9253d covers all attributed commits); code-review pending\nTruncation recovery: narrowed reads of template output paths, CLI fixture, and governing registry/charter sources\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are implemented and covered within the attributed footprint.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,11 +1,13 @@
 //! No-follow capability primitives: root handles and the walks, opens and reads that keep every traversal beneath a held directory.
 
 use crate::domain::relative_path::RootRelativePath;
-use crate::repository_state::{RepositoryLayout, RepositoryRootClass};
+use crate::repository_state::{RepositoryLayout, RepositoryRootClass, RepositoryRootEvidence};
 use crate::storage::atomic_write::sync_capability_directory;
+use crate::storage::redo_record::{RedoRecord, WorktreeRootBinding};
 use cap_primitives::fs::FollowSymlinks;
-use cap_std::fs::{Dir, OpenOptions};
+use cap_std::fs::{Dir, DirEntry, File, Metadata, OpenOptions};
 use cap_std::{ambient_authority, fs::MetadataExt as _};
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::{ErrorKind, Read};
 use std::path::{Component, Path, PathBuf};
 
@@ -23,7 +25,7 @@ pub enum CapabilityFsError {
 /// Open no-follow handles for the selected roots, constructed only inside the
 /// session boundary that verified their identity.
 pub struct CapabilityRoots {
-    worktree: Dir,
+    worktree: Option<(Dir, WorktreeRootBinding)>,
     data: Option<DataRoot>,
 }
 
@@ -81,33 +83,35 @@ impl CapabilityRoots {
     pub(in crate::storage) fn open(
         layout: &RepositoryLayout,
     ) -> Result<(Self, Dir, String), CapabilityFsError> {
-        let worktree = open_absolute_dir_nofollow(layout.worktree_root())?;
-        ensure_capability_identity(
-            &worktree,
-            layout.worktree_identity(),
-            layout.worktree_root(),
-        )?;
-        let data_parent_path = layout.data_root().parent().ok_or_else(|| {
-            CapabilityFsError::UnsafeTarget(layout.data_root().display().to_string())
+        let evidence =
+            RepositoryRootEvidence::new(layout.data_root(), layout.data_identity(), true);
+        let (mut roots, parent, leaf) = Self::open_data(&evidence)?;
+        roots.bind_worktree(&WorktreeRootBinding::from_layout(layout))?;
+        Ok((roots, parent, leaf))
+    }
+
+    pub(in crate::storage) fn open_data(
+        evidence: &RepositoryRootEvidence,
+    ) -> Result<(Self, Dir, String), CapabilityFsError> {
+        let data_parent_path = evidence.path().parent().ok_or_else(|| {
+            CapabilityFsError::UnsafeTarget(evidence.path().display().to_string())
         })?;
         let data_parent = open_absolute_dir_nofollow(data_parent_path)?;
-        let data_leaf = layout
-            .data_root()
+        let data_leaf = evidence
+            .path()
             .file_name()
             .and_then(|name| name.to_str())
-            .ok_or_else(|| {
-                CapabilityFsError::UnsafeTarget(layout.data_root().display().to_string())
-            })?
+            .ok_or_else(|| CapabilityFsError::UnsafeTarget(evidence.path().display().to_string()))?
             .to_string();
         let data = match data_parent.symlink_metadata(&data_leaf) {
             Ok(metadata) if metadata.is_dir() && !metadata.is_symlink() => {
                 let data = open_child_dir_nofollow(&data_parent, &data_leaf)?;
-                ensure_capability_identity(&data, layout.data_identity(), layout.data_root())?;
+                ensure_capability_identity(&data, evidence.identity(), evidence.path())?;
                 Some(DataRoot::from_dir(data))
             }
             Ok(_) => {
                 return Err(CapabilityFsError::UnsafeTarget(
-                    layout.data_root().display().to_string(),
+                    evidence.path().display().to_string(),
                 ))
             }
             Err(error) if error.kind() == ErrorKind::NotFound => None,
@@ -120,14 +124,63 @@ impl CapabilityRoots {
         if data.is_none() {
             if let Some(parent_identity) = capability_dir_identity(&data_parent) {
                 let expected = format!("absent:{parent_identity}:{data_leaf}");
-                if expected != layout.data_identity() {
+                if expected != evidence.identity() {
                     return Err(CapabilityFsError::RetryableConflict {
-                        path: layout.data_root().display().to_string(),
+                        path: evidence.path().display().to_string(),
                     });
                 }
             }
         }
-        Ok((Self { worktree, data }, data_parent, data_leaf))
+        Ok((
+            Self {
+                worktree: None,
+                data,
+            },
+            data_parent,
+            data_leaf,
+        ))
+    }
+
+    pub(in crate::storage) fn bind_worktree(
+        &mut self,
+        binding: &WorktreeRootBinding,
+    ) -> Result<(), CapabilityFsError> {
+        let directory = open_absolute_dir_nofollow(binding.path())?;
+        ensure_capability_identity(&directory, binding.identity(), binding.path())?;
+        self.worktree = Some((directory, binding.clone()));
+        Ok(())
+    }
+
+    pub(in crate::storage) fn validate_record_root(
+        &self,
+        record: &RedoRecord,
+    ) -> Result<(), crate::storage::RedoApplyError> {
+        let Some(binding) = record.worktree_binding() else {
+            return Ok(());
+        };
+        let failure = |source: anyhow::Error| crate::storage::RedoApplyError::OriginalWorktree {
+            path: binding.path().to_path_buf(),
+            source,
+        };
+        if self.worktree.as_ref().map(|(_, held)| held) != Some(binding) {
+            return Err(failure(anyhow::anyhow!(
+                "held worktree does not match the committed binding"
+            )));
+        }
+        let current =
+            open_absolute_dir_nofollow(binding.path()).map_err(|error| failure(error.into()))?;
+        ensure_capability_identity(&current, binding.identity(), binding.path())
+            .map_err(|error| failure(error.into()))
+    }
+
+    #[cfg(test)]
+    pub(in crate::storage) fn record_layout(&self) -> RepositoryLayout {
+        let binding = &self.worktree.as_ref().unwrap().1;
+        RepositoryLayout::new(
+            RepositoryRootEvidence::new(binding.path(), binding.identity(), true),
+            RepositoryRootEvidence::new(binding.path().join(".jit"), "fixture-data", true),
+        )
+        .unwrap()
     }
 
     pub(in crate::storage) fn data_root(&self) -> Option<&DataRoot> {
@@ -136,7 +189,7 @@ impl CapabilityRoots {
 
     pub(in crate::storage) fn root(&self, class: RepositoryRootClass) -> Option<&Dir> {
         match class {
-            RepositoryRootClass::Worktree => Some(&self.worktree),
+            RepositoryRootClass::Worktree => self.worktree.as_ref().map(|(directory, _)| directory),
             RepositoryRootClass::Data => self.data.as_ref().map(DataRoot::dir),
         }
     }
@@ -172,38 +225,163 @@ pub(in crate::storage) fn open_capability_parent(
     Ok(Some((current, leaf.clone())))
 }
 
-/// Open the parent directory of a repository-relative target, creating the
-/// ancestors it lacks.
+/// The directory handles one pass over a root opens, keyed by root-relative
+/// directory path, so a directory several targets share is opened once.
 ///
-/// Each directory it creates is synced into the parent that now names it before
-/// the walk descends, so a file published underneath is reachable after a crash
-/// rather than hanging off an entry the filesystem never wrote
-/// (`@/inv/atomic-writes`). An ancestor that already exists costs no sync.
-pub(in crate::storage) fn open_or_create_capability_parent(
-    root: &Dir,
-    path: &Path,
-) -> Result<(Dir, String), CapabilityFsError> {
-    let components = path
-        .components()
-        .map(|component| component.as_os_str().to_string_lossy().into_owned())
-        .collect::<Vec<_>>();
-    let (leaf, parents) = components
-        .split_last()
-        .ok_or_else(|| CapabilityFsError::UnsafeTarget(path.display().to_string()))?;
-    parents
-        .iter()
-        .try_fold(root.try_clone()?, |current, component| {
-            match current.symlink_metadata(component) {
-                Err(error) if error.kind() == ErrorKind::NotFound => {
-                    current.create_dir(component)?;
-                    sync_capability_directory(&current)?;
-                }
-                Err(error) => return Err(error.into()),
-                Ok(_) => {}
-            }
-            open_child_dir_nofollow(&current, component)
+/// It also holds the directories the pass marked changed, so a caller can sync
+/// each once after its last change rather than once per entry it wrote.
+pub(in crate::storage) struct DirectoryHandles<'r> {
+    root: &'r Dir,
+    opened: BTreeMap<PathBuf, Dir>,
+    changed: BTreeSet<PathBuf>,
+    #[cfg(test)]
+    opens: usize,
+    #[cfg(test)]
+    syncs: usize,
+}
+
+impl<'r> DirectoryHandles<'r> {
+    pub(in crate::storage) fn new(root: &'r Dir) -> Self {
+        Self {
+            root,
+            opened: BTreeMap::new(),
+            changed: BTreeSet::new(),
+            #[cfg(test)]
+            opens: 0,
+            #[cfg(test)]
+            syncs: 0,
+        }
+    }
+
+    /// The parent of `target` with its leaf name, opening the ancestors no
+    /// earlier call opened; `Ok(None)` when an ancestor is absent.
+    ///
+    /// # Errors
+    ///
+    /// A symlinked or non-directory ancestor is an unsafe target.
+    pub(in crate::storage) fn open_parent(
+        &mut self,
+        target: &Path,
+    ) -> Result<Option<(&Dir, String)>, CapabilityFsError> {
+        let (parent, leaf) = split_target(target)?;
+        Ok(match walk_held_directories(self, &parent, false)? {
+            true => Some((self.handle(&parent)?, leaf)),
+            false => None,
         })
-        .map(|parent| (parent, leaf.clone()))
+    }
+
+    /// [`Self::open_parent`], creating the ancestors it lacks.
+    ///
+    /// Every directory on the walk is marked changed: a pass may have created
+    /// any of them, and a replay meeting one an earlier pass created cannot
+    /// tell it from one that was already durable.
+    ///
+    /// # Errors
+    ///
+    /// A symlinked or non-directory ancestor is an unsafe target.
+    pub(in crate::storage) fn open_or_create_parent(
+        &mut self,
+        target: &Path,
+    ) -> Result<(&Dir, String), CapabilityFsError> {
+        let (parent, leaf) = split_target(target)?;
+        walk_held_directories(self, &parent, true)?;
+        self.changed
+            .extend(parent.ancestors().map(Path::to_path_buf));
+        Ok((self.handle(&parent)?, leaf))
+    }
+
+    /// Mark the parent of `target` changed.
+    pub(in crate::storage) fn mark_parent_changed(&mut self, target: &Path) {
+        self.changed
+            .insert(target.parent().unwrap_or(Path::new("")).to_path_buf());
+    }
+
+    /// Fsync each directory marked changed once, so every entry the pass wrote
+    /// is durable (`@/inv/atomic-writes`).
+    pub(in crate::storage) fn sync_changed(&mut self) -> std::io::Result<()> {
+        let changed = std::mem::take(&mut self.changed);
+        let directories = changed
+            .iter()
+            .filter_map(|directory| self.lookup(directory))
+            .collect::<Vec<_>>();
+        directories
+            .iter()
+            .try_for_each(|directory| sync_capability_directory(directory))?;
+        #[cfg(test)]
+        {
+            self.syncs += directories.len();
+        }
+        Ok(())
+    }
+
+    /// How many directories this instance opened.
+    #[cfg(test)]
+    pub(in crate::storage) fn opens(&self) -> usize {
+        self.opens
+    }
+
+    /// How many directory fsyncs this instance ran.
+    #[cfg(test)]
+    pub(in crate::storage) fn syncs(&self) -> usize {
+        self.syncs
+    }
+
+    fn handle(&self, directory: &Path) -> Result<&Dir, CapabilityFsError> {
+        self.lookup(directory)
+            .ok_or_else(|| CapabilityFsError::UnsafeTarget(directory.display().to_string()))
+    }
+
+    fn lookup(&self, directory: &Path) -> Option<&Dir> {
+        match directory.as_os_str().is_empty() {
+            true => Some(self.root),
+            false => self.opened.get(directory),
+        }
+    }
+}
+
+/// Open each component of `directory` beneath `handles`' root that no earlier
+/// walk opened, creating an absent one when `create` holds, so a directory it
+/// creates lies beneath that root, never at it; `false` when one is absent and
+/// `create` does not hold.
+fn walk_held_directories(
+    handles: &mut DirectoryHandles,
+    directory: &Path,
+    create: bool,
+) -> Result<bool, CapabilityFsError> {
+    let mut current = PathBuf::new();
+    for component in directory.components() {
+        let parent = current.clone();
+        current.push(component);
+        if handles.opened.contains_key(&current) {
+            continue;
+        }
+        let name = component.as_os_str();
+        let opened = match open_child_dir_nofollow(handles.handle(&parent)?, name) {
+            Err(CapabilityFsError::Io(error)) if error.kind() == ErrorKind::NotFound => {
+                if !create {
+                    return Ok(false);
+                }
+                handles.handle(&parent)?.create_dir(name)?;
+                open_child_dir_nofollow(handles.handle(&parent)?, name)?
+            }
+            outcome => outcome?,
+        };
+        #[cfg(test)]
+        {
+            handles.opens += 1;
+        }
+        handles.opened.insert(current.clone(), opened);
+    }
+    Ok(true)
+}
+
+/// A target's parent directory and leaf name.
+fn split_target(target: &Path) -> Result<(PathBuf, String), CapabilityFsError> {
+    let leaf = target
+        .file_name()
+        .ok_or_else(|| CapabilityFsError::UnsafeTarget(target.display().to_string()))?;
+    let parent = target.parent().unwrap_or(Path::new("")).to_path_buf();
+    Ok((parent, leaf.to_string_lossy().into_owned()))
 }
 
 pub(in crate::storage) fn open_descendant_dir_nofollow(
@@ -217,44 +395,164 @@ pub(in crate::storage) fn open_descendant_dir_nofollow(
     Ok(current)
 }
 
+/// The kind required of an opened leaf handle.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum LeafKind {
+    File,
+    Directory,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("leaf is not of the required filesystem kind")]
+struct UnexpectedLeafKind;
+
+/// Open without following the leaf; non-blocking mode lets metadata reject
+/// pipes and devices without waiting for a peer.
+fn open_leaf_nofollow(
+    kind: LeafKind,
+    open: impl FnOnce(&OpenOptions) -> std::io::Result<File>,
+) -> std::io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    options._cap_fs_ext_follow(FollowSymlinks::No);
+    options._cap_fs_ext_maybe_dir(matches!(kind, LeafKind::Directory));
+    options._cap_fs_ext_nonblock(true);
+    let file = open(&options)?;
+    let metadata = file.metadata()?;
+    let expected = match kind {
+        LeafKind::File => metadata.is_file(),
+        LeafKind::Directory => metadata.is_dir(),
+    };
+    if expected {
+        Ok(file)
+    } else {
+        Err(std::io::Error::new(
+            ErrorKind::InvalidInput,
+            UnexpectedLeafKind,
+        ))
+    }
+}
+
+/// Open a listed leaf through the directory handle that listed it.
+pub(crate) fn open_entry_nofollow(entry: &DirEntry, kind: LeafKind) -> std::io::Result<File> {
+    open_leaf_nofollow(kind, |options| entry.open_with(options))
+}
+
+/// Open beneath a held directory, refusing a leaf link or an escaping path.
+pub(crate) fn open_path_nofollow(
+    directory: &Dir,
+    relative: &Path,
+    kind: LeafKind,
+) -> std::io::Result<File> {
+    open_leaf_nofollow(kind, |options| directory.open_with(relative, options))
+}
+
+fn leaf_open_error(path: &Path, error: std::io::Error) -> CapabilityFsError {
+    match classify_open_failure(&error) {
+        OpenRefusal::Io => error.into(),
+        _ => CapabilityFsError::UnsafeTarget(path.display().to_string()),
+    }
+}
+
 pub(crate) fn open_child_dir_nofollow(
     parent: &Dir,
     name: impl AsRef<Path>,
 ) -> Result<Dir, CapabilityFsError> {
     let name = name.as_ref();
-    let metadata = parent.symlink_metadata(name)?;
-    if metadata.is_symlink() || !metadata.is_dir() {
-        return Err(CapabilityFsError::UnsafeTarget(name.display().to_string()));
-    }
-    let mut options = OpenOptions::new();
-    options.read(true);
-    options._cap_fs_ext_follow(FollowSymlinks::No);
-    options._cap_fs_ext_maybe_dir(true);
-    let file = parent.open_with(name, &options)?;
-    if !file.metadata()?.is_dir() {
-        return Err(CapabilityFsError::UnsafeTarget(name.display().to_string()));
-    }
+    let file = open_path_nofollow(parent, name, LeafKind::Directory)
+        .map_err(|error| leaf_open_error(name, error))?;
     Ok(Dir::from_std_file(file.into_std()))
 }
 
-/// Open `leaf` under `parent` as an ordinary file, refusing a symlink or any
-/// non-regular target without following it.
+/// Open an ordinary file under a held parent, refusing links and special files.
 pub(crate) fn open_regular_file_nofollow(
     parent: &Dir,
     leaf: &str,
-) -> Result<cap_std::fs::File, CapabilityFsError> {
-    let metadata = parent.symlink_metadata(leaf)?;
-    if metadata.is_symlink() || !metadata.is_file() {
-        return Err(CapabilityFsError::UnsafeTarget(leaf.to_string()));
+) -> Result<File, CapabilityFsError> {
+    open_path_nofollow(parent, Path::new(leaf), LeafKind::File)
+        .map_err(|error| leaf_open_error(Path::new(leaf), error))
+}
+
+/// Read an ordinary leaf; report refusals at `reported_path` and absence as no bytes.
+pub(crate) fn read_leaf_nofollow(
+    parent: &Dir,
+    leaf: impl AsRef<Path>,
+    reported_path: &Path,
+) -> Result<Option<Vec<u8>>, CapabilityFsError> {
+    let leaf = leaf.as_ref();
+    let mut file = match open_path_nofollow(parent, leaf, LeafKind::File)
+        .map_err(|error| leaf_open_error(reported_path, error))
+    {
+        Ok(file) => file,
+        Err(CapabilityFsError::Io(error)) if error.kind() == ErrorKind::NotFound => {
+            return Ok(None)
+        }
+        Err(error) => return Err(error),
+    };
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    Ok(Some(bytes))
+}
+
+/// What a failed no-follow open says about the name it was given.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OpenRefusal {
+    /// The name is a symbolic link, which a no-follow open refuses outright.
+    Symlink,
+    /// The leaf cannot serve the required filesystem kind.
+    Unopenable,
+    /// Resolving the name left the directory the open was anchored at.
+    Escape,
+    /// Ordinary I/O: the name is absent, unreadable, or the open failed for a
+    /// reason that says nothing about what the name is.
+    Io,
+}
+
+/// Distinguish kind refusals, links and capability escapes from ordinary I/O.
+#[cfg(unix)]
+pub(crate) fn classify_open_failure(error: &std::io::Error) -> OpenRefusal {
+    if error
+        .get_ref()
+        .is_some_and(|source| source.is::<UnexpectedLeafKind>())
+    {
+        return OpenRefusal::Unopenable;
     }
-    let mut options = OpenOptions::new();
-    options.read(true);
-    options._cap_fs_ext_follow(FollowSymlinks::No);
-    let file = parent.open_with(leaf, &options)?;
-    if !file.metadata()?.is_file() {
-        return Err(CapabilityFsError::UnsafeTarget(leaf.to_string()));
+    match error.raw_os_error() {
+        Some(code) if code == nix::libc::ELOOP || code == nix::libc::EMLINK => OpenRefusal::Symlink,
+        Some(code) if code == nix::libc::ENXIO => OpenRefusal::Unopenable,
+        None if error.kind() == std::io::ErrorKind::PermissionDenied => OpenRefusal::Escape,
+        _ => OpenRefusal::Io,
     }
-    Ok(file)
+}
+
+/// Non-Unix platforms distinguish handle-kind and capability-escape refusals.
+#[cfg(not(unix))]
+pub(crate) fn classify_open_failure(error: &std::io::Error) -> OpenRefusal {
+    if error
+        .get_ref()
+        .is_some_and(|source| source.is::<UnexpectedLeafKind>())
+    {
+        return OpenRefusal::Unopenable;
+    }
+    if error.raw_os_error().is_none() && error.kind() == std::io::ErrorKind::PermissionDenied {
+        OpenRefusal::Escape
+    } else {
+        OpenRefusal::Io
+    }
+}
+
+/// Whether the opened file carries an executable Unix mode.
+#[cfg(unix)]
+pub(crate) fn is_executable(metadata: &Metadata) -> bool {
+    use cap_std::fs::PermissionsExt as _;
+
+    metadata.permissions().mode() & 0o111 != 0
+}
+
+/// Windows has no executable mode bit for package-reader purposes.
+#[cfg(not(unix))]
+pub(crate) fn is_executable(_metadata: &Metadata) -> bool {
+    false
 }
 
 pub(crate) fn open_absolute_dir_nofollow(path: &Path) -> Result<Dir, CapabilityFsError> {
@@ -296,28 +594,7 @@ pub(crate) fn read_repository_file_nofollow(
     let Some((parent, leaf)) = open_capability_parent(&root, relative.as_path())? else {
         return Ok(None);
     };
-    let metadata = match parent.symlink_metadata(&leaf) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(error.into()),
-    };
-    if metadata.is_symlink() || !metadata.is_file() {
-        return Err(CapabilityFsError::UnsafeTarget(
-            relative.as_path().display().to_string(),
-        ));
-    }
-    let mut options = OpenOptions::new();
-    options.read(true);
-    options._cap_fs_ext_follow(FollowSymlinks::No);
-    let mut file = parent.open_with(&leaf, &options)?;
-    if !file.metadata()?.is_file() {
-        return Err(CapabilityFsError::UnsafeTarget(
-            relative.as_path().display().to_string(),
-        ));
-    }
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
-    Ok(Some(bytes))
+    read_leaf_nofollow(&parent, &leaf, relative.as_path())
 }
 
 /// Read one validated root-relative ordinary file through a confined root handle.
@@ -370,23 +647,7 @@ fn read_confined_relative(
             return read_confined_relative(root_path, root, &resolved, symlink_depth + 1);
         }
         if index + 1 == components.len() {
-            if !metadata.is_file() {
-                return Err(CapabilityFsError::UnsafeTarget(
-                    relative.display().to_string(),
-                ));
-            }
-            let mut options = OpenOptions::new();
-            options.read(true);
-            options._cap_fs_ext_follow(FollowSymlinks::No);
-            let mut file = current.open_with(component, &options)?;
-            if !file.metadata()?.is_file() {
-                return Err(CapabilityFsError::UnsafeTarget(
-                    relative.display().to_string(),
-                ));
-            }
-            let mut bytes = Vec::new();
-            file.read_to_end(&mut bytes)?;
-            return Ok(Some(bytes));
+            return read_leaf_nofollow(&current, component, relative);
         }
         if !metadata.is_dir() {
             return Err(CapabilityFsError::UnsafeTarget(
@@ -504,6 +765,96 @@ mod tests {
     use super::*;
     use crate::storage::repository_state_store::RepositoryStateStoreError;
     use crate::storage::RedoApplyError;
+    use tempfile::TempDir;
+
+    #[cfg(unix)]
+    #[test]
+    fn test_open_regular_file_nofollow_refuses_a_symbolic_link() {
+        use std::os::unix::fs::symlink;
+        let temp = TempDir::new().unwrap();
+        let target = temp.path().join("target.txt");
+        std::fs::write(&target, b"outside content").unwrap();
+        symlink(&target, temp.path().join("link.txt")).unwrap();
+        let dir = Dir::open_ambient_dir(temp.path(), ambient_authority()).unwrap();
+
+        let error = open_regular_file_nofollow(&dir, "link.txt").unwrap_err();
+
+        assert!(matches!(error, CapabilityFsError::UnsafeTarget(_)));
+    }
+
+    #[test]
+    fn test_open_regular_file_nofollow_refuses_a_directory() {
+        let temp = TempDir::new().unwrap();
+        std::fs::create_dir(temp.path().join("subdir")).unwrap();
+        let dir = Dir::open_ambient_dir(temp.path(), ambient_authority()).unwrap();
+
+        let error = open_regular_file_nofollow(&dir, "subdir").unwrap_err();
+
+        assert!(matches!(error, CapabilityFsError::UnsafeTarget(_)));
+    }
+
+    #[test]
+    fn test_open_child_dir_nofollow_requires_a_directory_handle() {
+        let temp = TempDir::new().unwrap();
+        std::fs::create_dir(temp.path().join("directory")).unwrap();
+        std::fs::write(temp.path().join("file"), b"content").unwrap();
+        let parent = Dir::open_ambient_dir(temp.path(), ambient_authority()).unwrap();
+        let directory = open_child_dir_nofollow(&parent, "directory").unwrap();
+        assert!(directory.dir_metadata().unwrap().is_dir());
+        assert!(matches!(
+            open_child_dir_nofollow(&parent, "file"),
+            Err(CapabilityFsError::UnsafeTarget(_))
+        ));
+    }
+
+    #[test]
+    fn test_read_leaf_nofollow_returns_absence_or_the_regular_files_bytes() {
+        let temp = TempDir::new().unwrap();
+        let dir = Dir::open_ambient_dir(temp.path(), ambient_authority()).unwrap();
+        assert_eq!(
+            read_leaf_nofollow(&dir, "missing", Path::new("missing")).unwrap(),
+            None
+        );
+        std::fs::write(temp.path().join("record"), b"record bytes").unwrap();
+        assert_eq!(
+            read_leaf_nofollow(&dir, "record", Path::new("record")).unwrap(),
+            Some(b"record bytes".to_vec())
+        );
+    }
+
+    #[test]
+    fn test_read_repository_file_reports_the_root_relative_unsafe_leaf_path() {
+        let temp = TempDir::new().unwrap();
+        let relative = RootRelativePath::parse("issues/abc.json").unwrap();
+        std::fs::create_dir_all(temp.path().join(relative.as_path())).unwrap();
+
+        for read in [read_repository_file_nofollow, read_repository_file_confined] {
+            let error = read(temp.path(), &relative).unwrap_err();
+            assert!(matches!(
+                error,
+                CapabilityFsError::UnsafeTarget(path) if Path::new(&path) == relative.as_path()
+            ));
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_open_regular_file_nofollow_refuses_a_fifo_without_waiting_for_a_writer() {
+        let temp = TempDir::new().unwrap();
+        nix::unistd::mkfifo(&temp.path().join("pipe"), nix::sys::stat::Mode::S_IRWXU).unwrap();
+        let dir = Dir::open_ambient_dir(temp.path(), ambient_authority()).unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            sender
+                .send(open_regular_file_nofollow(&dir, "pipe"))
+                .unwrap()
+        });
+        let error = receiver
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("a pipe must be refused without waiting for a writer")
+            .unwrap_err();
+        assert!(matches!(error, CapabilityFsError::UnsafeTarget(_)));
+    }
 
     #[test]
     fn test_capability_fs_error_conversions_preserve_variant_and_message() {

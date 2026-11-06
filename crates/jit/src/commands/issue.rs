@@ -921,28 +921,19 @@ impl<S: IssueStore> IssueOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         let id = self.exec.storage.resolve_issue_id(id)?;
-        let assignee = local.assignee;
         let outcome = self
             .exec
             .publish_captured_field_update(CapturedFieldUpdate {
-                issue_id: id.clone(),
                 title,
                 description,
                 priority,
                 state,
                 add_labels,
                 remove_labels,
-                append_label: None,
                 content_format,
                 issue_type,
-                add_gates: local.add_gates,
-                remove_gates: local.remove_gates,
-                assignee,
-                unassign: local.unassign,
-                bulk: false,
                 force,
-                enforce_lease: true,
-                rejection: false,
+                ..CapturedFieldUpdate::issue_local(id, local)
             })?;
 
         Ok(IssueMutation {
@@ -1087,18 +1078,13 @@ impl<S: IssueStore> IssueOps<'_, S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.exec.storage.resolve_issue_id(id)?;
-
-        // Collect warnings instead of printing
-        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
-
-        let (issue, _) =
-            self.exec
-                .publish_captured_issue_mutation(CapturedIssueMutation::Assign {
-                    issue_id: full_id,
-                    assignee,
-                })?;
-        Ok(IssueMutation { issue, warnings })
+        self.publish_issue_local(
+            id,
+            IssueLocalUpdate {
+                assignee: Some(assignee),
+                ..IssueLocalUpdate::default()
+            },
+        )
     }
 
     /// Claim an issue for `assignee`.
@@ -1131,17 +1117,31 @@ impl<S: IssueStore> IssueOps<'_, S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.exec.storage.resolve_issue_id(id)?;
+        self.publish_issue_local(
+            id,
+            IssueLocalUpdate {
+                unassign: true,
+                ..IssueLocalUpdate::default()
+            },
+        )
+    }
 
-        // Collect warnings instead of printing
-        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
-
-        let (issue, _) =
-            self.exec
-                .publish_captured_issue_mutation(CapturedIssueMutation::Unassign {
-                    issue_id: full_id,
-                })?;
-        Ok(IssueMutation { issue, warnings })
+    fn publish_issue_local(
+        &self,
+        id: &IssueIdPrefix,
+        local: IssueLocalUpdate,
+    ) -> Result<IssueMutation>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let id = self.exec.storage.resolve_issue_id(id)?;
+        let outcome = self
+            .exec
+            .publish_captured_field_update(CapturedFieldUpdate::issue_local(id, local))?;
+        Ok(IssueMutation {
+            issue: outcome.issue,
+            warnings: outcome.warnings,
+        })
     }
 
     pub fn release_issue(&self, id: &IssueIdPrefix, reason: &str) -> Result<Issue>
@@ -1149,8 +1149,26 @@ impl<S: IssueStore> IssueOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         let full_id = self.exec.storage.resolve_issue_id(id)?;
+        let actor = claim::resolve_release_actor(self.exec.require_worktree_paths()?)?;
         self.exec
-            .publish_captured_release(&full_id, reason.to_string())
+            .publish_captured_release(&full_id, reason.to_string(), actor)
+    }
+
+    /// Release an issue with an explicit audit actor, without resolving invocation identity.
+    ///
+    /// Returns the persisted issue.
+    pub fn release_issue_as(
+        &self,
+        id: &IssueIdPrefix,
+        reason: &str,
+        actor: crate::domain::Assignee,
+    ) -> Result<Issue>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let full_id = self.exec.storage.resolve_issue_id(id)?;
+        self.exec
+            .publish_captured_release(&full_id, reason.to_string(), actor)
     }
 
     /// Claim the highest-priority ready issue matching `filter`, a
@@ -2457,6 +2475,147 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             updated_before,
             "unassigning an already-unassigned issue must not bump updated_at"
         );
+    }
+
+    /// An issue in a claims-coordinated repository enforcing `mode`, leased by
+    /// another agent when `leased`; answers the executor, the issue and its holder.
+    fn assign_lease_fixture(
+        mode: &str,
+        leased: bool,
+    ) -> (
+        CommandExecutor<InMemoryStorage>,
+        IssueId,
+        Option<crate::domain::Assignee>,
+    ) {
+        let executor = crate::commands::test_helpers::setup_coordinated_with_enforcement(mode);
+        let issue = crate::test_utils::fixture_issue("Leased".to_string(), String::new());
+        let issue_id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
+        let holder = leased
+            .then(|| crate::commands::test_helpers::plant_foreign_lease(&executor, &issue_id));
+        (executor, issue_id, holder)
+    }
+
+    #[test]
+    fn test_assign_issue_strict_refuses_another_agents_lease_without_writing() {
+        let (executor, issue_id, holder) = assign_lease_fixture("strict", true);
+        let before = executor.storage.load_issue(&issue_id).unwrap();
+
+        let error = executor
+            .issues()
+            .assign_issue(&IssueIdPrefix::from(&issue_id), "agent:a".parse().unwrap())
+            .unwrap_err();
+
+        let refusal = error
+            .downcast_ref::<crate::errors::ForeignLeaseError>()
+            .expect("the refusal is a ForeignLeaseError");
+        assert_eq!(
+            refusal
+                .leases()
+                .iter()
+                .map(|lease| (&lease.issue_id, &lease.holder))
+                .collect::<Vec<_>>(),
+            [(&issue_id, holder.as_ref().unwrap())]
+        );
+        assert_eq!(executor.storage.load_issue(&issue_id).unwrap(), before);
+    }
+
+    #[test]
+    fn test_assign_issue_warn_assigns_another_agents_leased_issue_with_a_warning() {
+        let (executor, issue_id, holder) = assign_lease_fixture("warn", true);
+        let assignee: crate::domain::Assignee = "agent:a".parse().unwrap();
+
+        let mutation = executor
+            .issues()
+            .assign_issue(&IssueIdPrefix::from(&issue_id), assignee.clone())
+            .unwrap();
+
+        assert!(
+            mutation
+                .warnings
+                .iter()
+                .any(|warning| warning.contains(&holder.as_ref().unwrap().to_string())),
+            "{:?}",
+            mutation.warnings
+        );
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().assignee,
+            Some(assignee)
+        );
+    }
+
+    #[test]
+    fn test_assign_issue_strict_assigns_an_unleased_issue() {
+        let (executor, issue_id, _) = assign_lease_fixture("strict", false);
+        let assignee: crate::domain::Assignee = "agent:a".parse().unwrap();
+
+        let mutation = executor
+            .issues()
+            .assign_issue(&IssueIdPrefix::from(&issue_id), assignee.clone())
+            .unwrap();
+
+        assert!(mutation.warnings.is_empty(), "{:?}", mutation.warnings);
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().assignee,
+            Some(assignee)
+        );
+    }
+
+    #[test]
+    fn test_assign_issue_refused_by_enforcing_local_rule_that_refuses_update_assignee() {
+        let storage = InMemoryStorage::new();
+        seed_scenario_gates(&storage);
+        let executor = memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(&scenario_config()),
+                rules: Some(
+                    "[[rules]]\nname = \"team-required\"\nseverity = \"error\"\nenforce = true\n\
+                     assert = { require-label = { label = \"team:*\" } }\n",
+                ),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let issue = crate::test_utils::fixture_issue("Unteamed".to_string(), String::new());
+        let issue_id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
+        let before = executor.storage.load_issue(&issue_id).unwrap();
+        let prefix = IssueIdPrefix::from(&issue_id);
+        let assignee: crate::domain::Assignee = "agent:a".parse().unwrap();
+
+        let update = executor
+            .issues()
+            .update_issue_resolved(
+                &prefix,
+                None,
+                None,
+                None,
+                None,
+                vec![],
+                vec![],
+                None,
+                None,
+                IssueLocalUpdate {
+                    assignee: Some(assignee.clone()),
+                    ..IssueLocalUpdate::default()
+                },
+                false,
+            )
+            .unwrap_err();
+        let assign = executor
+            .issues()
+            .assign_issue(&prefix, assignee)
+            .unwrap_err();
+
+        for error in [update, assign] {
+            assert!(
+                error
+                    .downcast_ref::<crate::errors::ValidationFailedError>()
+                    .is_some(),
+                "{error:?}"
+            );
+        }
+        assert_eq!(executor.storage.load_issue(&issue_id).unwrap(), before);
     }
 
     #[test]

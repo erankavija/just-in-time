@@ -505,6 +505,41 @@ pub fn setup() -> CommandExecutor<InMemoryStorage> {
     setup_with_enforcement("off")
 }
 
+/// [`setup_with_enforcement`] in a Git checkout at the store's root, whose
+/// lease control plane is that root's `.git/jit`.
+pub fn setup_coordinated_with_enforcement(mode: &str) -> CommandExecutor<InMemoryStorage> {
+    let executor = setup_with_enforcement(mode);
+    let root = executor.storage().root().to_path_buf();
+    crate::test_cli::init_git_repository_with_commit(&root).unwrap();
+    executor.with_worktree_paths(crate::test_utils::primary_checkout_paths(&root))
+}
+
+/// Plant an active lease on `issue_id` held by an agent no test writer runs
+/// as, in `executor`'s lease control plane; answers the holder.
+pub fn plant_foreign_lease<S: IssueStore>(
+    executor: &CommandExecutor<S>,
+    issue_id: &crate::domain::identity::IssueId,
+) -> crate::domain::Assignee {
+    let holder: crate::domain::Assignee = "agent:foreign-lease-holder".parse().unwrap();
+    let now = chrono::Utc::now();
+    crate::test_lease_store::plant_lease(
+        &executor.require_worktree_paths().unwrap().shared_jit,
+        &crate::storage::claim_coordinator::Lease {
+            lease_id: "00000000-0000-4000-8000-000000000001".parse().unwrap(),
+            issue_id: issue_id.clone(),
+            agent_id: holder.clone(),
+            worktree_id: "wt:foreign-lease-holder".parse().unwrap(),
+            branch: None,
+            ttl_secs: 600,
+            acquired_at: now,
+            expires_at: Some(now + chrono::Duration::seconds(600)),
+            last_beat: now,
+        },
+    )
+    .unwrap();
+    holder
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

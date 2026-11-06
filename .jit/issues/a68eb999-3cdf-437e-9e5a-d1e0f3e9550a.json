@@ -1,22 +1,31 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker-a68eb999",
+  "claimed_at": "2026-11-05T23:22:32.148678324Z",
   "context": {},
   "created_at": "2026-09-03T04:31:23.810651679Z",
   "dependencies": [],
   "description": "Nothing states, where a reader first meets templates, that a template file is not a distribution unit: the gates it names and the rules those gates evaluate travel in the profile package that carries it.\n\n## Background\n\nA gate declared as `rule_validation` names a configured rule, and that rule lives in the rules registry rather than in the template. A reader who copies a `templates.toml` on its own therefore gets a template naming gates that do not exist, and concludes the gate cannot be ported.\n\nThe shipped mechanism is not at fault. A repository bootstrapped from the `jit-dogfood` package receives the `coverage-preview` rule with its full assertion body and the gate bound to it, and enforcement-drift checking reports nothing missing. The manual how-to is also correct: it instructs copying `config.toml`, `rules.toml` and `templates.toml` together, and devotes separate steps to adding the coverage rules and declaring the gates.\n\nWhat is missing is the general statement at the point of first contact. A reader arriving at templates through the planning-bracket concepts page or through an agent workflow that applies a template meets no sentence telling them the template is one file of a package, so the copy-all-three instruction reads as incidental rather than as the consequence of a rule.\n\n## Success Criteria\n\n- [hard] REQ-01: The documentation states that a template names gates rather than carrying them, and that a gate evaluating a configured rule runs only where that rule is declared.\n- [hard] REQ-02: The statement appears where a reader first meets templates, reachable without already knowing the manual adoption how-to.\n- [hard] REQ-03: The fact has one canonical home and is cited rather than restated elsewhere.\n- [hard] REQ-04: The existing manual how-to's copy instruction reads as a consequence of that stated principle.\n\n## Notes\n\nReported by an adopter who hand-copied a template file, found the `coverage-preview` gate unusable, and inferred a portability limit in the mechanism. Verification found the opposite: the profile route carries the rule complete. The reporting path is what needs closing, not the packaging.\n\nScope is documentation. No behaviour change is required, and the packaging contract is unchanged.\n",
   "documents": [],
+  "done_at": "2026-11-05T23:43:17.619839212Z",
   "first_ready_at": "2026-09-03T04:31:23.810651679Z",
   "gates_required": [
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "run_id": "84c4254a-ba13-4cba-9840-c22cf629130d",
+      "status": "passed",
+      "updated_at": "2026-11-05T23:38:05.808638186Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a68eb999-3cdf-437e-9e5a-d1e0f3e9550a",
   "labels": [
     "component:docs",
     "type:task"
   ],
   "priority": "low",
-  "state": "ready",
+  "state": "done",
   "title": "State that a template names gates rather than carrying them",
-  "updated_at": "2026-09-03T04:31:23.810651679Z"
+  "updated_at": "2026-11-05T23:43:17.619839212Z"
 }

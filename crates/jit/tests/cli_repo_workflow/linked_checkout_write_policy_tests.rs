@@ -209,8 +209,8 @@ fn test_invalid_env_write_stance_token_fails_the_invocation_naming_accepted_toke
 }
 
 // The refusal half of the policy (jit:f52567ed): the guard runs at dispatch,
-// before the repository mutation session opens, so a refused invocation is not a
-// state change and leaves nothing behind to recover from.
+// before a new repository mutation session opens. A clean-store refusal leaves
+// nothing behind; a pending record completes its already committed work first.
 
 /// Every byte under `checkout`'s `.jit/`, keyed by its path relative to it.
 ///
@@ -624,5 +624,69 @@ fn test_linked_checkout_write_policy_journey_walks_refusal_then_declared_permit_
         "the override leg's mutation must land in addition to the earlier legs' durable state, \
          proving the checkout accumulated state across the journey rather than being reset \
          between legs; events: {events_after_override:?}"
+    );
+}
+
+#[test]
+fn test_pending_recovery_precedes_cli_refusal_without_repeating_override_audit() {
+    use jit::repository_state::{FileMode, VirtualPath};
+    use jit::storage::{commit_redo_record, DataRoot, EventAppend, PutFile, RedoRecord};
+    let (_primary, linked) = JitCli::linked_checkouts().unwrap();
+    declare_stance(&linked, LinkedCheckoutWriteStance::Allow);
+    let data = linked.root().join(".jit");
+    let config = std::fs::read_to_string(data.join("config.toml"))
+        .unwrap()
+        .replace("write_policy = \"allow\"", "write_policy = \"refuse\"");
+    let before = std::fs::read(data.join("events.jsonl")).unwrap();
+    let before_audits = events_tagged(
+        &durable_events(linked.root()),
+        "linked_checkout_write_overridden",
+    )
+    .len();
+    let mut audit = serde_json::to_vec(
+        &jit::domain::event_catalog::EventTag::LinkedCheckoutWriteOverridden.sample(),
+    )
+    .unwrap();
+    audit.push(b'\n');
+    let record = RedoRecord::new(
+        Vec::new(),
+        vec![PutFile {
+            path: VirtualPath::CONFIG,
+            bytes: config.into_bytes(),
+            mode: FileMode::Regular,
+        }],
+        Vec::new(),
+        Some(EventAppend {
+            offset: before.len() as u64,
+            bytes: audit.clone(),
+        }),
+    )
+    .unwrap();
+    commit_redo_record(&DataRoot::open(&data).unwrap(), &record).unwrap();
+    let refusal = refusal_envelope(linked.command(CREATE_ISSUE).assert().failure());
+    assert_eq!(
+        refusal["code"],
+        serde_json::json!(jit::output::ErrorCode::LinkedCheckoutWriteRefused)
+    );
+    assert_eq!(
+        std::fs::read(data.join("events.jsonl")).unwrap(),
+        [before, audit].concat()
+    );
+    assert!(!data
+        .join(jit::storage::RECORD_SCRATCH_DIR)
+        .join(jit::storage::RECORD_FILE_NAME)
+        .exists());
+    linked
+        .command(CREATE_ISSUE)
+        .env(WRITE_STANCE_ENV, "allow")
+        .assert()
+        .success();
+    assert_eq!(
+        events_tagged(
+            &durable_events(linked.root()),
+            "linked_checkout_write_overridden"
+        )
+        .len(),
+        before_audits + 2
     );
 }

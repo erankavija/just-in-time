@@ -20,6 +20,7 @@ use jit::domain::identity::IssueId;
 use jit::domain::Priority;
 use jit::labels::parse_label;
 use jit::storage::{IssueStore, JsonFileStorage, PresetNotFoundError};
+use jit::templates::TemplatePrerequisitesUnmetError;
 use jit::templates::{GraphTemplate, TemplateRegistry};
 use jit::test_harness::TestHarness;
 use jit::test_utils::add_reducing_edge;
@@ -98,15 +99,23 @@ const DOCUMENT_AREA: &str = "workspace/notes";
 /// the captured aggregate the apply engine reads and the config file the query
 /// paths load, so the two views of the registry agree.
 fn declare_document_area(h: &TestHarness) {
-    let config = format!("[documentation]\nissue_scoped_areas = [\"{DOCUMENT_AREA}\"]\n");
-    h.storage.add_data_file("config.toml", &config);
+    declare_config(
+        h,
+        &format!("[documentation]\nissue_scoped_areas = [\"{DOCUMENT_AREA}\"]\n"),
+    );
+}
+
+/// Install `config` as this repository's `config.toml`, in both the captured
+/// aggregate the apply engine reads and the file the query paths load.
+fn declare_config(h: &TestHarness, config: &str) {
+    h.storage.add_data_file("config.toml", config);
     let config_path = h
         .storage
         .repository_layout()
         .resolve(&jit::repository_state::VirtualPath::CONFIG)
         .unwrap();
     std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
-    std::fs::write(config_path, &config).unwrap();
+    std::fs::write(config_path, config).unwrap();
 }
 
 fn type_of(issue: &jit::domain::Issue) -> Option<String> {
@@ -336,26 +345,52 @@ fn test_apply_resolves_the_declared_document_area_into_the_node_doc_location() {
     );
 }
 
+/// REQ-01/REQ-06 (jit:0723860e): a repository missing prerequisites of several
+/// kinds learns every one of them from a single failed application.
 #[test]
-fn test_apply_rejects_a_document_area_the_registry_does_not_declare_and_creates_nothing() {
+fn test_apply_reports_every_unmet_prerequisite_in_one_failure_and_creates_nothing() {
     let h = TestHarness::new();
-    declare_document_area(&h);
-    let undeclared = format!("{DOCUMENT_AREA}-drafts");
-    let template = plan_template_document("{container.dir}/plan.md", Some(&undeclared));
-    let epic = create_epic(&h, "Undeclared area epic");
+    // The repository declares a vocabulary of its own and none of the template's
+    // types, its bracket namespace, its gates, or its document area.
+    declare_config(
+        &h,
+        "[type_hierarchy]\ntypes = { epic = 1 }\n\
+         [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n\
+         [namespaces.area]\ndescription = \"Area\"\nunique = false\n",
+    );
+    let epic = h
+        .executor
+        .issues()
+        .create_issue(
+            "Unprepared epic".to_string(),
+            "## Success Criteria\n\n- [hard] REQ-01: it works\n".to_string(),
+            Priority::Normal,
+            vec![],
+            vec!["type:epic".to_string()],
+            None,
+            None,
+            false,
+        )
+        .unwrap()
+        .issue
+        .id;
 
     let before = h.all_issues().len();
     let error = h
         .executor
         .templates()
-        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .apply_template_with(&plan_template(), &epic, &container_binding(&epic), false)
         .unwrap_err();
 
-    // The application fails naming the area it was handed and the registry it
-    // was matched against, rather than composing a path outside the convention.
-    let message = error.to_string();
-    assert!(message.contains(&undeclared), "{message}");
-    assert!(message.contains(DOCUMENT_AREA), "{message}");
+    let report = error
+        .downcast_ref::<TemplatePrerequisitesUnmetError>()
+        .unwrap_or_else(|| panic!("expected the prerequisite report, got {error:#}"));
+    let kinds = report
+        .unmet()
+        .iter()
+        .map(std::mem::discriminant)
+        .collect::<std::collections::HashSet<_>>();
+    assert_eq!(kinds.len(), 4, "every unmet kind in one failure: {error}");
     assert_eq!(h.all_issues().len(), before, "no node may be created");
 }
 
@@ -415,9 +450,6 @@ fn test_apply_snapshots_container_dependencies_before_mutation() {
 #[test]
 fn test_apply_rejects_wrong_container_type_and_creates_nothing() {
     let h = TestHarness::new();
-    // The template's document area is declared, so the refusal under test is
-    // the container's type rather than an undeclared area reached first.
-    declare_document_area(&h);
     let template = plan_template();
     let task = h
         .executor
@@ -678,38 +710,6 @@ fn test_force_finds_breakdown_after_spine_reshaping_no_duplicate() {
 
 // === APPA-01: gate presets validated before any mutation ===
 
-#[test]
-fn test_apply_rejects_unknown_gate_preset_and_creates_nothing() {
-    let h = TestHarness::new();
-    // A single planning node referencing a gate preset that does not exist.
-    let toml = r#"
-[[template]]
-name        = "ghostgate"
-applies_to  = ["epic"]
-  [[template.nodes]]
-  role        = "planning"
-  type        = "planning"
-  gates       = ["does-not-exist"]
-  description = "Plan {container.title}."
-"#;
-    let template = TemplateRegistry::from_toml_str(toml, &HIERARCHY)
-        .unwrap()
-        .get("ghostgate")
-        .unwrap()
-        .clone();
-    let epic = create_epic(&h, "Ghost-gate epic");
-
-    let before = h.all_issues().len();
-    let err = h
-        .executor
-        .templates()
-        .apply_template_with(&template, &epic, &container_binding(&epic), false)
-        .unwrap_err();
-    assert!(err.to_string().contains("does-not-exist"));
-    // APPA-01: the missing-preset failure is caught before the first create.
-    assert_eq!(h.all_issues().len(), before);
-}
-
 // === REQ-13: anchor-level gate presets (jit:2614ecf2) ===
 
 #[test]
@@ -756,7 +756,7 @@ fn test_apply_attaches_registry_gate_key_not_preset() {
     // Guard: the name must NOT also be a preset, so the test exercises the
     // registry-key branch and not the preset branch.
     assert!(
-        h.storage.get_gate_preset("deploy-check").is_err(),
+        h.executor.gates().show_gate_preset("deploy-check").is_err(),
         "deploy-check must be a registry-only gate, not a preset"
     );
 
@@ -854,46 +854,6 @@ applies_to  = ["epic"]
     );
 }
 
-#[test]
-fn test_apply_rejects_unknown_anchor_gate_preset_and_creates_nothing() {
-    let h = TestHarness::new();
-    // The `container` anchor references a gate name that is NEITHER a preset NOR
-    // a registry gate key; this must be rejected up front, exactly like an
-    // unknown node gate.
-    let toml = r#"
-[[template]]
-name        = "ghostanchorgate"
-applies_to  = ["epic"]
-  [[template.anchors]]
-  name  = "container"
-  gates = ["does-not-exist"]
-  [[template.nodes]]
-  role        = "breakdown"
-  type        = "breakdown"
-  labels      = ["brackets:{container.short_id}"]
-  description = "Break down {container.title}."
-  [[template.anchor_edges]]
-  from = "container"
-  to   = "breakdown"
-"#;
-    let template = TemplateRegistry::from_toml_str(toml, &HIERARCHY)
-        .unwrap()
-        .get("ghostanchorgate")
-        .unwrap()
-        .clone();
-    let epic = create_epic(&h, "Ghost-anchor-gate epic");
-
-    let before = h.all_issues().len();
-    let err = h
-        .executor
-        .templates()
-        .apply_template_with(&template, &epic, &container_binding(&epic), false)
-        .unwrap_err();
-    assert!(err.to_string().contains("does-not-exist"), "{err}");
-    // The unknown-gate failure is caught before the first create (APPA-01).
-    assert_eq!(h.all_issues().len(), before);
-}
-
 /// REQ-02 (jit:ff1bbada): a template gate that no preset and no registry entry
 /// supplies is reported by name, whatever that name is.
 ///
@@ -907,7 +867,7 @@ fn test_apply_reports_a_planning_bracket_gate_no_preset_and_no_registry_entry_su
         // name under test is supplied by neither.
         let h = TestHarness::new();
         assert!(
-            h.storage.get_gate_preset(key).is_err(),
+            h.executor.gates().show_gate_preset(key).is_err(),
             "{key} must not resolve as a preset this repository never declared"
         );
         assert!(
@@ -982,16 +942,7 @@ applies_to  = ["epic"]
 
 #[test]
 fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_registry_key() {
-    // Regression for issue 552ff75c (REQ-13). `resolve_template_gate` resolves a
-    // template gate NAME by preferring a gate preset, falling back to a registry
-    // gate key ONLY when the name is genuinely not a preset (`PresetNotFoundError`).
-    // If the preset store itself fails to LOAD (a malformed custom preset under
-    // `.jit/config/gate-presets/`), that error must PROPAGATE. The prior bug treated
-    // ANY preset-load error as "not a preset" and fell back to the registry key, so a
-    // broken preset config could let `jit apply` SUCCEED by accidentally matching a
-    // same-named registry gate. This is exercised over a real file-based
-    // `JsonFileStorage`: the parse-error path lives in `PresetManager::new`, which the
-    // in-memory `TestHarness` (a HashMap lookup) cannot reproduce.
+    // A malformed preset must prevent fallback to a same-named registry gate.
     let temp = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp.path());
     std::fs::write(
@@ -1027,16 +978,15 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
     // preset lookup returns `PresetNotFoundError`, the swallowed-error case the bug
     // abused to fall through to the registry key.
     let pre_err = executor
-        .storage()
-        .get_gate_preset("repo-validate")
+        .gates()
+        .show_gate_preset("repo-validate")
         .unwrap_err();
     assert!(
         pre_err.downcast_ref::<PresetNotFoundError>().is_some(),
         "repo-validate must be a registry-only gate so the fallback would match: {pre_err}"
     );
 
-    // Plant a MALFORMED custom preset file named for that SAME gate. Loading it makes
-    // `PresetManager::new` fail with a parse error, NOT `PresetNotFoundError`.
+    // The catalog must propagate a parse error for a same-named malformed preset.
     let presets_dir = temp.path().join("config").join("gate-presets");
     std::fs::create_dir_all(&presets_dir).unwrap();
     std::fs::write(
@@ -1049,8 +999,8 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
     // `PresetNotFoundError` — it is the parse error that `resolve_template_gate` must
     // propagate rather than swallow.
     let load_err = executor
-        .storage()
-        .get_gate_preset("repo-validate")
+        .gates()
+        .show_gate_preset("repo-validate")
         .unwrap_err();
     assert!(
         load_err.downcast_ref::<PresetNotFoundError>().is_none(),
@@ -1308,6 +1258,59 @@ fn test_transform_does_not_move_freshly_created_breakdown_onto_planning() {
     // The spine B→P is intact and not inverted.
     let breakdown = h.get_issue(&breakdown_id);
     assert_eq!(breakdown.dependencies, vec![planning_id]);
+}
+
+#[test]
+fn test_apply_reports_each_dependency_moved_off_a_populated_container() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "Populated epic");
+    let children = ["Child 1", "Child 2", "Child 3"]
+        .map(|title| {
+            let child = h.create_issue(title);
+            add_reducing_edge(&h.executor, &epic, &child).unwrap();
+            h.get_issue(&child).id
+        })
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>();
+
+    let (result, _w) = h
+        .executor
+        .templates()
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+
+    let report = result
+        .upstream_move
+        .expect("a populated container reports its moved dependencies");
+    let planning_id = &result.created_node_ids_by_role["planning"];
+    assert_eq!(report.container, h.get_issue(&epic).id);
+    let moved: std::collections::BTreeSet<_> =
+        report.moves.iter().map(|m| m.dependency.clone()).collect();
+    assert_eq!(report.moves.len(), children.len());
+    assert_eq!(moved, children);
+    assert!(report
+        .moves
+        .iter()
+        .all(|m| m.role == "planning" && &m.node == planning_id));
+    // Each reported edge is one the receiving node now carries.
+    let planning = h.get_issue(planning_id);
+    assert!(moved.iter().all(|dep| planning.dependencies.contains(dep)));
+}
+
+#[test]
+fn test_apply_reports_no_upstream_move_for_an_empty_container() {
+    let h = TestHarness::new();
+    let template = plan_template();
+    let epic = create_epic(&h, "Empty epic");
+
+    let (result, _w) = h
+        .executor
+        .templates()
+        .apply_template_with(&template, &epic, &container_binding(&epic), false)
+        .unwrap();
+
+    assert_eq!(result.upstream_move, None);
 }
 
 #[test]
@@ -1789,7 +1792,21 @@ fn test_apply_result_serializes_to_expected_json_shape() {
         serde_json::json!([upstream_full])
     );
 
-    // The serialized shape has exactly the four documented top-level keys — no
+    // The advisory move report names the container and each moved edge with the
+    // role and node that received it.
+    assert_eq!(
+        json["upstream_move"],
+        serde_json::json!({
+            "container": epic_full,
+            "moves": [{
+                "dependency": upstream_full,
+                "role": "planning",
+                "node": planning_id,
+            }],
+        })
+    );
+
+    // The serialized shape has exactly the documented top-level keys — no
     // stray or missing field leaks into the machine-readable contract.
     let obj = json
         .as_object()
@@ -1803,6 +1820,7 @@ fn test_apply_result_serializes_to_expected_json_shape() {
             "anchor_dependency_snapshots",
             "created_node_ids_by_role",
             "template",
+            "upstream_move",
         ]
     );
 }

@@ -476,6 +476,10 @@ impl RepositoryRootEvidence {
         }
     }
 
+    pub(crate) fn validate(&self) -> Result<(), RepositoryLayoutError> {
+        validate_root(self)
+    }
+
     /// Lexically normalized absolute root path.
     pub fn path(&self) -> &Path {
         &self.path

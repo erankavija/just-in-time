@@ -228,11 +228,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                     .labels
                     .retain(|label| label != &label_utils::type_label(&old_type));
                 issue.labels.push(label_utils::type_label(&new_type));
-                if !dry_run {
-                    fixes
-                        .messages
-                        .extend(self.exec.refuse_foreign_lease(&issue_id)?);
-                }
                 fixes.messages.push(format!(
                     "{} type '{old_type}' with '{new_type}' for issue {issue_id}",
                     if dry_run { "Would replace" } else { "Replaced" }
@@ -1203,63 +1198,35 @@ impl<S: IssueStore> ValidationOps<'_, S> {
     /// Ok(()) when the branch is up-to-date, Err naming both commits and the
     /// rebase that reconciles them when it has drifted.
     pub fn validate_branch_drift(&self) -> Result<()> {
-        use std::process::Command;
+        use crate::storage::git::BaseComparison;
 
-        let layout = self
+        let checkout = self
             .exec
-            .gates()
-            .real_repo_layout()
-            .context("Branch drift needs a repository on disk")?;
-        let repository = layout.data_root();
-
-        // Get merge-base between HEAD and origin/main
-        let merge_base_output = Command::new("git")
-            .args(["merge-base", "HEAD", "origin/main"])
-            .current_dir(repository)
-            .output()
-            .context("Failed to execute git merge-base")?;
-
-        if !merge_base_output.status.success() {
-            let stderr = String::from_utf8_lossy(&merge_base_output.stderr);
-            anyhow::bail!(
-                "Failed to get merge-base with origin/main: {}",
-                stderr.trim()
-            );
-        }
-
-        let merge_base = String::from_utf8(merge_base_output.stdout)?
-            .trim()
-            .to_string();
-
-        // Get current origin/main commit
-        let main_commit_output = Command::new("git")
-            .args(["rev-parse", "origin/main"])
-            .current_dir(repository)
-            .output()
-            .context("Failed to execute git rev-parse")?;
-
-        if !main_commit_output.status.success() {
-            let stderr = String::from_utf8_lossy(&main_commit_output.stderr);
-            anyhow::bail!("Failed to get origin/main commit: {}", stderr.trim());
-        }
-
-        let main_commit = String::from_utf8(main_commit_output.stdout)?
-            .trim()
-            .to_string();
-
-        // If merge-base != main commit, branch has diverged
-        if merge_base != main_commit {
-            anyhow::bail!(
-                "Branch has diverged from origin/main\n\
-                 Merge base: {}\n\
-                 Main commit: {}\n\
-                 Fix: git rebase origin/main",
+            .require_worktree_paths()?
+            .code_checkout()
+            .context("branch drift validation requires a git repository")?;
+        match checkout.compare_with_base("origin/main")? {
+            BaseComparison::BaseUnresolved => {
+                anyhow::bail!("origin/main does not resolve to a commit")
+            }
+            BaseComparison::NoMergeBase => {
+                anyhow::bail!("HEAD shares no history with origin/main")
+            }
+            BaseComparison::Compared {
                 merge_base,
-                main_commit
-            );
+                base_commit,
+            } if merge_base != base_commit => {
+                anyhow::bail!(
+                    "Branch has diverged from origin/main\n\
+                     Merge base: {}\n\
+                     Main commit: {}\n\
+                     Fix: git rebase origin/main",
+                    merge_base.as_str(),
+                    base_commit.as_str()
+                )
+            }
+            BaseComparison::Compared { .. } => Ok(()),
         }
-
-        Ok(())
     }
 
     /// Validate all active leases are consistent and not stale.
@@ -1395,6 +1362,27 @@ fn recorded_worktree_ids(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_validate_branch_drift_uses_selected_code_checkout() {
+        use crate::test_harness::git::GitRepository;
+        let outer = tempfile::tempdir().unwrap();
+        let data = GitRepository::init(outer.path().join("data"));
+        let code = GitRepository::init(outer.path().join("code"));
+        data.write("data", "data")
+            .commit("data history without origin/main");
+        code.write("code", "code").commit("code history");
+        code.git(&["update-ref", "refs/remotes/origin/main", "HEAD"]);
+        let paths = crate::storage::WorktreePaths::detect_for_data_root(
+            &data.root().join(".jit"),
+            data.root(),
+        )
+        .unwrap()
+        .with_worktree_root(code.root())
+        .unwrap();
+        let executor = crate::commands::test_helpers::setup().with_worktree_paths(paths);
+        assert!(executor.validation().validate_branch_drift().is_ok());
+    }
+
     use super::*;
     use crate::commands::test_helpers::{seed_issue, MemoryDeclarations};
     use crate::repository_state::VirtualPath;
@@ -2038,6 +2026,37 @@ mod tests {
 
         let (second, _, _, _) = executor.validation().validate_with_fix(false).unwrap();
         assert_eq!(second, 0, "a captured type repair must not repeat");
+    }
+
+    #[test]
+    fn test_validate_type_fix_repairs_another_agents_leased_issue_in_strict_mode() {
+        use crate::commands::test_helpers::{
+            plant_foreign_lease, seed_issue, seed_repo_file, setup_coordinated_with_enforcement,
+        };
+        use crate::storage::IssueStore;
+
+        let executor = setup_coordinated_with_enforcement("strict");
+        seed_repo_file(
+            executor.storage(),
+            ".jit/config.toml",
+            "[worktree]\nenforce_leases = \"strict\"\n\
+             [type_hierarchy.types]\ntask = 4\n\
+             [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        );
+        let mut issue =
+            crate::test_utils::fixture_issue("Type fix lease".to_string(), String::new());
+        issue.labels.push("type:taks".to_string());
+        let issue_id = issue.id.clone();
+        seed_issue(executor.storage(), issue);
+        plant_foreign_lease(&executor, &issue_id);
+
+        let (count, messages, _, _) = executor.validation().validate_with_fix(false).unwrap();
+
+        assert!(count > 0, "{messages:?}");
+        let repaired = executor.storage().load_issue(&issue_id).unwrap();
+        assert!(repaired.labels.iter().any(|label| label == "type:task"));
+        assert!(!repaired.labels.iter().any(|label| label == "type:taks"));
+        assert!(messages.iter().all(|message| !message.contains("lease")));
     }
 
     #[test]

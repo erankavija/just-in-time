@@ -225,10 +225,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         let full_id = issue_id.clone();
-        let lease_warnings = self.exec.refuse_foreign_lease(&full_id)?;
-        let (result, warnings) =
-            self.publish_document_add(&full_id, path, commit, label, doc_type, skip_scan)?;
-        Ok((result, lease_warnings.into_iter().chain(warnings).collect()))
+        self.publish_document_add(&full_id, path, commit, label, doc_type, skip_scan)
     }
 
     /// The no-follow listing of the tree rooted at `root` at `scope`; a root
@@ -543,8 +540,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         let full_id = issue_id.clone();
-        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
-        Ok((self.publish_document_remove(&full_id, path)?, warnings))
+        self.publish_document_remove(&full_id, path)
     }
 
     /// Add or refresh one document reference from a coherent repository image.
@@ -569,6 +565,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
 
         validate_repo_relative_path(path)?;
         let layout = self.exec.require_layout()?;
+        let claims_guard = super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
         let issue_path = VirtualPath::issue_record(issue_id);
         let document_path = VirtualPath::worktree(path)
             .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))?;
@@ -582,7 +579,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         let context = super::production_mutation_context();
 
         with_mutation_session(&self.exec.storage, &layout, "document add", |session| {
-            let initial_paths = BTreeSet::from([issue_path.clone()]);
+            let initial_paths = BTreeSet::from([VirtualPath::CONFIG, issue_path.clone()]);
             let initial_spec = if skip_scan {
                 document_capture_spec(initial_paths)?
             } else {
@@ -598,6 +595,11 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             else {
                 return Ok(SessionStep::Retry);
             };
+            let lease_warnings = super::refuse_foreign_leases_held(
+                crate::repository_state::assemble_config(&image)?.enforcement_mode(),
+                std::slice::from_ref(issue_id),
+                claims_guard.as_ref(),
+            )?;
             let scan = if skip_scan {
                 CapturedDocumentScan::empty()
             } else {
@@ -615,12 +617,12 @@ impl<S: IssueStore> DocumentOps<'_, S> {
                 scan.format,
                 scan.assets,
             );
-            let warnings = scan
-                .warning
-                .as_ref()
-                .map(|warning| warning.message().to_string())
-                .into_iter()
-                .collect();
+            let mut warnings = lease_warnings;
+            warnings.extend(
+                scan.warning
+                    .as_ref()
+                    .map(|warning| warning.message().to_string()),
+            );
             if derived.intents.is_empty() {
                 return Ok(SessionStep::Done((derived.outcome, warnings)));
             }
@@ -634,7 +636,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         &self,
         issue_id: &IssueId,
         path: &str,
-    ) -> Result<DocumentRemoveResult>
+    ) -> Result<(DocumentRemoveResult, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -642,18 +644,24 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         use std::collections::BTreeSet;
 
         let layout = self.exec.require_layout()?;
+        let claims_guard = super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
         let issue_path = VirtualPath::issue_record(issue_id);
         let context = super::production_mutation_context();
         with_mutation_session(&self.exec.storage, &layout, "document removal", |session| {
-            let paths = BTreeSet::from([issue_path.clone()]);
+            let paths = BTreeSet::from([VirtualPath::CONFIG, issue_path.clone()]);
             let Some(image) = capture_or_retry(session.capture(document_capture_spec(paths)?))?
             else {
                 return Ok(SessionStep::Retry);
             };
+            let warnings = super::refuse_foreign_leases_held(
+                crate::repository_state::assemble_config(&image)?.enforcement_mode(),
+                std::slice::from_ref(issue_id),
+                claims_guard.as_ref(),
+            )?;
             let issue = captured_issue(&image, &issue_path, issue_id)?;
             let derived = derive_document_remove(issue, path)?;
             let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
-            Ok(SessionStep::Apply(plan, derived.outcome))
+            Ok(SessionStep::Apply(plan, (derived.outcome, warnings)))
         })
     }
 
@@ -681,13 +689,23 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         // Read content: try git first, fall back to filesystem if git unavailable
         let content = if at_commit.is_some() || doc.commit.is_some() {
             // Explicit version requested - require git
-            let repo = Repository::open(self.exec.require_layout()?.worktree_root())
-                .context("Git repository required when viewing specific commit version")?;
+            let repo = Repository::open(
+                self.exec
+                    .require_worktree_paths()?
+                    .code_checkout_top_level()
+                    .unwrap_or(self.exec.require_layout()?.worktree_root()),
+            )
+            .context("Git repository required when viewing specific commit version")?;
             self.read_file_from_git(&repo, &doc.path, reference)
                 .with_context(|| format!("Failed to read {} from git at {}", doc.path, reference))?
         } else {
             // No specific version - try git, fall back to filesystem
-            match Repository::open(self.exec.require_layout()?.worktree_root()) {
+            match Repository::open(
+                self.exec
+                    .require_worktree_paths()?
+                    .code_checkout_top_level()
+                    .unwrap_or(self.exec.require_layout()?.worktree_root()),
+            ) {
                 Ok(repo) => {
                     // Git available - read from git
                     self.read_file_from_git(&repo, &doc.path, "HEAD")
@@ -725,7 +743,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         let checkout = self
             .exec
             .require_worktree_paths()?
-            .git()
+            .code_checkout()
             .ok_or_else(|| anyhow!("Not a git repository"))?;
         let commits = checkout
             .file_history(path)?
@@ -753,8 +771,13 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         self.require_issue_document(issue, path)?;
 
         let layout = self.exec.require_layout()?;
-        let repo = Repository::open(layout.worktree_root())
-            .map_err(|e| anyhow!("Not a git repository: {}", e))?;
+        let repo = Repository::open(
+            self.exec
+                .require_worktree_paths()?
+                .code_checkout_top_level()
+                .unwrap_or(layout.worktree_root()),
+        )
+        .map_err(|e| anyhow!("Not a git repository: {}", e))?;
 
         let to_ref = to.unwrap_or("HEAD");
 
@@ -895,7 +918,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             .require_worktree_paths()
             .map_err(PathReadError::Other)?;
         Ok(paths
-            .git()
+            .code_checkout()
             .and_then(|checkout| checkout.file_history(path).ok())
             .unwrap_or_default()
             .into_iter()
@@ -929,7 +952,13 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         let repo_root = layout.worktree_root();
 
         // Try to get diff from git, return error message if not available
-        if let Ok(repo) = Repository::open(repo_root) {
+        if let Ok(repo) = Repository::open(
+            self.exec
+                .require_worktree_paths()
+                .map_err(PathReadError::Other)?
+                .code_checkout_top_level()
+                .unwrap_or(repo_root),
+        ) {
             let to_ref = to.unwrap_or("HEAD");
 
             // Try to get content at both commits
@@ -1004,7 +1033,15 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         let obj = repo.revparse_single(reference)?;
         let commit = obj.peel_to_commit()?;
         let tree = commit.tree()?;
-        let entry = tree.get_path(std::path::Path::new(path))?;
+        let layout = self.exec.require_layout()?;
+        let root = layout.worktree_root();
+        let top = self
+            .exec
+            .require_worktree_paths()?
+            .code_checkout_top_level()
+            .unwrap_or(root);
+        let relative_root = root.strip_prefix(top).unwrap_or(std::path::Path::new(""));
+        let entry = tree.get_path(&relative_root.join(path))?;
         let blob = repo.find_blob(entry.id())?;
 
         let content = std::str::from_utf8(blob.content())?;
@@ -1178,6 +1215,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::document::{AssetType, DocumentScope, LinkValidationResult, LinkValidator};
+        use crate::storage::git::GitObjectType;
         use std::path::PathBuf;
 
         let layout = self.exec.require_layout()?;
@@ -1222,12 +1260,36 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         // Create link validator
         let link_validator = LinkValidator::new(repo_root.to_path_buf(), all_document_paths);
 
-        // Try to open git repository for checking versioned assets
-        let git_repo = git2::Repository::discover(repo_root).ok();
-
         // Read every reference at the version it names, before any classification.
         let readings =
             self.read_documents_at_named_versions(&layout, &all_documents, &link_validator)?;
+
+        let missing_worktree_assets = all_documents
+            .iter()
+            .zip(&readings)
+            .filter(|(_, reading)| matches!(reading, CheckedDocument::WorkingTree))
+            .flat_map(|((_, document), _)| &document.assets)
+            .filter(|asset| asset.asset_type == AssetType::Local)
+            .filter_map(|asset| asset.resolved_path.as_ref())
+            .filter(|path| !repo_root.join(path).exists())
+            .collect::<std::collections::BTreeSet<_>>();
+        let committed_assets = match self.exec.require_worktree_paths()?.code_checkout() {
+            Some(checkout) if !missing_worktree_assets.is_empty() => {
+                let names = missing_worktree_assets
+                    .iter()
+                    .map(|path| format!("HEAD:./{}", path.to_string_lossy()))
+                    .collect::<Vec<_>>();
+                missing_worktree_assets
+                    .into_iter()
+                    .zip(checkout.object_types(names)?)
+                    .filter_map(|(path, object_type)| {
+                        matches!(object_type, Some(GitObjectType::Blob | GitObjectType::Tree))
+                            .then_some(path)
+                    })
+                    .collect::<std::collections::BTreeSet<_>>()
+            }
+            _ => std::collections::BTreeSet::new(),
+        };
 
         let mut urls = all_documents
             .iter()
@@ -1290,7 +1352,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
                                 Some(pinned) => pinned.target_kind(resolved).is_file(),
                                 None => {
                                     repo_root.join(resolved).exists()
-                                        || check_asset_in_git(&git_repo, resolved)
+                                        || committed_assets.contains(resolved)
                                 }
                             };
 
@@ -1992,24 +2054,6 @@ fn derive_document_remove(
     })
 }
 
-/// Check if an asset exists in git repository
-fn check_asset_in_git(repo: &Option<git2::Repository>, path: &std::path::Path) -> bool {
-    if let Some(repo) = repo {
-        // Try to find the file in HEAD
-        if let Ok(head) = repo.head() {
-            if let Some(target) = head.target() {
-                if let Ok(commit) = repo.find_commit(target) {
-                    if let Ok(tree) = commit.tree() {
-                        let path_str = path.to_str().unwrap_or("");
-                        return tree.get_path(std::path::Path::new(path_str)).is_ok();
-                    }
-                }
-            }
-        }
-    }
-    false
-}
-
 fn commit_info_from_git(commit: crate::storage::git::FileHistoryCommit) -> CommitInfo {
     let datetime = chrono::DateTime::from_timestamp(commit.commit_time(), 0).unwrap_or_default();
     CommitInfo {
@@ -2423,5 +2467,92 @@ mod tests {
             vec!["docs/plan.md"]
         );
         Ok(())
+    }
+
+    fn document_lease_fixture(
+        mode: &str,
+        leased: bool,
+        with_reference: bool,
+    ) -> (
+        CommandExecutor<InMemoryStorage>,
+        crate::domain::identity::IssueId,
+        Option<crate::domain::Assignee>,
+    ) {
+        let executor = crate::commands::test_helpers::setup_coordinated_with_enforcement(mode);
+        let mut issue =
+            crate::test_utils::fixture_issue("Leased document".to_string(), String::new());
+        if with_reference {
+            issue.documents.push(document_reference("docs/guide.md"));
+        }
+        let issue_id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(executor.storage(), issue);
+        let holder = leased
+            .then(|| crate::commands::test_helpers::plant_foreign_lease(&executor, &issue_id));
+        (executor, issue_id, holder)
+    }
+
+    #[test]
+    fn test_document_add_obeys_lease_mode_for_referencing_issue() {
+        for (mode, leased) in [("strict", true), ("warn", true), ("strict", false)] {
+            let (executor, issue_id, holder) = document_lease_fixture(mode, leased, false);
+            let before = executor.storage().load_issue(&issue_id).unwrap();
+
+            let result = executor.documents().add_document_reference(
+                &issue_id,
+                "docs/guide.md",
+                None,
+                None,
+                None,
+                true,
+            );
+
+            if mode == "strict" && leased {
+                let error = result.unwrap_err();
+                assert!(
+                    error
+                        .downcast_ref::<crate::errors::ForeignLeaseError>()
+                        .is_some(),
+                    "{error:#}"
+                );
+                assert_eq!(executor.storage().load_issue(&issue_id).unwrap(), before);
+                assert!(executor.storage().read_events().unwrap().is_empty());
+            } else {
+                let (_, warnings) = result.unwrap();
+                if let Some(holder) = holder {
+                    assert!(warnings
+                        .iter()
+                        .any(|warning| warning.contains(&holder.to_string())));
+                } else {
+                    assert!(warnings.is_empty());
+                }
+                assert!(executor
+                    .storage()
+                    .load_issue(&issue_id)
+                    .unwrap()
+                    .documents
+                    .iter()
+                    .any(|document| document.path == "docs/guide.md"));
+            }
+        }
+    }
+
+    #[test]
+    fn test_document_remove_strict_refuses_another_agents_lease_without_writing() {
+        let (executor, issue_id, _) = document_lease_fixture("strict", true, true);
+        let before = executor.storage().load_issue(&issue_id).unwrap();
+
+        let error = executor
+            .documents()
+            .remove_document_reference(&issue_id, "docs/guide.md")
+            .unwrap_err();
+
+        assert!(
+            error
+                .downcast_ref::<crate::errors::ForeignLeaseError>()
+                .is_some(),
+            "{error:#}"
+        );
+        assert_eq!(executor.storage().load_issue(&issue_id).unwrap(), before);
+        assert!(executor.storage().read_events().unwrap().is_empty());
     }
 }

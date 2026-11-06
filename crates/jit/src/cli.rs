@@ -2819,10 +2819,9 @@ impl Commands {
             Self::Item(command) => command.coordinates_claims_first(),
             Self::Invariant(command) => command.coordinates_claims_first(),
             Self::Project(command) => command.coordinates_claims_first(),
-            Self::Recover => true,
+            Self::Recover | Self::Apply(_) => true,
             Self::Init(_)
             | Self::List { .. }
-            | Self::Apply(_)
             | Self::Rdeps { .. }
             | Self::Query(QueryArgs {
                 subcommand: None, ..
@@ -2884,13 +2883,13 @@ impl GateCommands {
     fn requires_recovery_dispatch(&self) -> bool {
         match self {
             Self::Define { .. }
-            | Self::Update { .. }
             | Self::Remove { .. }
             | Self::Add { .. }
             | Self::Evaluate { .. }
             | Self::EvaluateAll { .. }
             | Self::EvaluateMany { .. }
-            | Self::Fail { .. } => true,
+            | Self::Fail { .. }
+            | Self::Update { .. } => true,
             Self::Preset(command) => command.requires_recovery_dispatch(),
             Self::List { .. }
             | Self::Show { .. }
@@ -3018,7 +3017,9 @@ impl IssueCommands {
         match self {
             Self::Update { .. }
             | Self::Delete { .. }
+            | Self::Assign { .. }
             | Self::Claim { .. }
+            | Self::Unassign { .. }
             | Self::Reject { .. }
             | Self::ClaimNext { .. } => true,
             Self::Create { .. }
@@ -3028,8 +3029,6 @@ impl IssueCommands {
             | Self::Status { .. }
             | Self::Children { .. }
             | Self::Progress { .. }
-            | Self::Assign { .. }
-            | Self::Unassign { .. }
             | Self::Release { .. }
             | Self::List { .. } => false,
         }
@@ -3050,14 +3049,14 @@ impl GateCommands {
     fn coordinates_claims_first(&self) -> bool {
         match self {
             Self::Preset(command) => command.coordinates_claims_first(),
-            Self::Define { .. }
-            | Self::Update { .. }
-            | Self::Remove { .. }
+            Self::Remove { .. }
             | Self::Add { .. }
             | Self::Evaluate { .. }
             | Self::EvaluateAll { .. }
             | Self::EvaluateMany { .. }
             | Self::Fail { .. }
+            | Self::Update { .. } => true,
+            Self::Define { .. }
             | Self::List { .. }
             | Self::Show { .. }
             | Self::Status { .. }
@@ -3087,9 +3086,8 @@ impl DocCommands {
     fn coordinates_claims_first(&self) -> bool {
         match self {
             Self::Assets { command } => command.coordinates_claims_first(),
-            Self::Add { .. }
-            | Self::List { .. }
-            | Self::Remove { .. }
+            Self::Add { .. } | Self::Remove { .. } => true,
+            Self::List { .. }
             | Self::Show { .. }
             | Self::Dir { .. }
             | Self::Conformance { .. }
@@ -3340,16 +3338,28 @@ mod recovery_dispatch_tests {
     ];
 
     const CLAIM_FIRST_LEAF_COMMANDS: &[&str] = &[
+        "apply",
         "claim acquire",
         "claim force-evict",
         "claim heartbeat",
         "claim release",
         "claim renew",
+        "gate add",
+        "gate evaluate",
+        "gate evaluate-all",
+        "gate evaluate-many",
+        "gate fail",
         "gate preset apply",
+        "gate update",
+        "gate remove",
+        "doc add",
+        "doc remove",
+        "issue assign",
         "issue claim",
         "issue claim-next",
         "issue delete",
         "issue reject",
+        "issue unassign",
         "issue update",
         "recover",
     ];
@@ -3457,6 +3467,57 @@ mod recovery_dispatch_tests {
     #[test]
     fn test_claim_first_classification_covers_exact_cli_callers() {
         let claim_first: &[(&str, &[&str])] = &[
+            ("apply", &["jit", "apply", "plan", "deadbeef"]),
+            (
+                "issue assign",
+                &["jit", "issue", "assign", "deadbeef", "agent:test"],
+            ),
+            ("issue unassign", &["jit", "issue", "unassign", "deadbeef"]),
+            ("gate add", &["jit", "gate", "add", "deadbeef", "tests"]),
+            ("gate remove", &["jit", "gate", "remove", "tests"]),
+            (
+                "gate update",
+                &["jit", "gate", "update", "tests", "--title", "updated"],
+            ),
+            (
+                "doc add",
+                &[
+                    "jit",
+                    "doc",
+                    "add",
+                    "deadbeef",
+                    "docs/guide.md",
+                    "--skip-scan",
+                ],
+            ),
+            (
+                "doc remove",
+                &["jit", "doc", "remove", "deadbeef", "docs/guide.md"],
+            ),
+            (
+                "gate evaluate",
+                &["jit", "gate", "evaluate", "deadbeef", "tests"],
+            ),
+            (
+                "gate evaluate-all",
+                &["jit", "gate", "evaluate-all", "deadbeef"],
+            ),
+            (
+                "gate evaluate-many",
+                &["jit", "gate", "evaluate-many", "tests", "deadbeef"],
+            ),
+            (
+                "gate fail",
+                &[
+                    "jit",
+                    "gate",
+                    "fail",
+                    "deadbeef",
+                    "tests",
+                    "--by",
+                    "agent:test",
+                ],
+            ),
             (
                 "issue update",
                 &["jit", "issue", "update", "deadbeef", "--title", "updated"],
@@ -3532,21 +3593,11 @@ mod recovery_dispatch_tests {
 
         let repository_first: &[(&str, &[&str])] = &[
             (
-                "issue assign",
-                &["jit", "issue", "assign", "deadbeef", "agent:test"],
-            ),
-            ("issue unassign", &["jit", "issue", "unassign", "deadbeef"]),
-            (
                 "issue release",
                 &["jit", "issue", "release", "deadbeef", "timeout"],
             ),
             ("dep add", &["jit", "dep", "add", "deadbeef", "feedface"]),
             ("dep rm", &["jit", "dep", "rm", "deadbeef", "feedface"]),
-            ("gate add", &["jit", "gate", "add", "deadbeef", "tests"]),
-            (
-                "gate evaluate",
-                &["jit", "gate", "evaluate", "deadbeef", "tests"],
-            ),
             (
                 "gate preset create",
                 &["jit", "gate", "preset", "create", "deadbeef", "custom"],

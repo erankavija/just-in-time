@@ -10,7 +10,7 @@ use crate::repository_state::{
     RepositoryAction, VirtualPath,
 };
 use crate::storage::worktree_identity::WorktreeIdentity;
-use crate::storage::{IssueStore, RepositoryStateStore};
+use crate::storage::{IssueStore, RepositoryStateStore, WorktreePaths};
 use anyhow::{Context, Result};
 use std::path::Path;
 
@@ -54,8 +54,7 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
             .map(ProfileSelection::application_inputs)
             .unwrap_or_default();
         let layout = self.exec.require_layout()?;
-        // Typed Git evidence is acquired once at the boundary (loop-invariant).
-        let gitattributes = gitattributes_claim(&layout);
+        let gitattributes = gitattributes_claim(&layout, self.exec.require_worktree_paths()?);
         // One MutationContext per operation, reused across probe/final finalize and
         // every retry so a composed lifecycle event's id/timestamp stay stable.
         let context = super::production_mutation_context();
@@ -398,37 +397,28 @@ fn init_validation_error(error: anyhow::Error) -> anyhow::Error {
     })
 }
 
-/// Acquire typed Git evidence for the worktree `.gitattributes` merge-driver claim.
-///
-/// Eligible only when the worktree is inside a Git work tree AND the selected data
-/// root is nested beneath it; the claim line is the Git-escaped worktree-relative
-/// data-root path plus `/events.jsonl merge=union`. No Git, a disjoint data root,
-/// or an unavailable Git is `NotApplicable`, and core init still succeeds
-/// (`@/charter/D-4`).
-fn gitattributes_claim(layout: &crate::repository_state::RepositoryLayout) -> GitattributesClaim {
+/// Claim a merge driver only for invocation-classified Git data nested in the worktree.
+fn gitattributes_claim(
+    layout: &crate::repository_state::RepositoryLayout,
+    paths: &WorktreePaths,
+) -> GitattributesClaim {
     let worktree = layout.worktree_root();
     let Ok(relative) = layout.data_root().strip_prefix(worktree) else {
         return GitattributesClaim::NotApplicable;
     };
-    if relative.as_os_str().is_empty() || !worktree_is_git_work_tree(worktree) {
+    if relative.as_os_str().is_empty()
+        || paths
+            .git()
+            .as_ref()
+            .map(|checkout| checkout.worktree_root())
+            != paths.code_checkout_top_level()
+        || !paths.is_git_repository()
+    {
         return GitattributesClaim::NotApplicable;
     }
     GitattributesClaim::Eligible {
         line: format!("{} merge=union", git_events_pattern(relative)),
     }
-}
-
-/// Whether Git identifies `worktree` as inside a work tree (Git-optional: an
-/// absent or failing `git` is treated as "not a work tree").
-fn worktree_is_git_work_tree(worktree: &Path) -> bool {
-    std::process::Command::new("git")
-        .arg("-C")
-        .arg(worktree)
-        .args(["rev-parse", "--is-inside-work-tree"])
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .is_some_and(|output| String::from_utf8_lossy(&output.stdout).trim() == "true")
 }
 
 /// Render the worktree-relative events path as a literal `.gitattributes` pattern.
@@ -478,6 +468,41 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier};
+
+    #[test]
+    fn test_fresh_init_uses_invocation_non_git_classification_inside_git_worktree() {
+        let repo = TempDir::new().unwrap();
+        crate::test_harness::git::GitRepository::init(repo.path());
+        let paths = WorktreePaths::non_git(&repo.path().join(".jit"), repo.path());
+        let executor = file_executor(repo.path())
+            .unwrap()
+            .with_worktree_paths(paths);
+
+        let result = executor
+            .profiles()
+            .initialize_fresh_repository(repo.path(), None)
+            .unwrap();
+
+        assert_eq!(result.gitattributes, GitattributesStatus::NotApplicable);
+        assert!(!repo.path().join(".gitattributes").exists());
+    }
+
+    #[test]
+    fn test_gitattributes_claim_rejects_nested_independent_data_checkout() {
+        let repo = TempDir::new().unwrap();
+        crate::test_harness::git::GitRepository::init(repo.path());
+        let data = repo.path().join(".jit");
+        crate::test_harness::git::GitRepository::init(&data);
+        let layout = discover_repository_layout(repo.path(), &data).unwrap();
+        let paths = WorktreePaths::detect_for_data_root(&data, repo.path())
+            .unwrap()
+            .with_worktree_root(repo.path())
+            .unwrap();
+        assert!(matches!(
+            gitattributes_claim(&layout, &paths),
+            GitattributesClaim::NotApplicable
+        ));
+    }
 
     #[test]
     fn test_initialize_worktree_identity_records_head_for_detached_checkout() {

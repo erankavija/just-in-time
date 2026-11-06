@@ -667,6 +667,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issues = Vec::from_iter(captured_issue_record(&bound, issue_id)?);
         let target_id = super::require_issue_in_capture(&issues, issue_id)?;
         let mut paths = vec![
+            VirtualPath::CONFIG,
             VirtualPath::issue_record(&target_id),
             VirtualPath::GATES,
             VirtualPath::GATE_RUNS,
@@ -748,6 +749,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         self.check_gate_with(issue_id, gate_key, VerdictSource::ReuseUnchangedInputs)
+            .map(|(result, _)| result)
     }
 
     /// Check a single gate, choosing whether a recorded verdict may stand in
@@ -760,12 +762,17 @@ impl<S: IssueStore> GateOps<'_, S> {
     /// at most once during this invocation: publication races retry the cheap record operation
     /// without re-running it. The verdict is recorded against the image captured before the
     /// checker started, with any post-run input drift reported on the record.
+    ///
+    /// The issue's lease is checked under a claims guard in the inputs session,
+    /// before any verdict lookup or checker run, and again in the session that
+    /// records the run; the result carries each lease warning either session
+    /// raised, once.
     pub fn check_gate_with(
         &self,
         issue_id: &IssueId,
         gate_key: &GateKey,
         source: VerdictSource,
-    ) -> Result<GateRunResult>
+    ) -> Result<(GateRunResult, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -776,8 +783,10 @@ impl<S: IssueStore> GateOps<'_, S> {
         let mutation = super::production_mutation_context();
         let run_id = mutation.gate_run_id_at(0);
         let run_paths = super::gate_run_record_paths(&mutation, issue_id, 1);
-        let (target_id, image, issue, issues, registry, runs, captured) =
+        let (target_id, image, issue, issues, registry, runs, captured, input_warnings) =
             with_mutation_attempts("gate evaluation inputs", || {
+                let claims_guard =
+                    super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
                 let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
                 let Some((image, target_id)) = self.exec.capture_gate_evaluation_image(
                     session.as_mut(),
@@ -788,6 +797,11 @@ impl<S: IssueStore> GateOps<'_, S> {
                 else {
                     return Ok(AttemptOutcome::Retry);
                 };
+                let input_warnings = super::refuse_foreign_leases_held(
+                    crate::repository_state::assemble_config(&image)?.enforcement_mode(),
+                    std::slice::from_ref(&target_id),
+                    claims_guard.as_ref(),
+                )?;
                 let issue = captured_bound_issue(&image, &target_id)?;
                 let registry = captured_gate_registry(&image)?;
                 let gate = required_automated_gate(&issue, &registry, gate_key)?;
@@ -809,7 +823,14 @@ impl<S: IssueStore> GateOps<'_, S> {
                 };
                 let captured = captured_gate_evaluation(&image, &issue, gate_key, gate, &runs)?;
                 Ok(AttemptOutcome::Done((
-                    target_id, image, issue, issues, registry, runs, captured,
+                    target_id,
+                    image,
+                    issue,
+                    issues,
+                    registry,
+                    runs,
+                    captured,
+                    input_warnings,
                 )))
             })?;
 
@@ -854,6 +875,7 @@ impl<S: IssueStore> GateOps<'_, S> {
             .collect::<Vec<_>>();
 
         with_mutation_attempts("gate evaluation record", || {
+            let claims_guard = super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
             let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
             let Some((final_image, _)) = self.exec.capture_gate_evaluation_image(
                 session.as_mut(),
@@ -864,6 +886,20 @@ impl<S: IssueStore> GateOps<'_, S> {
             else {
                 return Ok(AttemptOutcome::Retry);
             };
+            let record_warnings = super::refuse_foreign_leases_held(
+                crate::repository_state::assemble_config(&final_image)?.enforcement_mode(),
+                std::slice::from_ref(&target_id),
+                claims_guard.as_ref(),
+            )?;
+            let warnings = input_warnings
+                .iter()
+                .chain(
+                    record_warnings
+                        .iter()
+                        .filter(|warning| !input_warnings.contains(warning)),
+                )
+                .cloned()
+                .collect::<Vec<_>>();
             let mut final_issue = captured_bound_issue(&final_image, &target_id)?;
             let final_registry = captured_gate_registry(&final_image)?;
             let final_gate = required_automated_gate(&final_issue, &final_registry, gate_key)?;
@@ -912,7 +948,7 @@ impl<S: IssueStore> GateOps<'_, S> {
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
-            Ok(AttemptOutcome::Done(result.clone()))
+            Ok(AttemptOutcome::Done((result.clone(), warnings)))
         })
     }
 }
@@ -1248,7 +1284,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             crate::declarations::GateChecker::Exec { .. } => {
                 let head = self
                     .require_worktree_paths()?
-                    .git()
+                    .code_checkout()
                     .map(|git| git.head())
                     .transpose()?
                     .flatten();
@@ -1771,6 +1807,114 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         assert_eq!(
             serde_json::to_value(&view.gates).unwrap(),
             serde_json::json!([expected])
+        );
+    }
+
+    /// An issue requiring an automated gate whose checker runs `command`, in a
+    /// Git checkout enforcing `mode`, leased by another agent; answers the
+    /// executor, issue, gate key and holder.
+    fn leased_automated_gate_fixture(
+        mode: &str,
+        command: impl FnOnce(&std::path::Path) -> String,
+    ) -> (
+        CommandExecutor<crate::storage::InMemoryStorage>,
+        IssueId,
+        GateKey,
+        crate::domain::Assignee,
+    ) {
+        let executor = crate::commands::test_helpers::setup_coordinated_with_enforcement(mode);
+        let key: GateKey = "leased-gate".parse().unwrap();
+        let mut issue = crate::test_utils::fixture_issue("Leased".to_string(), String::new());
+        issue.gates_required = vec![key.clone()];
+        let issue_id = issue.id.clone();
+        let lease = crate::test_lease_store::lease_path(
+            &executor.require_worktree_paths().unwrap().shared_jit,
+            &issue_id,
+        );
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            key.clone(),
+            crate::declarations::GateDefinition {
+                version: 1,
+                key: key.clone(),
+                title: "Leased".to_string(),
+                description: String::new(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: command(&lease),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
+                }),
+                priority: 100,
+                reserved: HashMap::new(),
+                inputs: None,
+            },
+        );
+        seed_gate_registry(executor.storage(), &registry);
+        seed_issue(executor.storage(), issue);
+        let holder = crate::commands::test_helpers::plant_foreign_lease(&executor, &issue_id);
+        (executor, issue_id, key, holder)
+    }
+
+    #[test]
+    fn test_check_gate_strict_refuses_another_agents_lease_before_the_checker_runs() {
+        let marker_dir = tempfile::tempdir().unwrap();
+        let marker = marker_dir.path().join("checker-ran");
+        let (executor, issue_id, key, _) =
+            leased_automated_gate_fixture("strict", |_| format!("touch '{}'", marker.display()));
+
+        let error = executor.gates().check_gate(&issue_id, &key).unwrap_err();
+
+        assert!(
+            error
+                .downcast_ref::<crate::errors::ForeignLeaseError>()
+                .is_some(),
+            "{error:#}"
+        );
+        assert!(!marker.exists(), "the checker ran despite the refusal");
+    }
+
+    #[test]
+    fn test_check_gate_with_warn_keeps_the_warning_of_a_lease_released_while_the_checker_runs() {
+        let (executor, issue_id, key, holder) =
+            leased_automated_gate_fixture("warn", |lease| format!("rm '{}'", lease.display()));
+
+        let (result, warnings) = executor
+            .gates()
+            .check_gate_with(&issue_id, &key, super::VerdictSource::Execute)
+            .unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Passed, "{result:?}");
+        assert!(
+            warnings
+                .iter()
+                .any(|warning| warning.contains(&holder.to_string())),
+            "{warnings:?}"
+        );
+    }
+
+    #[test]
+    fn test_check_gate_with_warn_reports_a_lease_held_through_both_sessions_once() {
+        let (executor, issue_id, key, holder) =
+            leased_automated_gate_fixture("warn", |_| "exit 0".to_string());
+
+        let (_, warnings) = executor
+            .gates()
+            .check_gate_with(&issue_id, &key, super::VerdictSource::Execute)
+            .unwrap();
+
+        assert_eq!(
+            warnings
+                .iter()
+                .filter(|warning| warning.contains(&holder.to_string()))
+                .count(),
+            1,
+            "{warnings:?}"
         );
     }
 
@@ -2441,7 +2585,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         fixture.seed(Some((&["workspace"], &[])), 0);
         let executed = fixture.evaluate(&fixture.issue("Test", "Test"));
 
-        let forced = fixture
+        let (forced, _) = fixture
             .executor
             .gates()
             .check_gate_with(
@@ -2519,7 +2663,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         .with_layout(layout)
         .unwrap();
 
-        let forced = racing
+        let (forced, _) = racing
             .gates()
             .check_gate_with(
                 &fixture.issue("Test", "Test"),
@@ -4447,6 +4591,116 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         // Verify issue didn't transition
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::Ready);
+    }
+
+    /// A `Ready` issue and a declared automatic precheck gate whose checker
+    /// fails, required by the issue when `required` holds.
+    fn seed_ready_issue_with_failing_precheck(
+        executor: &CommandExecutor<InMemoryStorage>,
+        required: bool,
+    ) -> (IssueId, GateKey) {
+        let gate_key: GateKey = "precheck-fail".parse().unwrap();
+        let issue_id = seed_issue_requiring_exec_gates(
+            executor,
+            State::Ready,
+            &[(gate_key.as_str(), "exit 1")],
+        );
+        executor
+            .gates()
+            .update_gate(
+                &gate_key,
+                GateUpdate {
+                    stage: Some(GateStage::Precheck),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        if !required {
+            let mut issue = executor.storage.load_issue(&issue_id).unwrap();
+            issue.gates_required.clear();
+            issue.gates_status.clear();
+            seed_issue(executor.storage(), issue);
+        }
+        (issue_id, gate_key)
+    }
+
+    fn start_work_updating_gates(
+        executor: &CommandExecutor<InMemoryStorage>,
+        issue_id: &IssueId,
+        local: crate::commands::IssueLocalUpdate,
+    ) -> anyhow::Result<crate::commands::IssueMutation> {
+        executor.issues().update_issue_resolved(
+            &IssueIdPrefix::from(issue_id),
+            None,
+            None,
+            None,
+            Some(State::InProgress),
+            Vec::new(),
+            Vec::new(),
+            None,
+            None,
+            local,
+            false,
+        )
+    }
+
+    #[test]
+    fn test_update_issue_state_in_progress_refused_when_precheck_fails() {
+        let executor = setup();
+        let (issue_id, gate_key) = seed_ready_issue_with_failing_precheck(&executor, true);
+
+        let error = start_work_updating_gates(&executor, &issue_id, Default::default())
+            .expect_err("a failing precheck refuses the state change");
+
+        assert!(error
+            .downcast_ref::<crate::errors::TransitionBlockedError>()
+            .is_some());
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(issue.state, State::Ready);
+        assert_eq!(issue.gates_status[&gate_key].status, GateStatus::Failed);
+    }
+
+    #[test]
+    fn test_update_issue_state_in_progress_runs_precheck_gate_added_in_same_update() {
+        let executor = setup();
+        let (issue_id, gate_key) = seed_ready_issue_with_failing_precheck(&executor, false);
+
+        let error = start_work_updating_gates(
+            &executor,
+            &issue_id,
+            crate::commands::IssueLocalUpdate {
+                add_gates: vec![gate_key.clone()],
+                ..Default::default()
+            },
+        )
+        .expect_err("the added failing precheck refuses the state change");
+
+        assert!(error
+            .downcast_ref::<crate::errors::TransitionBlockedError>()
+            .is_some());
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(issue.state, State::Ready);
+        assert!(!issue.gates_required.contains(&gate_key));
+    }
+
+    #[test]
+    fn test_update_issue_state_in_progress_skips_precheck_gate_removed_in_same_update() {
+        let executor = setup();
+        let (issue_id, gate_key) = seed_ready_issue_with_failing_precheck(&executor, true);
+
+        start_work_updating_gates(
+            &executor,
+            &issue_id,
+            crate::commands::IssueLocalUpdate {
+                remove_gates: vec![gate_key.clone()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(issue.state, State::InProgress);
+        assert!(!issue.gates_required.contains(&gate_key));
     }
 
     #[cfg(unix)]

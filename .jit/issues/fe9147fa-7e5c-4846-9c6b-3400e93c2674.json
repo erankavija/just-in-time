@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:b697a3f7-lead",
+  "claimed_at": "2026-11-06T02:03:27.529534120Z",
   "context": {},
   "created_at": "2026-10-24T21:22:37.717854234Z",
   "dependencies": [
@@ -7,11 +8,26 @@
   ],
   "description": "Make every field change derive its issue state and events through the general field update: a bulk field change writes the same state and events as a single-issue update, and issue assign, issue unassign and gate attach and detach publish through that update, so each field change has one derivation whatever command requests it.\n\n## Background\n\n- The post-commit readiness machinery (`entered_terminal`, the `AutoReady` and `AutoBacklog` arms) is already removed when this task starts, and `derive_field_update` already carries its readiness corrections.\n- `CapturedFieldUpdate` (`crates/jit/src/commands/mod.rs:917`) carries a `bulk` flag (`:932`) that only `CapturedFieldUpdate::bulk` sets (`:951-971`); the other constructions spell `bulk: false` (`CapturedFieldUpdate::label_edit`, `mod.rs:1009-1029`, and the single-issue update in `crates/jit/src/commands/issue.rs:536-556`).\n- A single-issue update stages gate and assignee changes through `issue_local_mutations` (`mod.rs:976-1008`), which apply through `apply_captured_issue_mutation` (`mod.rs:1606`) and emit `gate_added`/`gate_removed` per key, `issue_claimed`, and for unassign an `issue_updated` with source `issue-unassign`; gate add also inserts a `Pending` `gates_status` entry.\n- With `bulk` set, `issue_local_mutations` returns nothing (`:977`) and `derive_field_update` (`mod.rs:1279`) folds the same fields inline (`:1342-1356`): gate add pushes only `gates_required` with no status entry, gate edits record `issue_updated` with `fields: [\"gates\"]`, and the field event uses source `bulk-update` (`:1510-1521`). The stored issue and the event log differ by invocation path. `test_bulk_transition_emits_same_events_as_single_transitions` (`crates/jit/src/commands/bulk_update.rs:1183`) covers state changes only.\n- `IssueOps::assign_issue` (`issue.rs:726`), `IssueOps::unassign_issue` (`issue.rs:772`), `add_gates` (`crates/jit/src/commands/gate.rs:696`) and `remove_gates` (`gate.rs:742`) publish through `publish_captured_issue_mutation` (`mod.rs:2298`), which captures only the target issue, the event log and the gate registry and runs no local or graph rule; it also publishes `SetManualGateStatus` (`mod.rs:493`) for manual pass and fail.\n- `issue update` publishes through `publish_captured_field_update` (`mod.rs:2599`), which captures the full mutation base, applies the issue-local mutations through `issue_local_mutations` (`mod.rs:976`) inside `derive_field_update`, runs write validation and checks the lease in session.\n- `add_gates` and `remove_gates` return `GateAddResult { added, already_exist }` and `GateRemoveResult { removed, not_found }` from `CapturedIssueMutationOutcome` (`mod.rs:525`); callers are `crates/jit/src/main.rs:3897` (gate add), `add_gate` (`gate.rs:685`), and the tests in `gate.rs:1550-1577`, `crates/jit/src/commands/issue.rs:2968-2970`, `crates/jit/tests/fast_issue/bulk_operations_tests.rs` and `crates/jit/tests/fast_issue/short_hash_tests.rs:202-205`.\n\n## Success Criteria\n\n- [hard] REQ-01: `CapturedFieldUpdate` has no `bulk` field, no construction names it, and no event carries the source `bulk-update`; a bulk field change composes the same issue-local mutations as a single-issue update.\n- [hard] REQ-02: A unit test shows bulk gate add storing a `Pending` status entry and writing one `gate_added` per key (both fail today).\n- [hard] REQ-03: Assign, unassign, gate attach and gate detach publish through the general field update, and `publish_captured_issue_mutation` publishes only manual gate status changes.\n- [hard] REQ-04: The commands keep their return values: gate attach reports added and already-present keys, gate detach reports removed and absent keys.\n- [hard] REQ-05: One property test over an initial issue and a field change shows the dedicated command, a single-issue update and a bulk update filtered to that issue producing equal stored issues and equal event bodies, ignoring event ids and timestamps.\n- [hard] REQ-06: A test shows an enforcing local rule refusing a dedicated assign that the general update refuses (today the dedicated command skips rules and succeeds).\n\n## Notes\n\n- Behaviour change: bulk gate and assignee edits now write the per-field events and status entries single updates write; `issue_updated` from bulk uses the `issue-update` source.\n- Behaviour change: the dedicated commands now run local and graph rules and capture the full mutation base, so a rule that refuses `issue update --assignee` also refuses `issue assign`.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-06T02:30:00.611282062Z",
+  "first_ready_at": "2026-11-06T02:03:09.419555514Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "a2cce6ad-ad6c-420a-a357-7d280e681ddc",
+      "status": "passed",
+      "updated_at": "2026-11-06T02:26:59.410753329Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "02146cdc-5e84-4fbb-9594-704a791574e5",
+      "status": "passed",
+      "updated_at": "2026-11-06T02:29:52.641632751Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fe9147fa-7e5c-4846-9c6b-3400e93c2674",
   "labels": [
     "type:task",
@@ -24,7 +40,7 @@
     "satisfies:b697a3f7/REQ-03"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "One field derivation for bulk, dedicated and single-issue changes",
-  "updated_at": "2026-10-24T21:22:37.717854234Z"
+  "updated_at": "2026-11-06T02:30:00.611282062Z"
 }

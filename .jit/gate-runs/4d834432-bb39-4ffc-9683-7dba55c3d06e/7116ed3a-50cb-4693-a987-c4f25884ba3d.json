@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6d175420a77987aee768388cfdf198aa1b2e14d3",
+  "completed_at": "2026-11-06T01:25:40.308002211Z",
+  "duration_ms": 280889,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed change meets the issue’s hard criteria: shared capability handles, deferred per-parent syncs, subset-replay conformance coverage, preserved safety checks, and updated documentation are integrated and covered by the recorded cargo-ci run.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4d834432-bb39-4ffc-9683-7dba55c3d06e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7116ed3a-50cb-4693-a987-c4f25884ba3d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T01:20:59.418816172Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c0bb74d5c19f21c94a20f6eba9d8988dc1c88304 (`jit:4d834432`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-17, @/charter/D-20, @/invariant/atomic-writes, @/invariant/no-ignored-tests, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/issue/b697a3f7/requirement/REQ-14, @/issue/b697a3f7/requirement/REQ-15, @/issue/b697a3f7/requirement/REQ-16\nGate evidence: cargo-ci passed (exit 0, 2026-11-06T01:20:40Z); its run commit 6d175420a77987aee768388cfdf198aa1b2e14d3 contains c0bb74d5c19f21c94a20f6eba9d8988dc1c88304\nTruncation recovery: individually re-read each changed patch and bounded current-source ranges for storage implementation, conformance tests, init publishing, memory backend, cutover test, and architecture note\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed change meets the issue’s hard criteria: shared capability handles, deferred per-parent syncs, subset-replay conformance coverage, preserved safety checks, and updated documentation are integrated and covered by the recorded cargo-ci run.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

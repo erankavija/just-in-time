@@ -1040,9 +1040,11 @@ jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
 - **Atomic per-issue:** Each issue update publishes its own redo record, with its dependents' [readiness corrections](../concepts/core-model.md#issue-lifecycle)
 - **Predictable:** Safer for large-scale changes
 - **Clear reporting:** Shows modified/skipped/error counts
+- **Same state derivation:** Single-issue and bulk updates run prechecks on `ready → in_progress`, refusing the change when one fails, and divert a `done` request with unpassed gates to `gated`
+- **Same field derivation:** A gate or assignee change writes the same issue state and events whether a bulk update, a single-issue update, or the dedicated assign and gate commands request it
 
 **When to use bulk vs single-issue update:**
-- **Single-issue:** Enforces prechecks on `ready → in_progress` and checks gate statuses on an explicit `done` request
+- **Single-issue:** One issue's fields, gates, and assignee change together
 - **Bulk:** Explicit, predictable batch changes across many issues
 
 ### Batch-Create with Dependency Wiring (`jit issue batch-create`)
@@ -2086,8 +2088,8 @@ is reusable.
 Issues are evaluated in argument order. Evaluation is serialised per issue,
 and the command continues after a checker failure, runner error, lookup error,
 or manual-gate attestation error. Under strict lease enforcement, another
-agent's lease on any requested issue refuses the whole batch before any
-evaluation. Exit `0` means every issue passed; otherwise
+agent's lease on a requested issue refuses only that issue's entry, reported as
+a per-entry finding, and the other issues are still evaluated. Exit `0` means every issue passed; otherwise
 the command returns the first failing issue's code from the [`jit gate
 evaluate`](#jit-gate-evaluate) taxonomy.
 
@@ -3395,6 +3397,34 @@ jit apply <TEMPLATE> <CONTAINER> [--anchor <ROLE=ID>] [--force]
 
 The container's `type:` label must be one of the template's `applies_to` types.
 
+Applying a template requires the repository declarations it names: each node
+`type` in `[type_hierarchy].types`, each namespace of a label a node writes in
+`[namespaces]`, each node or anchor gate as a gate preset or in the gate
+registry, and each node `doc_area` in `[documentation] issue_scoped_areas`. An
+empty type hierarchy or namespace registry requires nothing. Apply checks every
+requirement before it creates anything, and one failure (`VALIDATION_FAILED`)
+names all the unmet ones. `--json` puts them in `details`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "details": {
+      "template": "plan",
+      "unmet": [
+        { "kind": "type", "name": "planning" },
+        { "kind": "label-namespace", "name": "brackets" },
+        { "kind": "gate", "name": "plan-review" },
+        { "kind": "documentation-area", "name": "dev/active" }
+      ]
+    }
+  }
+}
+```
+
+`jit validate` reports a template node type the declared hierarchy lacks
+before the template is applied.
+
 ```bash
 jit apply plan epic-123
 jit apply plan epic-123 --json
@@ -3412,6 +3442,22 @@ JSON returns the role-to-id map plus the created issues:
   "anchor_dependency_snapshots": {},
   "created_issues": { "planning": { "id": "<uuid>", "title": "..." } },
   "message": "Applied template 'plan' to epic-123"
+}
+```
+
+When a transform moves dependencies the container already had, the result
+carries an advisory `upstream_move` report naming the container and, for each
+moved edge, the dependency, the receiving role, and its node; text output lists
+each moved dependency as now blocking that node. The moves are applied either
+way, so audit them: on a populated container they include its existing children.
+An empty container produces no report and no `upstream_move` key:
+
+```json
+{
+  "upstream_move": {
+    "container": "epic-123",
+    "moves": [{ "dependency": "<uuid>", "role": "planning", "node": "<uuid>" }]
+  }
 }
 ```
 

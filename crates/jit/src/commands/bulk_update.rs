@@ -373,8 +373,15 @@ impl<S: IssueStore> IssueOps<'_, S> {
                         let fresh = active.iter().find(|issue| issue.id == candidate.id)?;
                         let request =
                             CapturedFieldUpdate::bulk(fresh.id.clone(), operations, force).ok()?;
-                        let derived = derive_field_update(
+                        let projected = super::project_field_update(
                             fresh.clone(),
+                            &request,
+                            &graph.declarations.gates,
+                            &context,
+                        )
+                        .ok()?;
+                        let derived = derive_field_update(
+                            projected,
                             &request,
                             CapturedTransitionEvidence {
                                 issues: &active,
@@ -1387,6 +1394,242 @@ mod tests {
                 event_payloads_for(&single_reader, id),
                 "event sequence for issue {id} diverges between bulk and single transition"
             );
+        }
+    }
+
+    #[test]
+    fn test_apply_bulk_update_gate_add_records_pending_status_and_one_gate_added_per_key() {
+        use crate::query_engine::QueryFilter;
+        use crate::storage::{InMemoryStorage, IssueStore};
+
+        let keys: Vec<GateKey> = vec!["tests".parse().unwrap(), "review".parse().unwrap()];
+        let storage = InMemoryStorage::new();
+        crate::test_harness::seed_memory_gate_keys(&storage, &keys);
+        let issue_id = crate::test_utils::issue_id(0x6a7e_0001);
+        crate::commands::test_helpers::seed_issue(
+            &storage,
+            create_test_issue(&issue_id, State::Ready, vec!["type:task"]),
+        );
+        let reader = storage.clone();
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+
+        executor
+            .issues()
+            .apply_bulk_update(
+                &QueryFilter::parse("state:ready").unwrap(),
+                &UpdateOperations {
+                    add_gates: keys.clone(),
+                    ..Default::default()
+                },
+                false,
+            )
+            .unwrap();
+
+        let stored = reader.load_issue(&issue_id).unwrap();
+        assert!(keys.iter().all(|key| stored
+            .gates_status
+            .get(key)
+            .is_some_and(|state| state.status == GateStatus::Pending)));
+        let mut added = reader
+            .read_events()
+            .unwrap()
+            .into_iter()
+            .filter_map(|event| match event.body() {
+                EventBody::GateAdded {
+                    issue_id: id,
+                    gate_key,
+                } if id == &issue_id => Some(gate_key.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        added.sort();
+        let mut expected = keys;
+        expected.sort();
+        assert_eq!(added, expected);
+    }
+
+    /// A gate or assignee change requested through any command.
+    #[derive(Debug, Clone)]
+    enum FieldChange {
+        Assign(Assignee),
+        Unassign,
+        AttachGates(Vec<GateKey>),
+        DetachGates(Vec<GateKey>),
+    }
+
+    impl FieldChange {
+        fn operations(&self) -> UpdateOperations {
+            match self.clone() {
+                Self::Assign(assignee) => UpdateOperations {
+                    assignee: Some(assignee),
+                    ..Default::default()
+                },
+                Self::Unassign => UpdateOperations {
+                    unassign: true,
+                    ..Default::default()
+                },
+                Self::AttachGates(add_gates) => UpdateOperations {
+                    add_gates,
+                    ..Default::default()
+                },
+                Self::DetachGates(remove_gates) => UpdateOperations {
+                    remove_gates,
+                    ..Default::default()
+                },
+            }
+        }
+    }
+
+    const FIELD_GATES: [&str; 3] = ["tests", "review", "docs"];
+
+    fn field_gate_keys(mask: &[bool]) -> Vec<GateKey> {
+        FIELD_GATES
+            .iter()
+            .zip(mask)
+            .filter(|(_, selected)| **selected)
+            .map(|(key, _)| key.parse().unwrap())
+            .collect()
+    }
+
+    fn field_change_strategy() -> impl proptest::strategy::Strategy<Value = FieldChange> {
+        use proptest::prelude::*;
+        let assignee = prop_oneof![Just("agent:a"), Just("agent:b")]
+            .prop_map(|token| token.parse::<Assignee>().unwrap());
+        let keys = proptest::collection::vec(any::<bool>(), FIELD_GATES.len())
+            .prop_filter("a gate command names a key", |mask| mask.contains(&true))
+            .prop_map(|mask| field_gate_keys(&mask));
+        prop_oneof![
+            assignee.prop_map(FieldChange::Assign),
+            Just(FieldChange::Unassign),
+            keys.clone().prop_map(FieldChange::AttachGates),
+            keys.prop_map(FieldChange::DetachGates),
+        ]
+    }
+
+    /// The target issue and the stored outcome of `change` applied by `apply`,
+    /// timestamps cleared, and the target's event payloads.
+    fn field_change_outcome(
+        initial: &Issue,
+        apply: impl FnOnce(&CommandExecutor<crate::storage::InMemoryStorage>),
+    ) -> (Issue, Vec<String>) {
+        use crate::storage::{InMemoryStorage, IssueStore};
+
+        let storage = InMemoryStorage::new();
+        crate::test_harness::seed_memory_gate_keys(
+            &storage,
+            &FIELD_GATES.map(|key| key.parse().unwrap()),
+        );
+        crate::commands::test_helpers::seed_issue(&storage, initial.clone());
+        crate::commands::test_helpers::seed_issue(
+            &storage,
+            create_test_issue(&crate::test_utils::issue_id(0xdec0), State::Ready, vec![]),
+        );
+        let reader = storage.clone();
+        apply(&crate::commands::test_helpers::memory_executor(storage));
+        let mut stored = reader.load_issue(&initial.id).unwrap();
+        stored.updated_at = initial.updated_at;
+        stored.claimed_at = None;
+        stored
+            .gates_status
+            .values_mut()
+            .for_each(|state| state.updated_at = chrono::DateTime::default());
+        (stored, event_payloads_for(&reader, &initial.id))
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig::with_cases(12))]
+
+        /// A gate or assignee change derives one stored issue and one event
+        /// sequence whether the dedicated command, a single-issue update, or a
+        /// bulk update filtered to the issue requests it.
+        #[test]
+        fn test_field_change_derives_same_issue_and_events_through_every_command(
+            assignee in proptest::option::of(proptest::prelude::prop_oneof![
+                proptest::prelude::Just("agent:a"),
+                proptest::prelude::Just("agent:b"),
+            ]),
+            required in proptest::collection::vec(proptest::prelude::any::<bool>(), FIELD_GATES.len()),
+            change in field_change_strategy(),
+        ) {
+            use crate::query_engine::QueryFilter;
+
+            let mut initial = create_test_issue(
+                &crate::test_utils::issue_id(0xf1e1d),
+                State::Ready,
+                vec!["type:task"],
+            );
+            initial.assignee = assignee.map(|token| token.parse().unwrap());
+            initial.gates_required = field_gate_keys(&required);
+            initial.gates_status = initial
+                .gates_required
+                .iter()
+                .map(|key| {
+                    (
+                        key.clone(),
+                        crate::domain::GateState {
+                            status: GateStatus::Pending,
+                            updated_by: None,
+                            updated_at: chrono::DateTime::default(),
+                            run_id: None,
+                        },
+                    )
+                })
+                .collect();
+            let id = initial.id.clone();
+            let prefix = crate::domain::identity::IssueIdPrefix::from(&id);
+
+            let dedicated = field_change_outcome(&initial, |executor| match change.clone() {
+                FieldChange::Assign(assignee) => {
+                    executor.issues().assign_issue(&prefix, assignee).map(drop).unwrap()
+                }
+                FieldChange::Unassign => executor.issues().unassign_issue(&prefix).map(drop).unwrap(),
+                FieldChange::AttachGates(keys) => {
+                    executor.gates().add_gates(&id, &keys).map(drop).unwrap()
+                }
+                FieldChange::DetachGates(keys) => {
+                    executor.gates().remove_gates(&id, &keys).map(drop).unwrap()
+                }
+            });
+            let single = field_change_outcome(&initial, |executor| {
+                let operations = change.operations();
+                executor
+                    .issues()
+                    .update_issue_resolved(
+                        &prefix,
+                        None,
+                        None,
+                        None,
+                        None,
+                        vec![],
+                        vec![],
+                        None,
+                        None,
+                        crate::commands::IssueLocalUpdate {
+                            add_gates: operations.add_gates,
+                            remove_gates: operations.remove_gates,
+                            assignee: operations.assignee,
+                            unassign: operations.unassign,
+                        },
+                        false,
+                    )
+                    .map(drop)
+                    .unwrap()
+            });
+            let bulk = field_change_outcome(&initial, |executor| {
+                let result = executor
+                    .issues()
+                    .apply_bulk_update(
+                        &QueryFilter::parse("label:type:task").unwrap(),
+                        &change.operations(),
+                        false,
+                    )
+                    .unwrap();
+                assert_eq!(result.matched, vec![id.clone()]);
+                assert!(result.errors.is_empty(), "{:?}", result.errors);
+            });
+
+            proptest::prop_assert_eq!(&dedicated, &single);
+            proptest::prop_assert_eq!(&single, &bulk);
         }
     }
 

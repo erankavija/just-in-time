@@ -440,3 +440,191 @@ fn test_config_set_project_name_repairs_preexisting_invalid_name() {
     let parsed: toml::Value = toml::from_str(&content).unwrap();
     assert_eq!(parsed["project"]["name"].as_str().unwrap(), "good-name");
 }
+
+#[cfg(unix)]
+#[test]
+fn test_config_validate_needs_only_initialized_data_without_a_code_layout() {
+    let cli = JitCli::initialised().unwrap();
+    let data = cli.root().join(".jit");
+    let git = jit::test_harness::git::GitStandIn::new();
+    let output = cli
+        .command_with_env(["config", "validate", "--json"], [("JIT_DATA_DIR", &data)])
+        .current_dir(&data)
+        .env("PATH", git.search_path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["valid"], true);
+    assert!(
+        git.invocations().is_empty(),
+        "data-only diagnostics need no code Git discovery"
+    );
+}
+
+#[test]
+fn test_config_validate_checks_sibling_declarations_when_config_is_absent() {
+    let cli = JitCli::initialised().unwrap();
+    let data = cli.root().join(".jit");
+    fs::remove_file(data.join("config.toml")).unwrap();
+    for source in ["templates.toml", "invariants.toml"] {
+        fs::write(data.join("templates.toml"), "").unwrap();
+        fs::write(data.join("invariants.toml"), "").unwrap();
+        assert!(cli
+            .command(["config", "validate"])
+            .output()
+            .unwrap()
+            .status
+            .success());
+        fs::write(data.join(source), "not = valid = toml").unwrap();
+        let output = cli
+            .command(["config", "validate", "--json"])
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(jit::output::ErrorCode::ValidationFailed.exit_code() as i32)
+        );
+        let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert!(report["error"]["details"]["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|message| message.as_str().unwrap().contains(source)));
+    }
+}
+
+#[test]
+fn test_config_validate_explicit_root_input_precedes_authored_findings() {
+    use jit::output::ErrorCode;
+    let cli = JitCli::initialised().unwrap();
+    for (declaration, selected, expected) in [
+        (
+            "broken = [",
+            Some(cli.root().to_path_buf()),
+            Some(ErrorCode::ValidationFailed),
+        ),
+        (
+            "broken = [",
+            Some(cli.root().join("missing-code")),
+            Some(ErrorCode::InvalidArgument),
+        ),
+        (
+            "[worktree]\nroot = 'missing'\n",
+            None,
+            Some(ErrorCode::InvalidArgument),
+        ),
+        (
+            "[worktree]\nroot = 'missing'\n",
+            Some(cli.root().to_path_buf()),
+            None,
+        ),
+        (
+            "[worktree]\nroot = 42\n",
+            Some(cli.root().to_path_buf()),
+            Some(ErrorCode::ValidationFailed),
+        ),
+    ] {
+        fs::write(cli.root().join(".jit/config.toml"), declaration).unwrap();
+        let mut command = cli.command(["config", "validate", "--json"]);
+        if let Some(root) = selected {
+            command.env("JIT_WORKTREE_ROOT", root);
+        }
+        let output = command.output().unwrap();
+        let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        if let Some(expected) = expected {
+            assert_eq!(report["error"]["code"], expected.as_str(), "{report}");
+            assert_eq!(output.status.code(), Some(expected.exit_code() as i32));
+        } else {
+            assert!(output.status.success(), "{report}");
+            assert_eq!(report["valid"], true);
+        }
+    }
+}
+
+#[test]
+fn test_config_validate_pending_data_precedes_invalid_root_and_authored_findings() {
+    use jit::repository_state::{FileMode, VirtualPath};
+    use jit::storage::{
+        commit_redo_record, DataRoot, PutFile, RedoRecord, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
+    };
+    let cli = JitCli::initialised().unwrap();
+    let data = cli.root().join(".jit");
+    let before = fs::read(data.join("config.toml")).unwrap();
+    let record = RedoRecord::new(
+        Vec::new(),
+        vec![PutFile {
+            path: VirtualPath::CONFIG,
+            bytes: b"broken = [".to_vec(),
+            mode: FileMode::Regular,
+        }],
+        Vec::new(),
+        None,
+    )
+    .unwrap();
+    commit_redo_record(&DataRoot::open(&data).unwrap(), &record).unwrap();
+    let record_path = data.join(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME);
+    let committed = fs::read(&record_path).unwrap();
+    let output = cli
+        .command_with_env(
+            ["config", "validate", "--json"],
+            [("JIT_WORKTREE_ROOT", cli.root().join("missing-code"))],
+        )
+        .output()
+        .unwrap();
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        report["error"]["code"],
+        jit::output::ErrorCode::RetryableConflict.as_str()
+    );
+    assert_eq!(fs::read(record_path).unwrap(), committed);
+    assert_eq!(fs::read(data.join("config.toml")).unwrap(), before);
+}
+
+#[test]
+fn test_config_validate_missing_index_is_not_an_authored_finding() {
+    let cli = JitCli::initialised().unwrap();
+    let data = cli.root().join(".jit");
+    fs::remove_file(data.join("index.json")).unwrap();
+    fs::write(data.join("config.toml"), "broken = [").unwrap();
+    let output = cli
+        .command(["config", "validate", "--json"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_ne!(
+        report["error"]["code"],
+        jit::output::ErrorCode::ValidationFailed.as_str()
+    );
+    assert!(report["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("index.json"));
+}
+
+#[test]
+fn test_config_validate_declaration_capability_error_is_not_a_finding() {
+    let cli = JitCli::initialised().unwrap();
+    let config = cli.root().join(".jit/config.toml");
+    fs::remove_file(&config).unwrap();
+    fs::create_dir(&config).unwrap();
+    let output = cli
+        .command(["config", "validate", "--json"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_ne!(
+        report["error"]["code"],
+        jit::output::ErrorCode::ValidationFailed.as_str()
+    );
+    assert!(report["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("config.toml"));
+}

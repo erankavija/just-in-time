@@ -4,6 +4,7 @@ use super::*;
 use crate::declarations::GateMode;
 use crate::domain::identity::GateKey;
 use crate::domain::{GateRunResult, GateRunStatus};
+use crate::gate_presets::GatePresetCatalog;
 
 /// Error returned when `jit gate evaluate` runs an automated checker that does not pass.
 ///
@@ -276,39 +277,6 @@ const GATE_PRESET_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
         max_depth: 16,
     };
 
-fn listed_gate_preset_paths(
-    image: &crate::repository_state::RepositoryImage,
-) -> Result<Vec<crate::repository_state::VirtualPath>> {
-    use crate::repository_state::VirtualPath;
-    let directory = VirtualPath::GATE_PRESETS;
-    let listing = image
-        .directory_listings()
-        .get(&directory)
-        .ok_or_else(|| anyhow!("complete custom gate preset listing is absent"))?;
-    let prefix = directory.relative().as_str();
-    listing
-        .names()
-        .iter()
-        .filter(|name| name.ends_with(".json"))
-        .map(|name| VirtualPath::data(format!("{prefix}/{name}")).map_err(Into::into))
-        .collect()
-}
-
-fn parse_captured_gate_presets(
-    image: &crate::repository_state::RepositoryImage,
-) -> Result<std::collections::HashMap<String, crate::gate_presets::GatePresetDefinition>> {
-    let files = listed_gate_preset_paths(image)?
-        .into_iter()
-        .map(|path| {
-            let bytes = image
-                .file_bytes(&path)?
-                .ok_or_else(|| anyhow!("listed custom gate preset is absent: {path:?}"))?;
-            Ok((path.relative().as_str().to_string(), bytes.to_vec()))
-        })
-        .collect::<Result<Vec<_>>>()?;
-    crate::gate_presets::load_presets_from_custom_files(files)
-}
-
 fn captured_gate_preset_fixed_paths() -> Vec<crate::repository_state::VirtualPath> {
     use crate::repository_state::VirtualPath;
     vec![
@@ -359,7 +327,7 @@ fn capture_gate_preset_image(
             Vec::new()
         };
         Ok(spec.discover_paths(
-            listed_gate_preset_paths(image)?
+            GatePresetCatalog::paths(image)?
                 .into_iter()
                 .chain(issue_paths)
                 .chain(closure)
@@ -483,14 +451,10 @@ fn derive_gate_preset_application(
         .iter()
         .map(|gate| gate.key.clone())
         .collect::<Vec<_>>();
-    let issue_id = issue.id.clone();
     let derived = super::derive_captured_issue_mutation(
         issue,
         &registry,
-        &super::CapturedIssueMutation::AddGates {
-            issue_id,
-            gate_keys: keys,
-        },
+        &super::CapturedIssueMutation::AddGates { gate_keys: keys },
         context,
     )?;
     let super::CapturedIssueMutationOutcome::GatesAdded {
@@ -685,11 +649,7 @@ fn derive_gate_registry_mutation(
             )
         }
     };
-    // Normalize through the declaration-owned serializer now so projection input
-    // exactly matches what the authored file will contain (including null-valued
-    // reserved-entry stripping).
-    let bytes = crate::declarations::serialize_gate_registry(&registry)?;
-    let registry = crate::declarations::parse_gate_registry(&bytes)?;
+    crate::declarations::normalize_gate_registry_for_document(&mut registry);
     Ok(DerivedGateRegistryMutation {
         registry,
         event,
@@ -737,21 +697,19 @@ impl<S: IssueStore> GateOps<'_, S> {
             return Err(anyhow!("Must provide at least one gate key"));
         }
 
-        let full_id = issue_id.clone();
-
-        // Collect warnings instead of printing
-        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
-
-        let CapturedIssueMutationOutcome::GatesAdded {
+        let outcome = self
+            .exec
+            .publish_captured_field_update(CapturedFieldUpdate::issue_local(
+                issue_id.clone(),
+                super::issue::IssueLocalUpdate {
+                    add_gates: gate_keys.to_vec(),
+                    ..Default::default()
+                },
+            ))?;
+        let Some(CapturedIssueMutationOutcome::GatesAdded {
             added,
             already_exist,
-        } = self
-            .exec
-            .publish_captured_issue_mutation(CapturedIssueMutation::AddGates {
-                issue_id: full_id,
-                gate_keys: gate_keys.to_vec(),
-            })?
-            .1
+        }) = outcome.local_outcomes.into_iter().next()
         else {
             return Err(anyhow!("unexpected result from captured gate addition"));
         };
@@ -761,7 +719,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 added,
                 already_exist,
             },
-            warnings,
+            outcome.warnings,
         ))
     }
 
@@ -781,23 +739,22 @@ impl<S: IssueStore> GateOps<'_, S> {
             return Err(anyhow!("Must provide at least one gate key"));
         }
 
-        let full_id = issue_id.clone();
-
-        // Collect warnings instead of printing
-        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
-
-        let CapturedIssueMutationOutcome::GatesRemoved { removed, not_found } = self
+        let outcome = self
             .exec
-            .publish_captured_issue_mutation(CapturedIssueMutation::RemoveGates {
-                issue_id: full_id,
-                gate_keys: gate_keys.to_vec(),
-            })?
-            .1
+            .publish_captured_field_update(CapturedFieldUpdate::issue_local(
+                issue_id.clone(),
+                super::issue::IssueLocalUpdate {
+                    remove_gates: gate_keys.to_vec(),
+                    ..Default::default()
+                },
+            ))?;
+        let Some(CapturedIssueMutationOutcome::GatesRemoved { removed, not_found }) =
+            outcome.local_outcomes.into_iter().next()
         else {
             return Err(anyhow!("unexpected result from captured gate removal"));
         };
 
-        Ok((GateRemoveResult { removed, not_found }, warnings))
+        Ok((GateRemoveResult { removed, not_found }, outcome.warnings))
     }
 
     /// Mark a gate as passed, then complete the issue if that cleared the last
@@ -842,10 +799,6 @@ impl<S: IssueStore> GateOps<'_, S> {
             .map(|s| s.parse::<crate::domain::Assignee>())
             .transpose()?;
         let full_id = issue_id.clone();
-
-        // Collect warnings instead of printing
-        let mut warnings = self.exec.refuse_foreign_lease(&full_id)?;
-
         let issue = self.exec.storage.load_issue(&full_id)?;
 
         if !issue.gates_required.contains(gate_key) {
@@ -872,7 +825,7 @@ impl<S: IssueStore> GateOps<'_, S> {
             } else {
                 crate::commands::VerdictSource::ReuseUnchangedInputs
             };
-            let result = self.check_gate_with(&full_id, gate_key, source)?;
+            let (result, mut warnings) = self.check_gate_with(&full_id, gate_key, source)?;
             if result.status != GateRunStatus::Passed {
                 return Err(GatePassFailed {
                     issue_id: full_id,
@@ -903,13 +856,12 @@ impl<S: IssueStore> GateOps<'_, S> {
             .into());
         };
 
-        self.exec
-            .publish_captured_issue_mutation(CapturedIssueMutation::SetManualGateStatus {
-                issue_id: full_id.clone(),
-                gate_key: gate_key.clone(),
-                status: GateStatus::Passed,
-                by: Some(by),
-            })?;
+        let warnings = self.exec.publish_captured_issue_mutation(
+            full_id,
+            gate_key.clone(),
+            GateStatus::Passed,
+            Some(by),
+        )?;
 
         Ok(GatePassOutcome { warnings })
     }
@@ -1000,10 +952,6 @@ impl<S: IssueStore> GateOps<'_, S> {
             .map(|s| s.parse::<crate::domain::Assignee>())
             .transpose()?;
         let full_id = issue_id.clone();
-
-        // Collect warnings instead of printing
-        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
-
         let issue = self.exec.storage.load_issue(&full_id)?;
 
         if !issue.gates_required.contains(gate_key) {
@@ -1025,13 +973,12 @@ impl<S: IssueStore> GateOps<'_, S> {
             }
         }
 
-        self.exec
-            .publish_captured_issue_mutation(CapturedIssueMutation::SetManualGateStatus {
-                issue_id: full_id,
-                gate_key: gate_key.clone(),
-                status: GateStatus::Failed,
-                by,
-            })?;
+        let warnings = self.exec.publish_captured_issue_mutation(
+            full_id,
+            gate_key.clone(),
+            GateStatus::Failed,
+            by,
+        )?;
 
         Ok(warnings)
     }
@@ -1054,7 +1001,7 @@ impl<S: IssueStore> GateOps<'_, S> {
     fn publish_gate_registry_mutation(
         &self,
         request: CapturedGateRegistryMutation,
-    ) -> Result<CapturedGateRegistryOutcome>
+    ) -> Result<(CapturedGateRegistryOutcome, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -1064,6 +1011,15 @@ impl<S: IssueStore> GateOps<'_, S> {
         };
 
         let layout = self.exec.require_layout()?;
+        let leased_gate = match &request {
+            CapturedGateRegistryMutation::Update { key, .. }
+            | CapturedGateRegistryMutation::Remove { key } => Some(key),
+            CapturedGateRegistryMutation::Define(_) => None,
+        };
+        let claims_guard = leased_gate
+            .map(|_| super::claims_mutation_guard(self.exec.require_worktree_paths()?))
+            .transpose()?
+            .flatten();
         let context = super::production_mutation_context();
         let budget = CaptureBudget {
             max_listings: 64,
@@ -1086,6 +1042,9 @@ impl<S: IssueStore> GateOps<'_, S> {
             |session| {
                 let mut spec = CaptureSpec::new(registries()?, budget)?;
                 spec.discover_tail(VirtualPath::EVENTS)?;
+                if leased_gate.is_some() {
+                    spec.discover_listings([VirtualPath::ISSUES])?;
+                }
                 let Some(image) = super::capture_discovering(session, spec, |image, spec| {
                     let config = assemble_config(image)?;
                     let rules_text = super::image_virtual_bytes(
@@ -1094,15 +1053,39 @@ impl<S: IssueStore> GateOps<'_, S> {
                     )?
                     .map(String::from_utf8)
                     .transpose()?;
-                    Ok(spec.discover_paths(render_capture_closure(
-                        image.layout(),
-                        &config,
-                        &[],
-                        rules_text.as_deref(),
-                    )?)?)
+                    let issue_paths = if leased_gate.is_some() {
+                        crate::repository_state::captured_issue_ids(image)?
+                            .into_iter()
+                            .map(|issue_id| VirtualPath::issue_record(&issue_id))
+                            .collect::<Vec<_>>()
+                    } else {
+                        Vec::new()
+                    };
+                    Ok(spec.discover_paths(issue_paths.into_iter().chain(
+                        render_capture_closure(
+                            image.layout(),
+                            &config,
+                            &[],
+                            rules_text.as_deref(),
+                        )?,
+                    ))?)
                 })?
                 else {
                     return Ok(SessionStep::Retry);
+                };
+                let warnings = if let Some(key) = leased_gate {
+                    let targets = super::captured_active_issues(&image)?
+                        .into_iter()
+                        .filter(|issue| issue.gates_required.contains(key))
+                        .map(|issue| issue.id)
+                        .collect::<Vec<_>>();
+                    super::refuse_foreign_leases_held(
+                        assemble_config(&image)?.enforcement_mode(),
+                        &targets,
+                        claims_guard.as_ref(),
+                    )?
+                } else {
+                    Vec::new()
                 };
                 let gates_path = VirtualPath::GATES;
                 let registry = match image.entry(&gates_path)? {
@@ -1131,7 +1114,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                     &intents,
                     declarations.borrowed(),
                 )?;
-                Ok(SessionStep::Apply(plan, derived.outcome))
+                Ok(SessionStep::Apply(plan, (derived.outcome, warnings)))
             },
         )
     }
@@ -1158,7 +1141,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main
-        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
+        self.exec.require_common_history_with_main()?;
 
         // Validate: auto gates must have checker
         if mode == crate::declarations::GateMode::Auto && checker.is_none() {
@@ -1255,33 +1238,16 @@ impl<S: IssueStore> GateOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main (mirrors define_gate).
-        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
-        let warnings = self.refuse_foreign_leases_on_gate_users(key)?;
-        match self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Update {
-            key: key.clone(),
-            update,
-        })? {
+        self.exec.require_common_history_with_main()?;
+        let (outcome, warnings) =
+            self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Update {
+                key: key.clone(),
+                update,
+            })?;
+        match outcome {
             CapturedGateRegistryOutcome::Updated(updated) => Ok((*updated, warnings)),
             _ => unreachable!("update request has one outcome"),
         }
-    }
-
-    /// [`CommandExecutor::refuse_foreign_leases`] over the issues requiring `key`.
-    fn refuse_foreign_leases_on_gate_users(&self, key: &GateKey) -> Result<Vec<String>> {
-        let requiring = self
-            .exec
-            .storage
-            .list_issues()?
-            .into_iter()
-            .filter(|issue| issue.gates_required.contains(key))
-            .map(|issue| issue.id)
-            .collect::<Vec<_>>();
-        Ok(self
-            .exec
-            .refuse_foreign_leases(&requiring)?
-            .into_iter()
-            .map(|(_, warning)| warning)
-            .collect())
     }
 
     /// Remove a gate definition, refusing when another agent leases an issue that
@@ -1291,12 +1257,12 @@ impl<S: IssueStore> GateOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         // Global operation - enforce common history with main
-        crate::commands::worktree::enforce_main_only_operations(self.real_repo_layout().as_ref())?;
+        self.exec.require_common_history_with_main()?;
 
-        let warnings = self.refuse_foreign_leases_on_gate_users(key)?;
-        self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Remove {
-            key: key.clone(),
-        })?;
+        let (_, warnings) =
+            self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Remove {
+                key: key.clone(),
+            })?;
         Ok(warnings)
     }
 
@@ -1311,15 +1277,39 @@ impl<S: IssueStore> GateOps<'_, S> {
 
     // Preset management methods
 
-    pub fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
-        self.exec.storage.list_gate_presets()
+    pub fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        Ok(self.read_gate_preset_catalog()?.list())
     }
 
-    pub fn show_gate_preset(
-        &self,
-        name: &str,
-    ) -> Result<crate::gate_presets::GatePresetDefinition> {
-        self.exec.storage.get_gate_preset(name)
+    pub fn show_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        Ok(self.read_gate_preset_catalog()?.get(name)?.clone())
+    }
+
+    fn read_gate_preset_catalog(&self) -> Result<GatePresetCatalog>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::{CaptureSpec, VirtualPath};
+
+        let layout = self.exec.require_layout()?;
+        with_read_session(&self.exec.storage, &layout, "gate preset read", |session| {
+            let mut spec =
+                CaptureSpec::new([VirtualPath::GATE_PRESETS], GATE_PRESET_CAPTURE_BUDGET)?;
+            spec.discover_listings([VirtualPath::GATE_PRESETS])?;
+            let Some(image) = super::capture_discovering(session, spec, |image, spec| {
+                Ok(spec.discover_paths(GatePresetCatalog::paths(image)?)?)
+            })?
+            else {
+                return Ok(None);
+            };
+            Ok(Some(GatePresetCatalog::from_image(&image)?))
+        })
     }
 
     /// Apply a gate preset to an issue.
@@ -1374,14 +1364,13 @@ impl<S: IssueStore> GateOps<'_, S> {
                 std::slice::from_ref(&target),
                 claims_guard.as_ref(),
             )?;
-            let preset = parse_captured_gate_presets(&image)?
-                .remove(preset_name)
-                .ok_or_else(|| crate::storage::PresetNotFoundError::new(preset_name))?;
+            let catalog = GatePresetCatalog::from_image(&image)?;
+            let preset = catalog.get(preset_name)?;
             let issue = captured_gate_preset_issue(&image, &target)?;
             let derived = derive_gate_preset_application(
                 issue,
                 captured_gate_registry(&image)?,
-                &preset,
+                preset,
                 timeout_override,
                 PresetGateExclusions {
                     skip_precheck,
@@ -1526,6 +1515,68 @@ mod tests {
     use crate::domain::EventBody;
     use crate::storage::InMemoryStorage;
     use std::collections::HashMap;
+
+    #[test]
+    fn test_gate_registry_guard_maps_supplied_checkout_comparisons() {
+        use crate::test_cli::JitCli;
+
+        for scenario in ["unresolved", "unrelated", "matching", "diverged"] {
+            let cli = JitCli::uninitialised().unwrap();
+            cli.init_git().unwrap().commit("base").unwrap();
+            let base = match scenario {
+                "unresolved" => None,
+                "unrelated" => Some(
+                    cli.git(["commit-tree", "HEAD^{tree}", "-m", "unrelated"])
+                        .unwrap(),
+                ),
+                "matching" => Some(cli.git(["rev-parse", "HEAD"]).unwrap()),
+                "diverged" => Some(
+                    cli.git(["commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "ahead"])
+                        .unwrap(),
+                ),
+                _ => unreachable!(),
+            };
+            if let Some(base) = base {
+                cli.git(["update-ref", "refs/remotes/origin/main", base.trim()])
+                    .unwrap();
+            }
+            let executor =
+                setup().with_worktree_paths(crate::test_utils::primary_checkout_paths(cli.root()));
+            let key = "guarded".parse().unwrap();
+            let result = executor.gates().define_gate(
+                &key,
+                "Guarded".to_string(),
+                String::new(),
+                GateStage::Postcheck,
+                GateMode::Manual,
+                None,
+                100,
+            );
+            if scenario == "diverged" {
+                assert_eq!(
+                    result.unwrap_err().to_string(),
+                    "Global operations require common history with main\n\n\
+                     Your branch has diverged from origin/main. To proceed:\n  \
+                     git fetch origin\n  \
+                     git rebase origin/main"
+                );
+                assert!(!executor
+                    .storage
+                    .load_gate_registry()
+                    .unwrap()
+                    .gates
+                    .contains_key(&key));
+            } else {
+                result.unwrap_or_else(|error| panic!("{scenario}: {error}"));
+                assert!(executor
+                    .storage
+                    .load_gate_registry()
+                    .unwrap()
+                    .gates
+                    .contains_key(&key));
+            }
+        }
+    }
 
     #[test]
     fn test_pass_of_automated_gate_runs_checker() {
@@ -2173,30 +2224,6 @@ mod tests {
     }
 
     #[test]
-    fn test_memory_gate_preset_reader_rejects_non_regular_json_occupant() {
-        let executor = setup();
-        let path = crate::repository_state::VirtualPath::data("config/gate-presets/directory.json")
-            .unwrap();
-        executor.storage.repository_state().entries.insert(
-            path,
-            crate::repository_state::RepositoryEntry::Directory {
-                identity: crate::repository_state::EntryIdentity::for_bytes(
-                    "memory-preset-directory",
-                    b"directory",
-                )
-                .unwrap(),
-                mode: crate::repository_state::FileMode::Executable,
-            },
-        );
-
-        let error = executor
-            .gates()
-            .list_gate_presets()
-            .expect_err("a .json directory must be rejected");
-        assert!(error.to_string().contains("must be an ordinary file"));
-    }
-
-    #[test]
     fn test_gate_preset_create_reports_occupied_malformed_target_as_already_exists() {
         let executor = setup();
         define_manual_gate(&executor, &"review".parse().unwrap());
@@ -2259,6 +2286,141 @@ mod tests {
             }
             other => panic!("unexpected registry event: {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_gate_registry_edits_preserve_authored_sections_and_order() {
+        let authored = "# Input footprint: only files under the workspace are read.\n\n\
+            [[gates]]\n\
+            key = \"zulu\"\n\
+            title = \"Zulu\"\n\
+            description = \"Workspace check\"\n\
+            stage = \"postcheck\"\n\
+            mode = \"manual\"\n\
+            \n\
+            # Input footprint: the alpha checker reads declared schemas.\n\
+            [[gates]]\n\
+            key = \"alpha\"\n\
+            title = \"Alpha\"\n\
+            description = \"Schema check\"\n\
+            stage = \"precheck\"\n\
+            mode = \"manual\"\n\
+            \n\
+            # Input footprint: the beta checker is issue-local.\n\
+            [[gates]]\n\
+            key = \"beta\"\n\
+            title = \"Beta\"\n\
+            description = \"Issue check\"\n\
+            stage = \"postcheck\"\n\
+            mode = \"manual\"\n";
+        let executor = setup();
+        seed_repo_file(executor.storage(), ".jit/gates.toml", authored);
+
+        executor
+            .gates()
+            .define_gate(
+                &"new-gate".parse().unwrap(),
+                "New gate".to_string(),
+                "New check".to_string(),
+                GateStage::Postcheck,
+                GateMode::Manual,
+                None,
+                100,
+            )
+            .unwrap();
+
+        let after_define = executor
+            .storage
+            .read_repo_file(".jit/gates.toml")
+            .unwrap()
+            .unwrap();
+        assert!(
+            after_define.starts_with(authored),
+            "defining a gate must leave the authored registry bytes intact: {after_define:?}"
+        );
+
+        executor
+            .gates()
+            .remove_gate_definition(&"alpha".parse().unwrap())
+            .unwrap();
+
+        let after_remove = executor
+            .storage
+            .read_repo_file(".jit/gates.toml")
+            .unwrap()
+            .unwrap();
+        for section in [
+            "[[gates]]\n\
+             key = \"zulu\"\n\
+             title = \"Zulu\"\n\
+             description = \"Workspace check\"\n\
+             stage = \"postcheck\"\n\
+             mode = \"manual\"\n",
+            "[[gates]]\n\
+             key = \"beta\"\n\
+             title = \"Beta\"\n\
+             description = \"Issue check\"\n\
+             stage = \"postcheck\"\n\
+             mode = \"manual\"\n",
+        ] {
+            assert!(
+                after_remove.contains(section),
+                "removing a gate must retain every untouched authored section: {section}"
+            );
+        }
+        for (comment, key) in [
+            (
+                "# Input footprint: only files under the workspace are read.\n",
+                "key = \"zulu\"",
+            ),
+            (
+                "# Input footprint: the beta checker is issue-local.\n",
+                "key = \"beta\"",
+            ),
+        ] {
+            assert!(after_remove.contains(comment));
+            assert!(after_remove.find(comment).unwrap() < after_remove.find(key).unwrap());
+        }
+        assert!(!after_remove.contains("key = \"alpha\""));
+        assert!(
+            after_remove.find("key = \"zulu\"").unwrap()
+                < after_remove.find("key = \"beta\"").unwrap()
+        );
+        assert!(
+            after_remove.find("key = \"beta\"").unwrap()
+                < after_remove.find("key = \"new-gate\"").unwrap()
+        );
+    }
+
+    #[test]
+    fn test_gate_registry_projection_matches_edited_document_with_null_reserved_entry() {
+        let mut definition = GateDefinition {
+            version: 1,
+            key: "nullable-extension".parse().unwrap(),
+            title: "Nullable extension".to_string(),
+            description: "Projection equivalence".to_string(),
+            stage: GateStage::Postcheck,
+            mode: GateMode::Manual,
+            checker: None,
+            inputs: None,
+            priority: 100,
+            reserved: HashMap::new(),
+        };
+        definition
+            .reserved
+            .insert("discarded".to_string(), serde_json::Value::Null);
+        let derived = derive_gate_registry_mutation(
+            crate::declarations::GateRegistry::default(),
+            &CapturedGateRegistryMutation::Define(definition),
+        )
+        .unwrap();
+
+        let edited = crate::declarations::edit_gate_registry_document(None, &derived.registry)
+            .expect("the proposed registry edits an empty authored document");
+        let parsed =
+            crate::declarations::parse_gate_registry(&edited).expect("the edited document parses");
+
+        assert_eq!(derived.registry, parsed);
     }
 
     #[test]
@@ -2405,6 +2567,96 @@ mod tests {
             assert!(error
                 .downcast_ref::<crate::storage::GateNotFoundError>()
                 .is_some());
+        }
+    }
+
+    fn gate_definition_lease_fixture(
+        mode: &str,
+        leased: bool,
+    ) -> (
+        CommandExecutor<InMemoryStorage>,
+        crate::domain::identity::IssueId,
+        GateKey,
+        Option<crate::domain::Assignee>,
+    ) {
+        let executor = crate::commands::test_helpers::setup_coordinated_with_enforcement(mode);
+        let key: GateKey = "lease-gate".parse().unwrap();
+        let mut registry = executor.storage().load_gate_registry().unwrap();
+        registry.gates.insert(
+            key.clone(),
+            GateDefinition {
+                version: 1,
+                key: key.clone(),
+                title: "Lease gate".to_string(),
+                description: String::new(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Manual,
+                checker: None,
+                priority: 100,
+                reserved: HashMap::new(),
+                inputs: None,
+            },
+        );
+        seed_gate_registry(executor.storage(), &registry);
+        let mut issue =
+            crate::test_utils::fixture_issue("Requires gate".to_string(), String::new());
+        let issue_id = issue.id.clone();
+        issue.gates_required.push(key.clone());
+        seed_issue(executor.storage(), issue);
+        let holder = leased
+            .then(|| crate::commands::test_helpers::plant_foreign_lease(&executor, &issue_id));
+        (executor, issue_id, key, holder)
+    }
+
+    #[test]
+    fn test_gate_definition_update_and_removal_obey_lease_mode_for_captured_users() {
+        for operation in ["update", "remove"] {
+            for (mode, leased) in [("strict", true), ("warn", true), ("strict", false)] {
+                let (executor, _issue_id, key, holder) =
+                    gate_definition_lease_fixture(mode, leased);
+                let before = executor.storage().load_gate_registry().unwrap();
+                let result = match operation {
+                    "update" => executor
+                        .gates()
+                        .update_gate(
+                            &key,
+                            GateUpdate {
+                                title: Some("Updated lease gate".to_string()),
+                                ..Default::default()
+                            },
+                        )
+                        .map(|(_, warnings)| warnings),
+                    "remove" => executor.gates().remove_gate_definition(&key),
+                    _ => unreachable!(),
+                };
+
+                if mode == "strict" && leased {
+                    let error = result.unwrap_err();
+                    assert!(
+                        error
+                            .downcast_ref::<crate::errors::ForeignLeaseError>()
+                            .is_some(),
+                        "{error:#}"
+                    );
+                    assert_eq!(executor.storage().load_gate_registry().unwrap(), before);
+                    assert!(executor.storage().read_events().unwrap().is_empty());
+                } else {
+                    let warnings = result.unwrap();
+                    if let Some(holder) = holder {
+                        assert!(warnings
+                            .iter()
+                            .any(|warning| warning.contains(&holder.to_string())));
+                    } else {
+                        assert!(warnings.is_empty());
+                    }
+                    let updated = executor.storage().load_gate_registry().unwrap();
+                    if operation == "update" {
+                        assert_eq!(updated.gates[&key].title, "Updated lease gate");
+                    } else {
+                        assert!(!updated.gates.contains_key(&key));
+                    }
+                }
+            }
         }
     }
 }

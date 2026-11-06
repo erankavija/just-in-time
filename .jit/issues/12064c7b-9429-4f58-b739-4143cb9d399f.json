@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:b697a3f7-lead",
+  "claimed_at": "2026-11-05T23:20:21.693682922Z",
   "context": {},
   "created_at": "2026-10-24T21:22:37.717854234Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Read type labels through one extractor that returns the exact label value, and delete the lowercasing `extract_type`, so the taxonomy check and the graph and validation code agree on what a type label names (REQ-20 type extraction).\n\n## Background\n\n- `crate::labels::type_value_of` (`crates/jit/src/labels.rs:169-176`) is documented as the one primitive that owns the `type:` encoding and returns the value unchanged. The label grammar allows uppercase values.\n- `extract_type` (`crates/jit/src/domain/type_taxonomy.rs:173-180`) wraps it and lowercases and trims the value. Its callers are `detect_validation_issues` (`type_taxonomy.rs:267`, use at `:280`), `validate_strategic_labels` (`:306`, use at `:315`) and `validate_orphans` (`:355`, use at `:364`), plus tests (`test_extract_type_valid` `:472-484`, `test_extract_type_invalid_format` `:487-496`, `prop_extract_type_normalization` `:694-706`, `prop_invalid_labels_rejected` `:710-718`); the module has no rustdoc example. Nothing outside the module calls it.\n- So `type:Epic` is the known type `epic` to the taxonomy check and the membership warnings but an unknown type to graph and validation code built on `type_value_of`.\n- An unknown type already carries an edit-distance suggestion (`suggest_type_fix`, `:228`), which offers `epic` for `Epic`.\n\n## Success Criteria\n\n- [hard] REQ-01: `extract_type` no longer exists; `detect_validation_issues`, `validate_strategic_labels` and `validate_orphans` read the type through `type_value_of` and compare the exact value.\n- [hard] REQ-02: A unit test shows `detect_validation_issues` reports `type:Epic`, against a hierarchy declaring `epic`, as an unknown type `Epic` with the suggested fix `epic`; today it reports no issue.\n- [hard] REQ-03: The extraction tests use `type_value_of` or are removed where `labels.rs` tests already own the extraction property.\n\n## Notes\n\n- Behaviour change: an uppercase type value is an unknown type to the taxonomy check and the strategic and orphan membership warnings, as it already is to graph rules and validation; `validate --fix` offers the lowercase type through the existing suggestion.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-05T23:52:18.956531362Z",
   "first_ready_at": "2026-10-24T21:22:37.717854234Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "cf6c9271-5978-4ec8-bdb2-bc0cf729069d",
+      "status": "passed",
+      "updated_at": "2026-11-05T23:49:19.347857501Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "962c576b-16a8-407c-bee6-d25bba9aa364",
+      "status": "passed",
+      "updated_at": "2026-11-05T23:52:05.317029816Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "12064c7b-9429-4f58-b739-4143cb9d399f",
   "labels": [
     "type:task",
@@ -24,7 +39,7 @@
     "satisfies:b697a3f7/REQ-20"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Type labels have one exact extraction",
-  "updated_at": "2026-10-24T21:29:30.238083891Z"
+  "updated_at": "2026-11-05T23:52:18.956531362Z"
 }

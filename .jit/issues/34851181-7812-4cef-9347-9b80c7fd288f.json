@@ -5,7 +5,6 @@
   "dependencies": [
     "3d93442b-2764-4ada-b924-405220a9e6f4",
     "47d62472-731b-48a9-b27c-136cf86804ee",
-    "5046408a-9706-4ca0-9302-54d20e2088aa",
     "6fdb2d53-bc92-424e-bc74-455f21f2cc26",
     "732f7afb-f1ee-4242-aa18-82b3b70ea96f",
     "92afc5d8-ddeb-405b-a708-b4b97f19d024",
@@ -40,5 +39,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Trim the layout and git module surface to production callers",
-  "updated_at": "2026-10-24T18:41:57.840390356Z"
+  "updated_at": "2026-11-05T05:43:19.746042512Z"
 }

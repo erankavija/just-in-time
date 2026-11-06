@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-a273667c",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "291d90d2f398fc2d1f215329fc9214dc0d4524f4",
+  "completed_at": "2026-11-05T03:15:07.575180353Z",
+  "duration_ms": 224217,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/json.rs",
+        "id": "F1",
+        "line": 1280,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/a273667c/requirement/REQ-02"
+        ],
+        "severity": "medium",
+        "summary": "Committed paths containing a newline are newly rejected by the object-reader protocol, violating unchanged read semantics."
+      }
+    ],
+    "summary": "A valid committed filename containing a newline now fails with InvalidPath instead of returning its bytes.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a273667c-6902-46f2-9580-b74e1e8abac3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b9d20147-35e0-492d-acec-8ee0dcb04db2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T03:11:23.358172173Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4984 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /mnt/nvme/jit/agents/worktrees/agent-a273667c\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1a9b0-91a1-7162-9c4d-8baab3340dec\n--------\nuser\n--- 4971 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: f72d44c83a06bc22ad0c4423bd6d245856b38143 (`jit:a273667c`); uncommitted JIT metadata excluded\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/a273667c/requirement/REQ-01, REQ-02, REQ-03; @/issue/f4d9502a/requirement/REQ-01, REQ-10 (.jit issue sources)\nGate evidence: cargo-ci passed (exit 0; run 291d90d2 covers f72d44c8); code-review pending\nTruncation recovery: narrower reads of item sources, object-reader/path validation, callers, and affected tests after broad-search truncation\n\n1. **[blocking][issue-impact]** `crates/jit/src/storage/json.rs:1280` regresses committed paths containing a newline. The shared path validator accepts such a relative path, but `GitObjectReader` rejects newline-containing object names; the new code maps that failure to `PathReadError::InvalidPath`. Git can track such filenames, and the former `git2` tree lookup could read them, so bytes/error semantics are not unchanged as required. Preserve reads for valid newline-containing paths and add a regression test.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A valid committed filename containing a newline now fails with InvalidPath instead of returning its bytes.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Committed paths containing a newline are newly rejected by the object-reader protocol, violating unchanged read semantics.\",\"file\":\"crates/jit/src/storage/json.rs\",\"line\":1280,\"references\":[\"@/issue/a273667c/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

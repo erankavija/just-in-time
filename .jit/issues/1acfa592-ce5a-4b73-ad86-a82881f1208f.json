@@ -8,6 +8,7 @@
   ],
   "description": "Make `jit doc show` read through storage at the version the request names, so an unpinned document is read from the working tree and the command holds no git code.\n\n## Background\n\n- `show_document_content` (`crates/jit/src/commands/document.rs:497-554`) opens libgit2 for `--at` or a pinned reference and reads through `read_file_from_git`. Without either, it reads `HEAD` when a repository opens and the working tree otherwise. An unpinned document therefore shows committed content, and an uncommitted derived file cannot be shown (`docs/reference/cli-commands.md:2856`).\n- Its git-side failures are `git2::Error` values wrapped in context, which classify as the generic error with exit 1. `IssueStore::read_path_text` fails with `PathReadError` instead, and the classifier maps each variant to its own code (`crates/jit/src/output/failure.rs:338`), as the path-read classification establishes: a missing document or unresolvable commit gets the document-not-found code in the not-found exit class (3), and a rejected or escaping path gets `INVALID_ARGUMENT`.\n- The server reads an unpinned document from the working tree (`read_document_content`, `crates/jit/src/commands/document.rs:666-684`).\n- Tests: `crates/jit/tests/cli_repo_workflow/doc_show_tests.rs:22`, `crates/jit/tests/cli_repo_workflow/doc_show_tests.rs:84`, `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:214`, `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:238`.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit doc show` reads through `IssueStore::read_path_text` with the explicit `--at`, else the reference's pinned commit, else the working tree, and `show_document_content` uses no git2.\n- [hard] REQ-02: A test asserts the behaviour change and fails on today's code: an unpinned document with an uncommitted edit shows the edited content and reports `working-tree` as its commit. A pinned or `--at` read reports the requested reference, as today.\n- [hard] REQ-03: Read failures carry the path-read classification: `jit doc show --at <unresolvable>` reports the document-not-found code with exit 3, and a pinned read of a path absent at its commit reports the same. CLI tests assert both, including `test_doc_show_at_invalid_commit`; today both exit 1 with the generic code, so they fail.\n- [hard] REQ-04: Without git, an unpinned show works and a pinned show fails; `test_doc_show_at_head_by_default` is renamed for the working-tree read it now proves.\n\n## Notes\n\n- Behaviour change: an unpinned show reads the working tree, as the server already does, and read failures take the path-read codes.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-06T02:35:18.634869544Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Document show reads through storage at the version it names",
-  "updated_at": "2026-10-21T15:43:43.947887596Z"
+  "updated_at": "2026-11-06T02:35:18.634869544Z"
 }

@@ -211,7 +211,7 @@ fn show<S: IssueStore>(
     ))
 }
 
-fn preset_list<S: IssueStore>(
+fn preset_list<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
 ) -> HandlerResult<GatePresetListResponse> {
     let presets = ctx.executor.gates().list_gate_presets()?;
@@ -222,7 +222,7 @@ fn preset_list<S: IssueStore>(
     ))
 }
 
-fn preset_show<S: IssueStore>(
+fn preset_show<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     name: String,
 ) -> HandlerResult<GatePresetShowResponse> {
@@ -268,12 +268,7 @@ fn preset_apply<S: HandlerStore>(
     };
     let mut warnings = Vec::new();
     for id in ids {
-        let resolved = resolve_issue(ctx.executor, &id);
-        if let Ok(issue) = &resolved {
-            // A foreign lease is an authorization failure, not a per-gate error.
-            ctx.executor.refuse_foreign_lease(issue)?;
-        }
-        match resolved.and_then(|id| {
+        match resolve_issue(ctx.executor, &id).and_then(|id| {
             ctx.executor.gates().apply_gate_preset(
                 &id,
                 &report.preset,
@@ -295,8 +290,16 @@ fn preset_apply<S: HandlerStore>(
                     already_existed: result.already_exist,
                 });
             }
-            // Contention fails the run, so it exits as a lock timeout.
-            Err(error) if crate::storage::is_lock_timeout(&error) => return Err(error),
+            // Contention fails the run, so it exits as a lock timeout; a foreign
+            // lease is an authorization failure, not a per-gate error.
+            Err(error)
+                if crate::storage::is_lock_timeout(&error)
+                    || error
+                        .downcast_ref::<crate::errors::ForeignLeaseError>()
+                        .is_some() =>
+            {
+                return Err(error)
+            }
             Err(error) => {
                 report.errors.push(GatePresetError {
                     issue_id: id,
@@ -592,7 +595,7 @@ const EVALUATION_FAILURE_CODES: &[ErrorCode] = &[
 
 /// Each requested issue in argument order, an unresolved id failing its own
 /// entry; any failure makes the batch findings under the first failure's code.
-/// Another agent's lease on any issue refuses the whole batch.
+/// Another agent's lease refuses that issue's entry alone.
 fn evaluate_many<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     gate_key: String,
@@ -612,10 +615,6 @@ fn evaluate_many<S: HandlerStore>(
         .iter()
         .filter_map(|(_, id)| id.as_ref().ok().cloned())
         .collect();
-    // A foreign lease is an authorization failure, not a per-issue error.
-    full_ids
-        .iter()
-        .try_for_each(|id| ctx.executor.refuse_foreign_lease(id).map(drop))?;
     let mut evaluated = ctx
         .executor
         .gates()

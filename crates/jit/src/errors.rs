@@ -417,6 +417,47 @@ impl LeaseNotFoundError {
     }
 }
 
+/// An active lease another agent holds on an issue a write targets.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{issue_id} is leased by {holder}")]
+pub struct ForeignLease {
+    pub issue_id: IssueId,
+    pub holder: crate::domain::Assignee,
+}
+
+/// A `strict`-mode refusal of a write to issues other agents lease.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub struct ForeignLeaseError {
+    leases: Vec<ForeignLease>,
+}
+
+impl ForeignLeaseError {
+    pub fn new(leases: Vec<ForeignLease>) -> Self {
+        Self { leases }
+    }
+
+    /// Each refused issue with its holder.
+    pub fn leases(&self) -> &[ForeignLease] {
+        &self.leases
+    }
+}
+
+impl fmt::Display for ForeignLeaseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let named = self
+            .leases
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(
+            f,
+            "Refusing to write: {named}.\nCoordinate with the holder, or wait for the lease to end. \
+             If the lease is yours, set your identity with JIT_AGENT_ID."
+        )
+    }
+}
+
 /// The missing Git precondition, determining the appropriate remediation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GitRequirementGap {
@@ -1298,4 +1339,31 @@ mod tests {
         assert_eq!(any.to_string(), expected);
         assert!(any.downcast_ref::<LeaseNotFoundError>().is_some());
     }
+}
+
+/// The explicit input that selected a code root.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub enum WorktreeRootSource {
+    #[serde(rename = "JIT_WORKTREE_ROOT")]
+    Environment,
+    #[serde(rename = "[worktree].root")]
+    Configuration,
+}
+
+impl std::fmt::Display for WorktreeRootSource {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Environment => "JIT_WORKTREE_ROOT",
+            Self::Configuration => "[worktree].root",
+        })
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("invalid worktree root {supplied:?} from {setting} (resolved {resolved:?}): {reason}")]
+pub struct InvalidWorktreeRootError {
+    pub setting: WorktreeRootSource,
+    pub supplied: std::path::PathBuf,
+    pub resolved: std::path::PathBuf,
+    pub reason: String,
 }

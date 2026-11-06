@@ -1,19 +1,68 @@
 //! Worktree inspection and execution.
 
-use super::CommandExecutor;
+use super::{CommandExecutor, RepositoryInvocation};
 use crate::domain::identity::WorktreeId;
 use crate::domain::store_divergence::{compare_stores, StoreDivergence, StoreRecords};
 use crate::errors::{GitRequirementGap, RequiresGitError};
-use crate::repository_state::{RepositoryLayout, RECORD_SCRATCH_DIR};
 use crate::storage::claim_coordinator::{read_active_leases, Lease};
+use crate::storage::git::BaseComparison;
+use crate::storage::repository_state_store::DataRootHold;
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
-use crate::storage::{read_exact_store, IssueStore, StorageWarning, RECORD_FILE_NAME};
-use anyhow::{anyhow, ensure, Context, Result};
+use crate::storage::{IssueStore, JsonFileStorage, StorageWarning};
+use anyhow::{anyhow, Context, Result};
 use schemars::JsonSchema;
 use serde::Serialize;
-use std::path::Path;
+use std::path::PathBuf;
 use std::process::{Command, ExitStatus};
+
+/// Selected data and invocation cwd for running a child under the writer mutex.
+pub struct WorktreeExec {
+    storage: JsonFileStorage,
+    current_dir: PathBuf,
+}
+
+impl WorktreeExec {
+    pub(crate) fn for_invocation(invocation: &RepositoryInvocation) -> Self {
+        let (data_root, _) = super::bootstrap::select_data_root(invocation);
+        Self {
+            storage: JsonFileStorage::new(data_root),
+            current_dir: invocation.current_dir.clone(),
+        }
+    }
+
+    pub(crate) fn for_executor(
+        executor: &CommandExecutor<JsonFileStorage>,
+        current_dir: PathBuf,
+    ) -> Self {
+        Self {
+            storage: executor.storage.clone(),
+            current_dir,
+        }
+    }
+
+    pub(crate) fn run(&self, program: &str, args: &[String]) -> Result<ExitStatus> {
+        let _held =
+            match self
+                .storage
+                .hold_initialized_data_root()
+                .map_err(|error| match error {
+                    crate::storage::RepositoryStateStoreError::Other(error) => error,
+                    error => error.into(),
+                })? {
+                DataRootHold::Initialized(held) => held,
+                DataRootHold::PendingRecord(path) => anyhow::bail!(
+                    "Refusing to run over a leftover redo record at {}: run `jit recover` first",
+                    path.display()
+                ),
+            };
+        Command::new(program)
+            .args(args)
+            .current_dir(&self.current_dir)
+            .status()
+            .map_err(|error| anyhow!("Failed to run {program}: {error}"))
+    }
+}
 
 /// Worktree information for display
 #[derive(Debug, Serialize, JsonSchema)]
@@ -55,28 +104,29 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn worktrees(&self) -> WorktreeOps<'_, S> {
         WorktreeOps { exec: self }
     }
+
+    /// Refuse shared registry edits when the selected data root's checkout diverges
+    /// from `origin/main`; absent git, an unresolved base or unrelated histories allow them.
+    pub(crate) fn require_common_history_with_main(&self) -> Result<()> {
+        let Some(checkout) = self.require_worktree_paths()?.git() else {
+            return Ok(());
+        };
+        match checkout.compare_with_base("origin/main")? {
+            BaseComparison::Compared {
+                merge_base,
+                base_commit,
+            } if merge_base != base_commit => anyhow::bail!(
+                "Global operations require common history with main\n\n\
+                 Your branch has diverged from origin/main. To proceed:\n  \
+                 git fetch origin\n  \
+                 git rebase origin/main"
+            ),
+            _ => Ok(()),
+        }
+    }
 }
 
 impl<S: IssueStore> WorktreeOps<'_, S> {
-    /// Run a child under the repository write lock, refusing a leftover redo record.
-    pub fn exec(&self, program: &str, args: &[String]) -> Result<ExitStatus> {
-        let layout = self.exec.repository_layout()?;
-        let _guard = self.exec.storage.acquire_repo_write_lock()?;
-        let record = layout
-            .data_root()
-            .join(RECORD_SCRATCH_DIR)
-            .join(RECORD_FILE_NAME);
-        ensure!(
-            !record.exists(),
-            "Refusing to run over a leftover redo record at {}: run `jit recover` first",
-            record.display()
-        );
-        Command::new(program)
-            .args(args)
-            .status()
-            .map_err(|error| anyhow!("Failed to run {program}: {error}"))
-    }
-
     /// Current checkout identity, branch and paths, with relocation warnings.
     pub fn info(&self) -> Result<(WorktreeInfo, Vec<StorageWarning>)> {
         let paths = self.exec.require_worktree_paths()?;
@@ -98,7 +148,7 @@ impl<S: IssueStore> WorktreeOps<'_, S> {
             WorktreeInfo {
                 worktree_id: identity.worktree_id,
                 branch,
-                root_path: paths.worktree_root.to_string_lossy().to_string(),
+                root_path: paths.checkout_top_level().to_string_lossy().to_string(),
                 data_root: self
                     .exec
                     .repository_layout()?
@@ -132,15 +182,8 @@ impl<S: IssueStore> WorktreeOps<'_, S> {
             });
         };
 
-        let local_layout =
-            crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
-        let primary_worktree = paths
-            .primary_worktree_root()?
-            .ok_or_else(|| anyhow::anyhow!("primary worktree root is unavailable"))?;
-        let reference_layout =
-            crate::storage::discover_repository_layout(primary_worktree, &reference_root)?;
-        let local = read_exact_store(&local_layout)?;
-        let reference = read_exact_store(&reference_layout)?;
+        let local = crate::storage::json::read_exact_data_store(&paths.local_jit)?;
+        let reference = crate::storage::json::read_exact_data_store(&reference_root)?;
 
         Ok(StoreDivergenceReport {
             checkout_store,
@@ -245,99 +288,160 @@ pub struct StoreDivergenceReport {
     pub divergences: Vec<StoreDivergence>,
 }
 
-/// Whether the branch checked out at `repository` has moved off `origin/main`:
-/// `origin/main` is not an ancestor of its HEAD. A repository with no `origin/main`
-/// has not diverged.
-///
-/// # Errors
-///
-/// Returns an error when git cannot be spawned.
-pub fn check_branch_divergence(repository: &Path) -> Result<bool> {
-    let merge_base_output = Command::new("git")
-        .args(["merge-base", "HEAD", "origin/main"])
-        .current_dir(repository)
-        .output()
-        .context("Failed to execute git merge-base")?;
-
-    // If origin/main doesn't exist, not an error - just not diverged
-    if !merge_base_output.status.success() {
-        return Ok(false);
-    }
-
-    let main_commit_output = Command::new("git")
-        .args(["rev-parse", "origin/main"])
-        .current_dir(repository)
-        .output()
-        .context("Failed to execute git rev-parse")?;
-
-    if !main_commit_output.status.success() {
-        return Ok(false);
-    }
-
-    let merge_base = String::from_utf8(merge_base_output.stdout)
-        .context("Invalid UTF-8 in merge-base output")?
-        .trim()
-        .to_string();
-
-    let main_commit = String::from_utf8(main_commit_output.stdout)
-        .context("Invalid UTF-8 in rev-parse output")?
-        .trim()
-        .to_string();
-
-    // Branch has diverged if merge-base is not the same as origin/main
-    Ok(merge_base != main_commit)
-}
-
-/// Refuse a global operation (config, gates registry, type hierarchy) on a
-/// repository whose branch has diverged from `origin/main`, since it would modify
-/// state shared by all agents.
-///
-/// `layout` names the repository the operation serves, and its data root decides
-/// what git sees: the worktree root of a store outside git is the invocation's
-/// directory. A store with no repository on disk, and a repository outside git
-/// (`@/charter/D-4`), have no history to guard.
-///
-/// # Errors
-///
-/// Returns an error when the branch has diverged, naming the rebase that reconciles it.
-pub fn enforce_main_only_operations(layout: Option<&RepositoryLayout>) -> Result<()> {
-    let Some(repository) = layout.map(RepositoryLayout::data_root) else {
-        return Ok(());
-    };
-
-    // Skip enforcement if git is not available
-    match Command::new("git")
-        .args(["rev-parse", "--git-dir"])
-        .current_dir(repository)
-        .output()
-    {
-        Ok(output) if output.status.success() => {
-            // We're in a real git repo, check for divergence
-            if check_branch_divergence(repository)? {
-                anyhow::bail!(
-                    "Global operations require common history with main\n\n\
-                     Your branch has diverged from origin/main. To proceed:\n  \
-                     git fetch origin\n  \
-                     git rebase origin/main"
-                );
-            }
-            Ok(())
-        }
-        _ => {
-            // Not in a git repo or git not available - skip check
-            Ok(())
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::{RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
 
     use anyhow::Result;
 
     // Use shared test utilities
     use crate::test_utils::setup_test_repo;
+
+    #[test]
+    fn test_worktree_exec_selects_data_independently_of_child_cwd_without_code_authority() {
+        let (_repo, storage) = setup_test_repo().unwrap();
+        let cwd = tempfile::tempdir().unwrap();
+        std::fs::write(cwd.path().join(".git"), "unusable Git context").unwrap();
+        std::fs::write(storage.root().join("config.toml"), "not = valid = toml").unwrap();
+        let invocation = super::super::RepositoryInvocation {
+            current_dir: cwd.path().to_path_buf(),
+            data_dir_override: Some(storage.root().to_path_buf()),
+            worktree_root_override: Some(storage.root().to_path_buf()),
+            is_init: false,
+            opens_mutation_session: false,
+            coordinates_claims_first: false,
+            is_validation_exempt: false,
+            is_recover: false,
+            write_override: None,
+        };
+        let operation = WorktreeExec::for_invocation(&invocation);
+        operation
+            .run("sh", &["-c".into(), "pwd > ran".into()])
+            .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(cwd.path().join("ran"))
+                .unwrap()
+                .trim(),
+            cwd.path().to_str().unwrap()
+        );
+        assert!(!storage.root().join("ran").exists());
+    }
+
+    #[test]
+    fn test_worktree_exec_refuses_pending_before_invalid_initialization_without_replay() {
+        let (repo, storage) = setup_test_repo().unwrap();
+        let record = storage
+            .root()
+            .join(RECORD_SCRATCH_DIR)
+            .join(RECORD_FILE_NAME);
+        std::fs::create_dir_all(record.parent().unwrap()).unwrap();
+        std::fs::write(&record, b"leftover").unwrap();
+        std::fs::write(storage.root().join("index.json"), b"invalid index").unwrap();
+        let operation = WorktreeExec {
+            storage,
+            current_dir: repo.path().to_path_buf(),
+        };
+        let error = operation
+            .run("sh", &["-c".into(), "touch ran".into()])
+            .unwrap_err();
+        assert!(error.to_string().contains(&format!(
+            "Refusing to run over a leftover redo record at {}: run `jit recover` first",
+            record.display()
+        )));
+        assert_eq!(std::fs::read(record).unwrap(), b"leftover");
+        assert!(!repo.path().join("ran").exists());
+    }
+
+    #[test]
+    fn test_worktree_exec_requires_clean_initialized_data_before_launch() {
+        for contents in [None, Some(b"invalid index".as_slice())] {
+            let (repo, storage) = setup_test_repo().unwrap();
+            let index = storage.root().join("index.json");
+            match contents {
+                None => std::fs::remove_file(index).unwrap(),
+                Some(bytes) => std::fs::write(index, bytes).unwrap(),
+            }
+            let operation = WorktreeExec {
+                storage,
+                current_dir: repo.path().to_path_buf(),
+            };
+            assert!(operation
+                .run("sh", &["-c".into(), "touch ran".into()])
+                .is_err());
+            assert!(!repo.path().join("ran").exists());
+        }
+    }
+
+    #[test]
+    fn test_worktree_exec_preserves_typed_initialized_store_failures() {
+        let (repo, storage) = setup_test_repo().unwrap();
+        let missing = WorktreeExec {
+            storage: JsonFileStorage::new(repo.path().join("absent")),
+            current_dir: repo.path().to_path_buf(),
+        };
+        let missing_error = missing
+            .run("sh", &["-c".into(), "touch ran".into()])
+            .unwrap_err();
+
+        let index = crate::repository_state::RepositoryIndex {
+            schema_version: crate::repository_state::RepositoryIndex::default().schema_version + 1,
+            ..Default::default()
+        };
+        std::fs::write(
+            storage.root().join("index.json"),
+            serde_json::to_vec(&index).unwrap(),
+        )
+        .unwrap();
+        let unsupported = WorktreeExec {
+            storage,
+            current_dir: repo.path().to_path_buf(),
+        };
+        let format_error = unsupported
+            .run("sh", &["-c".into(), "touch ran".into()])
+            .unwrap_err();
+
+        assert_eq!(
+            (
+                missing_error.is::<crate::storage::RepositoryNotFoundError>(),
+                format_error.is::<crate::storage::RepositoryFormatUnsupportedError>(),
+            ),
+            (true, true),
+            "storage failures retain their concrete types across command propagation"
+        );
+        assert!(!repo.path().join("ran").exists());
+    }
+
+    #[test]
+    fn test_worktree_exec_releases_the_lock_chain_on_child_return_and_spawn_error() {
+        use crate::storage::RepoWriteLock;
+        use std::time::Duration;
+
+        for spawn_error in [false, true] {
+            let (repo, storage) = setup_test_repo().unwrap();
+            let operation = WorktreeExec {
+                storage: storage.clone(),
+                current_dir: repo.path().to_path_buf(),
+            };
+            let absent_program = repo.path().join("absent-program");
+            let result = if spawn_error {
+                operation.run(absent_program.to_str().unwrap(), &[])
+            } else {
+                operation.run("sh", &["-c".into(), "true".into()])
+            };
+            assert_eq!(result.is_err(), spawn_error);
+            let _repository = RepoWriteLock::for_storage_root(storage.root(), Duration::ZERO)
+                .acquire()
+                .unwrap();
+            let _bootstrap = RepoWriteLock::for_lock_path(
+                repo.path()
+                    .join(crate::repository_state::BOOTSTRAP_LOCK_FILE),
+                Duration::ZERO,
+            )
+            .acquire()
+            .unwrap();
+        }
+    }
 
     #[test]
     fn test_worktree_info_structure() -> Result<()> {
@@ -362,6 +466,51 @@ mod tests {
         assert!(info.is_main_worktree);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_common_history_guard_uses_data_checkout_with_separate_code() {
+        use crate::test_harness::git::GitRepository;
+        let dir = tempfile::tempdir().unwrap();
+        let data = GitRepository::init(dir.path().join("data"));
+        let code = GitRepository::init(dir.path().join("code"));
+        for repo in [&data, &code] {
+            repo.write("base", "base").commit("base");
+        }
+        let advance_base = |repo: &GitRepository| {
+            repo.write("later", "later").commit("later");
+            repo.git(&["update-ref", "refs/remotes/origin/main", "HEAD"]);
+            repo.git(&["reset", "--hard", "HEAD^"]);
+        };
+        advance_base(&code);
+        let selected = crate::storage::WorktreePaths::detect_for_data_root(
+            &data.root().join(".jit"),
+            data.root(),
+        )
+        .unwrap()
+        .with_worktree_root(code.root())
+        .unwrap();
+        let executor = crate::commands::test_helpers::setup().with_worktree_paths(selected);
+        assert!(executor.require_common_history_with_main().is_ok());
+        code.git(&["update-ref", "refs/remotes/origin/main", "HEAD"]);
+        advance_base(&data);
+        let selected = crate::storage::WorktreePaths::detect_for_data_root(
+            &data.root().join(".jit"),
+            data.root(),
+        )
+        .unwrap()
+        .with_worktree_root(code.root())
+        .unwrap();
+        let executor = crate::commands::test_helpers::setup().with_worktree_paths(selected);
+        assert!(executor.require_common_history_with_main().is_err());
+        let external = dir.path().join("external");
+        std::fs::create_dir(&external).unwrap();
+        let selected = crate::storage::WorktreePaths::detect_for_data_root(&external, code.root())
+            .unwrap()
+            .with_worktree_root(code.root())
+            .unwrap();
+        let executor = crate::commands::test_helpers::setup().with_worktree_paths(selected);
+        assert!(executor.require_common_history_with_main().is_ok());
     }
 
     #[test]

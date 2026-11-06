@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cb5e6f6f0bc83349b301cf24c67ad8f4b37c646e",
+  "completed_at": "2026-11-05T23:52:05.315288957Z",
+  "duration_ms": 165857,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The exact extractor migration satisfies all three hard criteria with covered passing cargo-ci evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "12064c7b-9429-4f58-b739-4143cb9d399f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "962c576b-16a8-407c-bee6-d25bba9aa364",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T23:49:19.457601653Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 584244436512ef5d235a0b6606cb958d769ab172 (`jit:12064c7b`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md; issue Markdown\nResolved items: @/issue/b697a3f7/requirement/REQ-20 (issue Markdown); @/charter/D-18 and @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests and @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-05T23:47:50.156683373+00:00); its run commit `cb5e6f6f` contains the attributable commit\nTruncation recovery: re-read individual changed-file patches, focused current implementation/test ranges, source registries, and current symbol searches\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The exact extractor migration satisfies all three hard criteria with covered passing cargo-ci evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

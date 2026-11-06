@@ -391,6 +391,9 @@ A binding names a role or anchor; it never invents one. If `roles.breakdown` nam
 a role no template node declares, that template simply has no breakdown node, and
 the commands that need one say so.
 
+A template names its gates; see
+[Graph Template Registry](storage-format.md#graph-template-registry).
+
 These bindings are the only names the bracket tooling reads from configuration.
 Everything else a template refers to by role names it in place: a
 `[[template.transforms]]` entry carries its own `role` field naming the node it
@@ -511,8 +514,8 @@ issue that requires the gate.
 Some writes reach a leased issue without the check: `jit issue release`
 (timeout recovery with a required reason; its event names who released),
 `jit issue claim` on an unleased issue, promotions of dependents, the rewrite of
-dependents when a dependency is deleted, the derived repair and transitive
-reduction of `jit validate --fix` (its type fix does refuse), `jit archive
+dependents when a dependency is deleted, the type repairs, derived-state repair,
+and transitive reduction performed by `jit validate --fix`, `jit archive
 --execute` on a terminal target, and `jit recover`, which replays what already
 committed.
 

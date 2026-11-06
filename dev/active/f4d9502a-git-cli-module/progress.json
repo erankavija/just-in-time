@@ -1,7 +1,7 @@
 {
   "epic_id": "f4d9502a-c585-4436-8819-bcd3d5c59171",
   "epic_short_id": "f4d9502a",
-  "current_wave": 5,
+  "current_wave": 6,
   "waves": [
     {
       "wave_number": 1,
@@ -326,10 +326,11 @@
           "short_id": "47d62472",
           "title": "Branch drift validation compares in the selected worktree",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "prepared",
-          "worker": "agent:f4d9502a-lead"
+          "worker_status": "merged_and_gated",
+          "worker": "agent:f4d9502a-lead",
+          "source_merge": "0757e05ba7c4c74ca47e5ce3f076a5b0624ae7ae"
         },
         {
           "id": "83c8632f-5495-4fef-a774-730ebeae95be",
@@ -346,28 +347,30 @@
           "short_id": "92afc5d8",
           "title": "Init reads git classification from the invocation's layout",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "prepared",
-          "worker": "agent:f4d9502a-lead"
+          "worker_status": "merged_and_gated",
+          "worker": "agent:f4d9502a-lead",
+          "source_merge": "5363b6b99a931efd7a6282c8207427533240b851"
         },
         {
           "id": "9ecde705-8aa9-4ceb-a352-c08fc285af12",
           "short_id": "9ecde705",
           "title": "Link checks test asset presence through one git process",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "dispatch_prepared"
+          "worker_status": "merged_and_gated",
+          "source_merge": "270f4894b8aa78ba6dfc696ec0bf6cd8bbd30c02"
         },
         {
           "id": "a273667c-6902-46f2-9580-b74e1e8abac3",
           "short_id": "a273667c",
           "title": "Path reads at a commit go through the git module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "full_gates_running"
+          "worker_status": "landed_8ae117d30"
         },
         {
           "id": "c140921c-0730-4983-8e77-c6a46bbdca5a",
@@ -376,7 +379,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "prepared",
+          "worker_status": "unblocked_4file_plan_pending_dispatch",
           "worker": "agent:f4d9502a-lead"
         },
         {
@@ -402,8 +405,11 @@
           "short_id": "fb5e8e8d",
           "title": "Main-history guard runs against the selected worktree",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "done",
+          "external_blockers": [],
+          "worker_status": "merged_and_gated",
+          "worker": "agent:f4d9502a-lead",
+          "source_merge": "e552fbb2cdec781216419c1d8918f37c75cd9de6"
         }
       ]
     },
@@ -423,8 +429,10 @@
           "short_id": "5046408a",
           "title": "Configurable worktree root independent of the data root",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "done",
+          "external_blockers": [],
+          "worker_status": "implementation_running",
+          "worker": "split_root_impl Astra/xhigh; split_root_consumers Terra/high"
         },
         {
           "id": "7cd27db8-9851-4af1-a2c8-d6780bdf76d1",
@@ -516,8 +524,37 @@
       ]
     }
   ],
-  "created_during_execution": [],
-  "escalations": [],
+  "created_during_execution": [
+    "783b33fa"
+  ],
+  "escalations": [
+    {
+      "issue": "a273667c",
+      "status": "done_2026-11-06",
+      "subject": "Git>=2.42 andDocker runtimeTrixie proposal",
+      "evidence": "/tmp/f4d9502a-lead/git-floor-decision.md andgit-floor-decision.patch; stewardpresentingconcreteproposal; noanswerinferred 2026-11-06: user approved floor/runtime (via steward 9b). Branch 43706d377 merged with main: json.rs read_path_bytes conflicts with 504 split-root (selection wrapper + code_checkout_top_level). Resolution dispatched (Sol/high); reviewed bytes change, so full cargo-ci + code-review rerun before landing. Issue criteria unchanged; six-file footprint (incl. Dockerfile/INSTALL.md floor) needs no scope edit. Excluded ancestors d0c98247f/7701663df verified absent. Branch a41286a02 cargo-ci pass + code-review 0 findings; refreshed 30406d0ab (lib 3247, contracts 557); landed 8ae117d30; forced merged cargo-ci pass; closed, lease released. 1acfa592 now ready."
+    },
+    {
+      "issue": "c140921c",
+      "status": "conditional_design_recorded",
+      "subject": "Preserve originalrevisionexpression beforepeeling canonicalcommit",
+      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded. Snapshot uses code_checkout; explicit 504 Done prerequisite recorded after steward approval. 2026-11-06: floor/runtime approved by user (via steward); 504 Done. Remaining prerequisite: a273667c Done."
+    },
+    {
+      "issue": "5046408a",
+      "status": "done_2026-11-06",
+      "subject": "Eager full configuration assembly blocks existing diagnostics and repair",
+      "evidence": "Cycle3 original config report/repair regressions pass; complete CLI1222pass/3fail and contracts548pass/2fail. Full registry sweep adds hidden item search/recover mismatches. Source frozen at376978ed0 + ten-file difff0c5fd8a; no new full gate. 2026-11-06: amended selected-A (DataRootHandle retained across lock chain) passed independent Astra/high R2 within 13 files; dev/active/5046408a/boundary-proposal.md, boundary-design-review-r1.md, -r2.md. 2026-11-06: frozen patch committed e16a759e6 (diff f0c5fd8a preserved), main merged at 6c6bdd57e (only tracker JSON conflicted; resolved to main). 13-file boundary implementation dispatched. 2026-11-06: boundary a35dc6226 (6 files), main merged 262b3ccc4; forced full cargo-ci FAILED run 1620bbb2 (recorded 939a10e57): test_read_exact_store_refuses_symlinked_records_and_a_fifo_record_without_blocking - DataReadSession tail observation read_link on absolute symlink gives raw Io before typed no-follow read. Non-fail-fast: only failure. Io Display duplicates message. Escalated to steward 9b with options A/B/C. Landed a652f3dff (land.sh); branch cargo-ci pass 093c719a3, independent Astra/high impl review PASS 0 blocking, code-review 0 findings; pre-land nff on 47b167f10 green; forced merged cargo-ci pass a652f3dff. Closed, lease released.",
+      "ruling": "Steward chooses A: shared typed item/recover adapters and data-only worktree exec with its own under-lock pending refusal; Io source fix approved. Exact13files subject to fresh independent bounded design review before edits. No contract cutover B or retry reset. Release actor concern excluded from504: reproduce unchanged main under same sanitized inputs, audit injection; if reproduced propose separate bounded same-epic task outside53manifest/noREQcredit for approval before creation/dispatch. 2026-11-06 steward 9b: option A, one bounded rework (Astra/xhigh) limited to repository_state_store.rs + tests; reuse capability_fs primitives, no local UnsafeTarget mapping; missing primitive returns as option B; Io displays once with source reachable; another full-gate failure or scope gap returns to steward; no further cycles. Lead lesson: run main-changed storage lib tests before forcing full cargo-ci on an integrated branch."
+    },
+    {
+      "issue": "783b33fa",
+      "status": "done_2026-11-06",
+      "subject": "Explicit actor input for issue release; isolated correction outside original manifest",
+      "ruling": "Steward approves four hard criteria/fourfiles, Sol/high and temporary fourth tree. Native504 prerequisite; actorlands+Done before504refresh. Fifthowner requires evidence/approval; no newCLIflag/ambient actor/parallel producer.",
+      "evidence": "Landed daaca4bc5 (source 08f374b0e); worktree cargo-ci + code-review (0 findings) pass; lead sanitized contracts 552/552 without JIT_* identity; forced merged cargo-ci pass on 6672a5e01."
+    }
+  ],
   "rework_counts": {
     "7aafec83": 1,
     "81664a6a": 1,
@@ -533,7 +570,11 @@
     "ea4b7363": 2,
     "a273667c": 1,
     "83c8632f": 1,
-    "3f8da8c4": 1
+    "3f8da8c4": 1,
+    "47d62472": 1,
+    "9ecde705": 1,
+    "fb5e8e8d": 1,
+    "5046408a": 4
   },
   "surfaced_pitfalls": [
     {
@@ -543,14 +584,15 @@
     {
       "issue": "f4d9502a",
       "criterion": "REQ-04",
-      "status": "owner_reconciled_remediation_pending",
+      "status": "closed",
       "finding": "External data-root fallback performs two layout probes; for_worktree_root adds probes for listed checkouts. Preserve external-store and relocated-checkout identity while resolving the invocation-wide one-process contract.",
       "owner": "layout_probe_research",
-      "disposition": "DEC27 owner permits one computation per distinct checkout context: ordinary reads<=1, external bootstrap<=2, external N contexts<=N+1. Duplicate probes remain defect; approved d681 remediation awaits independent plan review and implementation."
+      "disposition": "DEC27 bounds implemented by d68150e2, completed at e375af7d8 after stable branch and merged Cargo and independent review. Existing CLI counting suite proves ordinary <=1, external startup <=2, external traversal N+1 independent of lease count; shared LayoutContext owns alias, negative/error, clone and concurrency observations. c0ea31ee checkpoint independently audits composition."
     }
   ],
   "reconciled_after_breakdown": [
-    "5046408a"
+    "5046408a",
+    "783b33fa"
   ],
   "started_at": "2026-10-24T21:43:21+03:00",
   "dispatches": [
@@ -762,6 +804,73 @@
       "effort": "high",
       "reason": "Bounded batching of asset presence into canonical object_types while preserving landed HTTP probe pool.",
       "prepared": true
+    },
+    {
+      "issue": "5046408a",
+      "agent": "/root/split_root_diagnostics_review",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "reason": "Independent bounded diagnostic design R1/R2; final PASS closes omitted storage test owner."
+    },
+    {
+      "issue": "5046408a",
+      "agent": "/root/split_root_impl",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "reason": "Steward-authorized one additional bounded cycle3 after diagnostic design R2; exact ten-file correction, no unlimited retries."
+    },
+    {
+      "issue": "783b33fa",
+      "agent": null,
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Steward-approved bounded four-file explicit actor facade/input correction; only active implementation,504 frozen. Temporary fourth tree approved.",
+      "status": "prepared_not_dispatched_user_wind_down"
+    },
+    {
+      "issue": "783b33fa",
+      "vendor": "openai",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Steward-approved four-file actor facade; resumed after user lifted wind-down park 2026-11-06.",
+      "base": "5d4dc48a7"
+    },
+    {
+      "issue": "5046408a",
+      "vendor": "anthropic",
+      "model": "opus",
+      "classification": "design",
+      "reason": "Amend selected-A for R1 retained root/lock handoff; read-only."
+    },
+    {
+      "issue": "5046408a",
+      "vendor": "openai",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "classification": "independent design review R2",
+      "reason": "Fresh bounded review of amended selected-A; PASS."
+    },
+    {
+      "issue": "5046408a",
+      "vendor": "openai",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "reason": "Cycle 3 continued: implement R2-accepted selected-A boundary within 13 files; same steward-recorded tier.",
+      "base": "6c6bdd57e"
+    },
+    {
+      "issue": "5046408a",
+      "vendor": "openai",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "reason": "Steward option A rework: admission symlink capture and Io display, two files."
+    },
+    {
+      "issue": "a273667c",
+      "vendor": "openai",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Merge main into reviewed floor proposal; resolve read_path_bytes against 504 split-root."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -847,7 +956,39 @@
     "3f8da8c4 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
     "Steward-approved factual correction47d62472: old validation already runs in layout.data_root. Actual baseline CLI filter ran3PASS4FAIL; literal selected-data-dir scenario passes and remains regressioncoverage. Missingcheckout/base/unrelatedmessages and externalstoreprovide genuineRED. Only obsolete REQ04 failure premise/background corrected; authority/messages/status4 and footprint unchanged.",
     "Steward approved c140 second file git.rs solely fulfilled HEAD convergence comment deletion; primitive executable/test bytes must remain exact, no extra fullgate solelyprose.",
-    "c140 snapshot migration claimed from actualReady after3fDone; stewardapprovedtwo-file scope includes only fulfilled HEAD convergence comment in git.rs. a273 proposal fullCargo/review running isolated; Gitfloorpublication remainsheld."
+    "c140 snapshot migration claimed from actualReady after3fDone; stewardapprovedtwo-file scope includes only fulfilled HEAD convergence comment in git.rs. a273 proposal fullCargo/review running isolated; Gitfloorpublication remainsheld.",
+    "47 rework1 consolidates literal selected-data-dir case into existing property owner without newfixture duplication. c140 stewardapproved deletion of both fulfilledHEAD andorigin convergence comments, exactgit.rs executable/testbytes preserved. 9ec landingheld for available-target gitlink consumerclassification; rawtwo-versionprobe preserved in lead scratch.",
+    "92afc5d8 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "Steward-approved fb factual reconciliation: current worktree.rs255/303 accepts repository/layout and executes Git at data_root; no test-mode bypass or namedemptytests remain, gate.rs has3currentcalls. Preserve existing selectedrepositoryowner, allow/refuse semantics andliteralcase; do not restoreobsoletebypass. Actualexternalstoreauthority supplies missingbehavior forRED. Sameconsumer scope.",
+    "fb fourthfile git.rs approved solely basecomparison convergencecomment removal once47landed andfb migrated, executable/testbytes exact; no primitive changes or additional prose-onlygate.",
+    "47d62472 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "fb claimed actualReady after47Done, anchors currentmain with consolidatedselectedrepoowner. c140 focusedcomplete butfullgatesheld pending stewardruling on resolve_commit suffix/message-search semanticdifference; no privateworkaround. Gitfloor stillawaitsuserdecision.",
+    "9ec corrected branchfullCargo86c62420/reviewc85fcdaa stablePASS0; availabletargetgitlinkleadfindingclosed. Fourownedfilespreserved throughmainrefresh. PriorPASSgates remainhistoricalevidence, not acceptance of uncovereddefect.",
+    "9ecde705 Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "Wave5 complete; currentwave6. 9ec Done8aa3f60a0 afteractualmergedCargo fa6ff02f. a273concretedecisionpackage sent to steward, who ispresentinguserdecision; no time/unrelatedmessage countsapproval. c140 sharedresolver differentialconfirmed for:/message selectors includingLF; researchproposalpending. Frontendpriority1ac then933 oncea273Done.",
+    "Stewardfbpolicyruling: mutationguard uses supplied data-history paths.git(); relocatedcodecheckout mustnotlendhistory to externalnonGitstore. Existingownerassertion preserved, rootwrite_checkoutinferencewithdrawn.504planner mustpreserveseparatedatahistory/codeevidenceauthorities. 504claimedplanningonly perDEC04/23 outside53manifest/REQcredit, Terrahighdesignthenindependentreview/stewardacceptance. c0ea checkpointclaimed forcriteriaaudit+cargo/holisticgatesin isolation, no source-slotreservation.",
+    "Steward-approved post-plan d9ba0029 semantic correction: unchanged original revision -> shared canonical commit resolution -> canonical commit:path in one child; erroneous suffix-first expression contract corrected, availability/error rules retained. Added actual c140921c prerequisite with no cycle, reduced transitive d68150e2 edge; no redundant a273 edge. Producer must land/gate before archive dispatch. Rationale: dev/active/c140921c/revision-producer-plan.md.",
+    "fb guard authority correction: initial lead brief inferred write_checkout incorrectly; original git-absent assertion failed and was preserved. Steward directed paths.git data-history; withdrawn invalid external-store refusal expectation removed, final40worktreeCLI passed. Initial and corrected evidence retained.",
+    "fb5e8e8d Done and lease released after actual stable merged Cargo; next source owner notified directly.",
+    "Steward approved933ff852 -> c140921c after cycle/redundancy check: existing libgit2 read_file_from_git resolves original expression then peels, so two-version one-child migration uses shared reader resolution and canonical commit:path. No criteria weakening/private resolver;1ac retains existing prerequisites. Frontend parked chain now includes c140.",
+    "504 independentR1FAIL identified missing original-root redo authority; steward acceptedD26 recorded1d487be2e. Revisedplan inR2review, implementation held for independentPASS+steward exact-footprint acceptance. Main source boundary released afterfbclosure0c83d3d4f; c0ea isolated clean rebuild running.",
+    "c0ea checkpoint Done after actual clean Cargo and independent holisticPASS; seeded artifact failures3d160332/ffdc3aee and cached failurec5ff62bc preserved. Local target cleanup resolved E0463/E0460 without source edits. Tracker-only landing adds no production change; mandatory merged-source policy not triggered.",
+    "504 designR3PASS: allR1/R2findingsclosed atdesignlevel underD26/D27. Durable design andall3reviews in dev/active/5046408a linked. No implementation yet; awaiting steward exact-footprint acceptance. Initial doclink lacked lead actor and failed; retried successfully with owning actor before commit/validation.",
+    "Steward accepted504 exact reviewed design footprint and authorized Astra/xhigh primary implementation owner, with test-first owning crash/admission/policy matrix and mandatory D25 held-writer/no-reader-replay checks. All implementation remains isolated; no manifest fanout or Git-floor change.",
+    "Live checkpoint handoff-2.md records current holds, active504 source/docs ownership, completedfb/c0ea gates, D26/D27 design acceptance and tool traps. Work continues; no stop or pause requested.",
+    "504 pinned APIs code_checkout (code), git (data), write_checkout/checkout_top_level (data or relocated coordination), with_worktree_root (code selection only, shared context). Primary reported44redo testsPASS +originalA/newB recoveryRED\u2192PASS. Consumer slice transferred after no-edit/current-check confirmation; docs complete. Ownership in design_acceptances supersedes live handoff2 worker snapshot.",
+    "Steward-approved code-authority reconciliation: native c140921c -> 5046408a dependency added with cycle checking and transitive reduction of direct 4ba18af4/d68150e2 edges. The external 504 issue remains outside the 53-node manifest; its internal contract prerequisites remain represented there. c140 source/metadata, d9 pinned evidence and 933 diff explicitly use code_checkout, preserving existing worktree-root authority. Source footprint and producer semantics unchanged. c140 remains held until explicit floor approval, a273 Done and 504 Done. Native reduction also removes 34851181 -> 5046408a because surface trim now reaches split-root selection through its existing downstream chain; reachability is preserved.",
+    "Steward approved removal of obsolete committed-HEAD issue fallback note from 504: the tier was already retired. Local/primary behavior and absence of the HEAD tier remain required; no criterion or source-scope change. Historical issue/event records preserved.",
+    "504 source0ecd649ce refreshed36f2ea3c1 preserving35files; actual fullCargo35fd9abc FAIL after191pass/4fail and22pass/3doctestfail, fmt/clippy/buildbudgetPASS. Failed evidence preserved2fb068c61. Existing dependency/document workflows report absent .jit/config.toml; primary rework1 dispatched to repair shared configuration owner, preserve assertions/D25 and run non-fail-fast library+doctests before full gate rerun. Independent implementation reviews not started. Main remains free; held floor/runtime proposal unchanged.",
+    "504 rework1 committedccc0d3cea, refreshed70e934693. Actual fullCargo f604a1fc cleared original absent-path regressions and all25doctests, but failed config validate malformed-config exit1 vs required findings4 after3386tests passed. Evidence376978ed0 preserved. Bounded rework2 dispatched for correct bootstrap/validation boundary, unchanged plain/JSON assertion and full CLI non-fail-fast check; any further failed cycle escalates. No implementation review yet; main free.",
+    "Rework2 investigation found eager full JitConfig assembly also blocks config set project.name repair and existing diagnostic response shape. Steward requires bounded design review/acceptance before edits; primary preparing alternatives/footprint only. declarations/mod.rs was already named in accepted step3; verify added owners exactly. Main clean/free, source frozen at376978ed0.",
+    "Live handoff-3.md records both504 full-gate failures, closed absent-ancestry rework and required bounded diagnostic/repair design review. No session stop requested; primary proposal work continues.",
+    "504 diagnostics R1 footprint FAIL resolved by restoring existing storage test owner; R2 design PASS. Steward accepts ten-file correction and exactly cycle3, prior two gate failures retained. Durable proposal/reviews linked before source dispatch. Main remains source-free until all checks/reviews pass.",
+    "Lease renewal correction: claim acquire did not extend existing expiry. Actual claim renew --extension14400 at06:31UTC extends a273/c140/504 to10:31UTC; use renew and verify expires_at, not acquire, for held leases.",
+    "Cycle3 original config diagnostics/repair regression now green; broad non-fail-fast CLI/contracts exposes five failing tests plus two hidden registry arms. Source ten-file diff frozenf0c5fd8a over376978ed0. Concrete boundary proposal sent steward: recommend shared existing adapters/data-only exec (+3owners), explicit release actor (+3distinct owners,6total), permission source repair in current scope. No further edits pending ruling; prior single-extra-cycle limit remains.",
+    "Steward selects boundary optionA and in-footprint Io fix, exact13files subject to fresh independent design review before edits, no B/retryreset. Actor defect excluded from504 pending unchanged-main sanitized reproduction and injection audit; if confirmed propose separate same-epic leaf outside original53/noREQcredit, fourfiles, mainfix then504refresh. Primary read-only/proposal dispatch active.",
+    "Steward approved separate actor task783b33fa with four hard criteria/exactfourfiles, sameGit epic outside53manifest/noREQcredit. Native504->783 dependency added, Ready task claimed to lead; plan linked. Sol/high isolated temporary fourth tree approved; actorland+Done then504refresh before13-file work. Main baseline and matchedworker2tests bothRED, sevenrelevantfiles identical. No504retryreset.",
+    "USER WIND-DOWN: no new dispatch/landing. Actor783 was never dispatched; prepared clean tree at2e1692cff, unused lease released.504 boundaryR1 designFAIL retained-identity gap remains unresolved; primary read report but wrote no revision. All workers/commands parked. Source/evidence archive verified, held proposals unchanged. Resume requires explicit authorization; no issue markedDone."
   ],
   "planning_reviews_pending": [],
   "worker_limit": 3,
@@ -1295,13 +1436,13 @@
       "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS de6c3c8e-f6b2-4998-8fb6-f1a7529bfb88 on e0b02683af8da1b905a40e0f5922f65c6ea89a70."
     },
     "a273667c": {
-      "verdict": "FAIL",
-      "reviewed_source": "291d90d2f398fc2d1f215329fc9214dc0d4524f4",
+      "verdict": "PASS",
+      "reviewed_source": "2e51395b46f00cf0ac77815300fd2651eba77d6d",
       "gates": {
-        "cargo-ci": "3ac22ec9-0610-4beb-90e3-b1ebd1e823cd",
-        "code-review": "b9d20147-35e0-492d-acec-8ee0dcb04db2"
+        "cargo-ci": "dfc80720-8f01-452a-a02f-594efd8d9d05",
+        "code-review": "9c0cec8f-58a6-4f86-b853-3f81672959c8"
       },
-      "criteria": "F1 valid committed LF path rejected by shared line-framed protocol. Isolated six-file canonical -Z proposal and Git>=2.42/runtime Trixie proposal are under validation; explicit user decision required before landing minimum/runtime changes. No main authority change."
+      "criteria": "PriorF1validLFpathclosed bycanonicalNULframing. Originalrevisionresolvedbeforecanonicalpeel, typederrors/binarybytes/onechildretained. Allsixproposalfiles exactafterreviewed9eccomposition43706d377;28assetcompositiontestsPASS. Dockerbuild/healthPASS and actualGit2.47.3 12incrementalprotocolassertionsPASS. Explicituserdecision stillrequired forGit>=2.42 andruntimeTrixie; no landing/Done untilanswer. MandatorymergedCargo pendingapproval."
     },
     "3f8da8c4": {
       "verdict": "PASS",
@@ -1312,16 +1453,170 @@
       },
       "criteria": "All four criteria met: explicit Head argument, selected paths lookup before checker, actual baseline RED for nested and in-memory scenarios, argument-observing non-Git checker test. Private Git helpers/spawns removed. Two own files exact after refreshed reviewed branch; D25 test correction retained. No linked docs/deferrals. Head convergence comment still awaits c140 snapshot consumer, legitimately pending. Mandatory merged Cargo pending.",
       "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 083bd832-a288-4fe6-a201-a243b31d72d6 on 9df9fe2fc2161580f28aaf9f1f499e24aca49ffd."
+    },
+    "9ecde705": {
+      "verdict": "PASS",
+      "reviewed_source": "1ab12740c573c8d6e6cb8a043cd2cf65a60c7760",
+      "gates": {
+        "cargo-ci": "fa6ff02f-7e84-4731-9313-5011c673bd61",
+        "code-review": "c85fcdaa-9f4f-4d4e-8e9f-f306f1906f3c"
+      },
+      "criteria": "All4criteria met afterleadrework1: one selectedwrite_checkout batch; workingtree/pinned/HTTP behavior retained; onlyBlob/Tree count ascommittedassets; owninggitlink matrix coversmissing andavailabletarget, actualREDthenGREEN; oneprocess test. LeadF1availabletarget closed in03269c2d6, producer bytes unchanged, previous reviews preserved. No linked docs/deferrals/stale narrative. Historycomposition exactparentproof+40PASS. MandatorymergedCargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS fa6ff02f-7e84-4731-9313-5011c673bd61 on 270f4894b8aa78ba6dfc696ec0bf6cd8bbd30c02."
+    },
+    "92afc5d8": {
+      "verdict": "PASS",
+      "reviewed_source": "367506cae34e9dd0733ee1b5b8510fc1e6a1f4ae",
+      "gates": {
+        "cargo-ci": "00a11171-3d1d-474f-bca6-063b8420d5c6",
+        "code-review": "ee04eed7-7675-461b-975d-88d909c10427"
+      },
+      "criteria": "All3criteria met: existingclaim reads supplied classification and nesteddata-root containment; private processhelper removed; realGit/nonGitclassified regression actuallyRED thenGREEN; unchanged25initCLItests pass. No linked docs, deferrals, stale references or own-file drift afterrefresh. Mandatory mergedCargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 00a11171-3d1d-474f-bca6-063b8420d5c6 on 5363b6b99a931efd7a6282c8207427533240b851."
+    },
+    "47d62472": {
+      "verdict": "PASS",
+      "reviewed_source": "8bbd549e25e6c92ab216ed5b2f418ef573226154",
+      "gates": {
+        "cargo-ci": "c0fc1f14-1870-4b22-af67-a8e59463e24b",
+        "code-review": "41db8bbd-5147-40d0-a2b1-3e02f91713d0"
+      },
+      "criteria": "All4correctedcriteria met: supplied write_checkout typedbasecomparison, distinct exactmessages/findings exit4, actualRED missingbase/unrelated/noGit/externalstore, literal selected-data-dir scenario consolidated in existing owner. Leadrework1 duplicatefixtureclosed. No linked docs/deferrals; basecomparison convergencecomment legitimately awaitsfb. Mandatory mergedCargo pending.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS c0fc1f14-1870-4b22-af67-a8e59463e24b on 0757e05ba7c4c74ca47e5ce3f076a5b0624ae7ae."
+    },
+    "fb5e8e8d": {
+      "verdict": "PASS",
+      "reviewed_source": "4fc42eb64e71780af840cd99b2c0e2e77122ac89",
+      "gates": {
+        "cargo-ci": "1f3f1879-d902-4380-a3ef-3e1f435eb339",
+        "code-review": "65c49afc-490a-4694-a01b-4bfc0f0f1622"
+      },
+      "criteria": "All3 corrected criteria met; data-history supplied context, canonical comparison, all3 callers, exact refusal message, preserved noGit allow, existing CLI owner extended without weakening. Actual old-code RED and focused/fullPASS; obsolete comparison comment only in shared module. No deferred scope.",
+      "integration": "Reviewed own implementation preserved through main refresh; actual merged Cargo stable PASS 1f3f1879-d902-4380-a3ef-3e1f435eb339 on e552fbb2cdec781216419c1d8918f37c75cd9de6."
+    },
+    "c0ea31ee": {
+      "verdict": "PASS",
+      "reviewed_source": "488f97bd49d2ef49ea261278949bd7e10b834338",
+      "gates": {
+        "cargo-ci": "578925fb-8d7d-4fab-8ba4-5987315e29fc",
+        "holistic-review": "7c42386f-317d-4d2e-920d-00dac7a19857"
+      },
+      "criteria": "All3 layout checkpoint criteria audited: shared invocation observations, supplied storage/executor/recovery/server/init/hooks, ordinary/external/moved/lease counting suite, owning alias/error/clone/concurrency tests. Resolved d681 pitfall reconciled before gate. No source implementation introduced by checkpoint."
+    },
+    "5046408a": {
+      "verdict": "FAIL at Tier1; correction partial",
+      "last_full_gate": "f604a1fc-d5f9-4548-8dd1-5ed1f0c04d4d (failed, preserved)",
+      "source_head": "376978ed05c011717ab7c2d88fab54954f045f15",
+      "uncommitted_diff_sha256": "f0c5fd8a3e18932804cd4f02b412b9d1540321d408522733e66601a7ce22b9a3",
+      "correction_cycle": 3,
+      "focused_evidence": "Declarations108/storage512/config-related183/bootstrap13; unchanged exit projection1 and project-config20 pass. Counts overlap and are not a workspace total. Fmt/all-target Clippy pass. Complete CLI1222pass/3fail; contracts548pass/2fail. Nine-arm registry sweep6match/3mismatch; no full gate or implementation reviews for current correction.",
+      "result": "/tmp/f4d9502a-lead/5046408a-rework-3-result.md",
+      "proposal": "/tmp/f4d9502a-lead/5046408a-rework-3-boundary-proposal.md",
+      "open_findings": "Permission Io source; item list/search/recover early declaration adapters; worktree-exec pending refusal; two actor-less release tests. No assertion weakening or ambient identity masking."
     }
   },
   "source_queue": [
-    "83c8632f ready",
-    "3f8da8c4 review running",
-    "9ecde705 branch gates running",
-    "a273667c proposal only awaiting user decision"
+    "783b33fa explicit actor correction",
+    "5046408a frozen; selected-A design review and actor prerequisite",
+    "a273667c reviewed; explicit user decision pending",
+    "c140921c held for floor/a273/504 prerequisites"
   ],
   "blocked_source_exclusions": [
     "06177584 dependency tree source",
     "38df8a6c installer policy source"
-  ]
+  ],
+  "checkpoints": {
+    "c0ea31ee": {
+      "status": "done",
+      "worker_status": "gated_and_closed",
+      "gates": {
+        "cargo-ci": "578925fb-8d7d-4fab-8ba4-5987315e29fc",
+        "holistic-review": "7c42386f-317d-4d2e-920d-00dac7a19857"
+      }
+    }
+  },
+  "design_acceptances": {
+    "5046408a": {
+      "status": "accepted_for_implementation",
+      "authority": "Steward acceptance after original R3 PASS and diagnostics R2 PASS; D20/D25/D26/D27; one additional bounded implementation cycle3.",
+      "design": "dev/active/5046408a/design.md",
+      "review": "dev/active/5046408a/design-review-r3.md",
+      "footprint": "Implementation steps2\u20135 and named existing test owners; lease_enforcement_tests excluded unless necessary and reapproved. Any required extra file escalates before editing.",
+      "primary_worker": "Astra/xhigh shared storage/bootstrap owner",
+      "optional_worker": "Terra/high disjoint consumers/docs only after interfaces/ownership pinned; max3implementationworkers and no concurrent recovery-file edits",
+      "independent_implementation_review": "Fresh Astra/high after full configured Cargo gate",
+      "holds": "a273/c140 user floor/runtime holds and frozen proposal unchanged; no new manifest nodes or epic",
+      "active_ownership": {
+        "split_root_impl": "Parked by user. No active commands; ten-file source frozen. Selected-A R1 root/lock identity finding unresolved; proposal revision was not written.",
+        "split_root_consumers": "Complete; ownership returned to primary.",
+        "split_root_design": "Docs slice complete and lead reviewed; ownership returned to primary."
+      },
+      "build_coordination": "One shared-tree Cargo owner at a time, primary arbitrates freeze slots; peer pauses edits and acknowledges before queueing; collect every check then coordinator releases edits. No concurrent recovery edits or cancelled checks.",
+      "diagnostic_amendment": {
+        "proposal": "dev/active/5046408a/diagnostics-proposal.md",
+        "reviews": [
+          "dev/active/5046408a/diagnostics-design-review-r1.md",
+          "dev/active/5046408a/diagnostics-design-review-r2.md"
+        ],
+        "status": "accepted",
+        "correction_files": 10,
+        "new_maintained_owners": [
+          "crates/jit/src/commands/config.rs",
+          "crates/jit/src/dispatch/config.rs",
+          "crates/jit/tests/cli_repo_workflow/project_config_tests.rs"
+        ],
+        "cycle": 3,
+        "limit": "One additional cycle only; prior2 failures retained. New material scope/design gap or next full-gate failure escalates."
+      },
+      "boundary_amendment": {
+        "status": "unaccepted_pending_finding_closure",
+        "footprint": 13,
+        "review": "5046408a-boundary-design-review-r1.md in wind-down-evidence.tar.gz",
+        "finding": "Retain data-root and bootstrap-parent/ancestry evidence across lock acquisition; bind pending/index capture and revalidate before child; deterministic storage-owned replacement assertion."
+      }
+    }
+  },
+  "session_status": "parked_by_user_wind_down",
+  "wind_down": {
+    "authority": "User wind-down relayed by steward; supersedes prior proceed and dispatch approvals. No new work until explicit resume.",
+    "main_before_handoff": "2e1692cffc3eb439ccbeabe779086a74a60b2d6a",
+    "source_snapshot": {
+      "5046408a": {
+        "head": "376978ed05c011717ab7c2d88fab54954f045f15",
+        "status": " M crates/jit/src/commands/bootstrap.rs\n M crates/jit/src/commands/config.rs\n M crates/jit/src/config.rs\n M crates/jit/src/declarations/mod.rs\n M crates/jit/src/dispatch/config.rs\n M crates/jit/src/dispatch/mod.rs\n M crates/jit/src/storage/json.rs\n M crates/jit/src/storage/repository_state_store.rs\n M crates/jit/src/storage/repository_state_store_tests.rs\n M crates/jit/tests/cli_repo_workflow/project_config_tests.rs\n",
+        "diff_sha256": "f0c5fd8a3e18932804cd4f02b412b9d1540321d408522733e66601a7ce22b9a3",
+        "untracked": {}
+      },
+      "783b33fa": {
+        "head": "2e1692cffc3eb439ccbeabe779086a74a60b2d6a",
+        "status": "",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "untracked": {}
+      },
+      "a273667c": {
+        "head": "43706d377ae940ac3d4962136b16d6a647f58c99",
+        "status": "",
+        "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "untracked": {}
+      },
+      "c140921c": {
+        "head": "042767de992eaadcd60cc2069d4040d8a48ec210",
+        "status": " M crates/jit/src/commands/snapshot.rs\n M crates/jit/src/storage/git.rs\n?? dev/active/c140921c/\n",
+        "diff_sha256": "6191229166e88165617628f8e3fd60cc3270b76c93d5238b522dab57bc06901a",
+        "untracked": {
+          "dev/active/c140921c/revision-producer-plan.md": "972e8235fcd5a9c595cf47106875484bc234aefd1837cc66c01781db42992b6e"
+        }
+      }
+    },
+    "evidence_archive": "dev/active/f4d9502a-git-cli-module/wind-down-evidence.tar.gz",
+    "actor_dispatch": "NOT started; clean worktree and prepared brief only. Lease released; assignment/state retained.",
+    "active_commands": [],
+    "active_workers": [],
+    "retained_leases": {
+      "a273667c": "2026-11-05T10:31:02.605641760Z",
+      "c140921c": "2026-11-05T10:31:09.827480854Z",
+      "5046408a": "2026-11-05T10:31:15.107216481Z"
+    },
+    "next_after_explicit_resume": "Verify current main/worktrees/leases, start approved783 actor correction; resolve504boundaryR1 proposal finding and independentR2 before13-file edits, after actorland+Done and504refresh."
+  }
 }

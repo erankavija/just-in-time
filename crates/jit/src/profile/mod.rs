@@ -9,7 +9,6 @@ mod apply_claims;
 mod difference;
 mod graph;
 mod manifest;
-mod nofollow;
 mod package;
 pub mod package_archive;
 pub mod package_capture;

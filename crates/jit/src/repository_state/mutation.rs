@@ -387,9 +387,8 @@ pub enum MutationIntent {
         /// timestamps are reconciled against the preimage by the finalizer.
         issue: Box<Issue>,
     },
-    /// Replace the authored gate registry with a structured proposal derived
-    /// from the registry in the captured image. The finalizer owns canonical
-    /// declaration serialization; callers cannot submit repository bytes.
+    /// Apply a structured gate-registry proposal derived from the captured
+    /// document. The finalizer edits authored TOML; callers cannot submit bytes.
     EditGateRegistry {
         /// Complete proposed registry after one closed semantic edit.
         registry: Box<GateRegistry>,
@@ -477,8 +476,8 @@ pub enum MutationError {
     /// A record could not be serialized.
     #[error("failed to serialize repository record: {0}")]
     Serialize(#[from] serde_json::Error),
-    /// An authored gate registry could not be serialized canonically.
-    #[error(transparent)]
+    /// An authored gate registry could not be edited.
+    #[error("failed to edit authored gate registry: {0}")]
     GateDeclaration(#[from] crate::declarations::GateDeclarationError),
     /// A captured record could not be parsed.
     #[error("captured record at {path:?} is malformed: {reason}")]
@@ -960,13 +959,16 @@ pub(super) fn finalize_delta(
         }
     }
 
-    // Authored gate declarations are serialized only by the neutral declaration
-    // owner. A registry edit remains an explicit typed record mutation; the
-    // command cannot smuggle arbitrary repository bytes through this finalizer.
+    // Authored gate declarations are edited only by the neutral declaration
+    // owner. A registry edit remains typed; callers cannot supply repository
+    // bytes through this finalizer.
     for intent in intents {
         if let MutationIntent::EditGateRegistry { registry } = intent {
             let path = VirtualPath::GATES;
-            let bytes = crate::declarations::serialize_gate_registry(registry)?;
+            let bytes = crate::declarations::edit_gate_registry_document(
+                image.file_bytes(&path)?,
+                registry,
+            )?;
             let current = image.entry(&path)?;
             if !matches!(
                 current,
