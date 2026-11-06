@@ -16,7 +16,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "24080d47-0830-49ec-bd2a-ee25ad40e5ca",
+      "status": "passed",
+      "updated_at": "2026-11-06T03:44:04.595156144Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a5c424fe-40af-4424-a521-b5ada6d6a1f2",
+      "status": "passed",
+      "updated_at": "2026-11-06T03:47:40.195796959Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d9ba0029-2a1b-4b1b-a408-11035f534c1e",
   "labels": [
     "type:task",
@@ -31,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Archive planning reads pinned evidence through one git process",
-  "updated_at": "2026-11-06T03:25:36.243060194Z"
+  "updated_at": "2026-11-06T03:47:40.195796959Z"
 }
