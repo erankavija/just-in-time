@@ -1040,9 +1040,10 @@ jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
 - **Atomic per-issue:** Each issue update publishes its own redo record, with its dependents' [readiness corrections](../concepts/core-model.md#issue-lifecycle)
 - **Predictable:** Safer for large-scale changes
 - **Clear reporting:** Shows modified/skipped/error counts
+- **Same state derivation:** Single-issue and bulk updates run prechecks on `ready → in_progress`, refusing the change when one fails, and divert a `done` request with unpassed gates to `gated`
 
 **When to use bulk vs single-issue update:**
-- **Single-issue:** Enforces prechecks on `ready → in_progress` and checks gate statuses on an explicit `done` request
+- **Single-issue:** One issue's fields, gates, and assignee change together
 - **Bulk:** Explicit, predictable batch changes across many issues
 
 ### Batch-Create with Dependency Wiring (`jit issue batch-create`)

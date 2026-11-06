@@ -819,7 +819,7 @@ do not rely on it to prohibit a later explicit state update.
 - `Gated → Done`: Automatic. `jit gate evaluate` passing the last unpassed gate completes the issue, with its dependents' readiness corrections in the same redo record
 
 **Guarded workflow operations:**
-- `ready → in_progress`: `jit issue claim` attempts this transition and runs prechecks
+- `ready → in_progress`: `jit issue claim` and `jit issue update --state in_progress` attempt this transition and run prechecks
 - `jit issue assign`: Changes only the assignee; it does not change state
 - `→ Done`: `jit issue update --state done` checks dependencies and gate statuses
 - `→ Gated`: A `done` request with unpassed gates is diverted here
