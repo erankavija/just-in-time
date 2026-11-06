@@ -44,10 +44,10 @@ Counts: 35 claims (22 Background bullets, one implied-scope claim, 12 criteria):
 
 | REQ | Class | Gap at HEAD |
 |---|---|---|
-| REQ-01 | valid-and-open | Background sites C1, C3, C5-C8, C10, C13, C17-C20 plus sweep findings S1-S6 (§3.1). `mcp-server/` scope is vacuous (C23). |
+| REQ-01 | valid-and-open | Background sites C1, C3, C5-C8, C10, C13, C17-C20 plus sweep findings S1, S2, S4-S7 (§3.1; S3 already done). `mcp-server/` scope is vacuous (C23). |
 | REQ-02 | valid-and-open | No declaration names a reason namespace; `reject_issue` writes `resolution:` unconditionally, bypassing rule enforcement (`issue.rs:1060-1063`; test `issue.rs:4203` `test_reject_issue_appends_resolution_label_unchecked`). |
-| REQ-04 | valid-and-open | `templates.rs:821-830` ignores declared markers and sections; see decision D3. |
-| REQ-05 | valid-and-open | `link_validator.rs:202-211` literal list; see decision D4. |
+| REQ-04 | valid-and-open | `templates.rs:821-830` ignores declared markers and sections; see decision D3 (§8). |
+| REQ-05 | valid-and-open | `link_validator.rs:202-211` literal list; see decision D4 (§8). |
 | REQ-06 | valid-and-open | `labels.rs:130-136`; no registry reaches `validate_label`. |
 | REQ-07 | valid-and-open | `query.rs:143-153`. The domain function already returns empty for no types (`domain/queries.rs:307-323`, guard `:310-312`). |
 | REQ-08 | valid-and-open | `subgraphClustering.ts:66`; served `strategic_types` is fetched but discarded (`GraphView.tsx:587-592`). |
@@ -86,9 +86,9 @@ Production sources searched: `crates/*/src` (test modules excluded), `web/src` (
 
 | Id | Site | Construct | Assessment |
 |---|---|---|---|
-| S1 | `templates.rs:682` `PLAN_DOC_LABEL = "plan"`; read `:708`, consumers `validation/repository.rs:650`, `commands/validate.rs:1146` | const | Document-label vocabulary the engine assumes; no declaration names it. Instance under a literal REQ-01 reading. |
+| S1 | `templates.rs:682` `PLAN_DOC_LABEL = "plan"`; read in production only at `:708` (`plan_document_ref`; `:899` is a test fixture) | const | Document-label vocabulary the engine reads but never writes; no declaration names it. A document label is outside REQ-01's listed categories. |
 | S2 | `commands/init.rs:307` `.unwrap_or_else(\|\| "main".to_string())` | string literal | Fabricated branch label recorded in worktree identity when `HEAD` has no branch. A branch name no repository declares. |
-| S3 | `profile/registry_region.rs:25` `REGION_PACKAGE_ID = "jit-dogfood"` | pub const in an ungated `pub mod` (`profile/mod.rs:28`) | Names this repository's profile. Consumers are test-support `generated_artifacts.rs:269-270` and `examples/package-drift.rs:17`; no production command reads it. |
+| S3 | `profile/registry_region.rs:25` `REGION_PACKAGE_ID = "jit-dogfood"` | pub const in `profile/mod.rs:27-28`, gated `cfg(any(test, feature = "test-support"))` | **Already done** by `71c258a8c` (jit:e7d98542): the module is outside the production build. No work. |
 | S4 | `cli.rs:1115,2188,2200-2201,2352,2377-2378` | rustdoc help text | Domain example labels (`resolution:`, `epic:auth`, `milestone:v1.0`). Illustrative prose, not behavior; `cli.rs:1115` changes with REQ-02. |
 | S5 | `commands/snapshot.rs:19-23` `find_remote("origin")` via `git2` | string literal | Remote name, not branch; also a `@/charter/D-21` deviation. Owned by in-progress c140921c (moves to `storage/git.rs:357-367` `origin_url`, which also names `origin`). |
 | S6 | `crates/server/src/main.rs:164`, `first_read.rs:21,34-40` `JIT_SERVER_REPORT_FIRST_READS` | env read | Production read of a test-only switch (set only by `server/tests/server_integration/graceful_shutdown_tests.rs:261`). Same pattern REQ-10 removes, under another name. |
@@ -181,7 +181,7 @@ Production sources searched: `crates/*/src` (test modules excluded), `web/src` (
 
 | Invariant | Status at HEAD |
 |---|---|
-| `@/inv/domain-agnostic` | Violated by C1, C3, C5, C6, C7, C8, C10, C13, C17-C20; possibly S1-S3 (decision D5). |
+| `@/inv/domain-agnostic` | Violated by C1, C3, C5, C6, C7, C8, C10, C13, C17-C20; possibly S1, S2 (decision D5). |
 | `@/inv/architecture-dependency-direction` | Guard switch is a caller input (`with_worktree_paths`); held. S6 is an ambient-environment test switch in the server binary. |
 | `@/charter/D-21` | Held for guard and drift. Snapshot uses `git2` (S5, owned by c140921c). The hook calls git directly; it is a shell script outside the engine. |
 | `@/charter/D-4` | Held: without a checkout the guard allows (`worktree.rs:62-64`) and drift fails with "requires a git repository" (`validate.rs:1208-1212`). |
@@ -203,9 +203,14 @@ Production sources searched: `crates/*/src` (test modules excluded), `web/src` (
 
 ## 8. Open decisions
 
+Numbered as the plan's decisions table, which records each resolution.
+
+
 - **D1 Reason-namespace declaration (REQ-02).** Homes: (a) a role field on `[namespaces.<ns>]` (`NamespaceConfig`, `config.rs:379-387`), carried by existing profile namespace entries; (b) a binding table like `[type_hierarchy.label_associations]` (`config.rs:214-216`) or templates' `[roles]` (`templates.rs:209-242`); (c) delete `--reason` (`@/charter/D-18`), which contradicts REQ-02 as written.
-- **D2 Base branch (REQ-11).** Homes: (a) key under `[worktree]` (`WorktreeConfig`, `config.rs:1057-1064`), readable by the hook through `jit config get` like `enforce_leases`; (b) new `[git]` table; (c) delete all three comparisons, which REQ-11 permits. The guard already allows silently when the base does not resolve (`worktree.rs:65-75`).
+- **D2 Base branch (REQ-11, REQ-12).** Homes: (a) key under `[worktree]` (`WorktreeConfig`, `config.rs:1057-1064`), readable by the hook through `jit config get` like `enforce_leases`; (b) new `[git]` table; (c) delete all three comparisons, which REQ-11 permits. The guard already allows silently when the base does not resolve (`worktree.rs:65-75`).
 - **D3 `{container.hard_criteria}` (REQ-04).** The default requirement kind declares `["[hard]", "[aspirational]"]` (`profiles/jit-default/manifest.toml:212`), so "criteria carrying the declared markers" includes aspirational items under a token named `hard_criteria`. No shipped template uses the token (§3.3).
 - **D4 Permanent links (REQ-05).** Declared `permanent_paths` cover paths inside the development root. Under REQ-05 as written, root-relative links to `docs/` or `README.md` in this repository turn Risky unless declared. `retains_source_in_place` (`artifact_classifier.rs:155-158`) is the existing "stays in place" predicate (outside the development root or permanent).
-- **D5 Sweep findings S1-S7.** Which are in REQ-01 scope.
-- **D6 REQ-01 text.** Names absent `mcp-server/`.
+- **D5 Sweep findings S1-S7 (REQ-01).** Which are in REQ-01 scope; S3 is already done. REQ-01's `mcp-server/` scope is vacuous (C23).
+- **D6 REQ-10.** Already met (C11, C14, C16); how it is covered without separate work.
+- **D7 Web cluster source (REQ-08).** Served per-node `cluster` (topmost container, §4) or served `strategic_types` (§3.7).
+- **D8 REQ-13 test ownership.** Per rebound site or a separate test terminal.

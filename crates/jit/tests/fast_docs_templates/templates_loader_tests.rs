@@ -80,16 +80,13 @@ fn test_config_load_succeeds_without_templates_file() {
 }
 
 #[test]
-fn test_config_load_fails_on_invalid_template_unknown_type() {
-    // `type = "bogus"` is absent from [type_hierarchy].types, so config load
-    // must fail with a clear, attributable error.
+fn test_config_load_fails_on_invalid_template_unknown_container_type() {
+    // `applies_to = ["bogus"]` is absent from [type_hierarchy].types, so config
+    // load must fail with a clear, attributable error.
     let bad = r#"
 [[template]]
 name = "plan"
-applies_to = ["epic"]
-[[template.nodes]]
-role = "planning"
-type = "bogus"
+applies_to = ["bogus"]
 "#;
     let temp = declaration_dir(&[
         ("config.toml", CONFIG_WITH_HIERARCHY),
@@ -190,5 +187,41 @@ fn test_config_load_fails_on_malformed_templates_toml() {
             temp.path()
         ))
         .is_err()
+    );
+}
+
+/// `jit validate` judges a template's node types against the declared
+/// hierarchy, as `jit apply` does; the template's other requirements are
+/// prerequisites of applying it and stay with `jit apply`.
+#[test]
+fn test_validate_repository_report_fails_a_template_node_type_outside_the_hierarchy() {
+    let (temp, executor) = jit::test_utils::setup_test_repo_with_config(CONFIG_WITH_HIERARCHY)
+        .expect("fixture repository initializes");
+    let template = r#"
+[[template]]
+name = "plan"
+applies_to = ["epic"]
+[[template.nodes]]
+role     = "planning"
+type     = "bogus"
+gates    = ["undeclared-gate"]
+doc_area = "undeclared/area"
+"#;
+    std::fs::write(temp.path().join(".jit/templates.toml"), template).unwrap();
+
+    let report = executor.validation().validate_repository_report().unwrap();
+
+    let failure = report
+        .structural_failure
+        .as_ref()
+        .expect("an undeclared node type fails validation");
+    let unmet = failure
+        .downcast_ref::<jit::templates::TemplatePrerequisitesUnmetError>()
+        .unwrap_or_else(|| panic!("expected the prerequisite report, got {failure:#}"));
+    assert_eq!(
+        unmet.unmet(),
+        [jit::templates::TemplateRequirement::Type(
+            "bogus".to_string()
+        )]
     );
 }

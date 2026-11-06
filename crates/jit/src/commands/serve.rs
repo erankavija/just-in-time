@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::process::Child;
 use std::time::{Duration, Instant};
 
+use crate::process;
 use crate::repository_state::{RepositoryLayout, VirtualPath};
 use anyhow::{bail, Context, Result};
 
@@ -153,43 +154,6 @@ pub fn remove_pid_file(layout: &RepositoryLayout) -> Result<()> {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(anyhow::anyhow!("Failed to remove PID file: {e}")),
-    }
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Process liveness
-// ────────────────────────────────────────────────────────────────────────────
-
-/// Returns `true` if a process with the given PID is currently alive.
-///
-/// On Unix this sends signal 0 (no-op) and checks the kernel response.
-/// On other platforms falls back to always returning `false`.
-///
-/// # Safety
-/// PIDs that cannot be represented as a positive `i32` (i.e. > `i32::MAX`)
-/// are rejected and return `false` — casting them to `i32` would produce
-/// negative values that have special `kill(2)` semantics (e.g. -1 = all
-/// processes), which would be catastrophic.
-pub fn is_process_alive(pid: u32) -> bool {
-    #[cfg(unix)]
-    {
-        use nix::sys::signal::kill;
-        use nix::unistd::Pid;
-        // Guard: PIDs must fit in a positive i32.  Values > i32::MAX would
-        // become negative after casting and `kill(-1, ...)` would send to
-        // every process owned by this user.
-        let Ok(pid_i32) = i32::try_from(pid) else {
-            return false;
-        };
-        if pid_i32 <= 0 {
-            return false;
-        }
-        kill(Pid::from_raw(pid_i32), None).is_ok()
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = pid;
-        false
     }
 }
 
@@ -621,7 +585,7 @@ pub fn start_server(opts: ServeOptions, watch: StartupWatch<'_>) -> Result<Serve
 
     // Check existing PID file
     if let Some(pf) = read_pid_file(layout)? {
-        if is_process_alive(pf.pid) {
+        if process::is_alive(pf.pid) {
             return Ok(ServeOutcome::AlreadyRunning {
                 pid: pf.pid,
                 port: pf.port,
@@ -754,7 +718,7 @@ pub fn run_foreground(
     on_bound: impl FnOnce(&ForegroundLaunch),
 ) -> Result<ForegroundOutcome> {
     if let Some(pf) = read_pid_file(&opts.layout)? {
-        if is_process_alive(pf.pid) {
+        if process::is_alive(pf.pid) {
             return Ok(ForegroundOutcome::AlreadyRunning {
                 pid: pf.pid,
                 port: pf.port,
@@ -804,39 +768,49 @@ pub fn run_foreground(
 /// Returns [`StopOutcome::NotRunning`] if no server was running or the PID
 /// file is stale.
 pub fn stop_server(layout: &RepositoryLayout) -> Result<StopOutcome> {
-    let pf = match read_pid_file(layout)? {
-        Some(pf) if is_process_alive(pf.pid) => pf,
-        Some(_) => {
-            // Stale PID — clean up silently.
-            remove_pid_file(layout)?;
-            return Ok(StopOutcome::NotRunning);
-        }
-        None => return Ok(StopOutcome::NotRunning),
-    };
-
-    let pid = pf.pid;
-    let port = pf.port;
-
     #[cfg(unix)]
     {
-        use nix::sys::signal::{kill, Signal};
-        use nix::unistd::Pid;
-        let pid_i32 =
-            i32::try_from(pid).with_context(|| format!("PID {pid} is out of range for kill(2)"))?;
-        // Guard against pid 0 (signal whole process group) and negative values.
-        if pid_i32 <= 0 {
-            bail!("Refusing to signal PID {pid}: value would target a process group");
-        }
-        kill(Pid::from_raw(pid_i32), Signal::SIGTERM)
-            .with_context(|| format!("Failed to send SIGTERM to PID {pid}"))?;
+        stop_server_with_signal(layout, |pid| {
+            use nix::sys::signal::{kill, Signal};
+            use nix::unistd::Pid;
+
+            kill(Pid::from_raw(pid), Signal::SIGTERM)
+                .map_err(anyhow::Error::from)
+                .with_context(|| format!("Failed to send SIGTERM to PID {pid}"))
+        })
     }
     #[cfg(not(unix))]
     {
-        bail!(
-            "Stopping the server via --stop is not supported on this platform. \
-             Terminate the jit-server process manually."
-        );
+        stop_server_with_signal(layout, |_| {
+            bail!(
+                "Stopping the server via --stop is not supported on this platform. \
+                 Terminate the jit-server process manually."
+            )
+        })
     }
+}
+
+fn stop_server_with_signal(
+    layout: &RepositoryLayout,
+    send_signal: impl FnOnce(i32) -> Result<()>,
+) -> Result<StopOutcome> {
+    let Some(pf) = read_pid_file(layout)? else {
+        return Ok(StopOutcome::NotRunning);
+    };
+    let pid_signal_target = process::checked_pid(pf.pid).ok_or_else(|| {
+        anyhow::anyhow!(
+            "Refusing to signal PID {}: not a valid positive process ID for kill(2)",
+            pf.pid
+        )
+    })?;
+    if !process::is_alive(pf.pid) {
+        remove_pid_file(layout)?;
+        return Ok(StopOutcome::NotRunning);
+    }
+
+    let pid = pf.pid;
+    let port = pf.port;
+    send_signal(pid_signal_target)?;
 
     remove_pid_file(layout)?;
     Ok(StopOutcome::Stopped { pid, port })
@@ -848,7 +822,7 @@ pub fn stop_server(layout: &RepositoryLayout) -> Result<StopOutcome> {
 /// no server is running or the PID file is stale (stale files are cleaned up).
 pub fn server_status(layout: &RepositoryLayout) -> Result<Option<ServerPidFile>> {
     match read_pid_file(layout)? {
-        Some(pf) if is_process_alive(pf.pid) => Ok(Some(pf)),
+        Some(pf) if process::is_alive(pf.pid) => Ok(Some(pf)),
         Some(_) => {
             // Stale — clean up
             remove_pid_file(layout)?;
@@ -990,26 +964,6 @@ mod tests {
         let pid = child.id();
         child.wait().expect("failed to wait on child");
         pid
-    }
-
-    #[test]
-    fn test_is_process_alive_current_process() {
-        let my_pid = std::process::id();
-        assert!(is_process_alive(my_pid), "current process should be alive");
-    }
-
-    #[test]
-    fn test_is_process_alive_rejects_nonexistent_pid() {
-        assert!(
-            !is_process_alive(dead_pid()),
-            "exited process should not be alive"
-        );
-    }
-
-    #[test]
-    fn test_is_process_alive_rejects_overflowing_pid() {
-        // u32::MAX as i32 = -1 which would signal all processes — must return false.
-        assert!(!is_process_alive(u32::MAX));
     }
 
     // ── Port selection ───────────────────────────────────────────────────────
@@ -1230,6 +1184,30 @@ mod tests {
         let outcome = test_stop_server(data_dir).unwrap();
         assert_eq!(outcome, StopOutcome::NotRunning);
         assert!(!test_pid_path(data_dir).exists());
+    }
+
+    #[test]
+    fn test_stop_server_rejects_guarded_pid_without_signaling() {
+        let tmp = TempDir::new().unwrap();
+        let data_dir = tmp.path();
+        let pf = ServerPidFile {
+            pid: u32::MAX,
+            port: 3000,
+            started_at: Utc::now(),
+            data_dir: data_dir.to_path_buf(),
+            log_file: test_log_path(data_dir),
+        };
+        write_test_pid_file(data_dir, &pf);
+        let mut signaled = false;
+
+        let result = stop_server_with_signal(&test_layout(data_dir), |_| {
+            signaled = true;
+            Ok(())
+        });
+
+        assert!(result.is_err());
+        assert!(!signaled);
+        assert!(test_pid_path(data_dir).exists());
     }
 
     // ── liveness probe ───────────────────────────────────────────────────────
@@ -1613,7 +1591,7 @@ mod tests {
         );
         let child_pid = *child_pid.get().expect("the watch observed the child");
         assert!(
-            !is_process_alive(child_pid),
+            !process::is_alive(child_pid),
             "a server the start gave up on must not outlive it"
         );
     }
@@ -1646,7 +1624,7 @@ mod tests {
         let recorded = read_test_pid_file(data_dir).unwrap();
         let recorded_is_alive = recorded
             .as_ref()
-            .is_some_and(|record| is_process_alive(record.pid));
+            .is_some_and(|record| process::is_alive(record.pid));
         let stopped = test_stop_server(data_dir).unwrap();
 
         let record = recorded.expect("a started server leaves a record");
@@ -1733,7 +1711,7 @@ mod tests {
         // The kill is followed by a reap inside `start_server`, so the process
         // is already gone by the time it returns.
         assert!(
-            !is_process_alive(child_pid().expect("the fake server announced its PID")),
+            !process::is_alive(child_pid().expect("the fake server announced its PID")),
             "a spawned server must not outlive the start that failed to record it"
         );
     }

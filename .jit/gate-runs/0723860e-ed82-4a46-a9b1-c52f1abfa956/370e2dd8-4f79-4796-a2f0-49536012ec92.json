@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1f838b61b073639ebf5554b19cfa4083f0bef891",
+  "completed_at": "2026-11-06T00:25:35.015972355Z",
+  "duration_ms": 189365,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All six requirements are satisfied by the attributable implementation and covered gate evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0723860e-ed82-4a46-a9b1-c52f1abfa956",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "370e2dd8-4f79-4796-a2f0-49536012ec92",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T00:22:25.650529391Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 25b6b0f, cb5e6f6, 1fbf95b, 4079fd9, f86ef26, d603ac4\nPolicy sources: AGENTS.md\nResolved items: @/invariant/domain-agnostic (.jit/invariants.toml); @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/invariant/orthogonal-tests (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml); @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate and @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-06T00:20:37Z; run 1f838b6 contains all attributed commits\nTruncation recovery: narrowed source, test, documentation, and merge-parent patch reads by path\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All six requirements are satisfied by the attributable implementation and covered gate evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

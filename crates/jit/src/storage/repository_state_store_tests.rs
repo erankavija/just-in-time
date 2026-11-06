@@ -7,12 +7,11 @@ use crate::repository_state::{
 };
 #[cfg(windows)]
 use crate::storage::capability_fs::capability_metadata_identity;
-use crate::storage::capability_fs::{
-    open_regular_file_nofollow, CapabilityFsError, CapabilityRoots,
-};
+use crate::storage::capability_fs::CapabilityRoots;
 use crate::storage::redo_apply::test_fixtures::snapshot;
 use crate::storage::{EventAppend, RedoPoint, RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
 use crate::test_harness::git::GitStandIn;
+#[cfg(windows)]
 use cap_std::ambient_authority;
 use std::collections::{BTreeMap, BTreeSet};
 use std::process::Command;
@@ -332,32 +331,6 @@ fn test_control_path_symlink_is_never_followed() {
         .open_mutation_session(layout)
         .is_err());
     assert!(std::fs::read_dir(outside).unwrap().next().is_none());
-}
-
-#[cfg(unix)]
-#[test]
-fn test_open_regular_file_nofollow_refuses_a_symbolic_link() {
-    use std::os::unix::fs::symlink;
-    let temp = TempDir::new().unwrap();
-    let target = temp.path().join("target.txt");
-    std::fs::write(&target, b"outside content").unwrap();
-    symlink(&target, temp.path().join("link.txt")).unwrap();
-    let dir = Dir::open_ambient_dir(temp.path(), ambient_authority()).unwrap();
-
-    let error = open_regular_file_nofollow(&dir, "link.txt").unwrap_err();
-
-    assert!(matches!(error, CapabilityFsError::UnsafeTarget(_)));
-}
-
-#[test]
-fn test_open_regular_file_nofollow_refuses_a_directory() {
-    let temp = TempDir::new().unwrap();
-    std::fs::create_dir(temp.path().join("subdir")).unwrap();
-    let dir = Dir::open_ambient_dir(temp.path(), ambient_authority()).unwrap();
-
-    let error = open_regular_file_nofollow(&dir, "subdir").unwrap_err();
-
-    assert!(matches!(error, CapabilityFsError::UnsafeTarget(_)));
 }
 
 #[test]

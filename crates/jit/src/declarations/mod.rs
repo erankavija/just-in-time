@@ -8,9 +8,11 @@ mod gates;
 pub mod invariants;
 pub mod rules;
 
+pub(crate) use gates::normalize_gate_registry_for_document;
 pub use gates::{
-    parse_gate_registry, serialize_gate_registry, GateChecker, GateDeclarationError,
-    GateDefinition, GateMode, GateRegistry, GateStage, REVIEW_PLACEHOLDER_WARNING,
+    edit_gate_registry_document, parse_gate_registry, serialize_gate_registry, GateChecker,
+    GateDeclarationError, GateDefinition, GateMode, GateRegistry, GateStage,
+    REVIEW_PLACEHOLDER_WARNING,
 };
 
 use crate::config::{ItemKindConfigError, JitConfig};
@@ -115,19 +117,16 @@ mod tests {
     }
 
     #[test]
-    fn test_assemble_configuration_rejects_template_type_outside_declared_hierarchy() {
+    fn test_assemble_configuration_rejects_template_container_type_outside_declared_hierarchy() {
         let error = assemble_configuration(
             Some(b"[type_hierarchy]\ntypes = { epic = 1, task = 2 }\n"),
-            Some(
-                b"[[template]]\nname = \"t\"\napplies_to = [\"epic\"]\n\
-                  [[template.nodes]]\nrole = \"r\"\ntype = \"undeclared\"\n",
-            ),
+            Some(b"[[template]]\nname = \"t\"\napplies_to = [\"undeclared\"]\n"),
             None,
         )
         .unwrap_err();
         assert!(matches!(
             error,
-            ConfigurationAssemblyError::Templates(TemplateConfigError::UnknownType { .. })
+            ConfigurationAssemblyError::Templates(TemplateConfigError::UnknownAppliesToType { .. })
         ));
     }
 
