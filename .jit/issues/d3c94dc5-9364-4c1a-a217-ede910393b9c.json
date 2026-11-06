@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "7fe01edb-31b2-408b-af38-319a1f068e87",
+      "run_id": "372819a3-7cb4-4e34-8e44-98a641eb3eb8",
       "status": "passed",
-      "updated_at": "2026-11-06T04:12:31.546023713Z",
+      "updated_at": "2026-11-06T04:32:45.672028508Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Bulk and dependency edits check leases in their publishing session",
-  "updated_at": "2026-11-06T04:16:34.369848263Z"
+  "updated_at": "2026-11-06T04:32:45.672028508Z"
 }
