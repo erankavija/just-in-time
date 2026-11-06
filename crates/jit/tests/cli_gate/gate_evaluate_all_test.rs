@@ -342,3 +342,60 @@ fn test_evaluate_many_reports_each_issue_and_continues_after_failure() {
         );
     }
 }
+
+#[test]
+fn test_evaluate_many_strict_refuses_only_the_entry_another_agent_leases() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap().commit("init").unwrap();
+    let set = cli
+        .command(["config", "set", "worktree.enforce_leases", "strict"])
+        .output()
+        .unwrap();
+    assert!(set.status.success(), "{set:?}");
+    define_gate(&cli, "wave-gate", "true");
+    let leased = create_issue_requiring(&cli, &["wave-gate"]);
+    let unleased = create_issue_requiring(&cli, &["wave-gate"]);
+    let now = chrono::Utc::now();
+    jit::test_lease_store::plant_lease(
+        &cli.root().join(".git/jit"),
+        &jit::storage::claim_coordinator::Lease {
+            lease_id: "00000000-0000-4000-8000-000000000001".parse().unwrap(),
+            issue_id: leased.parse().unwrap(),
+            agent_id: "agent:foreign-lease-holder".parse().unwrap(),
+            worktree_id: "wt:foreign-lease-holder".parse().unwrap(),
+            branch: None,
+            ttl_secs: 600,
+            acquired_at: now,
+            expires_at: Some(now + chrono::Duration::seconds(600)),
+            last_beat: now,
+        },
+    )
+    .unwrap();
+
+    let out = cli
+        .command([
+            "gate",
+            "evaluate-many",
+            "wave-gate",
+            &leased,
+            &unleased,
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!out.status.success(), "{out:?}");
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let results = json["error"]["details"]["results"].as_array().unwrap();
+    assert_eq!(results[0]["issue_id"], leased);
+    assert_eq!(results[0]["status"], "failed");
+    assert!(
+        results[0]["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("agent:foreign-lease-holder")),
+        "{json}"
+    );
+    assert_eq!(results[1]["issue_id"], unleased);
+    assert_eq!(results[1]["status"], "passed");
+    assert_eq!(run_count(&cli, "wave-gate"), 1);
+}
