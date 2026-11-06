@@ -469,8 +469,9 @@
           "short_id": "cd603c8e",
           "title": "Document command reference states the show and history semantics",
           "classification": "documentation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatched_out_of_wave_2026-11-06"
         }
       ]
     },
@@ -886,6 +887,13 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "Bounded doc-show migration with exact criteria; disjoint from c140; base b22cbb54c."
+    },
+    {
+      "issue": "cd603c8e",
+      "vendor": "openai",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "One-file docs correction with exact criteria; out of wave order per steward."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -1633,5 +1641,18 @@
       "5046408a": "2026-11-05T10:31:15.107216481Z"
     },
     "next_after_explicit_resume": "Verify current main/worktrees/leases, start approved783 actor correction; resolve504boundaryR1 proposal finding and independentR2 before13-file edits, after actorland+Done and504refresh."
-  }
+  },
+  "standing_rules": [
+    {
+      "granted": "2026-11-06",
+      "by": "steward just-in-time-9b",
+      "rule": "A DAG-ready issue with a footprint disjoint from in-flight work, whose statements no earlier-wave issue can invalidate, may go out of wave order without asking; record each use here.",
+      "uses": [
+        {
+          "issue": "cd603c8e",
+          "note": "explicitly approved (option 1) before the rule; docs/reference/cli-commands.md only; lands after c140921c"
+        }
+      ]
+    }
+  ]
 }
