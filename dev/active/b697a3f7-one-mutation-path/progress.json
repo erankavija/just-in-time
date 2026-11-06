@@ -112,7 +112,7 @@
           "title": "One state derivation for update and lifecycle transitions",
           "classification": "implementation",
           "worker": "claude opus",
-          "status": "rework-1 (prechecks from projected gates)"
+          "status": "done"
         },
         {
           "id": "7fefd776-6e85-428d-a386-a1512c0a94a1",
