@@ -4943,7 +4943,8 @@ assert = {}
         let repo = tempfile::TempDir::new().unwrap();
         std::fs::create_dir(repo.path().join(".jit")).unwrap();
         crate::test_cli::init_git_repository(repo.path()).unwrap();
-        let paths = WorktreePaths::detect_from(repo.path()).unwrap();
+        let paths =
+            WorktreePaths::detect_for_data_root(&repo.path().join(".jit"), repo.path()).unwrap();
         let coordinator = ClaimCoordinator::new(
             paths.clone(),
             FileLocker::new(Duration::from_secs(1)),

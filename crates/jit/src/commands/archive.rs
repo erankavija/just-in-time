@@ -880,7 +880,10 @@ mod tests {
     fn executor(root: &std::path::Path) -> CommandExecutor<JsonFileStorage> {
         crate::test_utils::file_executor(root)
             .unwrap()
-            .with_worktree_paths(crate::storage::WorktreePaths::detect_from(root).unwrap())
+            .with_worktree_paths(
+                crate::storage::WorktreePaths::detect_for_data_root(&root.join(".jit"), root)
+                    .unwrap(),
+            )
     }
 
     #[test]
@@ -903,10 +906,13 @@ mod tests {
             .write("fixtures/nested/child.md", "child");
         let commit = repository.commit("pinned history");
         repository.git(&["tag", "-a", "snapshot", "-m", "snapshot"]);
-        let paths = crate::storage::WorktreePaths::detect_from(data.path())
-            .unwrap()
-            .with_worktree_root(code.path())
-            .unwrap();
+        let paths = crate::storage::WorktreePaths::detect_for_data_root(
+            &data.path().join(".jit"),
+            data.path(),
+        )
+        .unwrap()
+        .with_worktree_root(code.path())
+        .unwrap();
         // Production binds the selected checkout to both the executor and its
         // store, whose captures resolve pinned evidence.
         let bound_executor = |paths: crate::storage::WorktreePaths| {

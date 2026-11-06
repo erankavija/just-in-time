@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "62d800e28c2e96ed07ae79cc98b6e3f41d1bec1e",
+  "completed_at": "2026-11-06T05:48:39.587463018Z",
+  "duration_ms": 216008,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/commands/mod.rs",
+        "id": "F1",
+        "line": 2548,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "A new comment records task history and a removal issue ID rather than an essential code contract."
+      }
+    ],
+    "summary": "One advisory comment-prose finding; no blocking issue-impact defect.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "030df4b1-708f-4139-ba3c-3890fd6c27ba",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "201a5a14-e3b9-41f2-84c9-89f908965e05",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T05:45:03.579033441Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: acd4c7325e86310cd731062a68400bb1cd6fe808; 411100c300a09ed47d88843ef2f5aacabac11f51\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20, @/charter/D-22, @/charter/D-25 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose, @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/b697a3f7/requirement/REQ-10, @/issue/b697a3f7/requirement/REQ-21, @/issue/030df4b1/requirement/REQ-06 (issue descriptions)\nGate evidence: cargo-ci passed (exit 0; ancestry covers both attributable commits); code-review pending with no recorded run\nTruncation recovery: recovered initial truncated context with bounded per-commit patches and targeted current-file reads\n\n1. [advisory][issue-impact] [crates/jit/src/commands/mod.rs:2548](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/mod.rs:2548) adds a comment documenting task history and a removal issue ID rather than the fields’ present contract. Remove it or replace it with essential behavior-only prose. References: @/invariant/essential-code-prose.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"One advisory comment-prose finding; no blocking issue-impact defect.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"A new comment records task history and a removal issue ID rather than an essential code contract.\",\"file\":\"crates/jit/src/commands/mod.rs\",\"line\":2548,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

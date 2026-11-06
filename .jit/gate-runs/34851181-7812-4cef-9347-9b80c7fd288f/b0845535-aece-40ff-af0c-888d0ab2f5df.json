@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-34851181",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fd5f9da4acf341dbbcf94f623e7577e47296f9ee",
+  "completed_at": "2026-11-06T05:49:00.704785716Z",
+  "duration_ms": 336525,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "34851181-7812-4cef-9347-9b80c7fd288f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b0845535-aece-40ff-af0c-888d0ab2f5df",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T05:43:24.178929571Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: d95ae7e4c67337b5c0e9a3f40fa0f11361d96a68; fd5f9da4acf341dbbcf94f623e7577e47296f9ee\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml; .jit/issues/f4d9502a-c585-4436-8819-bcd3d5c59171.json; .jit/gates.toml\nResolved items: @/charter/D-4, @/charter/D-18, @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover (.jit/invariants.toml); @/issue/f4d9502a/requirement/REQ-02, REQ-04, REQ-11 (.jit/issues/f4d9502a-c585-4436-8819-bcd3d5c59171.json)\nGate evidence: cargo-ci passed, exit 0; its run contains d95ae7e4c67337b5c0e9a3f40fa0f11361d96a68 but not fd5f9da4acf341dbbcf94f623e7577e47296f9ee; code-review pending\nTruncation recovery: narrowed reads of each attributed patch, storage/git.rs public surface and callers, direct git process construction sites, feature boundaries, and affected test contexts\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
