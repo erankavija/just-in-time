@@ -33,7 +33,8 @@ const REFUSES: &[(&str, &str)] = &[
     ("gate add", "gate add {x} unused"),
     ("gate evaluate", "gate evaluate {x} auto"),
     ("gate evaluate-all", "gate evaluate-all {x}"),
-    ("gate evaluate-many", "gate evaluate-many auto {x}"),
+    // A refused entry reports its reason in the JSON findings.
+    ("gate evaluate-many", "gate evaluate-many auto {x} --json"),
     ("gate fail", "gate fail {w} manual --by agent:other"),
     ("gate preset apply", "gate preset apply seeded {x}"),
     ("issue assign", "issue assign {x} agent:other"),
@@ -434,6 +435,15 @@ fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
 
+/// What a refusal reports, on stderr or as JSON findings on stdout.
+fn diagnostics(output: &Output) -> String {
+    format!(
+        "{}{}",
+        stderr(output),
+        String::from_utf8_lossy(&output.stdout)
+    )
+}
+
 fn assert_ok(output: &Output) {
     assert!(
         output.status.success(),
@@ -612,18 +622,18 @@ fn test_strict_lease_every_cli_leaf_is_classified_and_only_anothers_lease_refuse
                     "{leaf} must refuse another agent"
                 );
                 assert!(
-                    stderr(&refused).contains(OWNER),
+                    diagnostics(&refused).contains(OWNER),
                     "{leaf} refused another agent for another reason: {}",
-                    stderr(&refused)
+                    diagnostics(&refused)
                 );
                 assert!(
                     !anonymous.status.success(),
                     "{leaf} must refuse no identity"
                 );
                 assert!(
-                    stderr(&anonymous).contains("JIT_AGENT_ID"),
+                    diagnostics(&anonymous).contains("JIT_AGENT_ID"),
                     "{leaf} refused no identity for another reason: {}",
-                    stderr(&anonymous)
+                    diagnostics(&anonymous)
                 );
                 assert_eq!(repo.snapshot(), before, "{leaf} changed something");
 
