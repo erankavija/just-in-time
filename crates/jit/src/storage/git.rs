@@ -197,8 +197,6 @@ impl GitCheckout {
         Self::new(git, worktree_root)
     }
 
-    // Temporary @/inv/convention-convergence exception: branch lookups converge
-    // here when 732f7afb, 3f8da8c4 and c140921c land.
     /// Read the checked-out commit and branch with at most two git processes.
     ///
     /// Validates the captured commit without history traversal or fetching.
@@ -352,8 +350,6 @@ impl GitCheckout {
         parse_file_history(&output.stdout).ok_or_else(|| unexpected(&output.stdout))
     }
 
-    // Temporary @/inv/convention-convergence exception: snapshot migration
-    // c140921c moves its origin lookup here.
     /// Read the `origin` remote URL with one git process.
     ///
     /// Returns `None` when the checkout has no `origin` remote.
