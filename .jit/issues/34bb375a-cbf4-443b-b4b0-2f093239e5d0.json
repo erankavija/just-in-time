@@ -14,12 +14,26 @@
   ],
   "description": "Replace every libgit2 read with the git module, drop the binding and its OpenSSL linkage from the workspace, and correct the documentation that describes the old behaviour.\n\n## Success Criteria\n\n- [hard] REQ-01: No workspace crate depends on git2, `Cargo.lock` holds neither git2 nor libgit2-sys, and the build-policy check rejects libgit2 and OpenSSL linkage.\n- [hard] REQ-02: Issue reads load no git object; document show, history, diff and asset checks, snapshot export, archive planning and reads at a commit go through the git module.\n- [hard] REQ-03: The server image ships the git executable, and user and contributor documents describe the new read sources and git requirements.\n",
   "documents": [],
+  "done_at": "2026-11-06T05:57:23.505596178Z",
   "first_ready_at": "2026-11-06T05:54:04.598545324Z",
   "gates_required": [
     "cargo-ci",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9cb64d70-0c89-4986-9528-b2f54ebf8f40",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:54:55.078052883Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "acbddd40-67ba-4947-a658-c9072934e9f9",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:57:06.619907305Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "34bb375a-cbf4-443b-b4b0-2f093239e5d0",
   "labels": [
     "type:story",
@@ -34,7 +48,7 @@
     "per:@/charter/D-11"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "The workspace reaches git without libgit2",
-  "updated_at": "2026-11-06T05:54:27.978358911Z"
+  "updated_at": "2026-11-06T05:57:23.505596178Z"
 }
