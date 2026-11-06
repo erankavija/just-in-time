@@ -60,13 +60,42 @@ fn exec(
     ctx: &CommandContext<'_, JsonFileStorage>,
     command: Vec<String>,
 ) -> HandlerResult<WorktreeExecResponse> {
+    exec_outcome(
+        crate::commands::worktree::WorktreeExec::for_executor(
+            ctx.executor,
+            std::env::current_dir()?,
+        ),
+        command,
+    )
+}
+
+fn exec_outcome(
+    operation: crate::commands::worktree::WorktreeExec,
+    command: Vec<String>,
+) -> HandlerResult<WorktreeExecResponse> {
     let (program, args) = command.split_first().context("no command to run")?;
-    let status = ctx.executor.worktrees().exec(program, args)?;
+    let status = operation.run(program, args)?;
     Ok(Outcome::Exited(
         status
             .code()
             .unwrap_or(crate::output::ExitCode::GenericError.code()),
     ))
+}
+
+pub(super) fn dispatch_exec(
+    operation: crate::commands::worktree::WorktreeExec,
+    command: Vec<String>,
+    mode: crate::output::OutputMode,
+    out: &mut dyn std::io::Write,
+    err: &mut dyn std::io::Write,
+) -> anyhow::Result<crate::output::RunStatus> {
+    let leaf = GROUP
+        .leaves
+        .iter()
+        .find(|leaf| leaf.path == "worktree_exec")
+        .ok_or_else(|| anyhow::anyhow!("worktree_exec leaf is not registered"))?;
+    let outcome = leaf.admit(exec_outcome(operation, command)?)?;
+    crate::output::emit_outcome(&outcome, mode, out, err)
 }
 
 command_group! {

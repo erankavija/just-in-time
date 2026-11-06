@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-5046408a",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "39b8ffcd20c59e0483485716067245c85afd191a",
+  "completed_at": "2026-11-06T02:05:08.690890951Z",
+  "duration_ms": 381024,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard split-root requirements are implemented, documented, and supported by current-tree inspection and passing cargo-ci evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5046408a-9706-4ca0-9302-54d20e2088aa",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6fb86f91-03e4-49dc-9c1a-ad3a0eaeaa59",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T01:58:47.666378835Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 29 `jit:5046408a` commits (8d52a4e through 39b8ffcd); cargo-ci covers 28, with 39b8ffcd a later gate-record commit  \nPolicy sources: AGENTS.md  \nResolved items: @/issue/5046408a/requirement/REQ-01–REQ-08 (issue); @/charter/D-4, D-17, D-18, D-20, D-23, D-25, D-26, D-27 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, derived-state-coherence, architecture-dependency-direction, canonical-cutover, convention-convergence, orthogonal-tests, essential-code-prose (.jit/invariants.toml)  \nGate evidence: cargo-ci passed, exit 0, 2026-11-06T01:50:32Z; run 093c719 contains all implementation commits  \nTruncation recovery: path-bounded per-commit patch and linked-document reads after aggregate-output truncation; historical event/progress records excluded from behavior judgment  \n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard split-root requirements are implemented, documented, and supported by current-tree inspection and passing cargo-ci evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

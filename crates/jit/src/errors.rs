@@ -1340,3 +1340,30 @@ mod tests {
         assert!(any.downcast_ref::<LeaseNotFoundError>().is_some());
     }
 }
+
+/// The explicit input that selected a code root.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub enum WorktreeRootSource {
+    #[serde(rename = "JIT_WORKTREE_ROOT")]
+    Environment,
+    #[serde(rename = "[worktree].root")]
+    Configuration,
+}
+
+impl std::fmt::Display for WorktreeRootSource {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Environment => "JIT_WORKTREE_ROOT",
+            Self::Configuration => "[worktree].root",
+        })
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("invalid worktree root {supplied:?} from {setting} (resolved {resolved:?}): {reason}")]
+pub struct InvalidWorktreeRootError {
+    pub setting: WorktreeRootSource,
+    pub supplied: std::path::PathBuf,
+    pub resolved: std::path::PathBuf,
+    pub reason: String,
+}

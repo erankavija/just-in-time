@@ -123,12 +123,26 @@
       "path": "dev/active/5046408a/boundary-design-review-r2.md"
     }
   ],
+  "done_at": "2026-11-06T02:10:15.905385494Z",
   "first_ready_at": "2026-10-24T18:36:32.241578953Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c5c4e68c-013d-447f-abf5-70852cb3c3f8",
+      "status": "passed",
+      "updated_at": "2026-11-06T02:10:06.118539702Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6fb86f91-03e4-49dc-9c1a-ad3a0eaeaa59",
+      "status": "passed",
+      "updated_at": "2026-11-06T02:05:08.695100587Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5046408a-9706-4ca0-9302-54d20e2088aa",
   "labels": [
     "type:enhancement",
@@ -139,7 +153,7 @@
     "per:@/charter/D-4"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Configurable worktree root independent of the data root",
-  "updated_at": "2026-11-05T23:39:19.937600931Z"
+  "updated_at": "2026-11-06T02:10:15.905385494Z"
 }

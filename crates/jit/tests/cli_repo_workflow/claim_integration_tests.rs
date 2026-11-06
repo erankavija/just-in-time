@@ -1895,3 +1895,35 @@ fn test_claim_list_text_marks_a_stale_unexpired_lease_with_its_heartbeat_remedy(
         ))),
     );
 }
+
+#[test]
+fn test_claim_acquire_keeps_data_common_directory_with_selected_code_checkout() {
+    let data = JitCli::initialised().unwrap();
+    data.init_git().unwrap();
+    let issue = data
+        .create_issue(["--title", "Split checkout claim"])
+        .unwrap();
+    data.commit("data").unwrap();
+    let code = JitCli::initialised().unwrap();
+    code.init_git().unwrap().commit("code").unwrap();
+    let output = data
+        .command([
+            "claim",
+            "acquire",
+            &issue,
+            "--ttl",
+            "600",
+            "--agent-id",
+            "agent:split",
+        ])
+        .env("JIT_WORKTREE_ROOT", code.root())
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    let paths =
+        WorktreePaths::detect_for_data_root(&data.root().join(".jit"), data.root()).unwrap();
+    assert!(read_lease(&paths.shared_jit, &parse_issue_id(&issue))
+        .unwrap()
+        .is_some());
+    assert!(!code.root().join(".git/jit/leases").exists());
+}

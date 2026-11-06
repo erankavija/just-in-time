@@ -16,7 +16,7 @@
 //! [`ConfigSetOutcome`] / [`ConfigGetOutcome`].
 
 use super::*;
-use crate::config::{EffectiveConfig, JitConfig};
+use crate::config::EffectiveConfig;
 use crate::errors::InvalidArgumentError;
 use schemars::JsonSchema;
 use std::path::PathBuf;
@@ -71,6 +71,43 @@ pub struct ConfigValidationReport {
 }
 
 impl ConfigValidationReport {
+    pub(crate) fn for_invocation(invocation: &super::RepositoryInvocation) -> Result<Self> {
+        let (data_root, _) = super::bootstrap::select_data_root(invocation);
+        Self::at_data_root(&data_root, invocation.worktree_root_override.as_deref())
+    }
+
+    fn at_data_root(
+        data_root: &std::path::Path,
+        root_override: Option<&std::path::Path>,
+    ) -> Result<Self> {
+        use crate::errors::WorktreeRootSource;
+        use crate::storage::repository_state_store::ConfigurationObservation;
+        let observation = ConfigurationObservation::capture_initialized(data_root)?;
+        if let Some(root) = root_override {
+            super::bootstrap::validate_worktree_root(
+                data_root,
+                WorktreeRootSource::Environment,
+                root,
+            )?;
+        } else if let Ok(worktree) = observation.worktree(true, false) {
+            if let Some(root) = worktree.root {
+                super::bootstrap::validate_worktree_root(
+                    data_root,
+                    WorktreeRootSource::Configuration,
+                    &root,
+                )?;
+            }
+        }
+        // Projection errors are authored errors in the same document's full view.
+        let errors = observation
+            .assemble()
+            .err()
+            .map(|error| format!("repo config: {error}"))
+            .into_iter()
+            .collect();
+        Ok(Self::new(errors))
+    }
+
     /// Build the report from the failing sources' messages.
     pub fn new(errors: Vec<String>) -> Self {
         Self {
@@ -123,7 +160,7 @@ pub enum ConfigKeyError {
 /// value.
 ///
 /// Pure and total over any [`serde_json::Value`] object tree — no IO, no
-/// knowledge of [`JitConfig`]'s actual shape — so it
+/// knowledge of [`crate::config::JitConfig`]'s actual shape — so it
 /// is unit-tested directly against hand-built snapshots, decoupled from
 /// [`EffectiveConfig::full_snapshot`]'s IO-heavy assembly. An intermediate key
 /// (fewer segments than the value's depth) returns the WHOLE subtree at that
@@ -377,26 +414,12 @@ impl<S: IssueStore> ConfigOps<'_, S> {
         EffectiveConfig::load(self.exec.repository_layout()?)?.full_snapshot()
     }
 
-    /// Check the repository `config.toml` (when present) and the invocation write
-    /// override, reporting every failing source.
-    ///
-    /// Invalid enforcement and write-policy tokens fail at TOML parse time, so a
-    /// successful load implies valid values.
+    /// Diagnose all admitted repository declarations; storage and input failures remain errors.
     pub fn validate(&self) -> Result<ConfigValidationReport> {
-        let mut errors = Vec::new();
+        crate::config_manager::ConfigManager::invocation_write_override()?;
+        let root_override = std::env::var_os("JIT_WORKTREE_ROOT").map(PathBuf::from);
         let layout = self.exec.storage().repository_layout()?;
-        if layout
-            .resolve(&crate::repository_state::VirtualPath::CONFIG)?
-            .exists()
-        {
-            if let Err(e) = JitConfig::load(&layout) {
-                errors.push(format!("repo config: {e}"));
-            }
-        }
-        if let Err(e) = crate::config_manager::ConfigManager::invocation_write_override() {
-            errors.push(e.to_string());
-        }
-        Ok(ConfigValidationReport::new(errors))
+        ConfigValidationReport::at_data_root(layout.data_root(), root_override.as_deref())
     }
 
     /// The type hierarchy declared by the repository's namespace configuration.

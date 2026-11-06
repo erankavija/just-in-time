@@ -530,21 +530,21 @@
   "escalations": [
     {
       "issue": "a273667c",
-      "status": "resolved_user_approved_2026-11-06",
+      "status": "resumed_floor_approved_merging_main",
       "subject": "Git>=2.42 andDocker runtimeTrixie proposal",
-      "evidence": "/tmp/f4d9502a-lead/git-floor-decision.md andgit-floor-decision.patch; stewardpresentingconcreteproposal; noanswerinferred"
+      "evidence": "/tmp/f4d9502a-lead/git-floor-decision.md andgit-floor-decision.patch; stewardpresentingconcreteproposal; noanswerinferred 2026-11-06: user approved floor/runtime (via steward 9b). Branch 43706d377 merged with main: json.rs read_path_bytes conflicts with 504 split-root (selection wrapper + code_checkout_top_level). Resolution dispatched (Sol/high); reviewed bytes change, so full cargo-ci + code-review rerun before landing. Issue criteria unchanged; six-file footprint (incl. Dockerfile/INSTALL.md floor) needs no scope edit. Excluded ancestors d0c98247f/7701663df verified absent."
     },
     {
       "issue": "c140921c",
       "status": "conditional_design_recorded",
       "subject": "Preserve originalrevisionexpression beforepeeling canonicalcommit",
-      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded. Snapshot uses code_checkout; explicit 504 Done prerequisite recorded after steward approval."
+      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded. Snapshot uses code_checkout; explicit 504 Done prerequisite recorded after steward approval. 2026-11-06: floor/runtime approved by user (via steward); 504 Done. Remaining prerequisite: a273667c Done."
     },
     {
       "issue": "5046408a",
-      "status": "rework_4_dispatched_steward_option_A",
+      "status": "done_2026-11-06",
       "subject": "Eager full configuration assembly blocks existing diagnostics and repair",
-      "evidence": "Cycle3 original config report/repair regressions pass; complete CLI1222pass/3fail and contracts548pass/2fail. Full registry sweep adds hidden item search/recover mismatches. Source frozen at376978ed0 + ten-file difff0c5fd8a; no new full gate. 2026-11-06: amended selected-A (DataRootHandle retained across lock chain) passed independent Astra/high R2 within 13 files; dev/active/5046408a/boundary-proposal.md, boundary-design-review-r1.md, -r2.md. 2026-11-06: frozen patch committed e16a759e6 (diff f0c5fd8a preserved), main merged at 6c6bdd57e (only tracker JSON conflicted; resolved to main). 13-file boundary implementation dispatched. 2026-11-06: boundary a35dc6226 (6 files), main merged 262b3ccc4; forced full cargo-ci FAILED run 1620bbb2 (recorded 939a10e57): test_read_exact_store_refuses_symlinked_records_and_a_fifo_record_without_blocking - DataReadSession tail observation read_link on absolute symlink gives raw Io before typed no-follow read. Non-fail-fast: only failure. Io Display duplicates message. Escalated to steward 9b with options A/B/C.",
+      "evidence": "Cycle3 original config report/repair regressions pass; complete CLI1222pass/3fail and contracts548pass/2fail. Full registry sweep adds hidden item search/recover mismatches. Source frozen at376978ed0 + ten-file difff0c5fd8a; no new full gate. 2026-11-06: amended selected-A (DataRootHandle retained across lock chain) passed independent Astra/high R2 within 13 files; dev/active/5046408a/boundary-proposal.md, boundary-design-review-r1.md, -r2.md. 2026-11-06: frozen patch committed e16a759e6 (diff f0c5fd8a preserved), main merged at 6c6bdd57e (only tracker JSON conflicted; resolved to main). 13-file boundary implementation dispatched. 2026-11-06: boundary a35dc6226 (6 files), main merged 262b3ccc4; forced full cargo-ci FAILED run 1620bbb2 (recorded 939a10e57): test_read_exact_store_refuses_symlinked_records_and_a_fifo_record_without_blocking - DataReadSession tail observation read_link on absolute symlink gives raw Io before typed no-follow read. Non-fail-fast: only failure. Io Display duplicates message. Escalated to steward 9b with options A/B/C. Landed a652f3dff (land.sh); branch cargo-ci pass 093c719a3, independent Astra/high impl review PASS 0 blocking, code-review 0 findings; pre-land nff on 47b167f10 green; forced merged cargo-ci pass a652f3dff. Closed, lease released.",
       "ruling": "Steward chooses A: shared typed item/recover adapters and data-only worktree exec with its own under-lock pending refusal; Io source fix approved. Exact13files subject to fresh independent bounded design review before edits. No contract cutover B or retry reset. Release actor concern excluded from504: reproduce unchanged main under same sanitized inputs, audit injection; if reproduced propose separate bounded same-epic task outside53manifest/noREQcredit for approval before creation/dispatch. 2026-11-06 steward 9b: option A, one bounded rework (Astra/xhigh) limited to repository_state_store.rs + tests; reuse capability_fs primitives, no local UnsafeTarget mapping; missing primitive returns as option B; Io displays once with source reachable; another full-gate failure or scope gap returns to steward; no further cycles. Lead lesson: run main-changed storage lib tests before forcing full cargo-ci on an integrated branch."
     },
     {
@@ -864,6 +864,13 @@
       "model": "gpt-6-astra",
       "effort": "xhigh",
       "reason": "Steward option A rework: admission symlink capture and Io display, two files."
+    },
+    {
+      "issue": "a273667c",
+      "vendor": "openai",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Merge main into reviewed floor proposal; resolve read_path_bytes against 504 split-root."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",

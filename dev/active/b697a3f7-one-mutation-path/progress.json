@@ -2,7 +2,7 @@
   "epic_id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
   "epic_short_id": "b697a3f7",
   "lead_agent_id": "agent:b697a3f7-lead",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -88,7 +88,7 @@
           "title": "Storage reads configuration files and the registry file loaders are gone",
           "classification": "implementation",
           "worker": "tbd",
-          "status": "pending",
+          "status": "dispatched (codex gpt-6.1-sol high) after 5046408a landed a652f3dff",
           "note": "held: rewrites JitConfig::load/config validate, which the frozen f4d9502a 5046408a patch also rewrites"
         },
         {
@@ -120,7 +120,7 @@
           "title": "One atomic file publication with a durability argument serves the redo put and external exports",
           "classification": "implementation",
           "worker": "claude opus",
-          "status": "dispatched (claude opus)"
+          "status": "done"
         }
       ]
     },
@@ -135,6 +135,20 @@
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
           "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "label": "3",
+      "issues": [
+        {
+          "short_id": "fe9147fa",
+          "status": "dispatched (claude opus)"
+        },
+        {
+          "short_id": "1b7f58ae",
+          "status": "dispatched (claude opus)"
         }
       ]
     }

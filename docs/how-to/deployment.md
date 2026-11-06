@@ -210,6 +210,7 @@ excluded the scratch directory that would have held it.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `JIT_DATA_DIR` | `./.jit` | Native `jit-server` data directory; the container serves `/repo/.jit` from its bind mount |
+| `JIT_WORKTREE_ROOT` | derived | Code worktree root; overrides `[worktree].root` and resolves relative to the selected data root. See [Data and Worktree Roots](../reference/storage-format.md#data-and-worktree-roots) |
 | `RUST_LOG` | `info` | Log level (trace, debug, info, warn, error) |
 | `JIT_LOCK_TIMEOUT` | see description | Lock wait in whole seconds for every lock jit acquires (the default is the lock-acquisition timeout in [Runtime Defaults](../reference/runtime-defaults.md)) |
 

@@ -26,6 +26,7 @@ fn init(args: &InitArgs) -> HandlerResult<InitResponse> {
     } = open_repository(RepositoryInvocation {
         current_dir: repository_root.clone(),
         data_dir_override: env::var("JIT_DATA_DIR").ok().map(PathBuf::from),
+        worktree_root_override: std::env::var_os("JIT_WORKTREE_ROOT").map(PathBuf::from),
         is_init: true,
         opens_mutation_session: true,
         coordinates_claims_first: false,
