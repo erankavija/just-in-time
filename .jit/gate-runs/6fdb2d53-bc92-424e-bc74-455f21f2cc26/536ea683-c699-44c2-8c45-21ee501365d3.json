@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-6fdb2d53",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7039580b78fd38949057fe091f1971fb0ffdc77c",
+  "completed_at": "2026-11-06T04:53:18.954544931Z",
+  "duration_ms": 219918,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "Cargo.lock",
+        "id": "F1",
+        "origin": "pre-existing",
+        "references": [
+          "@/charter/D-11",
+          "@/gate/dependency-audit"
+        ],
+        "severity": "high",
+        "summary": "Dependency-audit remains failed on the unchanged lockfile, leaving the v1.0 zero-known-advisory release objective unmet; it is not attributable to this dependency-removal issue."
+      }
+    ],
+    "summary": "All hard criteria are met; the only finding is a pre-existing dependency-audit release advisory.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6fdb2d53-bc92-424e-bc74-455f21f2cc26",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "536ea683-c699-44c2-8c45-21ee501365d3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T04:49:39.036494286Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 07429bee, 88d5b33b, f167bc7, 7039580 (jit:6fdb2d53)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-11, @/charter/D-18, @/charter/D-21, @/invariant/bounded-rust-build-footprint, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/issue/f4d9502a/requirement/REQ-01, @/issue/f4d9502a/requirement/REQ-13, @/gate/cargo-ci, @/gate/dependency-audit\nGate evidence: cargo-ci passed (exit 0; covers 07429bee and 88d5b33b); dependency-audit failed (exit 1; covers 07429bee and 88d5b33b)\nTruncation recovery: Re-read the implementation patch by path and inspected record-only commits via bounded statistics/name-status; current manifests, lockfile, Dockerfile, and policy test were read separately.\n\n1. [advisory][pre-existing] [Cargo.lock](/mnt/nvme/jit/agents/worktrees/agent-6fdb2d53/Cargo.lock) remains subject to a failed dependency-audit projection, leaving the v1.0 zero-known-advisory release objective unmet. The audited lockfile is unchanged since that run, but this issue’s functional patch only removes dependencies, so it is not attributable to this issue. References: @/charter/D-11, @/gate/dependency-audit.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the only finding is a pre-existing dependency-audit release advisory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Dependency-audit remains failed on the unchanged lockfile, leaving the v1.0 zero-known-advisory release objective unmet; it is not attributable to this dependency-removal issue.\",\"file\":\"Cargo.lock\",\"references\":[\"@/charter/D-11\",\"@/gate/dependency-audit\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
