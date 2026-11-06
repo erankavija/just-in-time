@@ -510,8 +510,9 @@ the **shared control plane**, not `.jit/`. `.jit/` is per-worktree data;
 common directory), because a lease must be visible to every worktree racing to
 claim the same issue. The repository is the one holding the data root; for a
 data root outside every checkout, it is the one holding the invoking directory.
-`jit claim` requires a git repository for this reason: with neither, it fails
-with exit code 10 rather than falling back to a
+`jit claim` requires the `git` executable on `PATH` and a Git repository for
+this reason ([Git Optional](../concepts/guarantees.md#git-optional)): with
+neither, it fails with exit code 10 rather than falling back to a
 per-worktree lease store.
 
 ```

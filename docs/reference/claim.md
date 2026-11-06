@@ -101,11 +101,12 @@ jit query available
 
 ### Git requirement
 
-Lease commands need a Git repository with a resolvable `HEAD` for worktree
-identity and branch tracking. This does not disable filesystem-backed document
+Lease commands require the `git` executable on `PATH` and a Git repository with
+a resolvable `HEAD` for worktree identity and branch tracking. See
+[Git Optional](../concepts/guarantees.md#git-optional). This does not disable filesystem-backed document
 operations: `jit doc add`, `jit doc list`, dependency-aware `jit archive`, and
 working-tree document reads work without Git. Document history, diffs, and
-commit-specific reads require Git.
+commit-specific reads require both prerequisites ([Git Optional](../concepts/guarantees.md#git-optional)).
 
 ### Failure modes
 

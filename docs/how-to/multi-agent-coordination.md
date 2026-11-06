@@ -484,7 +484,7 @@ This section covers the complete workflow for running multiple Copilot CLI agent
 
 ### Prerequisites
 
-- Git repository with jit initialized
+- Git repository with jit initialized and the `git` executable on `PATH` ([Git Optional](../concepts/guarantees.md#git-optional))
 - The repository declares the allowing write stance for linked checkouts
   (see [Configuration for Coordination](#configuration-for-coordination)
   above) — every worktree below writes to its local `.jit/`
@@ -629,7 +629,8 @@ The lease may have expired. Re-acquire if the issue is still available.
 
 ### "Cannot determine worktree location"
 
-Ensure you're in a git repository with proper worktree setup:
+Ensure the `git` executable is on `PATH` and you're in a Git repository with
+proper worktree setup ([Git Optional](../concepts/guarantees.md#git-optional)):
 ```bash
 git rev-parse --git-common-dir
 ```

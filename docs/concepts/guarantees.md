@@ -224,11 +224,11 @@ jit events query --event-type issue_state_changed
 
 ### Git Optional
 
-**Guarantee:** Core issue tracking works without git - repository versioning is optional.
+**Guarantee:** Core issue tracking works without Git. Git-backed operations require both a Git repository and the `git` executable on `PATH`.
 
 JIT is designed as a standalone issue tracker that *enhances* git workflows but doesn't require them. This supports use cases beyond software development.
 
-Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` / `jit issue unassign`) is bookkeeping on the issue record and works fully without git. Advisory work leases (`jit claim acquire` and its sibling `jit claim` subcommands) coordinate exclusive, time-boxed access across worktrees; they need a git repository with a resolvable `HEAD` for worktree identity and branch tracking. A missing repository and a repository with zero commits both fail with a typed `RequiresGitError` (exit code 10): `git init` alone is not enough, since `HEAD` does not resolve to a branch until the first commit exists.
+Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` / `jit issue unassign`) is bookkeeping on the issue record and works fully without Git. Advisory work leases (`jit claim acquire` and its sibling `jit claim` subcommands) coordinate exclusive, time-boxed access across worktrees; they need the executable and a Git repository with a resolvable `HEAD` for worktree identity and branch tracking. A missing repository, unavailable executable, or repository with zero commits fails with a typed `RequiresGitError` (exit code 10): `git init` alone is not enough, since `HEAD` does not resolve to a branch until the first commit exists.
 
 **What works without git:**
 
@@ -244,21 +244,17 @@ Issue assignment (`jit issue assign` / `jit issue claim` / `jit issue release` /
 
 ❌ `jit claim acquire` / `release` / `renew` / `heartbeat` / `status` / `list` / `force-evict` - Advisory work leases (`RequiresGitError`, exit code 10)\
 ❌ `jit hooks install` - Installs hooks in a Git checkout (`REQUIRES_GIT`, exit code 10; `@/charter/D-24`)\
-❌ `jit doc show --at <commit>` - View document at specific git revision  
-❌ `jit snapshot export --at <tag>` - Export from specific git revision  
-❌ Document asset validation from git history  
+❌ `jit doc history` and `jit doc diff` - Document history and diffs\
+❌ `jit doc show --at <commit>` - Read a document at a specific Git revision\
+❌ `jit snapshot export --at <tag>` - Export a snapshot from a specific Git revision\
+❌ Document asset validation from Git history
 
 **Fallback behavior:**
 
-When git is unavailable:
+When the `git` executable is unavailable on `PATH`, JIT cannot discover the checkout and treats the current location as outside Git. Core issue tracking commands continue to work; operations that need Git require both the executable and a repository.
 
-- **Document operations:** Fall back to working tree only
-- **Filesystem-backed documents:** `jit doc add`, `jit doc list`, dependency-aware
-  `jit archive`, and `jit doc show` without a commit reference remain available;
-  history, diff, and commit-specific reads require git
-- **Snapshot export:** Export from current working tree
-- **History commands:** Return error with helpful message
-- **Advisory leases:** Fail outright with `RequiresGitError` (exit code 10) instead of falling back; use issue assignment (`jit issue claim`) as the git-free alternative
+- Working-tree document operations and snapshot exports remain available where they do not request Git history.
+- Advisory lease commands fail with `REQUIRES_GIT` (exit code 10); use issue assignment (`jit issue claim`) as the git-free alternative.
 
 **Example:**
 

@@ -13,7 +13,20 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "run_id": "e9be5392-a37b-483f-bf92-bbd0ca5c6732",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:41:01.886193285Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "ea86a95b-2334-4fcc-a09a-44cc65b32a08",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:39:27.437335148Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "23b48cf0-02af-4286-a788-bcda0ec32abf",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Git requirement pages name the git executable",
-  "updated_at": "2026-11-06T05:20:40.452006735Z"
+  "updated_at": "2026-11-06T05:41:01.886193285Z"
 }

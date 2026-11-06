@@ -131,9 +131,10 @@ directory on `PATH` when a source checkout needs to serve a repository.
 
 ## Optional Dependencies
 
-- **Git 2.42 or newer**: Required for Git-backed features; core issue tracking remains
-  Git-optional. Advisory leases (`jit claim`)
-  and worktree coordination need a Git repository with a resolvable `HEAD`
+- **Git 2.42 or newer**: Required on `PATH` for advisory leases, worktree
+  coordination, and commit-backed document and snapshot operations; these also
+  need a Git repository. See [Git Optional](docs/concepts/guarantees.md#git-optional)
+  for the operation list. Core issue tracking remains Git-optional
   (`apt install git`)
 - **Node.js 20 or newer**: Required to build the web bundle (`apt install nodejs npm`); the floor is the `node-version: '20'` the
   CI jobs install (`.github/workflows/ci.yml`)

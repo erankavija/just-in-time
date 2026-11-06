@@ -302,8 +302,9 @@ identity, replacing the whole entry; fields the package does not state are
 dropped. A committed local edit to a declared entry or target is replaced by the
 next application, and git keeps the prior version.
 
-In a git repository an application refuses while a path it would write differs
-from HEAD — modified, staged, or untracked — with
+When the `git` executable on `PATH` identifies a Git repository ([Git Optional](../concepts/guarantees.md#git-optional)), an application
+refuses while a path it would write differs from HEAD — modified, staged, or
+untracked — with
 [`PROFILE_UNCOMMITTED_TARGETS`](error-codes.md) naming each such path. Each
 written path is judged by the checkout that holds it, a path in no checkout is
 never refused, and dirty paths the application does not write do not matter.
