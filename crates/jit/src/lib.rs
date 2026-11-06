@@ -23,6 +23,7 @@ pub mod generated_artifacts;
 pub mod graph;
 pub mod labels;
 pub mod output;
+pub(crate) mod process;
 pub mod profile;
 pub mod query_engine;
 pub mod repository_state;
