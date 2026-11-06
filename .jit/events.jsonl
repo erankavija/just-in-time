@@ -25577,3 +25577,13 @@
 {"id":"87141f22-c1a2-4f1e-9635-0c921cf28194","issue_id":"d9ba0029-2a1b-4b1b-a408-11035f534c1e","timestamp":"2026-11-06T03:51:07.187492475Z","type":"issue_completed"}
 {"from":"ready","id":"8bf04bc6-79cb-4980-afe4-77e77e6dd4f6","issue_id":"65aafaba-7dd8-42f2-bb3b-4bb37c803acd","timestamp":"2026-11-06T03:51:59.183890742Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:b697a3f7-lead","id":"cb193a71-2acd-48b3-b312-e6b44db260c9","issue_id":"65aafaba-7dd8-42f2-bb3b-4bb37c803acd","timestamp":"2026-11-06T03:51:59.183890742Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"9b6121dc-1c7b-4ed8-a9e1-860d6834dcf7","issue_id":"700a96dd-ba55-4cf3-8992-5d370acadf0d","timestamp":"2026-11-06T03:55:07.635766239Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"cdd74a32-28dc-4956-9890-445fea871561","issue_id":"700a96dd-ba55-4cf3-8992-5d370acadf0d","timestamp":"2026-11-06T03:58:51.362898507Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"78b29a92-f1c9-4fbb-bfd7-92271d812b73","issue_id":"700a96dd-ba55-4cf3-8992-5d370acadf0d","timestamp":"2026-11-06T03:59:00.498870963Z","to":"done","type":"issue_state_changed"}
+{"id":"97e81199-29b7-4fbf-82aa-0b6e3de92e59","issue_id":"700a96dd-ba55-4cf3-8992-5d370acadf0d","timestamp":"2026-11-06T03:59:00.498870963Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"00081be6-802f-4ecd-ad69-3cc8bdfffeb6","issue_id":"7cd27db8-9851-4af1-a2c8-d6780bdf76d1","timestamp":"2026-11-06T04:06:52.815355694Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"0463206a-0218-418e-a17e-91c1e6fa3443","issue_id":"7cd27db8-9851-4af1-a2c8-d6780bdf76d1","timestamp":"2026-11-06T04:11:09.913741552Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"ready","id":"093855ef-80a0-444f-90ba-31374baec923","issue_id":"e6ec58f3-94d4-4886-85ef-fae12decaeba","timestamp":"2026-11-06T04:03:07.853379963Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:f4d9502a-lead","id":"bc0357de-b9fe-41b3-b46c-664636cf081d","issue_id":"e6ec58f3-94d4-4886-85ef-fae12decaeba","timestamp":"2026-11-06T04:03:07.853379963Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"e922ce01-5874-4f69-b0d1-82b863a09d20","issue_id":"d3c94dc5-9364-4c1a-a217-ede910393b9c","timestamp":"2026-11-06T04:12:31.546023713Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"e709be6a-67ff-4ff5-99fc-eab44067762d","issue_id":"d3c94dc5-9364-4c1a-a217-ede910393b9c","timestamp":"2026-11-06T04:16:34.369848263Z","type":"gate_failed","updated_by":"auto:executor"}

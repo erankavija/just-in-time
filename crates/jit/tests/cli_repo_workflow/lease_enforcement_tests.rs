@@ -690,9 +690,9 @@ fn test_strict_lease_exempt_paths_write_for_their_stated_reason() {
 }
 
 #[test]
-fn test_strict_lease_filtered_update_refuses_whole_operation_naming_leased_issues() {
+fn test_strict_lease_filtered_update_reports_leased_match_and_applies_others() {
     let repo = Repo::new();
-    let free = repo.raw_record(&repo.y);
+    let leased = repo.raw_record(&repo.x);
 
     let output = repo.other(&[
         "issue",
@@ -703,9 +703,10 @@ fn test_strict_lease_filtered_update_refuses_whole_operation_naming_leased_issue
         "high",
     ]);
 
-    assert!(!output.status.success());
-    assert!(stderr(&output).contains(&repo.x), "{}", stderr(&output));
-    assert_eq!(repo.raw_record(&repo.y), free);
+    assert_ok(&output);
+    assert!(diagnostics(&output).contains(repo.x.parse::<IssueId>().unwrap().short_id()));
+    assert_eq!(repo.raw_record(&repo.x), leased);
+    assert_eq!(repo.record(&repo.y)["priority"], "high");
 }
 
 #[test]

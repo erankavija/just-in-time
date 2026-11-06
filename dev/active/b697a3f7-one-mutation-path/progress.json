@@ -162,7 +162,7 @@
         },
         {
           "short_id": "700a96dd",
-          "status": "rework-1 (REQ-05 registry in return value and record comparison)"
+          "status": "done"
         }
       ]
     }
@@ -211,7 +211,8 @@
     "9a2563fd": 1,
     "c2b3cefa": 2,
     "d2acb105": 1,
-    "700a96dd": 1
+    "700a96dd": 1,
+    "d3c94dc5": 1
   },
   "surfaced_pitfalls": [
     {

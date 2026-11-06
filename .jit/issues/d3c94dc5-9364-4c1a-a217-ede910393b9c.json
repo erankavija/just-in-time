@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "7fe01edb-31b2-408b-af38-319a1f068e87",
+      "status": "passed",
+      "updated_at": "2026-11-06T04:12:31.546023713Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1e2fcc09-5334-440d-8f8b-98ec41ced1a3",
+      "status": "failed",
+      "updated_at": "2026-11-06T04:16:34.369848263Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d3c94dc5-9364-4c1a-a217-ede910393b9c",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Bulk and dependency edits check leases in their publishing session",
-  "updated_at": "2026-11-06T03:26:21.792552351Z"
+  "updated_at": "2026-11-06T04:16:34.369848263Z"
 }

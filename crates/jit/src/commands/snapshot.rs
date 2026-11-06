@@ -7,9 +7,10 @@ use crate::snapshot::{
     compute_sha256, AssetSnapshot, DocumentSnapshot, IssuesInfo, MetadataInfo, RepoInfo,
     SnapshotFormat, SnapshotManifest, SnapshotScope, SourceInfo, SourceMode, VerificationInfo,
 };
-use crate::storage::git::GitCheckout;
+use crate::storage::git::{GitCheckout, GitObjectReader};
 use crate::storage::{IssueStore, RepositoryStateStore};
 use anyhow::{anyhow, Context, Result};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
@@ -20,6 +21,7 @@ const MAX_REPOSITORY_SNAPSHOT_BYTES: u64 = 128 * 1024 * 1024;
 struct SnapshotExporter<'a, S: IssueStore> {
     storage: &'a S,
     checkout: Option<GitCheckout>,
+    object_reader: RefCell<Option<GitObjectReader>>,
     worktree_root: PathBuf,
     data_root: PathBuf,
     created_at: chrono::DateTime<chrono::Utc>,
@@ -74,6 +76,7 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
         Self {
             storage,
             checkout,
+            object_reader: RefCell::new(None),
             worktree_root,
             data_root,
             created_at,
@@ -119,43 +122,6 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
         docs
     }
 
-    /// Read file content from git at specific commit
-    fn read_from_git(
-        &self,
-        repo: &git2::Repository,
-        path: &str,
-        reference: &str,
-    ) -> Result<(Vec<u8>, SourceInfo)> {
-        let obj = repo
-            .revparse_single(reference)
-            .with_context(|| format!("Failed to resolve git reference: {}", reference))?;
-        let commit = obj
-            .peel_to_commit()
-            .with_context(|| format!("Reference '{}' is not a commit", reference))?;
-        let tree = commit.tree()?;
-
-        let entry = tree.get_path(Path::new(path)).map_err(|_| {
-            // Generic NotFoundError: a path-in-commit not-found has no dedicated
-            // domain type. Still downcastable -> exit 3; message preserved verbatim.
-            crate::errors::NotFoundError::new(format!(
-                "Path '{}' not found in commit {}",
-                path, reference
-            ))
-        })?;
-        let blob = repo.find_blob(entry.id())?;
-
-        let content = blob.content().to_vec();
-
-        Ok((
-            content,
-            SourceInfo {
-                type_: "git".to_string(),
-                commit: Some(commit.id().to_string()),
-                blob_sha: Some(entry.id().to_string()),
-            },
-        ))
-    }
-
     /// Read file content from working tree filesystem
     fn read_from_filesystem(&self, path: &str) -> Result<(Vec<u8>, SourceInfo)> {
         let relative = crate::domain::relative_path::RootRelativePath::parse(path)?;
@@ -181,8 +147,40 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
     fn read_content(&self, path: &str, mode: &SourceMode) -> Result<(Vec<u8>, SourceInfo)> {
         match mode {
             SourceMode::Git { commit } => {
-                let repo = git2::Repository::open(&self.worktree_root)?;
-                self.read_from_git(&repo, path, commit)
+                let checkout = self
+                    .checkout
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("snapshot source requires git repository"))?;
+                let mut reader = self.object_reader.borrow_mut();
+                if reader.is_none() {
+                    *reader = Some(checkout.object_reader()?);
+                }
+                let reader = reader
+                    .as_mut()
+                    .ok_or_else(|| anyhow!("snapshot git object reader is unavailable"))?;
+                let object_name = format!("{commit}:{path}");
+                let object = reader.read(&object_name)?.ok_or_else(|| {
+                    crate::errors::NotFoundError::new(format!(
+                        "Path '{}' not found in commit {}",
+                        path, commit
+                    ))
+                })?;
+                if object.object_type() != crate::storage::git::GitObjectType::Blob {
+                    return Err(anyhow!(
+                        "Path '{}' in commit {} is not a file",
+                        path,
+                        commit
+                    ));
+                }
+
+                Ok((
+                    object.bytes().to_vec(),
+                    SourceInfo {
+                        type_: "git".to_string(),
+                        commit: Some(commit.clone()),
+                        blob_sha: Some(object.id().as_str().to_owned()),
+                    },
+                ))
             }
             SourceMode::WorkingTree => self.read_from_filesystem(path),
         }
@@ -238,10 +236,8 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
         for asset in &assets {
             if let Some(resolved_path) = &asset.resolved_path {
                 let asset_path = resolved_path.to_string_lossy();
-                if let Ok((_, captured_asset)) =
-                    self.capture_file(&asset_path, mode, base, captured)
-                {
-                    asset_snapshots.push(AssetSnapshot {
+                match self.capture_file(&asset_path, mode, base, captured) {
+                    Ok((_, captured_asset)) => asset_snapshots.push(AssetSnapshot {
                         path: asset_path.into_owned(),
                         source: captured_asset.source,
                         hash_sha256: captured_asset.hash_sha256,
@@ -249,7 +245,14 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
                             .unwrap_or_else(|| "application/octet-stream".to_string()),
                         size_bytes: captured_asset.size_bytes,
                         shared: asset.is_shared,
-                    });
+                    }),
+                    Err(error)
+                        if matches!(mode, SourceMode::Git { .. })
+                            && error.is::<crate::errors::NotFoundError>() =>
+                    {
+                        return Err(error);
+                    }
+                    Err(_) => {}
                 }
             }
         }
@@ -499,6 +502,12 @@ This is a read-only export. Future versions may support:
         for doc_ref in &doc_refs {
             match self.create_document_snapshot(doc_ref, mode, base, &mut captured) {
                 Ok(snapshot) => doc_snapshots.push(snapshot),
+                Err(error)
+                    if matches!(mode, SourceMode::Git { .. })
+                        && error.is::<crate::errors::NotFoundError>() =>
+                {
+                    return Err(error);
+                }
                 Err(e) => {
                     warnings.push(format!("Failed to snapshot {}: {}", doc_ref.path, e));
                 }

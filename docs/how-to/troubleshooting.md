@@ -326,7 +326,10 @@ git commit  # Retry
 
 **Symptom:** Hooks don't enforce anything.
 
-**Cause:** The hook isn't installed or enforcement is off. The hook checks only branch divergence on shared configuration; leases are enforced when a mutation is written, and a hand edit of an issue record is not caught at commit.
+**Cause:** The hook isn't installed or enforcement is off. The hook checks only
+branch divergence on shared configuration. Lease enforcement occurs during
+issue writes; a hand edit is not caught at commit. See the
+[Configuration Reference](../reference/configuration.md#enforce_leases).
 
 **Solution:**
 1. Install hooks:
