@@ -19,6 +19,12 @@
       "status": "passed",
       "updated_at": "2026-11-06T05:49:01.966058219Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a1af57ce-dc98-4210-9803-e9071de87d3d",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:52:40.574242893Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "78cb05ed-83b0-4bbb-ae56-69176457a7f0",
@@ -35,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Build-policy check rejects native git and OpenSSL linkage",
-  "updated_at": "2026-11-06T05:49:01.966058219Z"
+  "updated_at": "2026-11-06T05:52:40.574242893Z"
 }

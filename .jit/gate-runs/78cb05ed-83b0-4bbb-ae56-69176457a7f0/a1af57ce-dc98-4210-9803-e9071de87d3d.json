@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-78cb05ed",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3236925fa4508f607bb591aa3a2ec36e19f01755",
+  "completed_at": "2026-11-06T05:52:40.572565164Z",
+  "duration_ms": 218357,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed implementation satisfies the issue's hard criteria with focused fixtures and covered cargo-ci evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "78cb05ed-83b0-4bbb-ae56-69176457a7f0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a1af57ce-dc98-4210-9803-e9071de87d3d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T05:49:02.215412764Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8092bc30b (implementation); 3236925fa (gate record)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/charter/D-11, @/charter/D-18, @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/invariant/bounded-rust-build-footprint, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml); @/issue/f4d9502a/requirement/REQ-01 (issue description)\nGate evidence: cargo-ci passed, exit 0; ancestry contains 8092bc30b and not 3236925fa\nTruncation recovery: narrowed reads of the live scripts, focused test lines, individual patches, and policy sources\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed implementation satisfies the issue's hard criteria with focused fixtures and covered cargo-ci evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
