@@ -2,7 +2,7 @@
   "epic_id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
   "epic_short_id": "b697a3f7",
   "lead_agent_id": "agent:b697a3f7-lead",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
@@ -73,7 +73,7 @@
           "title": "One pure gate-preset catalog serves every preset reader",
           "classification": "implementation",
           "worker": "codex gpt-6.1-sol high",
-          "status": "pending",
+          "status": "dispatched (codex gpt-6.1-sol high)",
           "note": "shares gate.rs/template.rs with c2b3cefa"
         }
       ]
@@ -111,16 +111,16 @@
           "short_id": "d2acb105",
           "title": "One state derivation for update and lifecycle transitions",
           "classification": "implementation",
-          "worker": "tbd",
-          "status": "pending"
+          "worker": "claude opus",
+          "status": "dispatched (claude opus)"
         },
         {
           "id": "7fefd776-6e85-428d-a386-a1512c0a94a1",
           "short_id": "7fefd776",
           "title": "One atomic file publication with a durability argument serves the redo put and external exports",
           "classification": "implementation",
-          "worker": "tbd",
-          "status": "pending"
+          "worker": "claude opus",
+          "status": "dispatched (claude opus)"
         }
       ]
     },
@@ -133,8 +133,8 @@
           "short_id": "905364c1",
           "title": "Document and gate definition writes check their leases in their publishing session",
           "classification": "implementation",
-          "worker": "tbd",
-          "status": "pending"
+          "worker": "codex gpt-6-luna xhigh",
+          "status": "dispatched (codex gpt-6-luna xhigh)"
         }
       ]
     }
@@ -201,5 +201,8 @@
       "item": "external chain",
       "decision": "c140921c after a273667c and 5046408a; then d9ba0029, 7cd27db8, e6ec58f3; that lead notifies on each landing"
     }
+  ],
+  "notes": [
+    "Wave 1 leaves 12064c7b, 4334df62, 9a2563fd, c2b3cefa, f6477007, 4d834432 done; worktrees reclaimed. 1a737bb4 (W1b) and wave 2 (d2acb105, 7fefd776, 905364c1) in flight; dispatched together because all are dependency-ready and their shared files are in disjoint functions."
   ]
 }
