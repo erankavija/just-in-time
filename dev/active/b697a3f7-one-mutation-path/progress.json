@@ -64,7 +64,7 @@
           "title": "Redo apply opens and syncs each parent once per record",
           "classification": "implementation",
           "worker": "claude opus (durability proof)",
-          "status": "pending",
+          "status": "done",
           "note": "shares capability_fs.rs with 4334df62"
         },
         {
