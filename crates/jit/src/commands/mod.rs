@@ -575,57 +575,28 @@ fn read_optimistically<S: crate::storage::RepositoryStateStore, T>(
 }
 
 /// Closed issue-local operations whose final record is derived from the issue
-/// captured by the mutation session. Ordinary commands use this instead of
-/// constructing a full-record `UpdateIssue` from an earlier storage read.
+/// captured by the mutation session: a field update's gate and assignee steps,
+/// gate preset application, and manual gate status.
 #[derive(Clone)]
 enum CapturedIssueMutation {
     Assign {
-        issue_id: IssueId,
         assignee: crate::domain::Assignee,
     },
-    Unassign {
-        issue_id: IssueId,
-    },
+    Unassign,
     AddGates {
-        issue_id: IssueId,
         gate_keys: Vec<GateKey>,
     },
     RemoveGates {
-        issue_id: IssueId,
         gate_keys: Vec<GateKey>,
     },
     SetManualGateStatus {
-        issue_id: IssueId,
         gate_key: GateKey,
         status: GateStatus,
         by: Option<crate::domain::Assignee>,
     },
 }
 
-impl CapturedIssueMutation {
-    fn issue_id(&self) -> &IssueId {
-        match self {
-            Self::Assign { issue_id, .. }
-            | Self::Unassign { issue_id }
-            | Self::AddGates { issue_id, .. }
-            | Self::RemoveGates { issue_id, .. }
-            | Self::SetManualGateStatus { issue_id, .. } => issue_id,
-        }
-    }
-
-    fn captures_gate_registry(&self) -> bool {
-        matches!(
-            self,
-            Self::AddGates { .. } | Self::SetManualGateStatus { .. }
-        )
-    }
-
-    /// Whether the operation publishes a gate-run record: an attestation does.
-    fn records_gate_run(&self) -> bool {
-        matches!(self, Self::SetManualGateStatus { .. })
-    }
-}
-
+#[derive(Debug)]
 enum CapturedIssueMutationOutcome {
     Changed,
     Unchanged,
@@ -1251,7 +1222,8 @@ struct CapturedFieldUpdate {
     remove_gates: Vec<GateKey>,
     assignee: Option<crate::domain::Assignee>,
     unassign: bool,
-    bulk: bool,
+    /// Removing a label the issue lacks is an error rather than a no-op.
+    removed_labels_must_exist: bool,
     force: bool,
     enforce_lease: bool,
     /// Rejection: skips rule enforcement.
@@ -1282,40 +1254,28 @@ impl CapturedFieldUpdate {
             remove_gates: operations.remove_gates.clone(),
             assignee: operations.assignee.clone(),
             unassign: operations.unassign,
-            bulk: true,
+            removed_labels_must_exist: false,
             force,
             enforce_lease: false,
             rejection: false,
         })
     }
 
-    /// The standalone gate and assignee operations a single-issue update
-    /// composes, in the order its CLI flags apply; bulk updates fold these
-    /// fields into their own `issue_updated` record instead.
-    fn issue_local_mutations(&self, issue_id: &IssueId) -> Vec<CapturedIssueMutation> {
-        if self.bulk {
-            return Vec::new();
-        }
-        let issue_id = issue_id.clone();
+    /// The standalone gate and assignee operations the update composes, in
+    /// the order its CLI flags apply.
+    fn issue_local_mutations(&self) -> Vec<CapturedIssueMutation> {
         let assignment = if self.unassign {
-            Some(CapturedIssueMutation::Unassign {
-                issue_id: issue_id.clone(),
-            })
+            Some(CapturedIssueMutation::Unassign)
         } else {
             self.assignee
                 .clone()
-                .map(|assignee| CapturedIssueMutation::Assign {
-                    issue_id: issue_id.clone(),
-                    assignee,
-                })
+                .map(|assignee| CapturedIssueMutation::Assign { assignee })
         };
         [
             (!self.add_gates.is_empty()).then(|| CapturedIssueMutation::AddGates {
-                issue_id: issue_id.clone(),
                 gate_keys: self.add_gates.clone(),
             }),
             (!self.remove_gates.is_empty()).then(|| CapturedIssueMutation::RemoveGates {
-                issue_id: issue_id.clone(),
                 gate_keys: self.remove_gates.clone(),
             }),
             assignment,
@@ -1341,10 +1301,22 @@ impl CapturedFieldUpdate {
             remove_gates: Vec::new(),
             assignee: None,
             unassign: false,
-            bulk: false,
+            removed_labels_must_exist: true,
             force: false,
             enforce_lease: false,
             rejection: false,
+        }
+    }
+
+    /// Gate and assignee changes alone, as `issue update` applies them.
+    fn issue_local(issue_id: IssueId, local: issue::IssueLocalUpdate) -> Self {
+        Self {
+            add_gates: local.add_gates,
+            remove_gates: local.remove_gates,
+            assignee: local.assignee,
+            unassign: local.unassign,
+            enforce_lease: true,
+            ..Self::new(issue_id)
         }
     }
 
@@ -1363,6 +1335,7 @@ impl CapturedFieldUpdate {
 struct DerivedFieldUpdate {
     changed: bool,
     warnings: Vec<String>,
+    local_outcomes: Vec<CapturedIssueMutationOutcome>,
     intents: Vec<crate::repository_state::MutationIntent>,
     error_after_apply: Option<crate::errors::TransitionBlockedError>,
 }
@@ -1372,6 +1345,8 @@ struct CapturedFieldUpdateOutcome {
     issue: Issue,
     changed: bool,
     warnings: Vec<String>,
+    /// One outcome per [`CapturedFieldUpdate::issue_local_mutations`] entry, in order.
+    local_outcomes: Vec<CapturedIssueMutationOutcome>,
 }
 
 fn derive_write_validation(
@@ -1761,6 +1736,7 @@ struct ProjectedFieldUpdate {
     issue: Issue,
     staged: bool,
     events: PhasedEvents,
+    local_outcomes: Vec<CapturedIssueMutationOutcome>,
 }
 
 /// Apply `request`'s field, gate, and assignee edits to `original`; the state
@@ -1771,18 +1747,16 @@ fn project_field_update(
     registry: &crate::declarations::GateRegistry,
     context: &crate::repository_state::MutationContext,
 ) -> Result<ProjectedFieldUpdate> {
-    // A single-issue update stages its gate and assignee changes through the
-    // standalone operations, so it records their events; the inline handling
-    // below then finds them already applied.
-    let (original, staged, events) = request
-        .issue_local_mutations(&original.id)
-        .iter()
-        .try_fold(
-            (original, false, Vec::new()),
-            |(issue, staged, mut events), mutation| {
+    // Gate and assignee changes apply through the standalone operations, which
+    // record their events and report their outcomes.
+    let (original, staged, events, local_outcomes) =
+        request.issue_local_mutations().iter().try_fold(
+            (original, false, Vec::new(), Vec::new()),
+            |(issue, staged, mut events, mut outcomes), mutation| {
                 let applied = apply_captured_issue_mutation(issue, registry, mutation, context)?;
                 events.extend(applied.events);
-                Ok::<_, anyhow::Error>((applied.issue, staged || applied.changed, events))
+                outcomes.push(applied.outcome);
+                Ok::<_, anyhow::Error>((applied.issue, staged || applied.changed, events, outcomes))
             },
         )?;
     let mut issue = original.clone();
@@ -1804,7 +1778,7 @@ fn project_field_update(
         }
     }
     for label in &request.remove_labels {
-        if !request.bulk && !issue.labels.contains(label) {
+        if request.removed_labels_must_exist && !issue.labels.contains(label) {
             return Err(crate::errors::NotFoundError::new(format!(
                 "issue {} has no label '{label}' to remove",
                 issue.id
@@ -1815,29 +1789,6 @@ fn project_field_update(
     }
     if let Some(label) = &request.append_label {
         issue.labels.push(label.clone());
-    }
-    let missing_gates = request
-        .add_gates
-        .iter()
-        .filter(|key| !registry.gates.contains_key(key))
-        .cloned()
-        .collect::<Vec<_>>();
-    if !missing_gates.is_empty() {
-        return Err(crate::storage::GateNotFoundError::new(missing_gates).into());
-    }
-    for gate in &request.add_gates {
-        if !issue.gates_required.contains(gate) {
-            issue.gates_required.push(gate.clone());
-        }
-    }
-    for gate in &request.remove_gates {
-        issue.gates_required.retain(|candidate| candidate != gate);
-        issue.gates_status.remove(gate);
-    }
-    if let Some(assignee) = &request.assignee {
-        issue.assignee = Some(assignee.clone());
-    } else if request.unassign {
-        issue.assignee = None;
     }
     if let Some(kind) = &request.issue_type {
         issue
@@ -1850,6 +1801,7 @@ fn project_field_update(
         issue,
         staged,
         events,
+        local_outcomes,
     })
 }
 
@@ -1865,6 +1817,7 @@ fn derive_field_update(
         mut issue,
         staged,
         mut events,
+        local_outcomes,
     } = projected;
     let mut changed_fields = Vec::new();
     if issue.title != original.title {
@@ -1881,12 +1834,6 @@ fn derive_field_update(
     }
     if issue.content_format != original.content_format {
         changed_fields.push("content_format".to_string());
-    }
-    if issue.gates_required != original.gates_required {
-        changed_fields.push("gates".to_string());
-    }
-    if issue.assignee != original.assignee {
-        changed_fields.push("assignee".to_string());
     }
 
     let (target, gate_error) = match request.state {
@@ -1970,6 +1917,7 @@ fn derive_field_update(
                 return Ok(DerivedFieldUpdate {
                     changed: false,
                     warnings,
+                    local_outcomes,
                     intents: blocked_events
                         .into_iter()
                         .map(|(phase, event)| MutationIntent::RecordEvent {
@@ -1984,24 +1932,12 @@ fn derive_field_update(
     }
 
     let changed = staged || !changed_fields.is_empty() || issue.state != original.state;
-    if issue.assignee != original.assignee {
-        if let Some(assignee) = issue.assignee.clone() {
-            events.push((
-                4,
-                EventBody::draft_issue_claimed(issue.id.clone(), assignee),
-            ));
-        }
-    }
     if !changed_fields.is_empty() && request.append_label.is_none() {
         events.push((
             5,
             EventBody::draft_issue_updated(
                 issue.id.clone(),
-                if request.bulk {
-                    "bulk-update".to_string()
-                } else {
-                    "issue-update".to_string()
-                },
+                "issue-update".to_string(),
                 changed_fields,
             ),
         ));
@@ -2031,6 +1967,7 @@ fn derive_field_update(
     Ok(DerivedFieldUpdate {
         changed,
         warnings,
+        local_outcomes,
         intents,
         error_after_apply: gate_error.or(readiness.error_after_apply),
     })
@@ -2111,7 +2048,7 @@ fn apply_captured_issue_mutation(
                 )
             }
         }
-        CapturedIssueMutation::Unassign { .. } => {
+        CapturedIssueMutation::Unassign => {
             if issue.assignee.is_none() {
                 (CapturedIssueMutationOutcome::Unchanged, Vec::new(), false)
             } else {
@@ -2820,115 +2757,91 @@ impl<S: IssueStore> CommandExecutor<S> {
         )
     }
 
-    /// Rebase one closed issue-local operation on a freshly captured record.
+    /// Publish a manual gate's `status` attested `by`, rebased on a freshly
+    /// captured issue record, gate registry and event log.
     ///
-    /// The request determines its complete capture set. The caller cannot pass a
-    /// record, capture closure, or arbitrary patch. A conflict reopens a session
-    /// and derives again under a fresh context, so the identity and time an
-    /// attempt publishes are sampled under the write lock that publishes them,
-    /// so an attestation's run time is its publication time. The target's lease
-    /// is checked in that session under a claims guard taken before it, by the
-    /// captured enforcement mode; the outcome carries its warnings.
+    /// A conflict reopens a session and derives again under a fresh context,
+    /// so an attestation's run identity and time are sampled under the write
+    /// lock that publishes them. The target's lease is checked in that session
+    /// under a claims guard taken before it, by the captured enforcement mode;
+    /// the outcome carries its warnings.
     fn publish_captured_issue_mutation(
         &self,
-        request: CapturedIssueMutation,
-    ) -> Result<(Issue, CapturedIssueMutationOutcome, Vec<String>)>
+        issue_id: IssueId,
+        gate_key: GateKey,
+        status: GateStatus,
+        by: Option<crate::domain::Assignee>,
+    ) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, CaptureSpec, RepositoryEntry, VirtualPath};
         use std::collections::BTreeSet;
 
+        let request = CapturedIssueMutation::SetManualGateStatus {
+            gate_key,
+            status,
+            by,
+        };
         let layout = self.require_layout()?;
         let claims_guard = claims_mutation_guard(self.require_worktree_paths()?)?;
-        with_mutation_session(
-            &self.storage,
-            &layout,
-            "captured issue mutation",
-            |session| {
-                let context = production_mutation_context();
-                let run_paths = if request.records_gate_run() {
-                    gate_run_record_paths(&context, request.issue_id(), 1)
-                } else {
-                    Vec::new()
-                };
-                let mut paths = BTreeSet::from([
-                    VirtualPath::CONFIG,
-                    VirtualPath::issue_record(request.issue_id()),
-                ]);
-                if request.captures_gate_registry() {
-                    paths.insert(VirtualPath::GATES);
+        with_mutation_session(&self.storage, &layout, "manual gate status", |session| {
+            let context = production_mutation_context();
+            let run_paths = gate_run_record_paths(&context, &issue_id, 1);
+            let mut paths = BTreeSet::from([
+                VirtualPath::CONFIG,
+                VirtualPath::GATES,
+                VirtualPath::issue_record(&issue_id),
+            ]);
+            paths.extend(run_paths.iter().cloned());
+            let base = issue_mutation_capture_budget();
+            let budget = crate::repository_state::CaptureBudget {
+                max_depth: run_paths
+                    .iter()
+                    .map(|path| path.relative().depth())
+                    .fold(base.max_depth, usize::max),
+                ..base
+            };
+            let mut spec = CaptureSpec::new(paths, budget)?;
+            spec.discover_tail(VirtualPath::EVENTS)?;
+            let Some(image) = capture_or_retry(session.capture(spec))? else {
+                return Ok(SessionStep::Retry);
+            };
+            let issue_path = VirtualPath::issue_record(&issue_id);
+            let issue: Issue = match image.entry(&issue_path)? {
+                RepositoryEntry::File { content, .. } => {
+                    crate::repository_state::decode_issue_record(&issue_path, content.bytes())?
                 }
-                paths.extend(run_paths.iter().cloned());
-                let base = issue_mutation_capture_budget();
-                let budget = crate::repository_state::CaptureBudget {
-                    max_depth: run_paths
-                        .iter()
-                        .map(|path| path.relative().depth())
-                        .fold(base.max_depth, usize::max),
-                    ..base
-                };
-                let mut spec = CaptureSpec::new(paths, budget)?;
-                spec.discover_tail(VirtualPath::EVENTS)?;
-                let Some(image) = capture_or_retry(session.capture(spec))? else {
-                    return Ok(SessionStep::Retry);
-                };
-                let issue_path = VirtualPath::issue_record(request.issue_id());
-                let issue: Issue = match image.entry(&issue_path)? {
-                    RepositoryEntry::File { content, .. } => {
-                        crate::repository_state::decode_issue_record(&issue_path, content.bytes())?
-                    }
-                    RepositoryEntry::Absent => {
-                        return Err(crate::storage::IssueNotFoundError::new(
-                            request.issue_id().clone(),
-                        )
-                        .into())
-                    }
-                    _ => return Err(anyhow!("captured issue path is not an ordinary file")),
-                };
-                if &issue.id != request.issue_id() {
-                    return Err(anyhow!(
-                        "captured issue identity mismatch: requested {}, found {}",
-                        request.issue_id(),
-                        issue.id
-                    ));
+                RepositoryEntry::Absent => {
+                    return Err(crate::storage::IssueNotFoundError::new(issue_id.clone()).into())
                 }
-                let registry = if request.captures_gate_registry() {
-                    let path = VirtualPath::GATES;
-                    match image.entry(&path)? {
-                        RepositoryEntry::File { content, .. } => {
-                            crate::declarations::parse_gate_registry(content.bytes())
-                                .context("failed to parse captured gate registry")?
-                        }
-                        RepositoryEntry::Absent => crate::declarations::GateRegistry::default(),
-                        _ => return Err(anyhow!("captured gate registry is not an ordinary file")),
-                    }
-                } else {
-                    crate::declarations::GateRegistry::default()
-                };
+                _ => return Err(anyhow!("captured issue path is not an ordinary file")),
+            };
+            if issue.id != issue_id {
+                return Err(anyhow!(
+                    "captured issue identity mismatch: requested {}, found {}",
+                    issue_id,
+                    issue.id
+                ));
+            }
+            let registry = match image.entry(&VirtualPath::GATES)? {
+                RepositoryEntry::File { content, .. } => {
+                    crate::declarations::parse_gate_registry(content.bytes())
+                        .context("failed to parse captured gate registry")?
+                }
+                RepositoryEntry::Absent => crate::declarations::GateRegistry::default(),
+                _ => return Err(anyhow!("captured gate registry is not an ordinary file")),
+            };
 
-                let warnings = refuse_foreign_leases_held(
-                    crate::repository_state::assemble_config(&image)?.enforcement_mode(),
-                    std::slice::from_ref(request.issue_id()),
-                    claims_guard.as_ref(),
-                )?;
-                let derived = derive_captured_issue_mutation(issue, &registry, &request, &context)?;
-                let issue_result = crate::repository_state::mutated_issue(
-                    &image,
-                    request.issue_id(),
-                    &derived.intents,
-                    context.timestamp(),
-                )?;
-                if derived.intents.is_empty() {
-                    return Ok(SessionStep::Done((issue_result, derived.outcome, warnings)));
-                }
-                let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
-                Ok(SessionStep::Apply(
-                    plan,
-                    (issue_result, derived.outcome, warnings),
-                ))
-            },
-        )
+            let warnings = refuse_foreign_leases_held(
+                crate::repository_state::assemble_config(&image)?.enforcement_mode(),
+                std::slice::from_ref(&issue_id),
+                claims_guard.as_ref(),
+            )?;
+            let derived = derive_captured_issue_mutation(issue, &registry, &request, &context)?;
+            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
+            Ok(SessionStep::Apply(plan, warnings))
+        })
     }
 
     /// Publish `draft`, whose id `context` derived, as a new issue, with its
@@ -3455,6 +3368,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         issue: issue_result,
                         changed: derived.changed,
                         warnings: derived.warnings,
+                        local_outcomes: derived.local_outcomes,
                     })),
                 };
             }
@@ -3468,6 +3382,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     issue: issue_result,
                     changed: derived.changed,
                     warnings: derived.warnings,
+                    local_outcomes: derived.local_outcomes,
                 })),
             }
         })
@@ -4535,7 +4450,6 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
         crate::commands::test_helpers::seed_issue(&storage, issue);
         let layout = storage.repository_layout();
         let request = CapturedIssueMutation::Assign {
-            issue_id: id.clone(),
             assignee: "agent:retry".parse().unwrap(),
         };
         let context = MutationContext::deterministic(
@@ -4595,7 +4509,6 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
         );
         issue.assignee = Some("agent:same".parse().unwrap());
         let request = CapturedIssueMutation::Assign {
-            issue_id: issue.id.clone(),
             assignee: "agent:same".parse().unwrap(),
         };
         let derived = derive_captured_issue_mutation(
@@ -4645,7 +4558,6 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
             crate::commands::test_helpers::seed_issue(&storage, issue);
             let layout = storage.repository_layout();
             let request = CapturedIssueMutation::SetManualGateStatus {
-                issue_id: id.clone(),
                 gate_key: "review".parse().unwrap(),
                 status,
                 by: Some(actor.clone()),
@@ -4745,7 +4657,6 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
             "Pending precedence".to_string(),
         );
         let request = CapturedIssueMutation::SetManualGateStatus {
-            issue_id: issue.id.clone(),
             gate_key: "missing-and-not-required".parse().unwrap(),
             status: GateStatus::Pending,
             by: None,
@@ -4789,7 +4700,6 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
         crate::commands::test_helpers::seed_issue(&storage, issue);
         let layout = storage.repository_layout();
         let request = CapturedIssueMutation::AddGates {
-            issue_id: id.clone(),
             gate_keys: vec!["review".parse().unwrap()],
         };
         let context = MutationContext::deterministic(

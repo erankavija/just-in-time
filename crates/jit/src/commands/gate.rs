@@ -451,14 +451,10 @@ fn derive_gate_preset_application(
         .iter()
         .map(|gate| gate.key.clone())
         .collect::<Vec<_>>();
-    let issue_id = issue.id.clone();
     let derived = super::derive_captured_issue_mutation(
         issue,
         &registry,
-        &super::CapturedIssueMutation::AddGates {
-            issue_id,
-            gate_keys: keys,
-        },
+        &super::CapturedIssueMutation::AddGates { gate_keys: keys },
         context,
     )?;
     let super::CapturedIssueMutationOutcome::GatesAdded {
@@ -701,16 +697,19 @@ impl<S: IssueStore> GateOps<'_, S> {
             return Err(anyhow!("Must provide at least one gate key"));
         }
 
-        let (_, outcome, warnings) =
-            self.exec
-                .publish_captured_issue_mutation(CapturedIssueMutation::AddGates {
-                    issue_id: issue_id.clone(),
-                    gate_keys: gate_keys.to_vec(),
-                })?;
-        let CapturedIssueMutationOutcome::GatesAdded {
+        let outcome = self
+            .exec
+            .publish_captured_field_update(CapturedFieldUpdate::issue_local(
+                issue_id.clone(),
+                super::issue::IssueLocalUpdate {
+                    add_gates: gate_keys.to_vec(),
+                    ..Default::default()
+                },
+            ))?;
+        let Some(CapturedIssueMutationOutcome::GatesAdded {
             added,
             already_exist,
-        } = outcome
+        }) = outcome.local_outcomes.into_iter().next()
         else {
             return Err(anyhow!("unexpected result from captured gate addition"));
         };
@@ -720,7 +719,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 added,
                 already_exist,
             },
-            warnings,
+            outcome.warnings,
         ))
     }
 
@@ -740,17 +739,22 @@ impl<S: IssueStore> GateOps<'_, S> {
             return Err(anyhow!("Must provide at least one gate key"));
         }
 
-        let (_, outcome, warnings) =
-            self.exec
-                .publish_captured_issue_mutation(CapturedIssueMutation::RemoveGates {
-                    issue_id: issue_id.clone(),
-                    gate_keys: gate_keys.to_vec(),
-                })?;
-        let CapturedIssueMutationOutcome::GatesRemoved { removed, not_found } = outcome else {
+        let outcome = self
+            .exec
+            .publish_captured_field_update(CapturedFieldUpdate::issue_local(
+                issue_id.clone(),
+                super::issue::IssueLocalUpdate {
+                    remove_gates: gate_keys.to_vec(),
+                    ..Default::default()
+                },
+            ))?;
+        let Some(CapturedIssueMutationOutcome::GatesRemoved { removed, not_found }) =
+            outcome.local_outcomes.into_iter().next()
+        else {
             return Err(anyhow!("unexpected result from captured gate removal"));
         };
 
-        Ok((GateRemoveResult { removed, not_found }, warnings))
+        Ok((GateRemoveResult { removed, not_found }, outcome.warnings))
     }
 
     /// Mark a gate as passed, then complete the issue if that cleared the last
@@ -852,13 +856,11 @@ impl<S: IssueStore> GateOps<'_, S> {
             .into());
         };
 
-        let (_, _, warnings) = self.exec.publish_captured_issue_mutation(
-            CapturedIssueMutation::SetManualGateStatus {
-                issue_id: full_id.clone(),
-                gate_key: gate_key.clone(),
-                status: GateStatus::Passed,
-                by: Some(by),
-            },
+        let warnings = self.exec.publish_captured_issue_mutation(
+            full_id,
+            gate_key.clone(),
+            GateStatus::Passed,
+            Some(by),
         )?;
 
         Ok(GatePassOutcome { warnings })
@@ -971,13 +973,11 @@ impl<S: IssueStore> GateOps<'_, S> {
             }
         }
 
-        let (_, _, warnings) = self.exec.publish_captured_issue_mutation(
-            CapturedIssueMutation::SetManualGateStatus {
-                issue_id: full_id,
-                gate_key: gate_key.clone(),
-                status: GateStatus::Failed,
-                by,
-            },
+        let warnings = self.exec.publish_captured_issue_mutation(
+            full_id,
+            gate_key.clone(),
+            GateStatus::Failed,
+            by,
         )?;
 
         Ok(warnings)
