@@ -118,7 +118,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Lease enforcement mode",
             EnforcementMode::DEFAULT.to_string(),
-            "Mode applied when the repository's `[worktree]` section omits `enforce_leases`. In `strict` a write is refused only when another agent holds an active lease on the issue. A repository with no `[worktree]` section enforces no leases.",
+            "Mode applied when the repository's `[worktree]` section omits `enforce_leases`. See the [Configuration Reference](configuration.md#enforce_leases) for the rule and its scope.",
         ),
         (
             "Linked-checkout write policy",

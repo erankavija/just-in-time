@@ -182,7 +182,6 @@ impl<S: IssueStore> GraphOps<'_, S> {
         if dep_ids.is_empty() {
             return Err(anyhow!("Must provide at least one dependency"));
         }
-        let warnings = self.exec.refuse_foreign_lease(issue_id)?;
         match self
             .exec
             .publish_captured_dependency_mutation(CapturedDependencyMutation::Batch {
@@ -190,9 +189,7 @@ impl<S: IssueStore> GraphOps<'_, S> {
                 dependency_ids: dep_ids.to_vec(),
                 policy,
             })? {
-            CapturedDependencyOutcome::Batch(result) => {
-                Ok(DependenciesAddResult { warnings, ..result })
-            }
+            CapturedDependencyOutcome::Batch(result) => Ok(result),
             _ => unreachable!("batch dependency request returns a batch outcome"),
         }
     }
@@ -223,6 +220,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let context = super::production_mutation_context();
 
         with_mutation_attempts("dependency mutation", || {
+            let claims_guard = claims_mutation_guard(self.require_worktree_paths()?)?;
             let mut session = self.storage.open_mutation_session(layout.clone())?;
             let Some(crate::commands::validate::MutationBase { image, issues }) =
                 self.capture_mutation_base(session.as_mut(), &[], &[])?
@@ -239,8 +237,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let source_id = super::require_issue_in_capture(&issues, issue_id)?;
             let graph = super::CapturedGraphEvidence::capture(&image, &issues, &context)?;
-            let derived =
+            let warnings = refuse_foreign_leases_held(
+                graph.declarations.config().enforcement_mode(),
+                std::slice::from_ref(&source_id),
+                claims_guard.as_ref(),
+            )?;
+            let mut derived =
                 derive_batch_dependency_add(&issues, &source_id, dependency_ids, *policy, &graph)?;
+            if let CapturedDependencyOutcome::Batch(result) = &mut derived.outcome {
+                result.warnings = warnings;
+            }
             if derived.intents.is_empty() {
                 return match derived.error_after_apply {
                     Some(error) => Err(error.into()),
@@ -267,14 +273,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
-        let enforce_lease = matches!(request, CapturedDependencyMutation::RemoveSingle { .. });
         with_mutation_attempts("dependency removal", || {
-            // The claims guard depends only on the request, so it is taken before
-            // the one session whose image resolves the removal and lease policy.
-            let claims_guard = enforce_lease
-                .then(|| claims_mutation_guard(self.require_worktree_paths()?))
-                .transpose()?
-                .flatten();
+            // Claims coordination precedes the session that resolves and publishes removal.
+            let claims_guard = claims_mutation_guard(self.require_worktree_paths()?)?;
             let mut session = self.storage.open_mutation_session(layout.clone())?;
             let Some(crate::commands::validate::MutationBase { image, issues }) =
                 self.capture_mutation_base(session.as_mut(), &[], &[])?
@@ -299,28 +300,24 @@ impl<S: IssueStore> CommandExecutor<S> {
                 },
                 _ => unreachable!("removal coordinator receives only removals"),
             };
-            let warning = if enforce_lease {
-                let (CapturedDependencyMutation::RemoveSingle {
-                    issue_id: resolved_id,
-                    ..
-                }
-                | CapturedDependencyMutation::RemoveBatch {
-                    issue_id: resolved_id,
-                    ..
-                }) = &resolved_request
-                else {
-                    unreachable!("removal coordinator receives only removals");
-                };
-                refuse_foreign_leases_held(
-                    graph.declarations.config().enforcement_mode(),
-                    std::slice::from_ref(resolved_id),
-                    claims_guard.as_ref(),
-                )?
-                .into_iter()
-                .next()
-            } else {
-                None
+            let (CapturedDependencyMutation::RemoveSingle {
+                issue_id: resolved_id,
+                ..
+            }
+            | CapturedDependencyMutation::RemoveBatch {
+                issue_id: resolved_id,
+                ..
+            }) = &resolved_request
+            else {
+                unreachable!("removal coordinator receives only removals");
             };
+            let warning = refuse_foreign_leases_held(
+                graph.declarations.config().enforcement_mode(),
+                std::slice::from_ref(resolved_id),
+                claims_guard.as_ref(),
+            )?
+            .into_iter()
+            .next();
             let derived = derive_dependency_removal(&issues, &resolved_request, warning, &graph)?;
             if derived.intents.is_empty() {
                 return match derived.error_after_apply {
@@ -357,16 +354,13 @@ impl<S: IssueStore> GraphOps<'_, S> {
         if dep_ids.is_empty() {
             return Ok(DependenciesRemoveResult::default());
         }
-        let warnings = self.exec.refuse_foreign_lease(issue_id)?;
         match self.exec.publish_captured_dependency_mutation(
             CapturedDependencyMutation::RemoveBatch {
                 issue_id: issue_id.clone(),
                 dependency_ids: dep_ids.to_vec(),
             },
         )? {
-            CapturedDependencyOutcome::RemovedBatch(result) => {
-                Ok(DependenciesRemoveResult { warnings, ..result })
-            }
+            CapturedDependencyOutcome::RemovedBatch(result) => Ok(result),
             _ => unreachable!("batch removal returns a batch-removal outcome"),
         }
     }
@@ -407,7 +401,10 @@ fn derive_dependency_removal(
             dependency_ids,
         } => {
             let issue = captured_issue(issues, issue_id)?;
-            let mut result = DependenciesRemoveResult::default();
+            let mut result = DependenciesRemoveResult {
+                warnings: warning.into_iter().collect(),
+                ..Default::default()
+            };
             for id in dependency_ids {
                 if issue.dependencies.contains(id) && !result.removed.contains(id) {
                     result.removed.push(id.clone());
@@ -749,6 +746,157 @@ mod captured_tests {
     use crate::domain::event_catalog::EventTag;
     use crate::storage::{InMemoryStorage, IssueStore, MutationPoint, RepositoryStateStore};
     use crate::test_utils::add_reducing_edge;
+
+    #[test]
+    fn test_add_dependencies_with_policy_strict_refuses_foreign_lease_and_allows_unleased_issue() {
+        use crate::commands::test_helpers::{
+            plant_foreign_lease, seed_issue, setup_coordinated_with_enforcement,
+        };
+
+        let executor = setup_coordinated_with_enforcement("strict");
+        let leased_source = crate::test_utils::fixture_issue("leased source".into(), String::new());
+        let leased_source_id = leased_source.id.clone();
+        let leased_dependency =
+            crate::test_utils::fixture_issue("leased dependency".into(), String::new());
+        let leased_dependency_id = leased_dependency.id.clone();
+        let unleased_source =
+            crate::test_utils::fixture_issue("unleased source".into(), String::new());
+        let unleased_source_id = unleased_source.id.clone();
+        let unleased_dependency =
+            crate::test_utils::fixture_issue("unleased dependency".into(), String::new());
+        let unleased_dependency_id = unleased_dependency.id.clone();
+        [
+            leased_source,
+            leased_dependency,
+            unleased_source,
+            unleased_dependency,
+        ]
+        .into_iter()
+        .for_each(|issue| seed_issue(&executor.storage, issue));
+        let holder = plant_foreign_lease(&executor, &leased_source_id);
+
+        let error = executor
+            .graph()
+            .add_dependencies_with_policy(
+                &leased_source_id,
+                std::slice::from_ref(&leased_dependency_id),
+                RedundancyPolicy::Reduce,
+            )
+            .unwrap_err();
+
+        let refusal = error
+            .downcast_ref::<crate::errors::ForeignLeaseError>()
+            .expect("the strict refusal is a ForeignLeaseError");
+        assert_eq!(refusal.leases()[0].issue_id, leased_source_id);
+        assert_eq!(refusal.leases()[0].holder, holder);
+        assert!(executor
+            .storage
+            .load_issue(&leased_source_id)
+            .unwrap()
+            .dependencies
+            .is_empty());
+
+        let result =
+            add_reducing_edge(&executor, &unleased_source_id, &unleased_dependency_id).unwrap();
+
+        assert!(result.warnings.is_empty());
+        assert_eq!(
+            executor
+                .storage
+                .load_issue(&unleased_source_id)
+                .unwrap()
+                .dependencies,
+            [unleased_dependency_id]
+        );
+    }
+
+    #[test]
+    fn test_remove_dependencies_strict_refuses_foreign_lease_and_allows_unleased_issue() {
+        use crate::commands::test_helpers::{
+            plant_foreign_lease, seed_issue, setup_coordinated_with_enforcement,
+        };
+
+        let executor = setup_coordinated_with_enforcement("strict");
+        let dependency = crate::test_utils::fixture_issue("dependency".into(), String::new());
+        let dependency_id = dependency.id.clone();
+        let mut leased_source =
+            crate::test_utils::fixture_issue("leased source".into(), String::new());
+        let leased_source_id = leased_source.id.clone();
+        leased_source.dependencies.push(dependency_id.clone());
+        let mut unleased_source =
+            crate::test_utils::fixture_issue("unleased source".into(), String::new());
+        let unleased_source_id = unleased_source.id.clone();
+        unleased_source.dependencies.push(dependency_id.clone());
+        [dependency, leased_source, unleased_source]
+            .into_iter()
+            .for_each(|issue| seed_issue(&executor.storage, issue));
+        plant_foreign_lease(&executor, &leased_source_id);
+
+        let error = executor
+            .graph()
+            .remove_dependencies(&leased_source_id, std::slice::from_ref(&dependency_id))
+            .unwrap_err();
+
+        let refusal = error
+            .downcast_ref::<crate::errors::ForeignLeaseError>()
+            .expect("the strict refusal is a ForeignLeaseError");
+        assert_eq!(refusal.leases()[0].issue_id, leased_source_id);
+        let dependencies = executor
+            .storage
+            .load_issue(&leased_source_id)
+            .unwrap()
+            .dependencies;
+        assert_eq!(
+            dependencies.as_slice(),
+            std::slice::from_ref(&dependency_id)
+        );
+
+        let result = executor
+            .graph()
+            .remove_dependencies(&unleased_source_id, std::slice::from_ref(&dependency_id))
+            .unwrap();
+
+        assert!(result.warnings.is_empty());
+        assert_eq!(result.removed, [dependency_id]);
+        assert!(executor
+            .storage
+            .load_issue(&unleased_source_id)
+            .unwrap()
+            .dependencies
+            .is_empty());
+    }
+
+    #[test]
+    fn test_dependency_batches_warn_for_the_leased_target() {
+        use crate::commands::test_helpers::{
+            plant_foreign_lease, seed_issue, setup_coordinated_with_enforcement,
+        };
+
+        let executor = setup_coordinated_with_enforcement("warn");
+        let source = crate::test_utils::fixture_issue("source".into(), String::new());
+        let source_id = source.id.clone();
+        let dependency = crate::test_utils::fixture_issue("dependency".into(), String::new());
+        let dependency_id = dependency.id.clone();
+        [source, dependency]
+            .into_iter()
+            .for_each(|issue| seed_issue(&executor.storage, issue));
+        let holder = plant_foreign_lease(&executor, &source_id);
+
+        let added = add_reducing_edge(&executor, &source_id, &dependency_id).unwrap();
+        let removed = executor
+            .graph()
+            .remove_dependencies(&source_id, std::slice::from_ref(&dependency_id))
+            .unwrap();
+
+        assert!(added
+            .warnings
+            .iter()
+            .any(|warning| warning.contains(&holder.to_string())));
+        assert!(removed
+            .warnings
+            .iter()
+            .any(|warning| warning.contains(&holder.to_string())));
+    }
 
     #[derive(Default)]
     struct OneFailure(std::sync::Mutex<Option<MutationPoint>>);
