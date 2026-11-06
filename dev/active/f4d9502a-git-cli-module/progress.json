@@ -563,7 +563,7 @@
     },
     {
       "issue": "053b109e",
-      "status": "filed_dispatching",
+      "status": "done_2026-11-06",
       "subject": "Pre-existing RustSec advisories block dependency-audit on main",
       "ruling": "2026-11-06 steward 9b: option 1, lead owns remediation; semver-compatible cargo update only; hard stop with list if any advisory needs major bump, dependency swap, feature change, or any audit ignore/policy change (user's call under D-11); notify f3, 71 and steward before landing the shared Cargo.lock change; option 3 (narrow gate) declined.",
       "evidence": "cargo audit -D warnings exit 0 (same DB), Cargo.lock only. syn 3.0.9 enters solely via futures-macro 0.3.34 (proc-macro, required by futures-util 0.3.34), so it is build-time only and never in the runtime binary; steward accepted it conditional on unchanged build-footprint budgets passing."

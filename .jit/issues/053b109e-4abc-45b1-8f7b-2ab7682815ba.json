@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "The committed Rust dependency graph carries advisories that the current RustSec database reports, so the blocking dependency audit fails on every branch. This issue clears them within semver-compatible updates, as @/charter/D-11 requires for v1.0.\n\n## Background\n\n- `cargo audit -D warnings` against main's `Cargo.lock` reports ten vulnerabilities and two denied warnings in `rustls`, `rustls-webpki`, `webpki-roots` (through `ureq`), `pulldown-cmark`, `h2`, `tokio` (unsound `AsyncFd` constructors) and `pin-utils` (unmaintained, through `hyper` and `futures-util`), among others.\n- The earlier remediation (d3709cc6) left the graph advisory-free; these advisories were published after it.\n- The dependency audit is a configured, blocking gate and its policy has no ignore list.\n\n## Success Criteria\n\n- [hard] REQ-01: `cargo audit -D warnings` exits zero against the committed `Cargo.lock` with no advisory ignore, allowlist or other audit-policy change.\n- [hard] REQ-02: Every dependency change is a semver-compatible lockfile update; no manifest version requirement is raised across a major version, no dependency is replaced, and no feature set changes.\n- [hard] REQ-03: Workspace formatting, clippy with zero warnings, all-target and all-feature builds, and the Rust test suites pass after the update, with CLI and server verified together.\n\n## Notes\n\n- Blast radius: `Cargo.lock`, and only source or tests that a semver-compatible API change requires.\n- An advisory that only a major bump, a dependency swap, a feature change or an audit ignore can clear is out of scope for this issue and needs a separate decision.\n",
   "documents": [],
+  "done_at": "2026-11-06T05:08:01.094091077Z",
   "first_ready_at": "2026-11-06T04:50:24.195864631Z",
   "gates_required": [
     "cargo-ci",
@@ -16,9 +17,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "7b4b2a79-4774-4288-900b-46025dc22338",
+      "run_id": "3c8a7c7d-e183-4990-8cf4-6af56bf0113a",
       "status": "passed",
-      "updated_at": "2026-11-06T04:55:12.001784024Z",
+      "updated_at": "2026-11-06T05:07:52.070195625Z",
       "updated_by": "auto:executor"
     },
     "cargo-ci-features": {
@@ -54,7 +55,7 @@
     "per:@/charter/D-11"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Clear the Rust dependency advisories reported against the current lockfile",
-  "updated_at": "2026-11-06T05:05:22.253857075Z"
+  "updated_at": "2026-11-06T05:08:01.094091077Z"
 }
