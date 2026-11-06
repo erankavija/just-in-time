@@ -26,7 +26,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Document and gate definition writes check their leases in their publishing session",
-  "updated_at": "2026-11-06T00:59:19.834047102Z"
+  "updated_at": "2026-11-06T01:13:17.207056695Z"
 }
