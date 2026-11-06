@@ -222,6 +222,11 @@
       "with": "f4d9502a lead (just-in-time-13)",
       "item": "external chain",
       "decision": "c140921c after a273667c and 5046408a; then d9ba0029, 7cd27db8, e6ec58f3; that lead notifies on each landing"
+    },
+    {
+      "with": "f4d9502a lead (just-in-time-13)",
+      "item": "external chain",
+      "decision": "c140921c landed df02f5271; d9ba0029 and 7cd27db8 ready and being dispatched by that lead; e6ec58f3 after d9ba0029. Git commit resolution now spawns cat-file --batch-check -Z, not rev-parse: tests counting git children by argv[0]=='rev-parse' must follow."
     }
   ],
   "notes": [
