@@ -1,19 +1,68 @@
 //! Worktree inspection and execution.
 
-use super::CommandExecutor;
+use super::{CommandExecutor, RepositoryInvocation};
 use crate::domain::identity::WorktreeId;
 use crate::domain::store_divergence::{compare_stores, StoreDivergence, StoreRecords};
 use crate::errors::{GitRequirementGap, RequiresGitError};
-use crate::repository_state::RECORD_SCRATCH_DIR;
 use crate::storage::claim_coordinator::{read_active_leases, Lease};
 use crate::storage::git::BaseComparison;
+use crate::storage::repository_state_store::DataRootHold;
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
-use crate::storage::{IssueStore, StorageWarning, RECORD_FILE_NAME};
-use anyhow::{anyhow, ensure, Context, Result};
+use crate::storage::{IssueStore, JsonFileStorage, StorageWarning};
+use anyhow::{anyhow, Context, Result};
 use schemars::JsonSchema;
 use serde::Serialize;
+use std::path::PathBuf;
 use std::process::{Command, ExitStatus};
+
+/// Selected data and invocation cwd for running a child under the writer mutex.
+pub struct WorktreeExec {
+    storage: JsonFileStorage,
+    current_dir: PathBuf,
+}
+
+impl WorktreeExec {
+    pub(crate) fn for_invocation(invocation: &RepositoryInvocation) -> Self {
+        let (data_root, _) = super::bootstrap::select_data_root(invocation);
+        Self {
+            storage: JsonFileStorage::new(data_root),
+            current_dir: invocation.current_dir.clone(),
+        }
+    }
+
+    pub(crate) fn for_executor(
+        executor: &CommandExecutor<JsonFileStorage>,
+        current_dir: PathBuf,
+    ) -> Self {
+        Self {
+            storage: executor.storage.clone(),
+            current_dir,
+        }
+    }
+
+    pub(crate) fn run(&self, program: &str, args: &[String]) -> Result<ExitStatus> {
+        let _held =
+            match self
+                .storage
+                .hold_initialized_data_root()
+                .map_err(|error| match error {
+                    crate::storage::RepositoryStateStoreError::Other(error) => error,
+                    error => error.into(),
+                })? {
+                DataRootHold::Initialized(held) => held,
+                DataRootHold::PendingRecord(path) => anyhow::bail!(
+                    "Refusing to run over a leftover redo record at {}: run `jit recover` first",
+                    path.display()
+                ),
+            };
+        Command::new(program)
+            .args(args)
+            .current_dir(&self.current_dir)
+            .status()
+            .map_err(|error| anyhow!("Failed to run {program}: {error}"))
+    }
+}
 
 /// Worktree information for display
 #[derive(Debug, Serialize, JsonSchema)]
@@ -78,25 +127,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 }
 
 impl<S: IssueStore> WorktreeOps<'_, S> {
-    /// Run a child under the repository write lock, refusing a leftover redo record.
-    pub fn exec(&self, program: &str, args: &[String]) -> Result<ExitStatus> {
-        let layout = self.exec.repository_layout()?;
-        let _guard = self.exec.storage.acquire_repo_write_lock()?;
-        let record = layout
-            .data_root()
-            .join(RECORD_SCRATCH_DIR)
-            .join(RECORD_FILE_NAME);
-        ensure!(
-            !record.exists(),
-            "Refusing to run over a leftover redo record at {}: run `jit recover` first",
-            record.display()
-        );
-        Command::new(program)
-            .args(args)
-            .status()
-            .map_err(|error| anyhow!("Failed to run {program}: {error}"))
-    }
-
     /// Current checkout identity, branch and paths, with relocation warnings.
     pub fn info(&self) -> Result<(WorktreeInfo, Vec<StorageWarning>)> {
         let paths = self.exec.require_worktree_paths()?;
@@ -261,11 +291,157 @@ pub struct StoreDivergenceReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::{RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
 
     use anyhow::Result;
 
     // Use shared test utilities
     use crate::test_utils::setup_test_repo;
+
+    #[test]
+    fn test_worktree_exec_selects_data_independently_of_child_cwd_without_code_authority() {
+        let (_repo, storage) = setup_test_repo().unwrap();
+        let cwd = tempfile::tempdir().unwrap();
+        std::fs::write(cwd.path().join(".git"), "unusable Git context").unwrap();
+        std::fs::write(storage.root().join("config.toml"), "not = valid = toml").unwrap();
+        let invocation = super::super::RepositoryInvocation {
+            current_dir: cwd.path().to_path_buf(),
+            data_dir_override: Some(storage.root().to_path_buf()),
+            worktree_root_override: Some(storage.root().to_path_buf()),
+            is_init: false,
+            opens_mutation_session: false,
+            coordinates_claims_first: false,
+            is_validation_exempt: false,
+            is_recover: false,
+            write_override: None,
+        };
+        let operation = WorktreeExec::for_invocation(&invocation);
+        operation
+            .run("sh", &["-c".into(), "pwd > ran".into()])
+            .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(cwd.path().join("ran"))
+                .unwrap()
+                .trim(),
+            cwd.path().to_str().unwrap()
+        );
+        assert!(!storage.root().join("ran").exists());
+    }
+
+    #[test]
+    fn test_worktree_exec_refuses_pending_before_invalid_initialization_without_replay() {
+        let (repo, storage) = setup_test_repo().unwrap();
+        let record = storage
+            .root()
+            .join(RECORD_SCRATCH_DIR)
+            .join(RECORD_FILE_NAME);
+        std::fs::create_dir_all(record.parent().unwrap()).unwrap();
+        std::fs::write(&record, b"leftover").unwrap();
+        std::fs::write(storage.root().join("index.json"), b"invalid index").unwrap();
+        let operation = WorktreeExec {
+            storage,
+            current_dir: repo.path().to_path_buf(),
+        };
+        let error = operation
+            .run("sh", &["-c".into(), "touch ran".into()])
+            .unwrap_err();
+        assert!(error.to_string().contains(&format!(
+            "Refusing to run over a leftover redo record at {}: run `jit recover` first",
+            record.display()
+        )));
+        assert_eq!(std::fs::read(record).unwrap(), b"leftover");
+        assert!(!repo.path().join("ran").exists());
+    }
+
+    #[test]
+    fn test_worktree_exec_requires_clean_initialized_data_before_launch() {
+        for contents in [None, Some(b"invalid index".as_slice())] {
+            let (repo, storage) = setup_test_repo().unwrap();
+            let index = storage.root().join("index.json");
+            match contents {
+                None => std::fs::remove_file(index).unwrap(),
+                Some(bytes) => std::fs::write(index, bytes).unwrap(),
+            }
+            let operation = WorktreeExec {
+                storage,
+                current_dir: repo.path().to_path_buf(),
+            };
+            assert!(operation
+                .run("sh", &["-c".into(), "touch ran".into()])
+                .is_err());
+            assert!(!repo.path().join("ran").exists());
+        }
+    }
+
+    #[test]
+    fn test_worktree_exec_preserves_typed_initialized_store_failures() {
+        let (repo, storage) = setup_test_repo().unwrap();
+        let missing = WorktreeExec {
+            storage: JsonFileStorage::new(repo.path().join("absent")),
+            current_dir: repo.path().to_path_buf(),
+        };
+        let missing_error = missing
+            .run("sh", &["-c".into(), "touch ran".into()])
+            .unwrap_err();
+
+        let index = crate::repository_state::RepositoryIndex {
+            schema_version: crate::repository_state::RepositoryIndex::default().schema_version + 1,
+            ..Default::default()
+        };
+        std::fs::write(
+            storage.root().join("index.json"),
+            serde_json::to_vec(&index).unwrap(),
+        )
+        .unwrap();
+        let unsupported = WorktreeExec {
+            storage,
+            current_dir: repo.path().to_path_buf(),
+        };
+        let format_error = unsupported
+            .run("sh", &["-c".into(), "touch ran".into()])
+            .unwrap_err();
+
+        assert_eq!(
+            (
+                missing_error.is::<crate::storage::RepositoryNotFoundError>(),
+                format_error.is::<crate::storage::RepositoryFormatUnsupportedError>(),
+            ),
+            (true, true),
+            "storage failures retain their concrete types across command propagation"
+        );
+        assert!(!repo.path().join("ran").exists());
+    }
+
+    #[test]
+    fn test_worktree_exec_releases_the_lock_chain_on_child_return_and_spawn_error() {
+        use crate::storage::RepoWriteLock;
+        use std::time::Duration;
+
+        for spawn_error in [false, true] {
+            let (repo, storage) = setup_test_repo().unwrap();
+            let operation = WorktreeExec {
+                storage: storage.clone(),
+                current_dir: repo.path().to_path_buf(),
+            };
+            let absent_program = repo.path().join("absent-program");
+            let result = if spawn_error {
+                operation.run(absent_program.to_str().unwrap(), &[])
+            } else {
+                operation.run("sh", &["-c".into(), "true".into()])
+            };
+            assert_eq!(result.is_err(), spawn_error);
+            let _repository = RepoWriteLock::for_storage_root(storage.root(), Duration::ZERO)
+                .acquire()
+                .unwrap();
+            let _bootstrap = RepoWriteLock::for_lock_path(
+                repo.path()
+                    .join(crate::repository_state::BOOTSTRAP_LOCK_FILE),
+                Duration::ZERO,
+            )
+            .acquire()
+            .unwrap();
+        }
+    }
 
     #[test]
     fn test_worktree_info_structure() -> Result<()> {

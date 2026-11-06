@@ -86,7 +86,7 @@ pub enum RepositoryStateStoreError {
     RedoApply(#[source] Box<RedoApplyError>),
     #[error("unsafe repository mutation target: {0}")]
     UnsafeTarget(String),
-    #[error(transparent)]
+    #[error("{0}")]
     Io(#[from] std::io::Error),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
@@ -439,19 +439,13 @@ impl CommitObservation {
     }
 }
 
-/// A lock-free data capability, usable before a code root is selected.
-pub(crate) struct DataReadSession {
+struct DataRootHandle {
     data_root: PathBuf,
     evidence: RepositoryRootEvidence,
     roots: CapabilityRoots,
-    opened: CommitObservation,
 }
 
-impl DataReadSession {
-    pub(crate) fn open(data: &Path) -> Result<Self, RepositoryStateStoreError> {
-        Self::open_after_missing(data, || {})
-    }
-
+impl DataRootHandle {
     fn open_after_missing(
         data: &Path,
         after_missing: impl FnMut(),
@@ -465,17 +459,45 @@ impl DataReadSession {
                 path: data_root.display().to_string(),
             });
         }
-        let opened = observe_json_commits(&roots)?;
         Ok(Self {
             data_root,
             evidence,
             roots,
-            opened,
         })
     }
 
+    fn is_current(&self) -> Result<bool, RepositoryStateStoreError> {
+        Ok(discover_data_read_evidence(&self.data_root, || {})? == self.evidence)
+    }
+
+    fn reopen(&self) -> Result<CapabilityRoots, RepositoryStateStoreError> {
+        let (roots, _, _) = CapabilityRoots::open_data(&self.evidence)?;
+        Ok(roots)
+    }
+}
+
+/// A lock-free data capability, usable before a code root is selected.
+pub(crate) struct DataReadSession {
+    root: DataRootHandle,
+    opened: CommitObservation,
+}
+
+impl DataReadSession {
+    pub(crate) fn open(data: &Path) -> Result<Self, RepositoryStateStoreError> {
+        Self::open_after_missing(data, || {})
+    }
+
+    fn open_after_missing(
+        data: &Path,
+        after_missing: impl FnMut(),
+    ) -> Result<Self, RepositoryStateStoreError> {
+        let root = DataRootHandle::open_after_missing(data, after_missing)?;
+        let opened = observe_json_commits(&root.roots)?;
+        Ok(Self { root, opened })
+    }
+
     pub(crate) fn has_data_root(&self) -> bool {
-        self.roots.root(RepositoryRootClass::Data).is_some()
+        self.root.roots.root(RepositoryRootClass::Data).is_some()
     }
 
     pub(crate) fn read(
@@ -487,15 +509,15 @@ impl DataReadSession {
         if path.root_class() != RepositoryRootClass::Data {
             return Err(RepositoryStateStoreError::UnsafeTarget(format!("{path:?}")));
         }
-        inspect_capability_path(&self.roots, path, mode)
+        inspect_capability_path(&self.root.roots, path, mode)
     }
 
     pub(crate) fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError> {
-        if discover_data_read_evidence(&self.data_root, || {})? != self.evidence {
+        if !self.root.is_current()? {
             return Ok(ReadAdmission::Moved);
         }
-        let (roots, _, _) = CapabilityRoots::open_data(&self.evidence)?;
-        self.opened.admit(observe_json_commits(&roots))
+        self.opened
+            .admit(observe_json_commits(&self.root.reopen()?))
     }
 
     fn declarations(&self) -> Result<[Option<Vec<u8>>; 3], RepositoryStateStoreError> {
@@ -511,6 +533,80 @@ impl DataReadSession {
             read(&VirtualPath::TEMPLATES)?,
             read(&VirtualPath::INVARIANTS)?,
         ])
+    }
+}
+
+/// A present data root bound to its precheck, with repository released before bootstrap.
+pub(crate) struct HeldDataRoot {
+    _root: DataRootHandle,
+    _repository: RepoWriteGuard,
+    _bootstrap: RepoWriteGuard,
+}
+
+pub(crate) enum DataRootHold {
+    PendingRecord(PathBuf),
+    Initialized(HeldDataRoot),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HoldPoint {
+    LockChainAcquired,
+    IndexCaptured,
+}
+
+impl JsonFileStorage {
+    pub(crate) fn hold_initialized_data_root(
+        &self,
+    ) -> Result<DataRootHold, RepositoryStateStoreError> {
+        self.hold_initialized_data_root_at(|_| {})
+    }
+
+    fn hold_initialized_data_root_at(
+        &self,
+        mut at: impl FnMut(HoldPoint),
+    ) -> Result<DataRootHold, RepositoryStateStoreError> {
+        let mut root = DataRootHandle::open_after_missing(self.root(), || {})?;
+        if root.roots.root(RepositoryRootClass::Data).is_none() {
+            return Err(RepositoryStateStoreError::Other(
+                crate::storage::RepositoryNotFoundError::new(root.data_root.display().to_string())
+                    .into(),
+            ));
+        }
+        let conflict = || RepositoryStateStoreError::RetryableConflict {
+            path: root.data_root.display().to_string(),
+        };
+        let bootstrap = self.acquire_bootstrap_write_lock()?;
+        if !root.is_current()? {
+            return Err(conflict());
+        }
+        let repository = self.acquire_repo_write_lock_raw()?;
+        at(HoldPoint::LockChainAcquired);
+        if !root.is_current()? {
+            return Err(conflict());
+        }
+        let roots = root.reopen()?;
+        if open_leftover_record(&roots)?.is_some() {
+            if !root.is_current()? {
+                return Err(conflict());
+            }
+            return Ok(DataRootHold::PendingRecord(
+                root.data_root
+                    .join(RECORD_SCRATCH_DIR)
+                    .join(RECORD_FILE_NAME),
+            ));
+        }
+        let index = inspect_capability_path(&roots, &VirtualPath::INDEX, ReadMode::Whole);
+        at(HoldPoint::IndexCaptured);
+        if !root.is_current()? {
+            return Err(conflict());
+        }
+        super::json::validate_captured_index(&root.data_root, true, &index?)?;
+        root.roots = roots;
+        Ok(DataRootHold::Initialized(HeldDataRoot {
+            _root: root,
+            _repository: repository,
+            _bootstrap: bootstrap,
+        }))
     }
 }
 
@@ -577,7 +673,7 @@ impl ConfigurationObservation {
         Ok(Some((|| {
             if let Some(index) = index {
                 super::json::validate_captured_index(
-                    &session.data_root,
+                    &session.root.data_root,
                     session.has_data_root(),
                     &index?,
                 )?;
@@ -586,8 +682,8 @@ impl ConfigurationObservation {
             let document =
                 crate::declarations::ConfigurationDocument::parse(declarations[0].as_deref());
             Ok(Self {
-                data_root: session.data_root,
-                evidence: session.evidence,
+                data_root: session.root.data_root,
+                evidence: session.root.evidence,
                 opened: session.opened,
                 declarations,
                 document,
@@ -615,7 +711,7 @@ impl ConfigurationObservation {
 
     pub(in crate::storage) fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError> {
         let current = DataReadSession::open(&self.data_root)?;
-        if current.evidence != self.evidence {
+        if current.root.evidence != self.evidence {
             return Ok(ReadAdmission::Moved);
         }
         let admission = self.opened.admit(Ok(current.opened.clone()))?;

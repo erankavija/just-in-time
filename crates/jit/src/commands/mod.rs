@@ -2446,6 +2446,12 @@ fn require_issue_in_capture(issues: &[Issue], id: &IssueId) -> Result<IssueId> {
         .ok_or_else(|| crate::storage::IssueNotFoundError::new(id.clone()).into())
 }
 
+pub(crate) fn configuration_argument_error(
+    error: impl std::fmt::Display,
+) -> crate::errors::InvalidArgumentError {
+    crate::errors::InvalidArgumentError::new(format!("invalid .jit/config.toml: {error}"))
+}
+
 /// Executes CLI commands with business logic and validation.
 ///
 /// Generic over storage backend to support different implementations
@@ -2925,10 +2931,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.config
             .get_or_init(|| self.config_manager.load().map_err(|err| err.to_string()))
             .as_ref()
-            .map_err(|err| {
-                crate::errors::InvalidArgumentError::new(format!("invalid .jit/config.toml: {err}"))
-                    .into()
-            })
+            .map_err(|err| configuration_argument_error(err).into())
     }
 
     /// Return the cached label namespace registry, building it on first access.

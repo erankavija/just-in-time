@@ -15,7 +15,7 @@
 //! emitter renders (human) or lists (`--json`). Handlers resolve issue-id arguments with
 //! [`resolve_issue`].
 
-use crate::cli::{Cli, Commands, ConfigCommands, IssueCommands, ProfileCommands};
+use crate::cli::{Cli, Commands, ConfigCommands, IssueCommands, ProfileCommands, WorktreeCommands};
 use crate::commands::{open_repository, CommandExecutor, OpenedRepository, RepositoryInvocation};
 use crate::config_manager::ConfigManager;
 use crate::domain::identity::{IssueId, IssueIdPrefix};
@@ -123,6 +123,7 @@ fn count_message(count: usize, prefix: &str, suffix: &str) -> String {
 pub enum BootstrapResult {
     Repository(Box<OpenedRepository>),
     ConfigValidation(crate::commands::ConfigValidationReport),
+    WorktreeExec(crate::commands::worktree::WorktreeExec),
 }
 
 /// Open the repository `cli`'s command runs over; `--schema`, a missing
@@ -155,8 +156,25 @@ pub fn bootstrap(cli: &Cli) -> anyhow::Result<Option<BootstrapResult>> {
             .map(BootstrapResult::ConfigValidation)
             .map(Some);
     }
+    if matches!(command, Commands::Worktree(WorktreeCommands::Exec { .. })) {
+        return Ok(Some(BootstrapResult::WorktreeExec(
+            crate::commands::worktree::WorktreeExec::for_invocation(&invocation),
+        )));
+    }
     open_repository(invocation)
+        .map_err(|error| adapt_configuration_error(command, error))
         .map(|repository| Some(BootstrapResult::Repository(Box::new(repository))))
+}
+
+fn adapt_configuration_error(command: &Commands, error: anyhow::Error) -> anyhow::Error {
+    match error.downcast::<crate::declarations::ConfigurationAssemblyError>() {
+        Ok(error) => match command {
+            Commands::Item(_) => crate::commands::configuration_argument_error(error).into(),
+            Commands::Recover => crate::errors::RecoveryFailedError(error.into()).into(),
+            _ => error.into(),
+        },
+        Err(error) => error,
+    }
 }
 
 /// Run `cli`'s command over the `repository` [`bootstrap`] opened for it and
@@ -183,6 +201,12 @@ pub fn dispatch(
         .command
         .ok_or_else(|| anyhow!("No command provided. Use --help for usage."))?;
     let mut repository = match repository {
+        Some(BootstrapResult::WorktreeExec(operation)) => {
+            let Commands::Worktree(WorktreeCommands::Exec { command }) = command else {
+                anyhow::bail!("worktree exec context provided for another command");
+            };
+            return worktree::dispatch_exec(operation, command, mode, out, err);
+        }
         Some(BootstrapResult::ConfigValidation(report)) => {
             anyhow::ensure!(
                 matches!(command, Commands::Config(ConfigCommands::Validate)),
@@ -586,6 +610,61 @@ pub mod worktree;
 mod tests {
     use super::{count_message, REGISTERED_GROUPS};
     use crate::output::ErrorCode;
+
+    #[test]
+    fn test_bootstrap_configuration_error_preserves_the_item_full_view_adapter() {
+        use clap::Parser;
+        for args in [
+            vec!["jit", "item", "list"],
+            vec!["jit", "item", "search", "term"],
+        ] {
+            let command = super::Cli::try_parse_from(args).unwrap().command.unwrap();
+            let document =
+                crate::declarations::ConfigurationDocument::parse(Some(b"not = valid = toml"));
+            let expected = crate::commands::configuration_argument_error(
+                document.assemble(None, None).unwrap_err(),
+            );
+            let adapted = super::adapt_configuration_error(
+                &command,
+                document.worktree(true, false).unwrap_err().into(),
+            );
+            let actual = adapted
+                .downcast_ref::<crate::errors::InvalidArgumentError>()
+                .unwrap();
+            assert_eq!(actual.to_string(), expected.to_string());
+        }
+    }
+
+    #[test]
+    fn test_bootstrap_configuration_error_adapts_recovery_and_preserves_other_typed_failures() {
+        use clap::Parser;
+        for args in [
+            vec!["jit", "recover"],
+            vec!["jit", "item", "list"],
+            vec!["jit", "config", "show"],
+        ] {
+            let command = super::Cli::try_parse_from(args).unwrap().command.unwrap();
+            let failure =
+                crate::declarations::ConfigurationDocument::parse(Some(b"not = valid = toml"))
+                    .worktree(true, false)
+                    .unwrap_err();
+            let adapted = super::adapt_configuration_error(&command, failure.into());
+            match command {
+                super::Commands::Recover => {
+                    assert!(adapted.is::<crate::errors::RecoveryFailedError>())
+                }
+                super::Commands::Item(_) => {
+                    assert!(adapted.is::<crate::errors::InvalidArgumentError>())
+                }
+                _ => assert!(adapted.is::<crate::declarations::ConfigurationAssemblyError>()),
+            }
+            let storage = crate::storage::RepositoryStateStoreError::RetryableConflict {
+                path: "selected data".into(),
+            };
+            let adapted = super::adapt_configuration_error(&command, storage.into());
+            assert!(adapted.is::<crate::storage::RepositoryStateStoreError>());
+        }
+    }
 
     /// The codes the universal `*` exit-code rows describe.
     const UNIVERSAL: &[ErrorCode] = &[

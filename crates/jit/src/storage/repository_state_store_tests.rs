@@ -20,6 +20,19 @@ use std::sync::Mutex;
 use tempfile::TempDir;
 
 #[test]
+fn test_repository_state_store_io_retains_the_concrete_source() {
+    let error = anyhow::Error::new(RepositoryStateStoreError::Io(std::io::Error::new(
+        ErrorKind::PermissionDenied,
+        "denied",
+    )));
+    let source = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<std::io::Error>())
+        .expect("the output classifier must see the concrete I/O error");
+    assert_eq!(source.kind(), ErrorKind::PermissionDenied);
+}
+
+#[test]
 fn test_admit_read_sources_discards_errors_when_any_source_moved() {
     let admissions = vec![
         Err(RepositoryStateStoreError::Io(std::io::Error::other(
@@ -3405,6 +3418,49 @@ fn test_data_read_admission_detects_root_replacement() {
     std::fs::rename(&data, outer.path().join("old")).unwrap();
     std::fs::create_dir(&data).unwrap();
     assert_eq!(read.admit().unwrap(), ReadAdmission::Moved);
+}
+
+#[test]
+fn test_hold_initialized_data_root_refuses_root_replaced_while_chain_held() {
+    use crate::storage::RepoWriteLock;
+    use std::time::Duration;
+
+    for point in [HoldPoint::LockChainAcquired, HoldPoint::IndexCaptured] {
+        let backend = FileSessionBackend::seeded();
+        let data = backend.layout.data_root();
+        let old = backend.worktree.path().join("old");
+        let index = crate::repository_state::RepositoryIndex::default()
+            .to_pretty_bytes()
+            .unwrap();
+        std::fs::write(data.join("index.json"), &index).unwrap();
+        let mut replacement = None;
+        let result = backend.storage.hold_initialized_data_root_at(|at| {
+            if at == point {
+                std::fs::rename(data, &old).unwrap();
+                std::fs::create_dir(data).unwrap();
+                std::fs::write(data.join("index.json"), &index).unwrap();
+                replacement = Some(snapshot(data));
+            }
+        });
+        assert!(
+            matches!(&result, Err(RepositoryStateStoreError::RetryableConflict { path })
+                if path.as_str() == data.display().to_string()),
+            "{point:?}: a replacement cannot be accepted under the old root's lock"
+        );
+        let _repository = RepoWriteLock::for_storage_root(&old, Duration::ZERO)
+            .acquire()
+            .expect("the moved root's repository guard was released");
+        let _bootstrap = RepoWriteLock::for_lock_path(
+            backend
+                .worktree
+                .path()
+                .join(crate::repository_state::BOOTSTRAP_LOCK_FILE),
+            Duration::ZERO,
+        )
+        .acquire()
+        .expect("the independent bootstrap guard was released");
+        assert_eq!(snapshot(data), replacement.unwrap());
+    }
 }
 
 #[cfg(unix)]
