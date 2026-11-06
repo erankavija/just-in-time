@@ -379,7 +379,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "unblocked_4file_plan_pending_dispatch",
+          "worker_status": "dispatched_2026-11-06",
           "worker": "agent:f4d9502a-lead"
         },
         {
@@ -421,8 +421,9 @@
           "short_id": "1acfa592",
           "title": "Document show reads through storage at the version it names",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatched_2026-11-06"
         },
         {
           "id": "5046408a-9706-4ca0-9302-54d20e2088aa",
@@ -871,6 +872,20 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "Merge main into reviewed floor proposal; resolve read_path_bytes against 504 split-root."
+    },
+    {
+      "issue": "c140921c",
+      "vendor": "openai",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "reason": "Shared git-module revision producer (contract change) per approved four-file plan; base 6ff69d202."
+    },
+    {
+      "issue": "1acfa592",
+      "vendor": "openai",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Bounded doc-show migration with exact criteria; disjoint from c140; base b22cbb54c."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
