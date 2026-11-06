@@ -570,17 +570,15 @@ const _: () = assert!(
 /// `jit-server` grandchild is reached: the foreground path spawns it from a
 /// plain `Command` with no `process_group` call of its own (unlike the
 /// daemonizing path in `commands::serve::start_server`), so it stays in the
-/// group this test creates for the `jit` parent. The conversion is guarded
-/// before the negation (`@/invariant/pid-safety`): a value that does not fit a
-/// positive `i32`, or one at or below 1, would turn the signal into
-/// `kill(-1, …)` — every process this user owns.
+/// group this test creates for the `jit` parent. The shared PID guard also
+/// refuses the process-group sentinels (`@/inv/pid-safety`).
 #[cfg(unix)]
 fn kill_process_group(pgid: u32) -> nix::Result<()> {
     use nix::sys::signal::{kill, Signal};
     use nix::unistd::Pid;
-    match i32::try_from(pgid) {
-        Ok(leader) if leader > 1 => kill(Pid::from_raw(-leader), Signal::SIGKILL),
-        _ => Err(nix::errno::Errno::EINVAL),
+    match jit::process::process_group_target(pgid) {
+        Some(target) => kill(Pid::from_raw(target), Signal::SIGKILL),
+        None => Err(nix::errno::Errno::EINVAL),
     }
 }
 
@@ -594,12 +592,12 @@ fn kill_process_group(pgid: u32) -> nix::Result<()> {
 fn process_group_survives(pgid: u32) -> bool {
     use nix::sys::signal::kill;
     use nix::unistd::Pid;
-    match i32::try_from(pgid) {
-        Ok(leader) if leader > 1 => !matches!(
-            kill(Pid::from_raw(-leader), None),
+    match jit::process::process_group_target(pgid) {
+        Some(target) => !matches!(
+            kill(Pid::from_raw(target), None),
             Err(nix::errno::Errno::ESRCH)
         ),
-        _ => false,
+        None => false,
     }
 }
 
