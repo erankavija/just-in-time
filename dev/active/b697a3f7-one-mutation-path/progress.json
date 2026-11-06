@@ -97,7 +97,7 @@
           "title": "Benchmark: concurrent readers beside a continuous writer",
           "classification": "research",
           "worker": "tbd",
-          "status": "pending",
+          "status": "done",
           "note": "needs a quiet host (load < 2.0); run when no builds are active"
         }
       ]
