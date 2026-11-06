@@ -15,7 +15,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "39959f26-422a-493a-89ce-ad75085df582",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:01:42.177315856Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "38c5f2e6-11b0-4582-b355-cedb5dbb7b5a",
+      "status": "failed",
+      "updated_at": "2026-11-06T05:04:50.751788239Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "850eaad3-53a3-4d50-bd02-6a51a0c84208",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Mutation bases carry their parsed declarations and derivations reuse them",
-  "updated_at": "2026-11-06T04:36:35.602084697Z"
+  "updated_at": "2026-11-06T05:04:50.751788239Z"
 }

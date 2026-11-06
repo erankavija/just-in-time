@@ -1,8 +1,8 @@
 use super::{load_presets_from_custom_files, GatePresetDefinition, PresetInfo};
 use crate::domain::identity::GateKey;
-use crate::repository_state::{RepositoryEntry, RepositoryImage, VirtualPath};
+use crate::repository_state::{CaptureError, RepositoryEntry, RepositoryImage, VirtualPath};
 use crate::storage::PresetNotFoundError;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use std::collections::HashMap;
 
 /// A project's gate presets parsed from one captured repository image.
@@ -14,30 +14,18 @@ pub struct GatePresetCatalog {
 impl GatePresetCatalog {
     /// JSON paths named by the captured preset-directory listing, for capture discovery.
     pub fn paths(image: &RepositoryImage) -> Result<Vec<VirtualPath>> {
-        let directory = VirtualPath::GATE_PRESETS;
-        match image.entry(&directory)? {
-            RepositoryEntry::Absent | RepositoryEntry::Directory { .. } => {}
-            _ => {
-                return Err(crate::errors::InvalidArgumentError::new(format!(
-                    "Custom preset root '{}' must be an ordinary directory",
-                    directory.relative().as_str()
-                ))
-                .into());
-            }
-        }
-        let listing = image
-            .directory_listings()
-            .get(&directory)
-            .ok_or_else(|| anyhow!("complete custom gate preset listing is absent"))?;
-        listing
-            .names()
-            .iter()
-            .filter(|name| name.ends_with(".json"))
-            .map(|name| {
-                VirtualPath::data(format!("{}/{name}", directory.relative().as_str()))
-                    .map_err(Into::into)
+        image
+            .listed_json_files(&VirtualPath::GATE_PRESETS)
+            .map_err(|error| match error {
+                CaptureError::NotADirectory(directory) => {
+                    crate::errors::InvalidArgumentError::new(format!(
+                        "Custom preset root '{}' must be an ordinary directory",
+                        directory.relative().as_str()
+                    ))
+                    .into()
+                }
+                error => error.into(),
             })
-            .collect()
     }
 
     /// Parse every listed JSON file; refuse absent files and non-file occupants.
