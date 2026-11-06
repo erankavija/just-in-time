@@ -20,9 +20,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "0a4d6311-89fc-4d6a-ad3c-1a7fc212f956",
+      "run_id": "dd68e57e-c615-4383-8d3b-4d81d658dc86",
       "status": "passed",
-      "updated_at": "2026-11-06T04:46:29.350457994Z",
+      "updated_at": "2026-11-06T05:13:32.838829820Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -56,5 +56,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remove the libgit2 binding from the workspace",
-  "updated_at": "2026-11-06T04:53:18.957255555Z"
+  "updated_at": "2026-11-06T05:13:32.838829820Z"
 }
