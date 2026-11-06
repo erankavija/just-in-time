@@ -5,7 +5,7 @@
 //! 2. Check asset existence (working tree or git)
 //! 3. Validate internal doc links resolve
 //! 4. Detect broken relative vs root-relative links
-//! 5. Scope filtering (all vs issue:ID)
+//! 5. Shared issue scope filtering
 //! 6. Exit codes (0=valid or warnings only, 4=broken links)
 //! 7. JSON output support
 
@@ -258,6 +258,31 @@ fn test_scope_filtering_issue_id() {
 }
 
 #[test]
+fn test_check_links_label_scope_checks_only_matching_issue_documents() {
+    let cli = JitCli::initialised().unwrap();
+    let selected = cli
+        .create_issue(["Selected", "--label", "epic:auth"])
+        .unwrap();
+    let excluded = cli
+        .create_issue(["Excluded", "--label", "epic:billing"])
+        .unwrap();
+    fs::create_dir_all(cli.root().join("docs")).unwrap();
+    fs::write(cli.root().join("docs/selected.md"), "# Valid").unwrap();
+    fs::write(cli.root().join("docs/excluded.md"), "[Broken](missing.md)").unwrap();
+    cli.run(["doc", "add", &selected, "docs/selected.md"])
+        .unwrap();
+    cli.run(["doc", "add", &excluded, "docs/excluded.md"])
+        .unwrap();
+
+    let report = cli
+        .run_json(["doc", "check-links", "--scope", "label:epic:auth"])
+        .unwrap();
+
+    assert_eq!(report["summary"]["total_documents"], 1);
+    assert_eq!(report["valid"], true);
+}
+
+#[test]
 fn test_json_output_structure() {
     let cli = JitCli::uninitialised().unwrap();
     cli.init_git().unwrap().run(["init"]).unwrap();
@@ -291,14 +316,13 @@ fn test_invalid_scope_format() {
     let cli = JitCli::uninitialised().unwrap();
     cli.init_git().unwrap().run(["init"]).unwrap();
 
-    // Invalid scope should error
     let output = cli
-        .command(["doc", "check-links", "--scope", "invalid"])
+        .command(["doc", "check-links", "--scope", "invalid", "--json"])
         .output()
         .unwrap();
-    assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("Invalid scope"));
+    assert_eq!(output.status.code(), Some(2));
+    let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["error"]["code"], "INVALID_ARGUMENT");
 }
 
 #[test]

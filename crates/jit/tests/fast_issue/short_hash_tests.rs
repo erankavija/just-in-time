@@ -325,6 +325,22 @@ fn test_cli_doc_check_links_issue_scope_resolves_short_prefix() {
     assert_rejects_too_short_prefix(&cli, &["doc", "check-links", "--scope", "issue:{short}"]);
 }
 
+#[test]
+fn test_cli_issue_scopes_reject_an_ambiguous_prefix() {
+    let cli = JitCli::initialised().unwrap();
+    let (prefix, _) = jit::test_cli::seed_ambiguous_prefix(&cli).unwrap();
+    let scope = format!("issue:{prefix}");
+    for command in [["doc", "check-links"], ["snapshot", "export"]] {
+        let output = cli
+            .command([command[0], command[1], "--scope", &scope, "--json"])
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2));
+        let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(envelope["error"]["code"], "AMBIGUOUS_ID");
+    }
+}
+
 /// `snapshot export --scope issue:<prefix>` resolves the scope's issue at the CLI.
 #[test]
 fn test_cli_snapshot_export_issue_scope_resolves_short_prefix() {

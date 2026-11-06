@@ -2858,10 +2858,14 @@ reporting what was recorded when the reference was added.
 Validate the links and asset references of the documents in scope.
 
 ```bash
-jit doc check-links [--scope all|issue:<ID>]
+jit doc check-links [--scope all|issue:<ID>|label:<namespace>:<value>]
 ```
 
-`--scope` defaults to `all`. The exit code carries the verdict per the
+`--scope` selects every issue with `all` (the default), one issue with
+`issue:<ID>` (a full ID or unique prefix), or issues carrying an exact label with
+`label:<namespace>:<value>`. The value may contain colons.
+
+The exit code carries the verdict per the
 [exit-code reference](exit-codes.md#command-specific-mappings): `0` unless a link is
 broken, which exits `4` (`VALIDATION_FAILED`); warnings are reported in the output and the JSON
 result but never change the exit status. JSON reports `valid`, `errors`, `link_warnings`, and a `summary`;
@@ -3677,7 +3681,7 @@ jit snapshot export [OPTIONS]
 |------|-------------|
 | `--out <OUT>` | Output path. Defaults to `snapshot-YYYYMMDD-HHMMSS`. |
 | `--format <FORMAT>` | `dir` (default) or `tar`. |
-| `--scope <SCOPE>` | `all` (default), `issue:<ID>`, or `label:<namespace>:<value>`. |
+| `--scope <SCOPE>` | Select issues using the [shared scope syntax](#jit-doc-check-links). |
 | `--at <AT>` | Export the documents as of a git commit or tag. Requires the `git` executable on `PATH` and a Git repository ([Git Optional](../concepts/guarantees.md#git-optional)). |
 | `--working-tree` | Export the documents from the working tree instead of git. |
 | `--committed-only` | Fail when uncommitted documents or assets exist. Requires the `git` executable on `PATH` and a Git repository ([Git Optional](../concepts/guarantees.md#git-optional)); implies `--at HEAD`. |

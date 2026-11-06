@@ -1244,26 +1244,27 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     /// stays usable in a repository without Git (`@/charter/D-4`).
     pub fn check_document_links(
         &self,
-        scope: &crate::document::DocumentScope,
+        scope: &crate::domain::issue_scope::IssueScope<crate::domain::identity::IssueId>,
     ) -> Result<crate::commands::LinkCheckResult>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::document::{AssetType, DocumentScope, LinkValidationResult, LinkValidator};
+        use crate::document::{AssetType, LinkValidationResult, LinkValidator};
+        use crate::domain::issue_scope::{select_issues, IssueScope};
         use crate::storage::git::GitObjectType;
         use std::path::PathBuf;
 
         let layout = self.exec.require_layout()?;
         let repo_root = layout.worktree_root();
 
-        // Resolve the scope to the set of issues whose documents to check.
+        // Read only the named issue for a single-issue scope.
         let issues = match scope {
-            DocumentScope::All => self.exec.storage.list_issues()?,
-            DocumentScope::Issue(issue_id) => vec![self.exec.storage.load_issue(issue_id)?],
+            IssueScope::All | IssueScope::Label { .. } => self.exec.storage.list_issues()?,
+            IssueScope::Issue(issue_id) => vec![self.exec.storage.load_issue(issue_id)?],
         };
 
         // Every document in scope, explicit or derived, is checked and tracked.
-        let documented = self.with_issue_documents(issues)?;
+        let documented = self.with_issue_documents(select_issues(&issues, scope))?;
         let all_documents = documented
             .iter()
             .flat_map(|(issue, documents)| {
@@ -2243,7 +2244,7 @@ mod tests {
             .add_worktree_file("docs/guide.md", "# Guide\n");
         let mut issue = crate::test_utils::fixture_issue("Docs".into(), String::new());
         issue.documents.push(document_reference("docs/guide.md"));
-        let scope = crate::document::DocumentScope::Issue(issue.id.clone());
+        let scope = crate::domain::issue_scope::IssueScope::Issue(issue.id.clone());
         crate::commands::test_helpers::seed_issue(executor.storage(), issue);
 
         let checked = crate::commands::test_helpers::read_beside_held_mutation_session(

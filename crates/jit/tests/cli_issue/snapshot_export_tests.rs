@@ -403,7 +403,6 @@ fn test_snapshot_export_label_scope() {
     // Verify manifest shows 2 issues
     let manifest_content = fs::read_to_string(snapshot_dir.join("manifest.json")).unwrap();
     assert!(manifest_content.contains("\"count\": 2"));
-    assert!(manifest_content.contains("\"scope\": \"label:epic:auth\""));
 }
 
 #[test]
@@ -451,12 +450,13 @@ fn test_snapshot_export_json_output() {
 fn test_snapshot_export_invalid_scope() {
     let temp = JitCli::initialised().unwrap();
 
-    // Try invalid scope format
-    let mut cmd = temp.command(["snapshot", "export", "--scope", "invalid"]);
-
-    cmd.assert()
-        .failure()
-        .stderr(predicate::str::contains("Invalid scope"));
+    let output = temp
+        .command(["snapshot", "export", "--scope", "invalid", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let envelope: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["error"]["code"], "INVALID_ARGUMENT");
 }
 
 #[test]

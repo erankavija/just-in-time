@@ -7,8 +7,8 @@ use crate::commands::{
     AssetListResult, DocumentAddResult, DocumentContentResult, DocumentDiffResult, DocumentHistory,
     DocumentListResult, DocumentRemoveResult, LinkCheckResult,
 };
-use crate::document::DocumentScope;
-use crate::domain::identity::IssueId;
+use crate::domain::identity::{IssueId, IssueIdPrefix};
+use crate::domain::issue_scope::IssueScope;
 use crate::output::ErrorCode;
 use crate::storage::IssueStore;
 
@@ -148,7 +148,9 @@ fn check_links<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     scope: &str,
 ) -> HandlerResult<LinkCheckResult> {
-    let scope = DocumentScope::parse(scope, |id| issue(ctx, id))?;
+    let scope = scope
+        .parse::<IssueScope<IssueIdPrefix>>()?
+        .resolve(|prefix| ctx.executor.issues().resolve_issue_id(prefix))?;
     let result = ctx.executor.documents().check_document_links(&scope)?;
     let summary = &result.summary;
     let message = if summary.errors == 0 && summary.warnings == 0 {

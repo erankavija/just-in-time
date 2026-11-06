@@ -35,6 +35,7 @@ pub mod event_log;
 pub mod gate_findings;
 pub mod id_pattern;
 pub mod identity;
+pub mod issue_scope;
 pub mod item;
 pub mod key_reference;
 pub mod list_envelope;

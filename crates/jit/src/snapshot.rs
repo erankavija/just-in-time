@@ -152,59 +152,6 @@ pub struct VerificationInfo {
     pub instructions: String,
 }
 
-/// Scope of snapshot export
-#[derive(Debug, Clone)]
-pub enum SnapshotScope {
-    /// Export all issues
-    All,
-    /// Export a single issue
-    Issue(crate::domain::identity::IssueId),
-    /// Export all issues with a specific label
-    Label { namespace: String, value: String },
-}
-
-impl SnapshotScope {
-    /// Parse scope from string format: "all" | "issue:ID" | "label:namespace:value"
-    pub fn parse(
-        s: &str,
-        resolve: impl FnOnce(&str) -> Result<crate::domain::identity::IssueId>,
-    ) -> Result<Self> {
-        if s == "all" {
-            Ok(SnapshotScope::All)
-        } else if let Some(id) = s.strip_prefix("issue:") {
-            Ok(SnapshotScope::Issue(resolve(id)?))
-        } else if let Some(label_part) = s.strip_prefix("label:") {
-            // Parse "namespace:value" from label:namespace:value
-            let parts: Vec<&str> = label_part.splitn(2, ':').collect();
-            if parts.len() != 2 {
-                return Err(InvalidArgumentError::new(format!(
-                    "Invalid label scope format: '{s}'. Expected 'label:namespace:value'"
-                ))
-                .into());
-            }
-            Ok(SnapshotScope::Label {
-                namespace: parts[0].to_string(),
-                value: parts[1].to_string(),
-            })
-        } else {
-            Err(InvalidArgumentError::new(format!(
-                "Invalid scope format: '{s}'. Expected 'all', 'issue:ID', or 'label:namespace:value'"
-            ))
-            .into())
-        }
-    }
-}
-
-impl std::fmt::Display for SnapshotScope {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SnapshotScope::All => write!(f, "all"),
-            SnapshotScope::Issue(id) => write!(f, "issue:{}", id),
-            SnapshotScope::Label { namespace, value } => write!(f, "label:{}:{}", namespace, value),
-        }
-    }
-}
-
 /// Output format for snapshot
 #[derive(Debug, Clone)]
 pub enum SnapshotFormat {
@@ -247,7 +194,6 @@ pub fn compute_sha256(data: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::identity::IssueId;
 
     #[test]
     fn test_compute_sha256() {
@@ -267,93 +213,6 @@ mod tests {
             hash,
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         );
-    }
-
-    #[test]
-    fn test_scope_parse_all() {
-        let scope = SnapshotScope::parse("all", |id| Ok(id.parse::<IssueId>()?)).unwrap();
-        matches!(scope, SnapshotScope::All);
-        assert_eq!(scope.to_string(), "all");
-    }
-
-    #[test]
-    fn test_scope_parse_issue() {
-        let resolved = crate::test_utils::issue_id(0x4000_8000_0000_0000_0001_0f0e_0d0c);
-        let scope = SnapshotScope::parse("issue:abc123", |id| {
-            assert_eq!(id, "abc123");
-            Ok(resolved.clone())
-        })
-        .unwrap();
-        assert!(matches!(&scope, SnapshotScope::Issue(id) if id == &resolved));
-        assert_eq!(scope.to_string(), format!("issue:{resolved}"));
-    }
-
-    #[test]
-    fn test_scope_parse_label() {
-        let scope =
-            SnapshotScope::parse("label:epic:auth", |id| Ok(id.parse::<IssueId>()?)).unwrap();
-        match &scope {
-            SnapshotScope::Label { namespace, value } => {
-                assert_eq!(namespace, "epic");
-                assert_eq!(value, "auth");
-            }
-            _ => panic!("Expected Label variant"),
-        }
-        assert_eq!(scope.to_string(), "label:epic:auth");
-    }
-
-    #[test]
-    fn test_scope_parse_label_milestone() {
-        let scope =
-            SnapshotScope::parse("label:milestone:v1.0", |id| Ok(id.parse::<IssueId>()?)).unwrap();
-        match &scope {
-            SnapshotScope::Label { namespace, value } => {
-                assert_eq!(namespace, "milestone");
-                assert_eq!(value, "v1.0");
-            }
-            _ => panic!("Expected Label variant"),
-        }
-        assert_eq!(scope.to_string(), "label:milestone:v1.0");
-    }
-
-    #[test]
-    fn test_scope_parse_label_at_prefixed_value_unsplit() {
-        // Audit (jit:7a2bbe4f) REQ-01: `SnapshotScope::parse`'s
-        // `label_part.splitn(2, ':')` (applied after stripping the `label:`
-        // prefix) stops at the first colon, so a widened-grammar `@`-prefixed
-        // value — itself carrying `/`-delimited segments — passes through
-        // whole, unsplit any further.
-        let scope = SnapshotScope::parse("label:enforces:@/rule/label-format", |id| {
-            Ok(id.parse::<IssueId>()?)
-        })
-        .unwrap();
-        match &scope {
-            SnapshotScope::Label { namespace, value } => {
-                assert_eq!(namespace, "enforces");
-                assert_eq!(value, "@/rule/label-format");
-            }
-            _ => panic!("Expected Label variant"),
-        }
-    }
-
-    #[test]
-    fn test_scope_parse_label_missing_value() {
-        let result = SnapshotScope::parse("label:epic", |id| Ok(id.parse::<IssueId>()?));
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Expected 'label:namespace:value'"));
-    }
-
-    #[test]
-    fn test_scope_parse_invalid() {
-        let result = SnapshotScope::parse("invalid:123", |id| Ok(id.parse::<IssueId>()?));
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid scope format"));
     }
 
     #[test]
