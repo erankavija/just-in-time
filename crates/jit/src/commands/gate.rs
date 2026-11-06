@@ -685,11 +685,7 @@ fn derive_gate_registry_mutation(
             )
         }
     };
-    // Normalize through the declaration-owned serializer now so projection input
-    // exactly matches what the authored file will contain (including null-valued
-    // reserved-entry stripping).
-    let bytes = crate::declarations::serialize_gate_registry(&registry)?;
-    let registry = crate::declarations::parse_gate_registry(&bytes)?;
+    crate::declarations::normalize_gate_registry_for_document(&mut registry);
     Ok(DerivedGateRegistryMutation {
         registry,
         event,
@@ -2304,6 +2300,141 @@ mod tests {
             }
             other => panic!("unexpected registry event: {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_gate_registry_edits_preserve_authored_sections_and_order() {
+        let authored = "# Input footprint: only files under the workspace are read.\n\n\
+            [[gates]]\n\
+            key = \"zulu\"\n\
+            title = \"Zulu\"\n\
+            description = \"Workspace check\"\n\
+            stage = \"postcheck\"\n\
+            mode = \"manual\"\n\
+            \n\
+            # Input footprint: the alpha checker reads declared schemas.\n\
+            [[gates]]\n\
+            key = \"alpha\"\n\
+            title = \"Alpha\"\n\
+            description = \"Schema check\"\n\
+            stage = \"precheck\"\n\
+            mode = \"manual\"\n\
+            \n\
+            # Input footprint: the beta checker is issue-local.\n\
+            [[gates]]\n\
+            key = \"beta\"\n\
+            title = \"Beta\"\n\
+            description = \"Issue check\"\n\
+            stage = \"postcheck\"\n\
+            mode = \"manual\"\n";
+        let executor = setup();
+        seed_repo_file(executor.storage(), ".jit/gates.toml", authored);
+
+        executor
+            .gates()
+            .define_gate(
+                &"new-gate".parse().unwrap(),
+                "New gate".to_string(),
+                "New check".to_string(),
+                GateStage::Postcheck,
+                GateMode::Manual,
+                None,
+                100,
+            )
+            .unwrap();
+
+        let after_define = executor
+            .storage
+            .read_repo_file(".jit/gates.toml")
+            .unwrap()
+            .unwrap();
+        assert!(
+            after_define.starts_with(authored),
+            "defining a gate must leave the authored registry bytes intact: {after_define:?}"
+        );
+
+        executor
+            .gates()
+            .remove_gate_definition(&"alpha".parse().unwrap())
+            .unwrap();
+
+        let after_remove = executor
+            .storage
+            .read_repo_file(".jit/gates.toml")
+            .unwrap()
+            .unwrap();
+        for section in [
+            "[[gates]]\n\
+             key = \"zulu\"\n\
+             title = \"Zulu\"\n\
+             description = \"Workspace check\"\n\
+             stage = \"postcheck\"\n\
+             mode = \"manual\"\n",
+            "[[gates]]\n\
+             key = \"beta\"\n\
+             title = \"Beta\"\n\
+             description = \"Issue check\"\n\
+             stage = \"postcheck\"\n\
+             mode = \"manual\"\n",
+        ] {
+            assert!(
+                after_remove.contains(section),
+                "removing a gate must retain every untouched authored section: {section}"
+            );
+        }
+        for (comment, key) in [
+            (
+                "# Input footprint: only files under the workspace are read.\n",
+                "key = \"zulu\"",
+            ),
+            (
+                "# Input footprint: the beta checker is issue-local.\n",
+                "key = \"beta\"",
+            ),
+        ] {
+            assert!(after_remove.contains(comment));
+            assert!(after_remove.find(comment).unwrap() < after_remove.find(key).unwrap());
+        }
+        assert!(!after_remove.contains("key = \"alpha\""));
+        assert!(
+            after_remove.find("key = \"zulu\"").unwrap()
+                < after_remove.find("key = \"beta\"").unwrap()
+        );
+        assert!(
+            after_remove.find("key = \"beta\"").unwrap()
+                < after_remove.find("key = \"new-gate\"").unwrap()
+        );
+    }
+
+    #[test]
+    fn test_gate_registry_projection_matches_edited_document_with_null_reserved_entry() {
+        let mut definition = GateDefinition {
+            version: 1,
+            key: "nullable-extension".parse().unwrap(),
+            title: "Nullable extension".to_string(),
+            description: "Projection equivalence".to_string(),
+            stage: GateStage::Postcheck,
+            mode: GateMode::Manual,
+            checker: None,
+            inputs: None,
+            priority: 100,
+            reserved: HashMap::new(),
+        };
+        definition
+            .reserved
+            .insert("discarded".to_string(), serde_json::Value::Null);
+        let derived = derive_gate_registry_mutation(
+            crate::declarations::GateRegistry::default(),
+            &CapturedGateRegistryMutation::Define(definition),
+        )
+        .unwrap();
+
+        let edited = crate::declarations::edit_gate_registry_document(None, &derived.registry)
+            .expect("the proposed registry edits an empty authored document");
+        let parsed =
+            crate::declarations::parse_gate_registry(&edited).expect("the edited document parses");
+
+        assert_eq!(derived.registry, parsed);
     }
 
     #[test]

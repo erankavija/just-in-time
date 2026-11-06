@@ -23,7 +23,8 @@
           "title": "Process liveness and signalling go through one PID guard",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "rework-1"
+          "status": "rework-2 (code-review F1 406917d9)",
+          "landed": "7c6855d8a"
         },
         {
           "id": "9a2563fd-61ed-45c2-9cfa-b5f006c47afa",
@@ -31,7 +32,7 @@
           "title": "Gate registry edits keep the authored file",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "rework-1"
+          "status": "done"
         },
         {
           "id": "4334df62-95ca-4d3a-9a56-842b2174a5b5",
@@ -39,7 +40,7 @@
           "title": "The no-follow leaf open exists once and serves storage, profile and exact-store reads",
           "classification": "implementation",
           "worker": "codex gpt-6.1-sol high",
-          "status": "rework-1"
+          "status": "done"
         },
         {
           "id": "c2b3cefa-d690-4c6c-94dd-feaa3156acea",
@@ -135,7 +136,7 @@
     }
   ],
   "rework_counts": {
-    "f6477007": 1,
+    "f6477007": 2,
     "4334df62": 1,
     "9a2563fd": 1,
     "c2b3cefa": 1

@@ -19,6 +19,12 @@
       "status": "passed",
       "updated_at": "2026-11-06T00:19:22.378257875Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "406917d9-ed4a-4f62-b63d-c3d5718ded5d",
+      "status": "failed",
+      "updated_at": "2026-11-06T00:22:11.065484532Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "f6477007-09ab-4d53-8fec-ca4741c3cf78",
@@ -36,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Process liveness and signalling go through one PID guard",
-  "updated_at": "2026-11-06T00:19:22.378257875Z"
+  "updated_at": "2026-11-06T00:22:11.065484532Z"
 }

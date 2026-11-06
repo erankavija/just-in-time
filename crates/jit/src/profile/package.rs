@@ -1,9 +1,11 @@
 use super::manifest::{ProfilePackageModel, MANIFEST_FILE_NAME};
-use super::nofollow::{classify_open_failure, is_executable, open_entry_nofollow, OpenRefusal};
 use super::variables::{validate_body_references, validate_model_references, VariableError};
 use super::wire::ManifestWireError;
 use crate::domain::repository_inputs::is_safe_relative_path;
 use crate::repository_state::{Contribution, MapEntryTarget, ScalarTarget};
+use crate::storage::capability_fs::{
+    classify_open_failure, is_executable, open_entry_nofollow, LeafKind, OpenRefusal,
+};
 use cap_std::ambient_authority;
 use cap_std::fs::{Dir as CapDir, DirEntry as CapDirEntry};
 use serde_json::Value;
@@ -413,17 +415,9 @@ fn open_child_directory(
     root: &Path,
     relative: &str,
 ) -> Result<CapDir, ProfilePackageError> {
-    let opened = open_entry_nofollow(entry, true)
+    let opened = open_entry_nofollow(entry, LeafKind::Directory)
         .map_err(|source| entry_open_failure(root, relative, source))?;
-    let is_dir = opened
-        .metadata()
-        .map_err(|source| unreadable(&root.join(relative), source))?
-        .is_dir();
-    if is_dir {
-        Ok(CapDir::from_std_file(opened.into_std()))
-    } else {
-        Err(rejected_entry(root, relative.to_string()))
-    }
+    Ok(CapDir::from_std_file(opened.into_std()))
 }
 
 /// Read one listed regular file, bounded by what the budget still admits.
@@ -437,14 +431,11 @@ fn read_regular_entry(
     file_count: usize,
     byte_size: usize,
 ) -> Result<(Vec<u8>, bool), ProfilePackageError> {
-    let opened = open_entry_nofollow(entry, false)
+    let opened = open_entry_nofollow(entry, LeafKind::File)
         .map_err(|source| entry_open_failure(root, relative, source))?;
     let metadata = opened
         .metadata()
         .map_err(|source| unreadable(&root.join(relative), source))?;
-    if !metadata.is_file() {
-        return Err(rejected_entry(root, relative.to_string()));
-    }
     let admitted = file_count.saturating_add(1);
     let declared = usize::try_from(metadata.len()).unwrap_or(usize::MAX);
     if let Some(error) = package_bounds_failure(admitted, byte_size.saturating_add(declared)) {
@@ -475,15 +466,12 @@ fn rejected_entry(root: &Path, relative: String) -> ProfilePackageError {
     }
 }
 
-/// A failed open: a refusal when the name cannot be package content, I/O
-/// otherwise.
+/// Map leaf-kind refusals to package errors; preserve ordinary I/O failures.
 ///
-/// Two refusals say the listed name is not a regular file, whatever the listing
-/// said: the name is a symbolic link, which the no-follow open declines, or it
-/// is a kind that cannot be opened for reading at all — as distinct from the
-/// pipes and devices that open non-blockingly and are refused by their handle's
-/// metadata. A walk lists direct children of a handle it holds, so the escape
-/// arm cannot arise here and is reported as ordinary I/O with the rest.
+/// Symlinks and unopenable kinds cannot be regular files, whatever the listing
+/// said. Pipes and devices open non-blockingly and fail the handle metadata check.
+/// The walk lists direct children of a held handle, so an escape cannot arise
+/// here and is reported as ordinary I/O.
 fn entry_open_failure(root: &Path, relative: &str, source: std::io::Error) -> ProfilePackageError {
     if matches!(
         classify_open_failure(&source),
