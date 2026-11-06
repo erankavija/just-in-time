@@ -381,7 +381,14 @@
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "run_id": "de736d35-9b44-4cc1-a5d8-644c44d944a1",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:57:53.766234792Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f4d9502a-c585-4436-8819-bcd3d5c59171",
   "labels": [
     "epic:git-cli-module",
@@ -397,5 +404,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Reach git through one storage-owned CLI module instead of libgit2",
-  "updated_at": "2026-11-06T05:57:23.505596178Z"
+  "updated_at": "2026-11-06T05:57:53.766234792Z"
 }
