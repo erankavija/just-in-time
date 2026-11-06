@@ -441,9 +441,9 @@
           "short_id": "7cd27db8",
           "title": "Snapshot export reads committed files through one git process",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "dispatched_2026-11-06"
+          "worker_status": "landed_8ea13203f"
         },
         {
           "id": "e6ec58f3-94d4-4886-85ef-fae12decaeba",
