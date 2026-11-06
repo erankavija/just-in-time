@@ -25,7 +25,6 @@ use anyhow::{anyhow, Context, Result};
 use std::cell::RefCell;
 use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap};
 use std::fs;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -81,20 +80,17 @@ pub fn read_exact_store(layout: &RepositoryLayout) -> Result<ExactStoreSnapshot>
         Err(error) => return Err(error.into()),
     };
 
-    let issues = match data.symlink_metadata(VirtualPath::ISSUES.relative().as_str()) {
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-        Err(error) => return Err(error.into()),
-        Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
-            anyhow::bail!(
-                "Issue root at {} must be an ordinary directory",
-                issues_path.display()
-            )
+    let issues = match super::capability_fs::open_child_dir_nofollow(
+        &data,
+        VirtualPath::ISSUES.relative().as_str(),
+    ) {
+        Err(super::capability_fs::CapabilityFsError::Io(error))
+            if error.kind() == std::io::ErrorKind::NotFound =>
+        {
+            Vec::new()
         }
-        Ok(_) => {
-            let issue_dir = super::capability_fs::open_child_dir_nofollow(
-                &data,
-                VirtualPath::ISSUES.relative().as_str(),
-            )?;
+        Err(error) => return Err(error.into()),
+        Ok(issue_dir) => {
             let mut names = issue_dir
                 .entries()?
                 .map(|entry| entry.map(|entry| entry.file_name()))
@@ -112,20 +108,17 @@ pub fn read_exact_store(layout: &RepositoryLayout) -> Result<ExactStoreSnapshot>
                         )
                     })?;
                     let path = issues_path.join(&leaf);
-                    let metadata = issue_dir.symlink_metadata(&leaf)?;
-                    if metadata.is_symlink() || !metadata.is_file() {
-                        anyhow::bail!(
-                            "Issue record at {} must be an ordinary file",
-                            path.display()
-                        );
-                    }
-                    let mut file =
-                        super::capability_fs::open_regular_file_nofollow(&issue_dir, &leaf)
-                            .with_context(|| {
-                                format!("Failed to open issue record at {}", path.display())
-                            })?;
-                    let mut bytes = Vec::new();
-                    file.read_to_end(&mut bytes).with_context(|| {
+                    let bytes = super::capability_fs::read_leaf_nofollow(
+                        &issue_dir,
+                        &leaf,
+                        Path::new(&leaf),
+                    )
+                    .and_then(|bytes| {
+                        bytes.ok_or_else(|| {
+                            std::io::Error::from(std::io::ErrorKind::NotFound).into()
+                        })
+                    })
+                    .with_context(|| {
                         format!("Failed to read issue record at {}", path.display())
                     })?;
                     serde_json::from_slice(&bytes).with_context(|| {
@@ -136,33 +129,22 @@ pub fn read_exact_store(layout: &RepositoryLayout) -> Result<ExactStoreSnapshot>
         }
     };
 
-    let events = match data.symlink_metadata(VirtualPath::EVENTS.relative().as_str()) {
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-        Err(error) => return Err(error.into()),
-        Ok(metadata) if metadata.is_symlink() || !metadata.is_file() => {
-            anyhow::bail!(
-                "Event log at {} must be an ordinary file",
+    let events = super::capability_fs::read_leaf_nofollow(
+        &data,
+        VirtualPath::EVENTS.relative().as_str(),
+        VirtualPath::EVENTS.relative().as_path(),
+    )
+    .with_context(|| format!("Failed to read event log at {}", events_path.display()))?
+    .map(|contents| {
+        parse_known_events(&contents).with_context(|| {
+            format!(
+                "Failed to deserialize event log at {}",
                 events_path.display()
             )
-        }
-        Ok(_) => {
-            let mut file = super::capability_fs::open_regular_file_nofollow(
-                &data,
-                VirtualPath::EVENTS.relative().as_str(),
-            )
-            .with_context(|| format!("Failed to open event log at {}", events_path.display()))?;
-            let mut contents = Vec::new();
-            file.read_to_end(&mut contents).with_context(|| {
-                format!("Failed to read event log at {}", events_path.display())
-            })?;
-            parse_known_events(&contents).with_context(|| {
-                format!(
-                    "Failed to deserialize event log at {}",
-                    events_path.display()
-                )
-            })?
-        }
-    };
+        })
+    })
+    .transpose()?
+    .unwrap_or_default();
 
     Ok(ExactStoreSnapshot { issues, events })
 }
@@ -1392,8 +1374,85 @@ mod tests {
     use super::*;
     use crate::domain::identity::IssueIdPrefix;
     use crate::repository_state::SUPPORTED_INDEX_SCHEMA_VERSION;
+    #[cfg(unix)]
+    use crate::storage::capability_fs::{
+        open_absolute_dir_nofollow, open_child_dir_nofollow, open_regular_file_nofollow,
+        CapabilityFsError,
+    };
     use crate::storage::IssueStore;
+    use std::io::Read;
     use tempfile::TempDir;
+
+    #[test]
+    fn test_read_exact_store_missing_issue_directory_and_event_log_contribute_no_records() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        fs::create_dir(&data).unwrap();
+        let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        let issue = crate::test_utils::fixture_issue("physical".into(), String::new());
+        let event = crate::test_utils::stamped_event(
+            crate::domain::EventBody::draft_issue_created(&issue),
+            "event",
+            chrono::Utc::now(),
+        );
+        fs::write(
+            data.join("events.jsonl"),
+            format!("{}\n", serde_json::to_string(&event).unwrap()),
+        )
+        .unwrap();
+        assert_eq!(
+            read_exact_store(&layout).unwrap(),
+            ExactStoreSnapshot {
+                issues: vec![],
+                events: vec![event],
+            }
+        );
+        fs::remove_file(data.join("events.jsonl")).unwrap();
+        fs::create_dir(data.join("issues")).unwrap();
+        fs::write(
+            data.join("issues/record.json"),
+            crate::repository_state::serialize_issue(&issue).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            read_exact_store(&layout).unwrap(),
+            ExactStoreSnapshot {
+                issues: vec![issue],
+                events: vec![],
+            }
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_exact_store_refuses_symlinked_records_and_a_fifo_record_without_blocking() {
+        for relative in ["issues/link.json", "events.jsonl", "issues/pipe.json"] {
+            let temp = TempDir::new().unwrap();
+            let data = temp.path().join(".jit");
+            fs::create_dir_all(data.join("issues")).unwrap();
+            let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
+            let leaf = data.join(relative);
+            if relative.ends_with("pipe.json") {
+                nix::unistd::mkfifo(&leaf, nix::sys::stat::Mode::S_IRWXU).unwrap();
+            } else {
+                fs::write(temp.path().join("target"), b"").unwrap();
+                std::os::unix::fs::symlink(temp.path().join("target"), &leaf).unwrap();
+            }
+            let (sender, receiver) = std::sync::mpsc::channel();
+            std::thread::spawn(move || sender.send(read_exact_store(&layout)).unwrap());
+            let error = receiver
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .expect("an unsafe record must fail without waiting for a peer")
+                .unwrap_err();
+            assert!(
+                matches!(
+                    error.downcast_ref::<CapabilityFsError>(),
+                    Some(CapabilityFsError::UnsafeTarget(_))
+                ),
+                "{relative}: {error:#}"
+            );
+        }
+    }
 
     fn configure_test_layout(storage: &JsonFileStorage, worktree: &Path, data: &Path) {
         let layout = crate::storage::discover_repository_layout(worktree, data).unwrap();
@@ -1675,15 +1734,11 @@ mod tests {
         )
         .unwrap();
 
-        let data_handle = super::super::capability_fs::open_absolute_dir_nofollow(&data).unwrap();
-        let gate_runs_handle = super::super::capability_fs::open_child_dir_nofollow(
-            &data_handle,
-            VirtualPath::GATE_RUNS.relative().as_str(),
-        )
-        .unwrap();
-        let run_handle =
-            super::super::capability_fs::open_child_dir_nofollow(&gate_runs_handle, issue.as_str())
+        let data_handle = open_absolute_dir_nofollow(&data).unwrap();
+        let gate_runs_handle =
+            open_child_dir_nofollow(&data_handle, VirtualPath::GATE_RUNS.relative().as_str())
                 .unwrap();
+        let run_handle = open_child_dir_nofollow(&gate_runs_handle, issue.as_str()).unwrap();
 
         fs::rename(
             &original_run,
@@ -1713,9 +1768,7 @@ mod tests {
             b"outside-root",
             "the ambient path must demonstrate that the parent swap took effect"
         );
-        let mut held_file =
-            super::super::capability_fs::open_regular_file_nofollow(&run_handle, record_name)
-                .unwrap();
+        let mut held_file = open_regular_file_nofollow(&run_handle, record_name).unwrap();
         let mut held_bytes = Vec::new();
         held_file.read_to_end(&mut held_bytes).unwrap();
         assert_eq!(held_bytes, b"inside");
