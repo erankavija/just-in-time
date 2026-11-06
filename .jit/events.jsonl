@@ -25407,3 +25407,11 @@
 {"gate_key":"code-review","id":"c4e763ad-94c9-407c-b9a0-027c21c468fd","issue_id":"c2b3cefa-d690-4c6c-94dd-feaa3156acea","timestamp":"2026-11-06T00:07:03.782596146Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"plan-review","id":"e24d5376-d47c-4a59-8962-d7ee41afd27f","issue_id":"3204f6a5-322a-42a9-b782-b8caf040935f","timestamp":"2026-11-06T00:16:03.571650733Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"14c6fe77-5d26-435f-8397-2fa8056cf820","issue_id":"f6477007-09ab-4d53-8fec-ca4741c3cf78","timestamp":"2026-11-06T00:19:22.378257875Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"4bd26b55-65d2-43c2-910f-2c2c088d7272","issue_id":"f6477007-09ab-4d53-8fec-ca4741c3cf78","timestamp":"2026-11-06T00:22:11.065484532Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"e7618b39-a6bb-41e2-96f0-c01dfa4ebffb","issue_id":"0723860e-ed82-4a46-a9b1-c52f1abfa956","timestamp":"2026-11-06T00:22:25.537655582Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"152d33f3-ae86-44d4-ad24-a8fe6a2952ee","issue_id":"0723860e-ed82-4a46-a9b1-c52f1abfa956","timestamp":"2026-11-06T00:25:35.017467614Z","type":"gate_passed","updated_by":"auto:executor"}
+{"fields":["description"],"id":"f0a72226-eff8-4d87-b080-eb349161325f","issue_id":"0723860e-ed82-4a46-a9b1-c52f1abfa956","timestamp":"2026-11-06T00:25:44.436864905Z","type":"issue_updated","updated_by":"issue-update"}
+{"from":"in_progress","id":"07a3d40e-c5cf-480e-b455-c3b52e44aecf","issue_id":"0723860e-ed82-4a46-a9b1-c52f1abfa956","timestamp":"2026-11-06T00:25:44.548325686Z","to":"done","type":"issue_state_changed"}
+{"id":"a806117b-f5dc-435b-b11e-eaab2951fb87","issue_id":"0723860e-ed82-4a46-a9b1-c52f1abfa956","timestamp":"2026-11-06T00:25:44.548325686Z","type":"issue_completed"}
+{"from":"ready","id":"563a7f6c-6ef3-4af0-b63d-6cd4d7be0711","issue_id":"cd1da611-c869-4d7b-968e-4ea20ff4481f","timestamp":"2026-11-06T00:25:44.756167751Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker-cd1da611","id":"7270f060-9a81-4f73-9cf4-57476da604ef","issue_id":"cd1da611-c869-4d7b-968e-4ea20ff4481f","timestamp":"2026-11-06T00:25:44.756167751Z","type":"issue_claimed"}
