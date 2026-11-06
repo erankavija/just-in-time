@@ -2046,7 +2046,11 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         nested.write("seed.txt", "nested\n");
         let nested_commit = nested.commit("nested checker repository");
         assert_ne!(selected_commit, nested_commit);
-        let paths = crate::storage::WorktreePaths::detect_from(temp.path()).unwrap();
+        let paths = crate::storage::WorktreePaths::detect_for_data_root(
+            &temp.path().join(".jit"),
+            temp.path(),
+        )
+        .unwrap();
         let executor = executor.with_worktree_paths(paths);
         let gate_key: GateKey = "nested-check".parse().unwrap();
         executor

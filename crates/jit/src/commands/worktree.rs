@@ -924,7 +924,7 @@ mod tests {
             std::fs::create_dir_all(primary.join(".jit")).expect("create the primary store");
 
             let paths = crate::test_utils::primary_checkout_paths(&primary);
-            assert!(paths.is_main_worktree(), "the fixture models the primary");
+            assert!(!paths.is_worktree(), "the fixture models the primary");
             let layout =
                 crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)
                     .unwrap();
