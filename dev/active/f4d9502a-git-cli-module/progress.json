@@ -501,9 +501,9 @@
           "short_id": "23b48cf0",
           "title": "Git requirement pages name the git executable",
           "classification": "documentation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "gates_passed_landing"
+          "worker_status": "landed_6dc6dbbc0"
         },
         {
           "id": "34851181-7812-4cef-9347-9b80c7fd288f",
