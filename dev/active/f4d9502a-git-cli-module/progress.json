@@ -531,7 +531,8 @@
     }
   ],
   "created_during_execution": [
-    "783b33fa"
+    "783b33fa",
+    "053b109e"
   ],
   "escalations": [
     {
@@ -559,6 +560,12 @@
       "subject": "Explicit actor input for issue release; isolated correction outside original manifest",
       "ruling": "Steward approves four hard criteria/fourfiles, Sol/high and temporary fourth tree. Native504 prerequisite; actorlands+Done before504refresh. Fifthowner requires evidence/approval; no newCLIflag/ambient actor/parallel producer.",
       "evidence": "Landed daaca4bc5 (source 08f374b0e); worktree cargo-ci + code-review (0 findings) pass; lead sanitized contracts 552/552 without JIT_* identity; forced merged cargo-ci pass on 6672a5e01."
+    },
+    {
+      "issue": "053b109e",
+      "status": "filed_dispatching",
+      "subject": "Pre-existing RustSec advisories block dependency-audit on main",
+      "ruling": "2026-11-06 steward 9b: option 1, lead owns remediation; semver-compatible cargo update only; hard stop with list if any advisory needs major bump, dependency swap, feature change, or any audit ignore/policy change (user's call under D-11); notify f3, 71 and steward before landing the shared Cargo.lock change; option 3 (narrow gate) declined."
     }
   ],
   "rework_counts": {
