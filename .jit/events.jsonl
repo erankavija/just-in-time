@@ -25627,6 +25627,9 @@
 {"id":"80a780e9-c3c8-416d-ae78-1ae3e4150bce","issue_id":"e6ec58f3-94d4-4886-85ef-fae12decaeba","timestamp":"2026-11-06T04:39:49.072579391Z","type":"issue_completed"}
 {"from":"ready","id":"aa95cf17-46ea-404e-be95-2d583b652db9","issue_id":"b2c28ec1-4178-4e77-9153-b86aefae1056","timestamp":"2026-11-06T04:40:37.253606382Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:b697a3f7-lead","id":"1736a737-b362-4df3-ae1d-aaee76b5496f","issue_id":"b2c28ec1-4178-4e77-9153-b86aefae1056","timestamp":"2026-11-06T04:40:37.253606382Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"d6adac7c-fe73-40a2-abae-42db15d776e4","issue_id":"6fdb2d53-bc92-424e-bc74-455f21f2cc26","timestamp":"2026-11-06T04:46:29.350457994Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"dependency-audit","id":"52bc9e19-f4ed-4c96-a9a0-bd49da6d998f","issue_id":"6fdb2d53-bc92-424e-bc74-455f21f2cc26","timestamp":"2026-11-06T04:48:33.874302854Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"26f9e7d7-37f6-417a-9a51-008991e12829","issue_id":"6fdb2d53-bc92-424e-bc74-455f21f2cc26","timestamp":"2026-11-06T04:53:18.957255555Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"589018d6-7d10-4e5c-a02e-6299a84ac623","issue_id":"30334066-4bae-49fb-b10a-2282c07a7344","timestamp":"2026-11-06T04:48:00.179937720Z","type":"gate_passed","updated_by":"auto:executor"}
 {"id":"057d6b1f-a56f-4016-902c-38feb5a23461","issue_id":"053b109e-4abc-45b1-8f7b-2ab7682815ba","priority":"normal","timestamp":"2026-11-06T04:50:24.195864631Z","title":"Clear the Rust dependency advisories reported against the current lockfile","type":"issue_created"}
 {"fields":["dependencies"],"id":"f282e0c8-8342-4643-8cf4-48d0fc83e093","issue_id":"6fdb2d53-bc92-424e-bc74-455f21f2cc26","timestamp":"2026-11-06T04:50:38.081960875Z","type":"issue_updated","updated_by":"dependency-add"}
@@ -25648,3 +25651,5 @@
 {"gate_key":"cargo-ci","id":"9e12bb38-9bc7-4f69-a0c2-1d1d5e1f9a23","issue_id":"053b109e-4abc-45b1-8f7b-2ab7682815ba","timestamp":"2026-11-06T05:07:52.070195625Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"53b1859f-1032-4f14-a542-fa9788e7f230","issue_id":"053b109e-4abc-45b1-8f7b-2ab7682815ba","timestamp":"2026-11-06T05:08:01.094091077Z","to":"done","type":"issue_state_changed"}
 {"id":"f6c330aa-ca99-4ea6-9c95-de6df5e4d950","issue_id":"053b109e-4abc-45b1-8f7b-2ab7682815ba","timestamp":"2026-11-06T05:08:01.094091077Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"86e3303a-5443-4b84-9849-cddd387910bb","issue_id":"6fdb2d53-bc92-424e-bc74-455f21f2cc26","timestamp":"2026-11-06T05:13:32.838829820Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"dependency-audit","id":"01c4f9b9-3fb2-4aff-80ea-763e664da329","issue_id":"6fdb2d53-bc92-424e-bc74-455f21f2cc26","timestamp":"2026-11-06T05:16:20.463238336Z","type":"gate_passed","updated_by":"auto:executor"}

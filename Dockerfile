@@ -10,9 +10,6 @@ RUN npm run build
 
 FROM rust:1.97-bookworm AS server-builder
 
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends libssl-dev pkg-config \
-  && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ ./crates/
