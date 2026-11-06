@@ -16,7 +16,7 @@ use crate::repository_state::{
     BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE,
 };
 use crate::storage::{
-    git::{Git, GitCheckout, GitError, GitObjectType},
+    git::{CommitResolution, Git, GitCheckout, GitError, GitObjectType},
     FileLocker, IssueNotFoundError, IssueStore, RecoveryDispatchReport, RepoWriteGuard,
     RepoWriteLock, RepositoryFormatUnsupportedError, RepositoryMutationSession,
     RepositoryNotFoundError, RepositoryStateStore, WorktreePaths,
@@ -1369,26 +1369,30 @@ impl IssueStore for JsonFileStorage {
                     .object_reader()
                     .map_err(|error| PathReadError::Other(error.into()))?;
                 let resolved = reader
-                    .read(commit_ref)
+                    .resolve_commit(commit_ref)
                     .map_err(|error| match error {
                         GitError::InvalidPath(_) => {
                             PathReadError::CommitNotFound(commit_ref.to_string())
                         }
                         error => PathReadError::Other(error.into()),
-                    })?
-                    .ok_or_else(|| PathReadError::CommitNotFound(commit_ref.to_string()))?;
-                let commit = if resolved.object_type() == GitObjectType::Commit {
-                    resolved
-                } else {
-                    reader
-                        .read(&format!("{}^{{commit}}", resolved.id().as_str()))
-                        .map_err(|error| PathReadError::Other(error.into()))?
-                        .filter(|object| object.object_type() == GitObjectType::Commit)
-                        .ok_or_else(|| {
-                            PathReadError::Other(anyhow!("Failed to peel to commit: {commit_ref}"))
-                        })?
+                    })?;
+                let commit = match resolved {
+                    CommitResolution::Commit(commit) => commit,
+                    CommitResolution::Missing => {
+                        return Err(PathReadError::CommitNotFound(commit_ref.to_string()))
+                    }
+                    CommitResolution::NonCommit => {
+                        return Err(PathReadError::Other(anyhow!(
+                            "Failed to peel to commit: {commit_ref}"
+                        )))
+                    }
+                    CommitResolution::Ambiguous => {
+                        return Err(PathReadError::Other(anyhow!(
+                            "Ambiguous commit revision: {commit_ref}"
+                        )))
+                    }
                 };
-                let commit_id = commit.id().as_str();
+                let commit_id = commit.as_str();
                 let tree_path = repo_root
                     .strip_prefix(top)
                     .unwrap_or_else(|_| Path::new(""))

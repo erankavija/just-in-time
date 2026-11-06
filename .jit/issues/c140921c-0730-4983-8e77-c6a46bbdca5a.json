@@ -43,7 +43,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d7c646b3-07f5-42d1-9371-3a58adb00a86",
+      "status": "passed",
+      "updated_at": "2026-11-06T03:15:41.264754964Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "5cff90c1-58ea-4bff-9c99-2e1b2037b557",
+      "status": "passed",
+      "updated_at": "2026-11-06T03:19:34.807890812Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c140921c-0730-4983-8e77-c6a46bbdca5a",
   "labels": [
     "type:task",
@@ -58,5 +71,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Snapshot source and repository facts come from the module",
-  "updated_at": "2026-11-05T05:44:13.346974595Z"
+  "updated_at": "2026-11-06T03:19:34.807890812Z"
 }
