@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:b697a3f7-lead",
+  "claimed_at": "2026-11-06T03:51:59.183890742Z",
   "context": {},
   "created_at": "2026-10-24T21:22:37.717854234Z",
   "dependencies": [
@@ -28,7 +29,7 @@
     "satisfies:b697a3f7/REQ-21"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Archive preview runs the execute planner read-only",
-  "updated_at": "2026-11-06T03:51:07.187492475Z"
+  "updated_at": "2026-11-06T03:51:59.183890742Z"
 }
