@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7945cf103aa267599df9a280436fc9ef6a027ac6",
+  "completed_at": "2026-11-06T03:25:38.421958647Z",
+  "duration_ms": 266434,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped criteria are met; the prior Gated-diversion finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "693a2fdd-18cc-477d-97a6-e4a8f52fcd3f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c5ba2a3a-82ae-48ed-b085-79ec23ab2de7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T03:21:11.987675107Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2252c76fd, ab65fe5c, 88e00cea, aef66178, 95e2a99a (`jit:693a2fdd`)\nPolicy sources: AGENTS.md\nResolved items: REQ-01–REQ-06 (issue description); @/charter/D-20 (dev/vision/9db27a3a-charter.md); relevant invariants and @/gate/cargo-ci (.jit registries)\nGate evidence: cargo-ci passed (exit 0; ancestry covers all tagged commits); prior code-review F1 was addressed in aef66178\nTruncation recovery: bounded per-commit/per-path patches and current bulk-update, test, documentation, and policy reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped criteria are met; the prior Gated-diversion finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
