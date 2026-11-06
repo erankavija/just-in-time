@@ -594,7 +594,7 @@ Implement full diff viewer with:
 
 **Backend:**
 - ✅ `jit::commands::CommandExecutor` - Already has document methods
-- ✅ `git2` crate - Already integrated for git operations
+- ✅ Git CLI module - Git access goes through the storage-owned module that runs the git CLI (`@/charter/D-21`)
 - ✅ Axum router - Already configured
 
 **Frontend:**
