@@ -134,7 +134,7 @@
           "title": "Document and gate definition writes check their leases in their publishing session",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "dispatched (codex gpt-6-luna xhigh)"
+          "status": "done"
         }
       ]
     }
