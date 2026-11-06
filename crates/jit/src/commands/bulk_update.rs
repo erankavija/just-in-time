@@ -433,12 +433,14 @@ impl<S: IssueStore> IssueOps<'_, S> {
             .flat_map(|precheck| precheck.capture_paths.iter().cloned())
             .collect::<Vec<_>>();
         let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
-        let Some(validate::MutationBase { image, issues }) =
+        let Some(mut base) =
             self.exec
                 .capture_mutation_base(session.as_mut(), &capture_paths, &targets)?
         else {
             return Ok(BulkAttempt::Retry);
         };
+        let issues = std::mem::take(&mut base.issues);
+        let image = &base.image;
         let matched = filter
             .filter_issues(&issues)?
             .into_iter()
@@ -446,13 +448,13 @@ impl<S: IssueStore> IssueOps<'_, S> {
             .collect::<Vec<_>>();
         let mut result = BulkUpdateResult::new();
         result.matched = matched.clone();
-        let graph = CapturedGraphEvidence::capture(&image, &issues, context)?;
+        let graph = CapturedGraphEvidence::capture(base.declarations()?, image, &issues, context)?;
         let enforcement_mode = graph.declarations.config().enforcement_mode();
         let derivation = BulkDerivation {
             operations,
             force,
             prechecks,
-            image: &image,
+            image,
             graph: &graph,
             context,
         };
@@ -498,9 +500,9 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 .iter()
                 .map(|issue| issue.id.clone())
                 .collect::<Vec<_>>();
-            let Some(base) = self
-                .exec
-                .extend_mutation_base(session.as_mut(), image, &ids)?
+            let Some(base) =
+                self.exec
+                    .extend_mutation_base(session.as_mut(), image.clone(), &ids)?
             else {
                 return Ok(BulkAttempt::Retry);
             };
@@ -522,7 +524,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         }
         let plan = crate::repository_state::finalize(
             layout,
-            &image,
+            image,
             context,
             &latest_issue_updates(intents),
             None,
