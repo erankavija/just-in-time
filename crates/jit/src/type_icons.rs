@@ -92,6 +92,25 @@ pub fn resolve_icons_for_hierarchy(
         .collect()
 }
 
+/// Icons for every type `config`'s `[type_hierarchy]` declares, from its
+/// levels and its custom per-type icons.
+pub fn hierarchy_icons(config: &crate::config::JitConfig) -> HashMap<String, String> {
+    config
+        .type_hierarchy
+        .as_ref()
+        .map(|hierarchy| {
+            resolve_icons_for_hierarchy(
+                &hierarchy.types,
+                &hierarchy
+                    .icons
+                    .as_ref()
+                    .map(|icons| IconConfig::new(icons.custom.clone()))
+                    .unwrap_or_default(),
+            )
+        })
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,5 +227,49 @@ mod tests {
         assert_eq!(icons.get(&test_type(2)), Some(&"📦".to_string()));
         assert_eq!(icons.get(&test_type(3)), Some(&"📝".to_string()));
         assert_eq!(icons.get(&test_type(4)), Some(&"☑️".to_string()));
+    }
+
+    fn icons_of(extra: &str) -> HashMap<String, String> {
+        let toml = format!(
+            "{}\n{extra}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        );
+        hierarchy_icons(
+            &crate::declarations::assemble_configuration(Some(toml.as_bytes()), None, None)
+                .unwrap(),
+        )
+    }
+
+    #[test]
+    fn test_hierarchy_icons_uses_level_defaults_without_icons() {
+        let icons = icons_of("");
+
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let level_icon = |level: u8| get_icon_for_type("", level, &IconConfig::default());
+        for level in 1..=4 {
+            assert_eq!(
+                icons.get(taxonomy.type_at_level(level)).cloned(),
+                level_icon(level)
+            );
+        }
+    }
+
+    #[test]
+    fn test_hierarchy_icons_preserves_custom_values() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let icons = icons_of(&format!(
+            "[type_hierarchy.icons.custom]\n{} = \"🎯\"\n{} = \"🛠️\"\n",
+            taxonomy.type_at_level(1),
+            taxonomy.type_at_level(4)
+        ));
+
+        assert_eq!(
+            icons.get(taxonomy.type_at_level(1)),
+            Some(&"🎯".to_string())
+        );
+        assert_eq!(
+            icons.get(taxonomy.type_at_level(4)),
+            Some(&"🛠️".to_string())
+        );
     }
 }

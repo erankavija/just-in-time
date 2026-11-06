@@ -637,7 +637,8 @@ fn test_item_list_and_show_kind_gate_registry_first_through_real_cli() {
          key = \"cargo-ci\"\n\
          title = \"Cargo CI\"\n\
          description = \"Full Rust CI pipeline must pass.\"\n\
-         stage = \"postcheck\"\n",
+         stage = \"postcheck\"\n\
+         mode = \"manual\"\n",
     )
     .unwrap();
 

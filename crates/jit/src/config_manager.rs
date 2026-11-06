@@ -3,7 +3,6 @@
 use crate::config::{JitConfig, NamespaceConfig};
 use crate::domain::{LabelNamespace, LabelNamespaces};
 use crate::repository_state::RepositoryLayout;
-use crate::type_icons::{resolve_icons_for_hierarchy, IconConfig};
 use anyhow::Result;
 use std::collections::HashMap;
 
@@ -158,38 +157,7 @@ impl ConfigManager {
     /// single command parses `config.toml` at most once. Returns `None` when
     /// the `[project]` table or its `name` key is absent.
     pub fn project_name_from_config(&self, config: &JitConfig) -> Option<String> {
-        config
-            .project
-            .as_ref()?
-            .name
-            .as_ref()
-            .map(|name| name.as_str().to_string())
-    }
-
-    /// Get resolved icons for the current hierarchy.
-    ///
-    /// Returns a map of type name to icon string. Icons are resolved using the
-    /// hierarchy configuration (levels) and custom per-type icon configuration.
-    pub fn get_hierarchy_icons(&self) -> Result<HashMap<String, String>> {
-        let config = self.load()?;
-
-        // Get type hierarchy (levels)
-        let types = config
-            .type_hierarchy
-            .as_ref()
-            .map(|h| h.types.clone())
-            .unwrap_or_default();
-
-        // Get icon configuration
-        let icon_config = config
-            .type_hierarchy
-            .as_ref()
-            .and_then(|h| h.icons.as_ref())
-            .map(|icons_toml| IconConfig::new(icons_toml.custom.clone()))
-            .unwrap_or_default();
-
-        // Resolve icons for all types
-        Ok(resolve_icons_for_hierarchy(&types, &icon_config))
+        config.project_name().map(str::to_string)
     }
 }
 
@@ -282,13 +250,6 @@ mod tests {
             RepositoryRootEvidence::new(data_root, "test-data", true),
         )
         .unwrap()
-    }
-
-    fn test_config(extra: &str) -> String {
-        format!(
-            "{}\n{extra}",
-            crate::test_taxonomy::test_taxonomy().config_fragment()
-        )
     }
 
     fn setup_test_dir() -> TempDir {
@@ -413,63 +374,6 @@ unique = false
         assert_eq!(
             error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
             Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
-        );
-    }
-
-    #[test]
-    fn test_get_hierarchy_icons_uses_level_defaults_without_icons() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-        fs::write(jit_dir.join("config.toml"), test_config("")).unwrap();
-
-        let icons = ConfigManager::new(test_layout(&jit_dir))
-            .get_hierarchy_icons()
-            .unwrap();
-
-        let taxonomy = crate::test_taxonomy::test_taxonomy();
-        assert_eq!(
-            icons.get(taxonomy.type_at_level(1)),
-            Some(&"⭐".to_string())
-        );
-        assert_eq!(
-            icons.get(taxonomy.type_at_level(2)),
-            Some(&"📦".to_string())
-        );
-        assert_eq!(
-            icons.get(taxonomy.type_at_level(3)),
-            Some(&"📝".to_string())
-        );
-        assert_eq!(
-            icons.get(taxonomy.type_at_level(4)),
-            Some(&"☑️".to_string())
-        );
-    }
-
-    #[test]
-    fn test_get_hierarchy_icons_preserves_custom_values() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-        let taxonomy = crate::test_taxonomy::test_taxonomy();
-        let config_toml = test_config(&format!(
-            "[type_hierarchy.icons.custom]\n{} = \"🎯\"\n{} = \"🛠️\"\n",
-            taxonomy.type_at_level(1),
-            taxonomy.type_at_level(4)
-        ));
-        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
-
-        let icons = ConfigManager::new(test_layout(&jit_dir))
-            .get_hierarchy_icons()
-            .unwrap();
-
-        assert_eq!(
-            icons.get(taxonomy.type_at_level(1)),
-            Some(&"🎯".to_string())
-        );
-        assert_eq!(
-            icons.get(taxonomy.type_at_level(4)),
-            Some(&"🛠️".to_string())
         );
     }
 

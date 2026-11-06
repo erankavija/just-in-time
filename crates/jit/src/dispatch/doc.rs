@@ -39,7 +39,10 @@ fn add<S: HandlerStore>(
     Ok(Outcome::success_with(result, message).with_warnings(warnings))
 }
 
-fn list<S: IssueStore>(ctx: &CommandContext<'_, S>, id: &str) -> HandlerResult<DocumentListResult> {
+fn list<S: HandlerStore>(
+    ctx: &CommandContext<'_, S>,
+    id: &str,
+) -> HandlerResult<DocumentListResult> {
     let result = ctx
         .executor
         .documents()
@@ -64,7 +67,7 @@ fn remove<S: HandlerStore>(
     Ok(Outcome::success_with(result, message).with_warnings(warnings))
 }
 
-fn show<S: IssueStore>(
+fn show<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     id: &str,
     path: &str,
@@ -77,7 +80,7 @@ fn show<S: IssueStore>(
     Ok(Outcome::success_with(result, "Document content retrieved"))
 }
 
-fn dir<S: IssueStore>(
+fn dir<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     id: &str,
     area: &str,
@@ -89,7 +92,7 @@ fn dir<S: IssueStore>(
     Ok(directory.into())
 }
 
-fn conformance<S: IssueStore>(
+fn conformance<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
 ) -> HandlerResult<ArtifactConformanceResponse> {
     Ok(ctx
@@ -99,7 +102,7 @@ fn conformance<S: IssueStore>(
         .into())
 }
 
-fn history<S: IssueStore>(
+fn history<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     id: &str,
     path: &str,
@@ -112,7 +115,7 @@ fn history<S: IssueStore>(
     Ok(Outcome::success_with(result, message))
 }
 
-fn diff<S: IssueStore>(
+fn diff<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     id: &str,
     path: &str,
@@ -170,15 +173,15 @@ command_group! {
         "doc_add" => DocCommands::Add { id, path, commit, label, doc_type, skip_scan }
             => add(&id, &path, commit.as_deref(), label.as_deref(), doc_type.as_deref(), skip_scan)
             -> DocumentAddResult,
-        "doc_list" => DocCommands::List { id } => list(&id) -> DocumentListResult,
+        "doc_list" => DocCommands::List { id } => list(&id) raises [RetryableConflict] -> DocumentListResult,
         "doc_remove" => DocCommands::Remove { id, path } => remove(&id, &path) -> DocumentRemoveResult,
         "doc_show" => DocCommands::Show { id, path, at }
-            => show(&id, &path, at.as_deref()) -> DocumentContentResult,
-        "doc_dir" => DocCommands::Dir { id, area } => dir(&id, &area) -> ArtifactDirectoryResponse,
+            => show(&id, &path, at.as_deref()) raises [RetryableConflict] -> DocumentContentResult,
+        "doc_dir" => DocCommands::Dir { id, area } => dir(&id, &area) raises [RetryableConflict] -> ArtifactDirectoryResponse,
         "doc_conformance" => DocCommands::Conformance => conformance() raises [RetryableConflict] -> ArtifactConformanceResponse,
-        "doc_history" => DocCommands::History { id, path } => history(&id, &path) -> DocumentHistory,
+        "doc_history" => DocCommands::History { id, path } => history(&id, &path) raises [RetryableConflict] -> DocumentHistory,
         "doc_diff" => DocCommands::Diff { id, path, from, to }
-            => diff(&id, &path, &from, to.as_deref()) -> DocumentDiffResult,
+            => diff(&id, &path, &from, to.as_deref()) raises [RetryableConflict] -> DocumentDiffResult,
         "doc_assets_list" => DocCommands::Assets { command: AssetCommands::List { id, path, rescan } }
             => assets_list(&id, &path, rescan) -> AssetListResult,
         "doc_check-links" => DocCommands::CheckLinks { scope } => check_links(&scope)

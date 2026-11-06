@@ -136,11 +136,15 @@ impl<S: IssueStore> QueryOps<'_, S> {
         Ok(crate::domain::queries::query_by_assignee(&issues, assignee))
     }
 
-    pub fn query_strategic(&self) -> Result<Vec<Issue>> {
-        let namespaces = self.exec.config_manager.get_namespaces()?;
+    pub fn query_strategic(&self) -> Result<Vec<Issue>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let declarations = self.exec.captured_declarations()?;
+        let namespaces = declarations.namespaces();
 
         // Get strategic types from config, or fall back to hierarchy-based approach
-        let strategic_types: Vec<String> = if let Some(ref types) = namespaces.strategic_types {
+        let strategic_types: Vec<String> = if let Some(types) = &namespaces.strategic_types {
             types.clone()
         } else {
             // Fallback: use hierarchy levels 1-2
@@ -225,7 +229,10 @@ impl<S: IssueStore> QueryOps<'_, S> {
     }
 
     /// Query strategic issues, narrowed by every supplied field filter.
-    pub fn query_strategic_filtered(&self, filter: AllFilter<'_>) -> Result<Vec<Issue>> {
+    pub fn query_strategic_filtered(&self, filter: AllFilter<'_>) -> Result<Vec<Issue>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         filter
             .labels
             .iter()
