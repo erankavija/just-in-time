@@ -15,15 +15,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "5b7981ba-7759-48a3-985c-88d4753f4f8f",
+      "run_id": "621d71c3-af45-4f9f-b4b4-80365ecef1ab",
       "status": "passed",
-      "updated_at": "2026-11-06T00:19:22.378257875Z",
+      "updated_at": "2026-11-06T00:52:29.341880218Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "406917d9-ed4a-4f62-b63d-c3d5718ded5d",
+      "run_id": "90b9291f-73cb-4469-abd1-9940b500d58e",
       "status": "failed",
-      "updated_at": "2026-11-06T00:22:11.065484532Z",
+      "updated_at": "2026-11-06T00:54:52.470868222Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Process liveness and signalling go through one PID guard",
-  "updated_at": "2026-11-06T00:22:11.065484532Z"
+  "updated_at": "2026-11-06T00:54:52.470868222Z"
 }

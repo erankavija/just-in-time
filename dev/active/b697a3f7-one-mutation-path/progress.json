@@ -23,7 +23,7 @@
           "title": "Process liveness and signalling go through one PID guard",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "rework-2 (code-review F1 406917d9)",
+          "status": "rework-3 (steward-authorized final)",
           "landed": "7c6855d8a"
         },
         {
@@ -123,20 +123,55 @@
           "status": "pending"
         }
       ]
+    },
+    {
+      "wave_number": 5,
+      "label": "2b",
+      "issues": [
+        {
+          "id": "905364c1-e1e2-4150-8aa9-2a489d3e5977",
+          "short_id": "905364c1",
+          "title": "Document and gate definition writes check their leases in their publishing session",
+          "classification": "implementation",
+          "worker": "tbd",
+          "status": "pending"
+        }
+      ]
     }
   ],
   "later_chain_note": "After wave 2: fe9147fa, 1b7f58ae -> 693a2fdd, a991f42b -> d3c94dc5, 700a96dd -> 850eaad3 -> 93e3f1ad. Blocked externally by f4d9502a (parked): 7cd27db8 -> 30334066 -> 030df4b1, 9623fe6a; d9ba0029 -> 65aafaba -> c0775a83 -> 4e2bed35 -> e73ad8bc, 42046050, 45d0a971; e6ec58f3 -> b2c28ec1.",
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "id": "905364c1-e1e2-4150-8aa9-2a489d3e5977",
+      "short_id": "905364c1",
+      "title": "Document and gate definition writes check their leases in their publishing session",
+      "reason": "surfaced pitfall: unowned pre-session lease checks (epic REQ-04); steward authorized filing",
+      "depends_on": [
+        "c2b3cefa"
+      ],
+      "blocks": [
+        "93e3f1ad"
+      ]
+    }
+  ],
   "escalations": [
     {
       "to": "steward just-in-time-9b",
       "category": "blocker outside scope (f4d9502a chain)",
       "decision": "option 1: accept the wait; re-escalate when the last dispatchable wave is in flight, with remaining reachable count, blocked IDs, and any proposal to decouple a blocked issue; do not reshape the graph unilaterally",
       "status": "resolved"
+    },
+    {
+      "to": "steward just-in-time-9b",
+      "category": "rework exceeded MAX_REWORK_ATTEMPTS",
+      "issue": "f6477007",
+      "detail": "third distinct code-review finding (run 90b9291f): exited-process test lacks #[cfg(unix)]; requested one more round",
+      "status": "resolved",
+      "decision": "steward: one final round, scope = #[cfg(unix)] on unix-dependent tests in process.rs only; if code-review fails again, do not rework, send the finding to the steward"
     }
   ],
   "rework_counts": {
-    "f6477007": 2,
+    "f6477007": 3,
     "4334df62": 1,
     "9a2563fd": 1,
     "c2b3cefa": 2
@@ -146,7 +181,7 @@
       "found_in": "c2b3cefa review",
       "subject": "pre-session lease checks with no owning issue",
       "detail": "After c2b3cefa and planned d3c94dc5, the read form refuse_foreign_lease is still called before the publishing session by dispatch/gate.rs evaluate_many (batch pre-check), commands/document.rs:228 and :546 (document writes) and commands/validate.rs:234. Epic REQ-04 says no pre-session lease check remains, so this is a criterion gap to close with a remediation task inside the epic before the epic gate, not a follow-up. Also dispatch/gate.rs preset_apply discards the read-form result (c2b3cefa rework report); evaluate_many and preset_apply both drop warn-mode findings from that pre-check.",
-      "status": "open"
+      "status": "tracked by 905364c1"
     }
   ],
   "started_at": "2026-11-06T01:20:00+02:00",
