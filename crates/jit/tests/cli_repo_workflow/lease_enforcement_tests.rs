@@ -829,9 +829,10 @@ fn test_warn_mode_dependency_writes_warn_only_in_human_non_quiet_mode() {
 }
 
 #[test]
-fn test_validate_fix_type_fix_refuses_another_agents_lease() {
+fn test_validate_fix_type_fix_repairs_another_agents_leased_issue() {
     let repo = Repo::new();
     repo.owner(&["dep", "add", &repo.y, &repo.z]);
+    repo.owner(&["dep", "add", &repo.w, &repo.z]);
     repo.append_config(
         "\n[type_hierarchy.types]\ntask = 4\n\
          \n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
@@ -839,13 +840,17 @@ fn test_validate_fix_type_fix_refuses_another_agents_lease() {
     let mut record = repo.record(&repo.x);
     record["labels"] = serde_json::json!(["type:taks"]);
     repo.write_record(&repo.x, &record);
-    let before = repo.raw_record(&repo.x);
-
     let output = repo.other(&["validate", "--fix"]);
 
-    assert!(!output.status.success(), "{}", stderr(&output));
-    assert!(stderr(&output).contains(OWNER), "{}", stderr(&output));
-    assert_eq!(repo.raw_record(&repo.x), before);
+    assert_ok(&output);
+    let labels = repo.record(&repo.x)["labels"].as_array().unwrap().clone();
+    assert!(labels.iter().any(|label| label == "type:task"));
+    assert!(!labels.iter().any(|label| label == "type:taks"));
+    assert!(
+        !diagnostics(&output).contains(OWNER),
+        "{}",
+        diagnostics(&output)
+    );
 }
 
 #[test]

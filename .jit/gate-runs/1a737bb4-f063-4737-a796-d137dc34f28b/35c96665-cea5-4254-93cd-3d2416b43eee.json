@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ae2c096fbbd025cc17b7053b3ea8823be91b7354",
+  "completed_at": "2026-11-06T01:44:57.782335012Z",
+  "duration_ms": 245014,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed catalog consolidation satisfies the issue-scoped hard criteria with no findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1a737bb4-f063-4737-a796-d137dc34f28b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "35c96665-cea5-4254-93cd-3d2416b43eee",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T01:40:52.767646049Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7e24a0c93e2145b79462eee7714c2f817732263f (`jit:1a737bb4`); uncommitted `.jit/` changes excluded\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-2, @/charter/D-20, @/charter/D-22 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic, @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/single-source-prose (.jit/invariants.toml); @/issue/b697a3f7/requirement/REQ-11, @/issue/b697a3f7/requirement/REQ-21 (issue description); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0; tagged commit contained by run ae2c096f); code-review pending\nTruncation recovery: inspected the tagged patch by affected path, then bounded current-file and focused-diff reads for catalog, command/template callers, storage removals, tests, dispatch, and documentation\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed catalog consolidation satisfies the issue-scoped hard criteria with no findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
