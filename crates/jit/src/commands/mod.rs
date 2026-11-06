@@ -906,10 +906,9 @@ fn claims_mutation_guard(
         .map(Some)
 }
 
-/// The lease rule every issue-record write obeys: `strict` refuses with a
-/// [`ForeignLeaseError`](crate::errors::ForeignLeaseError) when another agent
-/// holds an active lease on a target; `warn` answers each such lease as a
-/// finding; `off` answers none.
+/// Enforce leases for user-requested writes to existing issue targets:
+/// `strict` refuses with a [`ForeignLeaseError`](crate::errors::ForeignLeaseError),
+/// `warn` returns findings, and `off` returns none.
 fn refuse_foreign_leases(
     mode: crate::config::EnforcementMode,
     targets: &[IssueId],
@@ -960,28 +959,6 @@ fn refuse_foreign_leases_held(
             .map(|lease| lease.agent_id))
     })?;
     Ok(findings.into_iter().map(|(_, finding)| finding).collect())
-}
-
-/// [`refuse_foreign_leases`] over active leases read from storage, for a
-/// command that reaches it without taking the claims lock.
-fn refuse_foreign_leases_read(
-    paths: &crate::storage::WorktreePaths,
-    mode: crate::config::EnforcementMode,
-    targets: &[IssueId],
-) -> Result<Vec<(IssueId, String)>> {
-    use crate::storage::claim_coordinator::read_active_leases;
-
-    if mode == crate::config::EnforcementMode::Off {
-        return Ok(Vec::new());
-    }
-    let agent = crate::agent_config::resolve_agent_id(None).ok();
-    let leases = read_active_leases(paths, chrono::Utc::now())?;
-    refuse_foreign_leases(mode, targets, |id| {
-        Ok(leases
-            .iter()
-            .find(|lease| &lease.issue_id == id && Some(&lease.agent_id) != agent.as_ref())
-            .map(|lease| lease.agent_id.clone()))
-    })
 }
 
 /// Refuse claiming `target` for `assignee` when anyone else leases it, whatever
@@ -3748,28 +3725,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 changed,
             }))
         })
-    }
-
-    /// Refuse a write to any of `targets` another agent holds an active lease on
-    /// ([`refuse_foreign_leases`]), by the repository's enforcement mode.
-    pub(crate) fn refuse_foreign_leases(
-        &self,
-        targets: &[IssueId],
-    ) -> Result<Vec<(IssueId, String)>> {
-        let mode = self.cached_config()?.enforcement_mode();
-        if mode == crate::config::EnforcementMode::Off {
-            return Ok(Vec::new());
-        }
-        refuse_foreign_leases_read(self.require_worktree_paths()?, mode, targets)
-    }
-
-    /// [`Self::refuse_foreign_leases`] for one issue, answering its warnings.
-    pub(crate) fn refuse_foreign_lease(&self, issue_id: &IssueId) -> Result<Vec<String>> {
-        Ok(self
-            .refuse_foreign_leases(std::slice::from_ref(issue_id))?
-            .into_iter()
-            .map(|(_, warning)| warning)
-            .collect())
     }
 }
 

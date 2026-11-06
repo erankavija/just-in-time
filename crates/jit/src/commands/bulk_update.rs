@@ -102,6 +102,12 @@ struct BulkPrecheck {
     capture_paths: Vec<crate::repository_state::VirtualPath>,
 }
 
+struct BulkUpdateAttemptContext {
+    layout: crate::repository_state::RepositoryLayout,
+    mutation: crate::repository_state::MutationContext,
+    claims_guard: Option<crate::storage::claim_coordinator::ClaimsMutationGuard>,
+}
+
 enum BulkAttempt {
     Published(BulkUpdateResult),
     /// The session read the prechecks the batch runs and holds no execution of.
@@ -314,6 +320,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// change moves a `Ready` issue with precheck gates to `InProgress`, a
     /// preflight session reads the prechecks first, because they run outside
     /// the repository lock.
+    /// One claims guard spans those prechecks and every session attempt.
     pub fn apply_bulk_update(
         &mut self,
         filter: &QueryFilter,
@@ -323,22 +330,33 @@ impl<S: IssueStore> IssueOps<'_, S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let layout = self.exec.require_layout()?;
-        let context = production_mutation_context();
+        let attempt_context = BulkUpdateAttemptContext {
+            layout: self.exec.require_layout()?,
+            mutation: production_mutation_context(),
+            claims_guard: super::claims_mutation_guard(self.exec.require_worktree_paths()?)?,
+        };
         let mut prechecks = Vec::new();
         with_mutation_attempts("bulk update", || {
             let attempt =
-                self.attempt_bulk_update(&layout, &context, filter, operations, force, &prechecks)?;
+                self.attempt_bulk_update(&attempt_context, filter, operations, force, &prechecks)?;
             let preflights = match attempt {
                 BulkAttempt::Published(result) => return Ok(AttemptOutcome::Done(result)),
                 BulkAttempt::Retry => return Ok(AttemptOutcome::Retry),
                 BulkAttempt::Preflight(preflights) => preflights,
             };
-            prechecks = self.execute_bulk_prechecks(&layout, preflights, &context)?;
+            prechecks = self.execute_bulk_prechecks(
+                &attempt_context.layout,
+                preflights,
+                &attempt_context.mutation,
+            )?;
             Ok(
-                match self
-                    .attempt_bulk_update(&layout, &context, filter, operations, force, &prechecks)?
-                {
+                match self.attempt_bulk_update(
+                    &attempt_context,
+                    filter,
+                    operations,
+                    force,
+                    &prechecks,
+                )? {
                     BulkAttempt::Published(result) => AttemptOutcome::Done(result),
                     BulkAttempt::Preflight(_) | BulkAttempt::Retry => AttemptOutcome::Retry,
                 },
@@ -394,8 +412,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// holds, and publish it unless the batch runs prechecks it holds none of.
     fn attempt_bulk_update(
         &self,
-        layout: &crate::repository_state::RepositoryLayout,
-        context: &crate::repository_state::MutationContext,
+        attempt_context: &BulkUpdateAttemptContext,
         filter: &QueryFilter,
         operations: &UpdateOperations,
         force: bool,
@@ -404,6 +421,9 @@ impl<S: IssueStore> IssueOps<'_, S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
+        let layout = &attempt_context.layout;
+        let context = &attempt_context.mutation;
+        let claims_guard = attempt_context.claims_guard.as_ref();
         let targets = prechecks
             .iter()
             .map(|precheck| precheck.cached.target_id.clone())
@@ -425,9 +445,9 @@ impl<S: IssueStore> IssueOps<'_, S> {
             .map(|issue| issue.id.clone())
             .collect::<Vec<_>>();
         let mut result = BulkUpdateResult::new();
-        result.warnings = self.exec.refuse_foreign_leases(&matched)?;
         result.matched = matched.clone();
         let graph = CapturedGraphEvidence::capture(&image, &issues, context)?;
+        let enforcement_mode = crate::repository_state::assemble_config(&image)?.enforcement_mode();
         let derivation = BulkDerivation {
             operations,
             force,
@@ -448,7 +468,26 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 result,
                 precheck_targets: Vec::new(),
             },
-            |projection, id| derivation.derive(projection, id),
+            |mut projection, id| match super::refuse_foreign_leases_held(
+                enforcement_mode,
+                std::slice::from_ref(id),
+                claims_guard,
+            ) {
+                Ok(warnings) => {
+                    projection
+                        .result
+                        .warnings
+                        .extend(warnings.into_iter().map(|warning| (id.clone(), warning)));
+                    derivation.derive(projection, id)
+                }
+                Err(error) => {
+                    projection
+                        .result
+                        .errors
+                        .push((id.clone(), error.to_string()));
+                    projection
+                }
+            },
         );
         if !precheck_targets
             .iter()
@@ -500,6 +539,7 @@ mod tests {
     use super::*;
     use crate::domain::EventBody;
     use crate::domain::{Issue, Priority, State};
+    use crate::query_engine::QueryFilter;
 
     fn create_test_issue(id: &IssueId, state: State, labels: Vec<&str>) -> Issue {
         Issue {
@@ -743,6 +783,118 @@ mod tests {
             ))
             .unwrap();
         assert!(!issue3.labels.contains(&"milestone:v1.0".to_string()));
+    }
+
+    #[test]
+    fn test_apply_bulk_update_strict_refuses_leased_match_and_updates_unleased_match() {
+        use crate::commands::test_helpers::{plant_foreign_lease, seed_issue};
+
+        let executor = crate::commands::test_helpers::setup_coordinated_with_enforcement("strict");
+        let leased_id = crate::test_utils::issue_id(0x1111_0001);
+        let unleased_id = crate::test_utils::issue_id(0x1111_0002);
+        [leased_id.clone(), unleased_id.clone()]
+            .into_iter()
+            .map(|id| create_test_issue(&id, State::Ready, vec!["type:task"]))
+            .for_each(|issue| seed_issue(&executor.storage, issue));
+        let holder = plant_foreign_lease(&executor, &leased_id);
+
+        let result = executor
+            .issues()
+            .apply_bulk_update(
+                &QueryFilter::parse("state:ready").unwrap(),
+                &UpdateOperations {
+                    priority: Some(Priority::High),
+                    ..Default::default()
+                },
+                false,
+            )
+            .unwrap();
+
+        assert!(result
+            .errors
+            .iter()
+            .any(|(id, error)| { id == &leased_id && error.contains(&holder.to_string()) }));
+        assert!(result.modified.contains(&unleased_id));
+        assert_eq!(result.summary.total_errors, 1);
+        assert_eq!(result.summary.total_modified, 1);
+        assert_eq!(
+            executor.storage.load_issue(&leased_id).unwrap().priority,
+            Priority::Normal
+        );
+        assert_eq!(
+            executor.storage.load_issue(&unleased_id).unwrap().priority,
+            Priority::High
+        );
+    }
+
+    #[test]
+    fn test_apply_bulk_update_warn_reports_the_leased_match_and_applies_it() {
+        use crate::commands::test_helpers::{plant_foreign_lease, seed_issue};
+
+        let executor = crate::commands::test_helpers::setup_coordinated_with_enforcement("warn");
+        let issue_id = crate::test_utils::issue_id(0x1111_0003);
+        seed_issue(
+            &executor.storage,
+            create_test_issue(&issue_id, State::Ready, vec!["type:task"]),
+        );
+        let holder = plant_foreign_lease(&executor, &issue_id);
+
+        let result = executor
+            .issues()
+            .apply_bulk_update(
+                &QueryFilter::parse("state:ready").unwrap(),
+                &UpdateOperations {
+                    priority: Some(Priority::High),
+                    ..Default::default()
+                },
+                false,
+            )
+            .unwrap();
+
+        assert!(result
+            .warnings
+            .iter()
+            .any(|(id, warning)| { id == &issue_id && warning.contains(&holder.to_string()) }));
+        assert!(result.modified.contains(&issue_id));
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().priority,
+            Priority::High
+        );
+    }
+
+    #[test]
+    fn test_apply_bulk_update_does_not_check_leased_issue_promoted_by_readiness_correction() {
+        use crate::commands::test_helpers::{plant_foreign_lease, seed_issue};
+
+        let executor = crate::commands::test_helpers::setup_coordinated_with_enforcement("strict");
+        let blocker_id = crate::test_utils::issue_id(0x1111_0004);
+        let dependent_id = crate::test_utils::issue_id(0x1111_0005);
+        seed_issue(
+            &executor.storage,
+            create_test_issue(&blocker_id, State::Ready, vec!["type:task"]),
+        );
+        let mut dependent = create_test_issue(&dependent_id, State::Backlog, vec!["type:task"]);
+        dependent.dependencies.push(blocker_id.clone());
+        seed_issue(&executor.storage, dependent);
+        plant_foreign_lease(&executor, &dependent_id);
+
+        let result = executor
+            .issues()
+            .apply_bulk_update(
+                &QueryFilter::parse("state:ready").unwrap(),
+                &UpdateOperations {
+                    state: Some(State::Done),
+                    ..Default::default()
+                },
+                false,
+            )
+            .unwrap();
+
+        assert!(result.errors.is_empty());
+        assert_eq!(
+            executor.storage.load_issue(&dependent_id).unwrap().state,
+            State::Ready
+        );
     }
 
     #[test]
