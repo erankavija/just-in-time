@@ -3654,7 +3654,9 @@ items, use `jit item search`.
 Export a self-contained snapshot of issues, the documents they reference, the
 assets those documents use, a manifest of SHA256 hashes, and a README describing
 the contents. A snapshot preserves its provenance: git commit, source mode, and
-timestamps.
+timestamps. Its `.jit/` holds each exported issue record as stored and the
+repository's [declaration files](storage-format.md#directory-structure), read
+together from one capture of the repository.
 
 In git mode (`--at`, `--committed-only`, or the default when git is available), a
 referenced document or asset missing from the selected commit fails export with a
