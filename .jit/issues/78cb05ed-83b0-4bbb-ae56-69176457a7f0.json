@@ -7,6 +7,7 @@
   ],
   "description": "Make the build-policy script fail when a built jit executable links libgit2 or OpenSSL, so the native dependency cannot return through another crate.\n\n## Background\n\n- `scripts/rust-build-budget.sh` runs after compilation in `scripts/cargo-ci.sh` and checks build profiles and dependency features from injectable inputs, each failure mode with a fixture test in `crates/jit/tests/scratch_build/rust_build_budget_checker_tests.rs` that needs no compilation (`scripts/rust-build-budget.sh:12`).\n- Nothing checks what the built executables link. Before libgit2's removal, the `jit` binary's dynamic section named `libgit2`, `libssl` and `libcrypto`.\n\n## Success Criteria\n\n- [hard] REQ-01: The script fails, naming the executable and the library, when a built `jit` or `jit-server` executable declares a dynamic dependency on `libgit2`, `libssl` or `libcrypto`. It fails closed (exit 2) when the tool it reads dynamic sections with is missing on an ELF host.\n- [hard] REQ-02: The dynamic-dependency listing is an injectable input, and fixture tests cover a clean listing and each banned library without compiling.\n- [hard] REQ-03: The check passes on the current tree.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-06T05:20:10.236593888Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "satisfies:f4d9502a/REQ-01"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Build-policy check rejects native git and OpenSSL linkage",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-06T05:20:10.236593888Z"
 }

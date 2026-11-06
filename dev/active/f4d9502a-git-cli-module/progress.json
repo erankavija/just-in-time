@@ -487,8 +487,9 @@
           "short_id": "6fdb2d53",
           "title": "Remove the libgit2 binding from the workspace",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "done",
+          "external_blockers": [],
+          "worker_status": "landed"
         }
       ]
     },
