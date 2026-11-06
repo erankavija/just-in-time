@@ -970,6 +970,27 @@ impl RepositoryImage {
         &self.data.listings
     }
 
+    /// The `*.json` files `directory`'s captured listing names, in name order.
+    pub fn listed_json_files(
+        &self,
+        directory: &VirtualPath,
+    ) -> Result<Vec<VirtualPath>, CaptureError> {
+        self.data
+            .listings
+            .get(directory)
+            .ok_or_else(|| CaptureError::IncompleteListing(directory.clone()))?
+            .names()
+            .iter()
+            .filter(|name| name.ends_with(".json"))
+            .map(|name| {
+                Ok(VirtualPath::from_root(
+                    directory.root_class(),
+                    directory.relative().join(name),
+                )?)
+            })
+            .collect()
+    }
+
     /// Read an exactly captured entry; uncaptured reads are always errors.
     pub fn entry(&self, path: &VirtualPath) -> Result<&RepositoryEntry, CaptureError> {
         self.data.layout.ensure_canonical(path)?;

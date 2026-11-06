@@ -21,6 +21,8 @@ in [Storage Record Layout](storage-records.md).
 ├── templates.toml    # Graph template registry
 ├── rules.toml        # Validation rules
 ├── invariants.toml   # Invariants registry
+├── config/
+│   └── gate-presets/ # Project gate presets, one <name>.json each
 ├── events.jsonl      # Append-only event log
 ├── issues/           # One JSON file per issue
 │   └── <uuid>.json   # Issue data
@@ -35,6 +37,10 @@ in [Storage Record Layout](storage-records.md).
 └── tmp/              # Machine-local scratch directory
     └── redo.record   # The pending redo record, while a mutation leaves one
 ```
+
+The declaration files are `config.toml`, `gates.toml`, `templates.toml`,
+`rules.toml`, `invariants.toml`, and each `*.json` file under
+`config/gate-presets/`.
 
 `templates.toml` is authored per project; `jit init` does not scaffold it.
 `config.toml`, the empty `gates.toml`, the empty `invariants.toml`, and

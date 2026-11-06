@@ -2,7 +2,7 @@ use super::{load_presets_from_custom_files, GatePresetDefinition, PresetInfo};
 use crate::domain::identity::GateKey;
 use crate::repository_state::{RepositoryEntry, RepositoryImage, VirtualPath};
 use crate::storage::PresetNotFoundError;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use std::collections::HashMap;
 
 /// A project's gate presets parsed from one captured repository image.
@@ -25,19 +25,7 @@ impl GatePresetCatalog {
                 .into());
             }
         }
-        let listing = image
-            .directory_listings()
-            .get(&directory)
-            .ok_or_else(|| anyhow!("complete custom gate preset listing is absent"))?;
-        listing
-            .names()
-            .iter()
-            .filter(|name| name.ends_with(".json"))
-            .map(|name| {
-                VirtualPath::data(format!("{}/{name}", directory.relative().as_str()))
-                    .map_err(Into::into)
-            })
-            .collect()
+        Ok(image.listed_json_files(&directory)?)
     }
 
     /// Parse every listed JSON file; refuse absent files and non-file occupants.
