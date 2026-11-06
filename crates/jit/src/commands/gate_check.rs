@@ -152,12 +152,20 @@ pub(super) struct CapturedGateEvidence {
     pub(super) runs: Vec<GateRunResult>,
 }
 
-/// An evaluation's captured image with the bound issue and the required
-/// automated gate resolved from it.
+/// An evaluation's captured image with the bound issue, the gate registry and
+/// the required automated gate resolved from it.
 struct BoundGateEvaluation {
     image: crate::repository_state::RepositoryImage,
     issue: Issue,
+    registry: crate::declarations::GateRegistry,
     gate: crate::declarations::GateDefinition,
+}
+
+impl BoundGateEvaluation {
+    /// Whether `other` resolved the same issue, gate registry and gate.
+    fn resolves_as(&self, other: &Self) -> bool {
+        self.issue == other.issue && self.registry == other.registry && self.gate == other.gate
+    }
 }
 
 #[derive(Default)]
@@ -718,7 +726,7 @@ impl<S: IssueStore> GateOps<'_, S> {
 
 impl<S: IssueStore> CommandExecutor<S> {
     /// Capture the resolved issue and the inputs `gate_key` evaluates, with
-    /// the issue and gate the capture resolved.
+    /// the issue, gate registry and gate the capture resolved.
     fn capture_gate_evaluation_image(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
@@ -765,6 +773,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let bind = |image| BoundGateEvaluation {
             image,
             issue: issue.clone(),
+            registry: registry.clone(),
             gate: gate.clone(),
         };
         if checker_needs_validation_image(checker) {
@@ -902,7 +911,9 @@ impl<S: IssueStore> GateOps<'_, S> {
                 )))
             })?;
 
-        let BoundGateEvaluation { image, issue, gate } = &bound;
+        let BoundGateEvaluation {
+            image, issue, gate, ..
+        } = &bound;
         let target_id = &issue.id;
         // Digest the declared inputs BEFORE the checker runs: the value must name the content
         // the verdict was derived over, not what the checker left behind.
@@ -971,7 +982,9 @@ impl<S: IssueStore> GateOps<'_, S> {
                 &final_bound.issue,
                 &[&final_bound.gate],
             )?;
-            result.evaluation_stability = if final_captured.evidence == captured.evidence {
+            result.evaluation_stability = if final_captured.evidence == captured.evidence
+                && final_bound.resolves_as(&bound)
+            {
                 GateEvaluationStability::Stable
             } else {
                 GateEvaluationStability::InputsMoved
@@ -980,6 +993,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 image: final_image,
                 issue: mut final_issue,
                 gate: final_gate,
+                ..
             } = final_bound;
             let state = gate_state_from_run(&result);
             let by = result.by.clone();
@@ -5468,60 +5482,60 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
 
     #[cfg(unix)]
     #[test]
-    fn test_check_gate_records_pre_run_verdict_when_gate_definition_changes_during_checker() {
-        let taxonomy = crate::test_taxonomy::test_taxonomy();
-        let config = format!(
-            "[worktree]\nenforce_leases = \"off\"\n\n{}",
-            taxonomy.config_fragment()
-        );
-        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
-        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
-        std::fs::write(
-            repo.path().join("gate-race.sh"),
-            "if [ ! -f .gate-race-seen ]; then : > .gate-race-seen; sed -i 's/Original race title/Changed race title/' .jit/gates.toml; fi\nprintf x >> checker-count\ncat \"$JIT_CONTEXT_FILE\"\n",
-        )
-        .unwrap();
-        add_exec_gate(
-            &executor,
-            &issue_id,
-            &"gate-race".parse().unwrap(),
-            "Original race title",
-            "sh gate-race.sh".to_string(),
-            None,
-        );
-
-        let result = executor
-            .gates()
-            .check_gate(&issue_id, &"gate-race".parse().unwrap())
+    fn test_check_gate_records_pre_run_verdict_when_gate_registry_changes_during_checker() {
+        // The evaluated gate's own definition, then another registered gate.
+        for (original, changed) in [
+            ("Original race title", "Changed race title"),
+            ("Portable check", "Edited check"),
+        ] {
+            let taxonomy = crate::test_taxonomy::test_taxonomy();
+            let config = format!(
+                "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                taxonomy.config_fragment()
+            );
+            let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+            let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
+            std::fs::write(
+                repo.path().join("gate-race.sh"),
+                format!(
+                    "if [ ! -f .gate-race-seen ]; then : > .gate-race-seen; sed -i 's/{original}/{changed}/' .jit/gates.toml; fi\nprintf x >> checker-count\ncat \"$JIT_CONTEXT_FILE\"\n"
+                ),
+            )
             .unwrap();
-        let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
+            add_exec_gate(
+                &executor,
+                &issue_id,
+                &"gate-race".parse().unwrap(),
+                "Original race title",
+                "sh gate-race.sh".to_string(),
+                None,
+            );
 
-        assert_eq!(context["gate"]["title"], "Original race title");
-        assert_eq!(
-            std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
-            "x"
-        );
-        assert_eq!(
-            executor
+            let result = executor
+                .gates()
+                .check_gate(&issue_id, &"gate-race".parse().unwrap())
+                .unwrap();
+            let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
+
+            assert_eq!(context["gate"]["title"], "Original race title");
+            assert_eq!(
+                std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
+                "x"
+            );
+            let runs = executor
                 .storage
                 .list_gate_runs_for_issue(&issue_id)
                 .unwrap()
                 .into_iter()
                 .filter(|run| run.gate_key == "gate-race".parse().unwrap())
-                .count(),
-            1
-        );
-        let run = executor
-            .storage
-            .list_gate_runs_for_issue(&issue_id)
-            .unwrap()
-            .into_iter()
-            .find(|run| run.gate_key == "gate-race".parse().unwrap())
-            .unwrap();
-        assert_eq!(
-            run.evaluation_stability,
-            crate::domain::GateEvaluationStability::InputsMoved
-        );
+                .collect::<Vec<_>>();
+            assert_eq!(runs.len(), 1, "editing {original}");
+            assert_eq!(
+                runs[0].evaluation_stability,
+                crate::domain::GateEvaluationStability::InputsMoved,
+                "editing {original}"
+            );
+        }
     }
 
     #[cfg(unix)]
