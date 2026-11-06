@@ -5,13 +5,11 @@
 //! through [`RepositoryStateStore`] capture/apply sessions.
 
 use crate::declarations::GateRegistry;
-use crate::domain::artifact_plan::PlanTarget;
 use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::domain::{Event, Issue};
 use anyhow::Result;
 
-pub mod artifact_discovery;
-pub mod artifact_planning;
+pub(crate) mod artifact_inspection;
 pub(crate) mod atomic_write;
 pub(crate) mod capability_fs;
 pub mod claim_coordinator;
@@ -26,7 +24,6 @@ pub(crate) mod gate_run_reader;
 pub mod gate_runs;
 pub mod gate_store;
 pub mod git;
-pub mod git_revision;
 pub mod guard_order;
 pub(crate) mod init_publish;
 #[cfg(test)]
@@ -54,9 +51,6 @@ pub mod worktree_identity;
 pub mod worktree_paths;
 
 // Re-export for convenience
-pub use artifact_discovery::{discover_archive_artifacts, ArtifactDiscoveryError};
-pub(crate) use artifact_planning::collect_citation_scan_evidence;
-pub use artifact_planning::{collect_artifact_classification_facts, resolve_container_destination};
 pub use capability_fs::DataRoot;
 pub use claim_coordinator::{ClaimAcquireLimits, ClaimCoordinator, Lease};
 pub use clock::{Clock, SystemClock};
@@ -65,9 +59,7 @@ pub use errors::{
     IssueNotFoundError, PresetNotFoundError, RepositoryFormatUnsupportedError,
     RepositoryNotFoundError,
 };
-pub use git_revision::{
-    GitRevisionError, GitRevisionResolver, PinnedArtifactRead, PinnedTargetRead,
-};
+pub use git::PinnedTargetRead;
 pub use json::{
     read_exact_store, ExactStoreSnapshot, JsonFileStorage, RetainedMutationSessionGuard,
     RetainedSessionSuspendedError,
@@ -291,18 +283,6 @@ pub trait IssueStore: Clone {
     ///
     /// Returns an error if events cannot be read.
     fn read_events(&self) -> Result<Vec<Event>>;
-
-    /// Read the evidence record addressed by one archive target.
-    ///
-    /// Returns `None` when the target has no prior executions.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the record cannot be read or decoded.
-    fn read_archive_evidence_record(
-        &self,
-        target: &PlanTarget,
-    ) -> Result<Option<crate::domain::artifact_execution::ArchiveEvidenceRecord>>;
 
     /// Load a gate run result by issue and run ID.
     ///

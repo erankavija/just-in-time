@@ -447,7 +447,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         let mut result = BulkUpdateResult::new();
         result.matched = matched.clone();
         let graph = CapturedGraphEvidence::capture(&image, &issues, context)?;
-        let enforcement_mode = crate::repository_state::assemble_config(&image)?.enforcement_mode();
+        let enforcement_mode = graph.declarations.config().enforcement_mode();
         let derivation = BulkDerivation {
             operations,
             force,

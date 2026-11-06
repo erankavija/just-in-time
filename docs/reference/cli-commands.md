@@ -225,7 +225,9 @@ jit archive document dev/active/design.md --execute
 jit archive container 2f84c930 --execute --json
 ```
 
-Both target forms use the same planner. Without `--execute`, they are read-only.
+Both target forms, with or without `--execute`, use the same planner. Without
+`--execute`, they are read-only: the preview reads one repository snapshot
+without taking the write lock and reports the plan execution would apply to it.
 A document target
 includes its recursively supported local bundle. A container target includes
 documents attached to the container and its resolved-hierarchy descendants,
@@ -3655,6 +3657,11 @@ the contents. A snapshot preserves its provenance: git commit, source mode, and
 timestamps. Its `.jit/` holds each exported issue record as stored and the
 repository's [declaration files](storage-format.md#directory-structure), read
 together from one capture of the repository.
+
+In git mode (`--at`, `--committed-only`, or the default when git is available), a
+referenced document or asset missing from the selected commit fails export with a
+not-found error (exit `3`); working-tree exports continue to warn for missing
+documents and skip missing assets.
 
 ```bash
 jit snapshot export [OPTIONS]

@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c48a4d20-72c2-4596-9fa7-246d15bd12a6",
+      "status": "passed",
+      "updated_at": "2026-11-06T04:29:51.745130247Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1ca6ea0e-0cde-4807-85b1-42e77aba0f8b",
+      "status": "passed",
+      "updated_at": "2026-11-06T04:33:03.316063443Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e6ec58f3-94d4-4886-85ef-fae12decaeba",
   "labels": [
     "type:task",
@@ -31,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remove the revision resolver bridge",
-  "updated_at": "2026-11-06T04:03:07.853379963Z"
+  "updated_at": "2026-11-06T04:33:03.316063443Z"
 }

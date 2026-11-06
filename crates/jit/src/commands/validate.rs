@@ -1608,8 +1608,9 @@ mod tests {
 
     #[test]
     fn test_validate_fix_rejects_ambiguous_region_without_memory_writes() {
-        use crate::commands::test_helpers::{memory_executor_declaring, seed_repo_file};
+        use crate::commands::test_helpers::memory_executor_declaring;
         use crate::storage::IssueStore;
+        use crate::test_harness::seed_memory_repository_file;
 
         let (_source, storage) =
             crate::test_utils::profiled_in_memory_repository_fixture("jit-dogfood").unwrap();
@@ -1632,7 +1633,7 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        seed_repo_file(&storage, "AGENTS.md", &agents);
+        seed_memory_repository_file(&storage, "AGENTS.md", &agents);
 
         let (_, _, report, _) = executor.validation().validate_with_fix(false).unwrap();
         let error = report.structural_failure.unwrap();
@@ -1703,11 +1704,12 @@ mod tests {
 
     #[test]
     fn test_validate_fix_reports_malformed_records_without_publishing_repairs() {
-        use crate::commands::test_helpers::{memory_executor, seed_repo_file};
+        use crate::commands::test_helpers::memory_executor;
+        use crate::test_harness::seed_memory_repository_file;
         let storage = crate::storage::InMemoryStorage::new();
         let executor = memory_executor(storage.clone());
         let path = format!(".jit/issues/{}.json", crate::test_utils::issue_id(1));
-        seed_repo_file(&storage, &path, "{");
+        seed_memory_repository_file(&storage, &path, "{");
         let (count, _, report, _) = executor.validation().validate_with_fix(false).unwrap();
         assert_eq!(count, 0);
         assert!(report.structural_failure.is_some());
@@ -1716,9 +1718,8 @@ mod tests {
 
     #[test]
     fn test_validate_fix_skips_declaration_dependent_repairs_once_and_keeps_other_fixes() {
-        use crate::commands::test_helpers::{
-            memory_executor_declaring, seed_issue, seed_repo_file,
-        };
+        use crate::commands::test_helpers::{memory_executor_declaring, seed_issue};
+        use crate::test_harness::seed_memory_repository_file;
         let storage = crate::storage::InMemoryStorage::new();
         let executor = memory_executor_declaring(
             storage.clone(),
@@ -1727,7 +1728,7 @@ mod tests {
                 ..MemoryDeclarations::default()
             },
         );
-        seed_repo_file(&storage, ".jit/gates.toml", "not valid TOML");
+        seed_memory_repository_file(&storage, ".jit/gates.toml", "not valid TOML");
         let mut leaf = crate::test_utils::fixture_issue("leaf".into(), String::new());
         leaf.state = State::Done;
         let mut middle = crate::test_utils::fixture_issue("middle".into(), String::new());
@@ -1828,10 +1829,9 @@ mod tests {
 
     #[test]
     fn test_validate_fix_publishes_every_fix_class_once_and_dry_run_publishes_nothing() {
-        use crate::commands::test_helpers::{
-            memory_executor_declaring, seed_issue, seed_repo_file,
-        };
+        use crate::commands::test_helpers::{memory_executor_declaring, seed_issue};
         use crate::storage::{IssueStore, MutationPoint};
+        use crate::test_harness::seed_memory_repository_file;
         use std::sync::{
             atomic::{AtomicUsize, Ordering},
             Arc,
@@ -1868,7 +1868,7 @@ mod tests {
             seed_issue(&storage, issue.clone());
         }
         let agents = storage.read_repo_file("AGENTS.md").unwrap().unwrap();
-        seed_repo_file(
+        seed_memory_repository_file(
             &storage,
             "AGENTS.md",
             &agents.replacen(
@@ -2033,12 +2033,13 @@ mod tests {
     #[test]
     fn test_validate_type_fix_repairs_another_agents_leased_issue_in_strict_mode() {
         use crate::commands::test_helpers::{
-            plant_foreign_lease, seed_issue, seed_repo_file, setup_coordinated_with_enforcement,
+            plant_foreign_lease, seed_issue, setup_coordinated_with_enforcement,
         };
         use crate::storage::IssueStore;
+        use crate::test_harness::seed_memory_repository_file;
 
         let executor = setup_coordinated_with_enforcement("strict");
-        seed_repo_file(
+        seed_memory_repository_file(
             executor.storage(),
             ".jit/config.toml",
             "[worktree]\nenforce_leases = \"strict\"\n\
@@ -2328,10 +2329,9 @@ depends_on = ["planning"]
 
     #[test]
     fn test_capture_repair_plan_ignores_document_larger_than_capture_budget() {
-        use crate::commands::test_helpers::{
-            memory_executor_declaring, seed_issue, seed_repo_file,
-        };
+        use crate::commands::test_helpers::{memory_executor_declaring, seed_issue};
         use crate::storage::{RepositoryMutationSession, RepositoryStateStore};
+        use crate::test_harness::seed_memory_repository_file;
 
         let executor = memory_executor_declaring(
             InMemoryStorage::new(),
@@ -2359,12 +2359,12 @@ depends_on = ["planning"]
         seed_issue(executor.storage(), container);
         seed_issue(executor.storage(), breakdown);
         let max_bytes = 64 * 1024;
-        seed_repo_file(
+        seed_memory_repository_file(
             executor.storage(),
             "receipts/large.log",
             &"x".repeat(max_bytes * 2),
         );
-        seed_repo_file(
+        seed_memory_repository_file(
             executor.storage(),
             ".jit/schemas/default-label-format.json",
             "false",
@@ -2407,15 +2407,16 @@ depends_on = ["planning"]
 
     #[test]
     fn test_capture_document_reference_validation_bounds_each_reference_independently() {
-        use crate::commands::test_helpers::{seed_issue, seed_repo_file, setup};
+        use crate::commands::test_helpers::{seed_issue, setup};
         use crate::storage::RepositoryStateStore;
+        use crate::test_harness::seed_memory_repository_file;
 
         let executor = setup();
         let mut issue = crate::test_utils::fixture_issue("Receipts".into(), String::new());
         let max_bytes = 64 * 1024;
         let content = "x".repeat(max_bytes * 3 / 4);
         for path in ["receipts/first.log", "receipts/second.log"] {
-            seed_repo_file(executor.storage(), path, &content);
+            seed_memory_repository_file(executor.storage(), path, &content);
             issue
                 .documents
                 .push(crate::test_utils::document_reference(path));

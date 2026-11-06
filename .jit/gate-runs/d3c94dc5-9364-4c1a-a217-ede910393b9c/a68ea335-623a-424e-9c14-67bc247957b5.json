@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a4633e9d0f1b7d98058880cb25eba7184c26cbe4",
+  "completed_at": "2026-11-06T04:36:14.305101547Z",
+  "duration_ms": 208527,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied; the prior blocking configuration-assembly finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d3c94dc5-9364-4c1a-a217-ede910393b9c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a68ea335-623a-424e-9c14-67bc247957b5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T04:32:45.777994002Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 666aefc32, b67ae623, 4514a8d9 (all reachable from `main`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-13, @/charter/D-20, @/invariant/single-source-prose, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/issue/b697a3f7/requirement/REQ-04, @/issue/693a2fdd/requirement/REQ-05, @/gate/cargo-ci\nGate evidence: cargo-ci passed (exit 0, 2026-11-06T04:31:11Z); supplied ancestry says run a4633e9d contains all attributed commits\nTruncation recovery: inspected individual core, test, documentation, evidence-record, and corrective patches separately; recovered bounded current-path reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied; the prior blocking configuration-assembly finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

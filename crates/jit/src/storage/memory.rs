@@ -5,8 +5,6 @@
 
 use super::gate_run_reader::TreeNode;
 use crate::declarations::{parse_gate_registry, GateRegistry};
-use crate::domain::artifact_execution::ArchiveEvidenceRecord;
-use crate::domain::artifact_plan::PlanTarget;
 use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::{GateRunId, IssueId};
 use crate::domain::relative_path::RootRelativePath;
@@ -907,29 +905,6 @@ impl IssueStore for InMemoryStorage {
 
     fn read_events(&self) -> Result<Vec<Event>> {
         Self::load_events(&*self.read_repository_state()?)
-    }
-
-    fn read_archive_evidence_record(
-        &self,
-        target: &PlanTarget,
-    ) -> Result<Option<ArchiveEvidenceRecord>> {
-        let path = VirtualPath::archive_evidence_record(target);
-        let state = self.read_repository_state()?;
-        match state.entries.get(&path) {
-            None | Some(RepositoryEntry::Absent) => Ok(None),
-            Some(RepositoryEntry::File { content, .. }) => serde_json::from_slice(content.bytes())
-                .with_context(|| {
-                    format!(
-                        "Failed to deserialize archive evidence record at {}",
-                        path.relative().as_path().display()
-                    )
-                })
-                .map(Some),
-            Some(_) => anyhow::bail!(
-                "Archive evidence record at {} must be an ordinary file",
-                path.relative().as_path().display()
-            ),
-        }
     }
 
     fn root(&self) -> &std::path::Path {

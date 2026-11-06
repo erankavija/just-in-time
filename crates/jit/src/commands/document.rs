@@ -198,6 +198,84 @@ impl DocumentScanWarning {
     }
 }
 
+fn render_document_diff(
+    checkout: &crate::storage::git::GitCheckout,
+    checkout_top_level: &std::path::Path,
+    repository_root: &std::path::Path,
+    path: &str,
+    from: &str,
+    to: &str,
+) -> Result<String> {
+    use similar::{ChangeTag, TextDiff};
+
+    crate::storage::validate_repo_relative_path(path)?;
+    let relative_root = repository_root
+        .strip_prefix(checkout_top_level)
+        .unwrap_or(std::path::Path::new(""));
+    let relative_path = relative_root.join(path);
+    let relative_path = relative_path
+        .to_str()
+        .ok_or_else(|| anyhow!("document path is not valid UTF-8"))?;
+
+    let mut reader = checkout.object_reader()?;
+    let from_content = read_document_diff_version(&mut reader, relative_path, from)?;
+    let to_content = read_document_diff_version(&mut reader, relative_path, to)?;
+
+    let mut diff_output = format!("diff --git a/{path} b/{path}\n");
+    diff_output.push_str(&format!("--- a/{path} ({from})\n"));
+    diff_output.push_str(&format!("+++ b/{path} ({to})\n\n"));
+
+    let diff = TextDiff::from_lines(&from_content, &to_content);
+    for change in diff.iter_all_changes() {
+        let sign = match change.tag() {
+            ChangeTag::Delete => "-",
+            ChangeTag::Insert => "+",
+            ChangeTag::Equal => " ",
+        };
+        diff_output.push_str(&format!("{sign}{change}"));
+    }
+
+    Ok(diff_output)
+}
+
+fn read_document_diff_version(
+    reader: &mut crate::storage::git::GitObjectReader,
+    path: &str,
+    revision: &str,
+) -> Result<String> {
+    use crate::{
+        domain::artifact_plan::ArtifactVersion,
+        storage::git::{GitError, GitObjectType},
+    };
+
+    let version = reader.resolve_commit(revision)?.into_version(revision)?;
+    let ArtifactVersion::Pinned(commit) = version else {
+        return Err(anyhow!(
+            "internal error: commit resolution returned a working tree version"
+        ));
+    };
+    let object_name = format!("{}:{path}", commit.as_str());
+    let object = reader
+        .read(&object_name)?
+        .ok_or_else(|| GitError::PinnedReadFailed {
+            revision: revision.to_owned(),
+            path: path.to_owned(),
+            stderr: "path does not identify an object".to_owned(),
+        })?;
+    if object.object_type() != GitObjectType::Blob {
+        return Err(GitError::PinnedReadFailed {
+            revision: revision.to_owned(),
+            path: path.to_owned(),
+            stderr: "path does not identify a blob".to_owned(),
+        }
+        .into());
+    }
+
+    std::str::from_utf8(object.bytes())
+        .map(str::to_owned)
+        .map_err(|error| anyhow!("document '{path}' is not UTF-8: {error}"))
+}
+
 /// Document operations of a [`CommandExecutor`].
 pub struct DocumentOps<'a, S: IssueStore> {
     exec: &'a CommandExecutor<S>,
@@ -238,7 +316,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         use crate::domain::artifact_discovery::ArtifactEvidence;
 
         Ok(
-            match crate::storage::artifact_planning::inspect_artifact_evidence(
+            match crate::storage::artifact_inspection::inspect_artifact_evidence(
                 &self.exec.storage,
                 root,
                 scope,
@@ -719,46 +797,28 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         from: &str,
         to: Option<&str>,
     ) -> Result<DocumentDiffResult> {
-        use git2::Repository;
-
         let full_id = issue_id.clone();
         let issue = self.exec.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
 
         let layout = self.exec.require_layout()?;
-        let repo = Repository::open(
-            self.exec
-                .require_worktree_paths()?
-                .code_checkout_top_level()
-                .unwrap_or(layout.worktree_root()),
-        )
-        .map_err(|e| anyhow!("Not a git repository: {}", e))?;
+        let paths = self.exec.require_worktree_paths()?;
+        let checkout = paths
+            .code_checkout()
+            .ok_or_else(|| anyhow!("Not a git repository"))?;
 
         let to_ref = to.unwrap_or("HEAD");
-
-        // Get content at both commits
-        let from_content = self.read_file_from_git(&repo, path, from)?;
-        let to_content = self.read_file_from_git(&repo, path, to_ref)?;
-
-        // Generate unified diff
-        let mut diff_output = String::new();
-        diff_output.push_str(&format!("diff --git a/{} b/{}\n", path, path));
-        diff_output.push_str(&format!("--- a/{} ({})\n", path, from));
-        diff_output.push_str(&format!("+++ b/{} ({})\n", path, to_ref));
-        diff_output.push('\n');
-
-        // Use similar crate for diff generation
-        use similar::{ChangeTag, TextDiff};
-        let diff = TextDiff::from_lines(&from_content, &to_content);
-
-        for change in diff.iter_all_changes() {
-            let sign = match change.tag() {
-                ChangeTag::Delete => "-",
-                ChangeTag::Insert => "+",
-                ChangeTag::Equal => " ",
-            };
-            diff_output.push_str(&format!("{}{}", sign, change));
-        }
+        let checkout_top_level = paths
+            .code_checkout_top_level()
+            .unwrap_or(layout.worktree_root());
+        let diff_output = render_document_diff(
+            &checkout,
+            checkout_top_level,
+            layout.worktree_root(),
+            path,
+            from,
+            to_ref,
+        )?;
 
         Ok(DocumentDiffResult {
             path: path.to_string(),
@@ -897,54 +957,38 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         to: Option<&str>,
     ) -> Result<String, crate::storage::PathReadError> {
         use crate::storage::PathReadError;
-        use git2::Repository;
-        use similar::{ChangeTag, TextDiff};
 
         let issue = self.load_issue_typed(issue_id)?;
         self.find_issue_document(issue, path)?;
 
         let layout = self.exec.require_layout().map_err(PathReadError::Other)?;
-        let repo_root = layout.worktree_root();
+        let paths = self
+            .exec
+            .require_worktree_paths()
+            .map_err(PathReadError::Other)?;
+        let Some(checkout) = paths.code_checkout() else {
+            return Err(PathReadError::Other(anyhow!(
+                "Document diff not available (requires git repository with history)"
+            )));
+        };
+        let to_ref = to.unwrap_or("HEAD");
+        let checkout_top_level = paths
+            .code_checkout_top_level()
+            .unwrap_or(layout.worktree_root());
 
-        // Try to get diff from git, return error message if not available
-        if let Ok(repo) = Repository::open(
-            self.exec
-                .require_worktree_paths()
-                .map_err(PathReadError::Other)?
-                .code_checkout_top_level()
-                .unwrap_or(repo_root),
-        ) {
-            let to_ref = to.unwrap_or("HEAD");
-
-            // Try to get content at both commits
-            if let (Ok(from_content), Ok(to_content)) = (
-                self.read_file_from_git(&repo, path, from),
-                self.read_file_from_git(&repo, path, to_ref),
-            ) {
-                // Generate unified diff
-                let mut diff_output = format!("diff --git a/{} b/{}\n", path, path);
-                diff_output.push_str(&format!("--- a/{} ({})\n", path, from));
-                diff_output.push_str(&format!("+++ b/{} ({})\n\n", path, to_ref));
-
-                let diff = TextDiff::from_lines(&from_content, &to_content);
-
-                for change in diff.iter_all_changes() {
-                    let sign = match change.tag() {
-                        ChangeTag::Delete => "-",
-                        ChangeTag::Insert => "+",
-                        ChangeTag::Equal => " ",
-                    };
-                    diff_output.push_str(&format!("{}{}", sign, change));
-                }
-
-                return Ok(diff_output);
-            }
-        }
-
-        // No git or diff not available
-        Err(PathReadError::Other(anyhow!(
-            "Document diff not available (requires git repository with history)"
-        )))
+        render_document_diff(
+            &checkout,
+            checkout_top_level,
+            layout.worktree_root(),
+            path,
+            from,
+            to_ref,
+        )
+        .map_err(|_| {
+            PathReadError::Other(anyhow!(
+                "Document diff not available (requires git repository with history)"
+            ))
+        })
     }
 
     /// Every issue's document paths, explicit or derived, sorted and
@@ -977,30 +1021,6 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         at_commit: Option<&str>,
     ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
         self.exec.storage.read_path_bytes(path, at_commit)
-    }
-
-    fn read_file_from_git(
-        &self,
-        repo: &git2::Repository,
-        path: &str,
-        reference: &str,
-    ) -> Result<String> {
-        let obj = repo.revparse_single(reference)?;
-        let commit = obj.peel_to_commit()?;
-        let tree = commit.tree()?;
-        let layout = self.exec.require_layout()?;
-        let root = layout.worktree_root();
-        let top = self
-            .exec
-            .require_worktree_paths()?
-            .code_checkout_top_level()
-            .unwrap_or(root);
-        let relative_root = root.strip_prefix(top).unwrap_or(std::path::Path::new(""));
-        let entry = tree.get_path(&relative_root.join(path))?;
-        let blob = repo.find_blob(entry.id())?;
-
-        let content = std::str::from_utf8(blob.content())?;
-        Ok(content.to_string())
     }
 
     pub fn list_document_assets(
