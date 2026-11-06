@@ -4593,6 +4593,50 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(issue.state, State::Ready);
     }
 
+    #[test]
+    fn test_update_issue_state_in_progress_refused_when_precheck_fails() {
+        let executor = setup();
+        let gate_key: GateKey = "precheck-fail".parse().unwrap();
+        let issue_id = seed_issue_requiring_exec_gates(
+            &executor,
+            State::Ready,
+            &[(gate_key.as_str(), "exit 1")],
+        );
+        executor
+            .gates()
+            .update_gate(
+                &gate_key,
+                GateUpdate {
+                    stage: Some(GateStage::Precheck),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+        let error = executor
+            .issues()
+            .update_issue(
+                &issue_id,
+                None,
+                None,
+                None,
+                Some(State::InProgress),
+                Vec::new(),
+                Vec::new(),
+                None,
+                None,
+                false,
+            )
+            .expect_err("a failing precheck refuses the state change");
+
+        assert!(error
+            .downcast_ref::<crate::errors::TransitionBlockedError>()
+            .is_some());
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(issue.state, State::Ready);
+        assert_eq!(issue.gates_status[&gate_key].status, GateStatus::Failed);
+    }
+
     #[cfg(unix)]
     #[test]
     fn test_lifecycle_precheck_records_one_moved_run_when_checker_mutates_repository() {
