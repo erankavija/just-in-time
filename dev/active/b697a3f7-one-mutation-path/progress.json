@@ -162,7 +162,7 @@
         },
         {
           "short_id": "700a96dd",
-          "status": "rework-1 (REQ-05 registry in return value and record comparison)"
+          "status": "done"
         }
       ]
     }
