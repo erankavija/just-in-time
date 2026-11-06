@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2ac42b754f1b3ebb886a3849352b5215e0ee547e",
+  "completed_at": "2026-11-06T03:58:51.361165488Z",
+  "duration_ms": 223620,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met by the attributed commits; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "700a96dd-ba55-4cf3-8992-5d370acadf0d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cd5a2df6-a8db-4612-845d-7d9d05898c1c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T03:55:07.740822740Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4c9b9fa51fa36e50e2812529279f2484cfac5af5, 4e75853612cdf945806a8ea54a7229a196093ea7\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/b697a3f7/requirement/REQ-12 and @/issue/8454236c/decision/D-1 (issue descriptions); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-06T03:53:22Z); its run contains both attributed commits\nTruncation recovery: read every tagged patch separately by commit, file, and range; excluded truncated unrelated archive-search output outside the impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met by the attributed commits; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

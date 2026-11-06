@@ -22,7 +22,8 @@ use crate::domain::artifact_inventory::{
     pinned_root_requests, ExplicitRootTarget, PinnedRootEvidence, PinnedRootEvidenceMap,
 };
 use crate::domain::artifact_plan::{
-    normalize_artifact_path, ArchiveCandidates, ArtifactPlan, BlockerCode, PlanBlocker, PlanTarget,
+    normalize_artifact_path, ArchiveCandidates, ArtifactPlan, ArtifactVersion, BlockerCode,
+    PlanBlocker, PlanTarget,
 };
 #[cfg(test)]
 use crate::domain::artifact_plan::{ArtifactAction, WarningCode};
@@ -30,10 +31,11 @@ use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::Issue;
 use crate::storage::artifact_planning::inspect_artifact_evidence;
+use crate::storage::git::{CommitResolution, GitCheckout, GitObjectType};
 use crate::storage::{
     collect_artifact_classification_facts, discover_archive_artifacts,
-    resolve_container_destination, validate_repo_relative_path, GitRevisionResolver, IssueStore,
-    JsonFileStorage, RepositoryMutationSession,
+    resolve_container_destination, validate_repo_relative_path, IssueStore, JsonFileStorage,
+    RepositoryMutationSession,
 };
 use anyhow::{bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
@@ -105,17 +107,29 @@ fn remap_archived_references(issues: &mut [Issue], destination_root: &str, devel
 
 fn inventory_issues_pinned_evidence(
     requests: impl IntoIterator<Item = (String, String)>,
-    resolver: &GitRevisionResolver,
+    checkout: Option<&GitCheckout>,
 ) -> PinnedRootEvidenceMap {
+    let mut requests = requests.into_iter().peekable();
+    let mut reader = requests
+        .peek()
+        .and(checkout)
+        .and_then(|checkout| checkout.object_reader().ok());
     requests
-        .into_iter()
         .map(|(revision, path)| {
-            let key = (revision.clone(), path.clone());
-            let evidence = resolver
-                .read_pinned_path(&revision, &path)
-                .map(|read| PinnedRootEvidence::Resolved(read.version().clone()))
-                .unwrap_or(PinnedRootEvidence::Unavailable);
-            (key, evidence)
+            let evidence = (|| {
+                validate_repo_relative_path(&path).ok()?;
+                let reader = reader.as_mut()?;
+                let CommitResolution::Commit(commit) = reader.resolve_commit(&revision).ok()?
+                else {
+                    return None;
+                };
+                let object = reader.read(&format!("{}:{path}", commit.as_str())).ok()??;
+                (object.object_type() == GitObjectType::Blob).then_some(
+                    PinnedRootEvidence::Resolved(ArtifactVersion::Pinned(commit)),
+                )
+            })()
+            .unwrap_or(PinnedRootEvidence::Unavailable);
+            ((revision, path), evidence)
         })
         .collect()
 }
@@ -189,9 +203,7 @@ impl<S: IssueStore> ArchiveOps<'_, S> {
         let config = self.exec.config_manager.load()?;
         let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
         let issues = self.exec.storage.list_issues()?;
-        let layout = self.exec.require_layout()?;
-        let repo_root = layout.worktree_root();
-        let resolver = GitRevisionResolver::new(repo_root);
+        let checkout = self.exec.require_worktree_paths()?.code_checkout();
 
         let root_container_id = match target {
             ArchiveTarget::Document(_) => None,
@@ -251,7 +263,7 @@ impl<S: IssueStore> ArchiveOps<'_, S> {
         };
         let pinned = inventory_issues_pinned_evidence(
             pinned_root_requests(&inventory_issues, &hierarchy, explicit_target)?,
-            &resolver,
+            checkout.as_ref(),
         );
         let inventory =
             inventory_explicit_roots(&inventory_issues, &hierarchy, explicit_target, &pinned)?;
@@ -1054,6 +1066,88 @@ mod tests {
 
     fn stored_archive_executions<S: IssueStore>(storage: &S) -> Vec<ArchiveExecution> {
         crate::domain::artifact_execution::archive_executions(&storage.read_events().unwrap())
+    }
+
+    fn executor(root: &std::path::Path) -> CommandExecutor<JsonFileStorage> {
+        crate::test_utils::file_executor(root)
+            .unwrap()
+            .with_worktree_paths(crate::storage::WorktreePaths::detect_from(root).unwrap())
+    }
+
+    #[test]
+    fn test_preview_archive_container_pinned_evidence_uses_selected_code_checkout() {
+        use crate::test_harness::git::GitRepository;
+
+        let config = format!(
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            test_taxonomy().config_fragment()
+        );
+        let (data, _) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let data_repository = GitRepository::init(data.path());
+        data_repository.write("fixtures/data.md", "data checkout only");
+        data_repository.commit("data history");
+        let code = tempfile::TempDir::new().unwrap();
+        let repository = GitRepository::init(code.path());
+        repository
+            .write("fixtures/historical.md", "historical")
+            .write("fixtures/tagged.md", "tagged")
+            .write("fixtures/nested/child.md", "child");
+        let commit = repository.commit("pinned history");
+        repository.git(&["tag", "-a", "snapshot", "-m", "snapshot"]);
+        let paths = crate::storage::WorktreePaths::detect_from(data.path())
+            .unwrap()
+            .with_worktree_root(code.path())
+            .unwrap();
+        let executor = executor(data.path()).with_worktree_paths(paths.clone());
+        let mut container =
+            crate::test_utils::fixture_issue("Pinned container".into(), String::new());
+        container.state = State::Done;
+        container.labels = vec![format!("type:{}", test_taxonomy().type_at_level(1))];
+        container.documents = vec![
+            document_reference_at("fixtures/historical.md", ":/pinned history"),
+            document_reference_at("fixtures/tagged.md", "snapshot"),
+            document_reference_at("fixtures/absent.md", "HEAD"),
+            document_reference_at("fixtures/nested", "HEAD"),
+            document_reference_at("fixtures/data.md", "HEAD"),
+        ];
+        let id = container.id.clone();
+        seed_archive_issue_precondition(&executor.storage, container);
+
+        let plan = executor.archive().preview_archive_container(&id).unwrap();
+
+        assert_eq!(
+            plan.artifacts()
+                .iter()
+                .map(|artifact| (artifact.source(), artifact.version().as_str()))
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                ("fixtures/historical.md", commit.as_str()),
+                ("fixtures/tagged.md", commit.as_str()),
+            ]),
+            "pinned evidence must come from the selected code checkout"
+        );
+        assert_eq!(
+            plan.blockers()
+                .iter()
+                .filter(|blocker| blocker.code == BlockerCode::PinnedReadFailed)
+                .map(|blocker| blocker.path.as_deref().unwrap())
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from(["fixtures/absent.md", "fixtures/nested", "fixtures/data.md"])
+        );
+
+        let outside = tempfile::TempDir::new().unwrap();
+        let executor =
+            executor.with_worktree_paths(paths.with_worktree_root(outside.path()).unwrap());
+        let plan = executor.archive().preview_archive_container(&id).unwrap();
+        assert!(plan.artifacts().is_empty());
+        assert_eq!(
+            plan.blockers()
+                .iter()
+                .filter(|blocker| blocker.code == BlockerCode::PinnedReadFailed)
+                .count(),
+            5,
+            "a code root outside Git cannot use the data checkout's history"
+        );
     }
 
     #[test]

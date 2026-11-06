@@ -54,9 +54,14 @@ set -euo pipefail
 #   SESSION_BENCH_TARGET_DIR    Cargo target directory for the release build
 #                               (default: CARGO_TARGET_DIR when set, otherwise
 #                               <repo>/target).
-#   SESSION_BENCH_BIN           prebuilt jit binary used only by the fast
-#                               harness self-test; when unset, the release
-#                               binary is always built as required above.
+#   SESSION_BENCH_BIN           prebuilt jit binary, used by the fast harness
+#                               self-test and by fixture mode; when unset, the
+#                               release binary is always built as required above.
+#   SESSION_BENCH_FIXTURE_DIR   fixture mode: generate the pristine fixture with
+#                               SESSION_BENCH_BIN at this absent path, print its
+#                               target issue id on stdout, and exit without
+#                               timing or writing an artifact. Other harnesses
+#                               share the generator through this mode.
 #   CARGO_CI_BUILD_LOCK         build lock shared with cargo-ci.sh (default
 #                               ${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock); held
 #                               only around the release build.
@@ -64,9 +69,10 @@ set -euo pipefail
 #                               the build exits 2 when the wait passes.
 #
 # Exit codes:
-#   0 — artifact written
+#   0 — artifact written (fixture mode: fixture generated)
 #   1 — the release build failed, or a measured jit command exited non-zero
-#   2 — environment problem (not a git repo, missing prerequisite, no real cargo)
+#   2 — environment problem (not a git repo, missing prerequisite, no real cargo,
+#       or a fixture-mode path that exists or lacks SESSION_BENCH_BIN)
 
 ISSUE_COUNT="${SESSION_BENCH_ISSUE_COUNT:-665}"
 WARMUP="${SESSION_BENCH_WARMUP:-3}"
@@ -102,6 +108,9 @@ for tool in jq python3 git df cp awk find ln rg realpath; do
   }
 done
 
+# Resolved before the harness moves to the repository root.
+FIXTURE_DIR="${SESSION_BENCH_FIXTURE_DIR:+$(realpath -m -- "$SESSION_BENCH_FIXTURE_DIR")}"
+
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || {
   echo "ERROR: not inside a git work tree." >&2
   exit 2
@@ -133,6 +142,16 @@ ensure_real_cargo() {
   echo "       cargo --version output: $probe" >&2
   exit 2
 }
+if [[ -n "$FIXTURE_DIR" ]]; then
+  [[ -n "${SESSION_BENCH_BIN:-}" ]] || {
+    echo "ERROR: SESSION_BENCH_FIXTURE_DIR requires SESSION_BENCH_BIN." >&2
+    exit 2
+  }
+  [[ ! -e "$FIXTURE_DIR" ]] || {
+    echo "ERROR: refusing to replace existing fixture path $FIXTURE_DIR" >&2
+    exit 2
+  }
+fi
 if [[ -z "${SESSION_BENCH_BIN:-}" ]]; then
   ensure_real_cargo
 fi
@@ -262,6 +281,12 @@ echo "[session-bench] generating pristine fixture of $ISSUE_COUNT issues ($BULK_
 TARGET_ID=$(<"$WORK_BASE/target-id")
 [[ -n "$TARGET_ID" && "$TARGET_ID" != null ]] || { echo "ERROR: could not resolve a fixture target id." >&2; exit 1; }
 echo "[session-bench] fixture target id: $TARGET_ID" >&2
+
+if [[ -n "$FIXTURE_DIR" ]]; then
+  cp -a "$PRISTINE" "$FIXTURE_DIR"
+  printf '%s\n' "$TARGET_ID"
+  exit 0
+fi
 
 # Warm working copy shared by the read scenarios (its page cache and fixed
 # repository-scoped locks are primed by each scenario's warmup runs).

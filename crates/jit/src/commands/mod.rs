@@ -678,53 +678,6 @@ struct CapturedTransitionEvidence<'a> {
     graph: &'a CapturedGraphEvidence<'a>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct PrecheckEvidence {
-    inputs: Vec<(
-        crate::repository_state::VirtualPath,
-        Option<crate::repository_state::EntryIdentity>,
-    )>,
-    validation_view: Option<PrecheckValidationView>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct PrecheckValidationView {
-    listings: std::collections::BTreeMap<
-        crate::repository_state::VirtualPath,
-        crate::repository_state::DirectoryListing,
-    >,
-}
-
-impl PrecheckEvidence {
-    /// Whether `image` holds these inputs unchanged, compared over the inputs
-    /// it reads: a mutation base reads no issue document reference.
-    fn matches(&self, image: &crate::repository_state::RepositoryImage) -> Result<bool> {
-        let inputs_unchanged = self
-            .inputs
-            .iter()
-            .filter(|(path, _)| image.capture_spec().contains_path(path))
-            .map(|(path, identity)| {
-                image
-                    .entry(path)
-                    .map(|entry| entry.identity() == identity.as_ref())
-            })
-            .collect::<std::result::Result<Vec<_>, _>>()?;
-        let validation_view = self
-            .validation_view
-            .as_ref()
-            .map(|_| PrecheckValidationView {
-                listings: image.directory_listings().clone(),
-            });
-        Ok(inputs_unchanged.into_iter().all(|unchanged| unchanged)
-            && validation_view == self.validation_view)
-    }
-}
-
-struct CapturedPrecheckPlan {
-    evidence: PrecheckEvidence,
-    prompts: std::collections::HashMap<GateKey, String>,
-}
-
 /// One precheck execution retained across publication retries. A transition
 /// reuses it whenever the bound target is unchanged, even when its captured
 /// inputs moved; that drift is recorded on the reused run instead of launching
@@ -733,7 +686,7 @@ struct CachedPrecheckExecution {
     target_id: IssueId,
     /// The captured inputs are retained so a reused precheck can be recorded as
     /// stable or as having moved while its checker ran.
-    evidence: PrecheckEvidence,
+    evidence: gate_check::GateEvidence,
     execution: gate_check::PrecheckExecution,
 }
 
@@ -749,7 +702,7 @@ fn checker_consumes_run_history(checker: &crate::declarations::GateChecker) -> b
 
 /// Whether `gate` is an automatic built-in checker that judges the whole
 /// captured repository rather than one issue's slice of it.
-pub(crate) fn is_broad_builtin_precheck(gate: &crate::declarations::GateDefinition) -> bool {
+pub(crate) fn is_broad_builtin_gate(gate: &crate::declarations::GateDefinition) -> bool {
     use crate::declarations::GateChecker;
     gate.mode == GateMode::Auto
         && !matches!(
@@ -760,23 +713,14 @@ pub(crate) fn is_broad_builtin_precheck(gate: &crate::declarations::GateDefiniti
 
 /// Whether `issue` requires a gate `registry` runs as a precheck.
 fn has_precheck_gates(issue: &Issue, registry: &crate::declarations::GateRegistry) -> bool {
-    issue
-        .gates_required
-        .iter()
-        .filter_map(|key| registry.gates.get(key))
-        .any(|gate| gate.stage == crate::declarations::GateStage::Precheck)
+    !precheck_gates(issue, registry).is_empty()
 }
 
 /// Whether one of `issue`'s precheck gates validates the whole repository.
 fn has_broad_precheck(issue: &Issue, registry: &crate::declarations::GateRegistry) -> bool {
-    issue
-        .gates_required
-        .iter()
-        .filter_map(|key| registry.gates.get(key))
-        .any(|gate| {
-            gate.stage == crate::declarations::GateStage::Precheck
-                && is_broad_builtin_precheck(gate)
-        })
+    precheck_gates(issue, registry)
+        .into_iter()
+        .any(is_broad_builtin_gate)
 }
 
 /// The prompt file each of `issue`'s automatic precheck gates passes its checker.
@@ -804,72 +748,26 @@ fn precheck_prompt_paths(
         .collect()
 }
 
-fn captured_precheck_plan(
+/// The precheck-stage gates `issue` requires that `registry` declares.
+fn precheck_gates<'a>(
+    issue: &Issue,
+    registry: &'a crate::declarations::GateRegistry,
+) -> Vec<&'a crate::declarations::GateDefinition> {
+    issue
+        .gates_required
+        .iter()
+        .filter_map(|key| registry.gates.get(key))
+        .filter(|gate| gate.stage == crate::declarations::GateStage::Precheck)
+        .collect()
+}
+
+/// The evidence `issue`'s precheck gates read from `image`.
+fn captured_precheck_evidence(
     image: &crate::repository_state::RepositoryImage,
     issue: &Issue,
     registry: &crate::declarations::GateRegistry,
-) -> Result<CapturedPrecheckPlan> {
-    use crate::declarations::GateStage;
-    use crate::repository_state::VirtualPath;
-    use std::collections::{BTreeSet, HashMap};
-
-    let gates = issue
-        .gates_required
-        .iter()
-        .filter_map(|key| registry.gates.get(key).map(|gate| (key, gate)))
-        .filter(|(_, gate)| gate.stage == GateStage::Precheck)
-        .collect::<Vec<_>>();
-    let broad_builtin = has_broad_precheck(issue, registry);
-    let consumes_history = gates.iter().any(|(_, gate)| {
-        gate.mode == GateMode::Auto
-            && gate
-                .checker
-                .as_ref()
-                .is_some_and(checker_consumes_run_history)
-    });
-    let mut paths = if broad_builtin {
-        image.entries().keys().cloned().collect::<BTreeSet<_>>()
-    } else {
-        BTreeSet::from([VirtualPath::issue_record(&issue.id), VirtualPath::GATES])
-    };
-    if !broad_builtin {
-        paths.extend(
-            issue
-                .dependencies
-                .iter()
-                .map(VirtualPath::issue_record)
-                .collect::<Vec<_>>(),
-        );
-        if consumes_history {
-            paths.extend(named_gate_run_records(issue).map(|(_, _, path)| path));
-        }
-    }
-    let mut prompts = HashMap::new();
-    for (key, path) in precheck_prompt_paths(image.layout(), issue, registry)? {
-        let bytes = image
-            .file_bytes(&path)?
-            .ok_or_else(|| anyhow!("captured precheck prompt file '{:?}' is missing", path))?;
-        prompts.insert(key, String::from_utf8(bytes.to_vec())?);
-        paths.insert(path);
-    }
-    let inputs = paths
-        .into_iter()
-        .map(|path| {
-            image
-                .entry(&path)
-                .map(|entry| (path, entry.identity().cloned()))
-        })
-        .collect::<std::result::Result<Vec<_>, _>>()?;
-    let validation_view = broad_builtin.then(|| PrecheckValidationView {
-        listings: image.directory_listings().clone(),
-    });
-    Ok(CapturedPrecheckPlan {
-        evidence: PrecheckEvidence {
-            inputs,
-            validation_view,
-        },
-        prompts,
-    })
+) -> Result<gate_check::CapturedGateEvidence> {
+    gate_check::captured_gate_evidence(image, issue, &precheck_gates(issue, registry))
 }
 
 fn claims_mutation_guard(
@@ -1065,7 +963,7 @@ fn derive_state_target(
 /// The full base a precheck-running state change reads before taking the
 /// claims guard, because its precheck gates run outside the lock.
 struct PrecheckPreflight {
-    plan: CapturedPrecheckPlan,
+    captured: gate_check::CapturedGateEvidence,
     image: crate::repository_state::RepositoryImage,
     issue: Issue,
     registry: crate::declarations::GateRegistry,
@@ -1138,7 +1036,7 @@ impl RecordedPrechecks {
 /// `image` since the preflight.
 fn record_captured_prechecks(
     cached: Option<&CachedPrecheckExecution>,
-    expected: Option<&CapturedPrecheckPlan>,
+    expected: Option<&gate_check::CapturedGateEvidence>,
     image: &crate::repository_state::RepositoryImage,
     planned: &Issue,
     registry: &crate::declarations::GateRegistry,
@@ -1147,10 +1045,10 @@ fn record_captured_prechecks(
         return Ok(RecordedPrechecks::default());
     };
     let inputs_moved = expected.evidence != cached.evidence
-        || if cached.evidence.validation_view.is_some() {
+        || if cached.evidence.is_broad() {
             !cached.evidence.matches(image)?
         } else {
-            captured_precheck_plan(image, planned, registry)?.evidence != cached.evidence
+            captured_precheck_evidence(image, planned, registry)?.evidence != cached.evidence
         };
     let runs = cached
         .execution
@@ -3174,7 +3072,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .into_iter()
             .map(|issue| {
                 Ok(PrecheckPreflight {
-                    plan: captured_precheck_plan(&image, &issue, registry)?,
+                    captured: captured_precheck_evidence(&image, &issue, registry)?,
                     image: image.clone(),
                     issue,
                     registry: registry.clone(),
@@ -3207,12 +3105,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         {
             *cached = Some(CachedPrecheckExecution {
                 target_id: target.clone(),
-                evidence: precheck.plan.evidence.clone(),
+                evidence: precheck.captured.evidence.clone(),
                 execution: self.execute_captured_prechecks(
                     &precheck.image,
                     &precheck.issue,
                     &precheck.registry,
-                    &precheck.plan.prompts,
+                    &precheck.captured,
                     first_run,
                     context,
                 )?,
@@ -3373,7 +3271,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             )?;
             let recorded = record_captured_prechecks(
                 cached_precheck.as_ref(),
-                precheck.map(|precheck| &precheck.plan),
+                precheck.map(|precheck| &precheck.captured),
                 &image,
                 &projected.issue,
                 &graph.declarations.gates,
@@ -3541,7 +3439,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
             let recorded = record_captured_prechecks(
                 cached_precheck.as_ref(),
-                precheck.as_ref().map(|precheck| &precheck.plan),
+                precheck.as_ref().map(|precheck| &precheck.captured),
                 &image,
                 &issue,
                 &declarations.gates,
@@ -4276,10 +4174,10 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
         issue_id
     }
 
-    fn capture_precheck_plan(
+    fn capture_precheck_evidence(
         executor: &CommandExecutor<crate::storage::InMemoryStorage>,
         issue_id: &IssueId,
-    ) -> CapturedPrecheckPlan {
+    ) -> gate_check::CapturedGateEvidence {
         use crate::storage::RepositoryStateStore;
         let mut session = executor
             .storage
@@ -4296,7 +4194,7 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
         let registry = crate::repository_state::declarations_from_image(&image)
             .unwrap()
             .gates;
-        captured_precheck_plan(&image, &issue, &registry).unwrap()
+        captured_precheck_evidence(&image, &issue, &registry).unwrap()
     }
 
     fn prior_precheck_run(issue_id: &IssueId) -> crate::domain::GateRunResult {
@@ -4872,7 +4770,7 @@ assert = {}
         let storage = crate::storage::InMemoryStorage::new();
         let issue_id = seed_precheck_evidence(&storage);
         let executor = crate::commands::test_helpers::memory_executor(storage.clone());
-        let before = capture_precheck_plan(&executor, &issue_id).evidence;
+        let before = capture_precheck_evidence(&executor, &issue_id).evidence;
 
         let mut issue = storage.load_issue(&issue_id).unwrap();
         issue
@@ -4882,7 +4780,10 @@ assert = {}
             .status = GateStatus::Failed;
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
-        assert_ne!(capture_precheck_plan(&executor, &issue_id).evidence, before);
+        assert_ne!(
+            capture_precheck_evidence(&executor, &issue_id).evidence,
+            before
+        );
     }
 
     #[test]
@@ -4897,7 +4798,7 @@ assert = {}
         );
         crate::commands::test_helpers::seed_issue(&storage, issue);
         let executor = crate::commands::test_helpers::memory_executor(storage.clone());
-        let before = capture_precheck_plan(&executor, &issue_id).evidence;
+        let before = capture_precheck_evidence(&executor, &issue_id).evidence;
         storage.add_data_file(
             crate::repository_state::VirtualPath::gate_run_record(&run.issue_id, &run.run_id)
                 .relative()
@@ -4905,7 +4806,32 @@ assert = {}
             &serde_json::to_string(&run).unwrap(),
         );
 
-        assert_ne!(capture_precheck_plan(&executor, &issue_id).evidence, before);
+        assert_ne!(
+            capture_precheck_evidence(&executor, &issue_id).evidence,
+            before
+        );
+    }
+
+    #[test]
+    fn test_precheck_evidence_excludes_document_content_its_mutation_base_did_not_capture() {
+        use crate::storage::IssueStore;
+        let storage = crate::storage::InMemoryStorage::new();
+        let issue_id = seed_precheck_evidence(&storage);
+        let mut issue = storage.load_issue(&issue_id).unwrap();
+        issue
+            .documents
+            .push(crate::test_utils::document_reference("dev/notes.md"));
+        crate::commands::test_helpers::seed_issue(&storage, issue);
+        storage.add_worktree_file("dev/notes.md", "captured notes");
+        let executor = crate::commands::test_helpers::memory_executor(storage.clone());
+        let before = capture_precheck_evidence(&executor, &issue_id).evidence;
+
+        storage.add_worktree_file("dev/notes.md", "mutated notes");
+
+        assert_eq!(
+            capture_precheck_evidence(&executor, &issue_id).evidence,
+            before
+        );
     }
 
     #[test]
@@ -4913,14 +4839,14 @@ assert = {}
         let storage = crate::storage::InMemoryStorage::new();
         let issue_id = seed_precheck_evidence(&storage);
         let executor = crate::commands::test_helpers::memory_executor(storage.clone());
-        let before = capture_precheck_plan(&executor, &issue_id);
+        let before = capture_precheck_evidence(&executor, &issue_id);
         assert_eq!(
             before.prompts[&"auto-start".parse().unwrap()],
             "captured prompt"
         );
 
         storage.add_worktree_file("start-prompt.md", "mutated prompt");
-        let after = capture_precheck_plan(&executor, &issue_id);
+        let after = capture_precheck_evidence(&executor, &issue_id);
 
         assert_eq!(
             after.prompts[&"auto-start".parse().unwrap()],
