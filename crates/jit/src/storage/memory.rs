@@ -623,11 +623,10 @@ fn memory_directory_entry(relative: &std::path::Path) -> RepositoryEntry {
 
 /// Refuse a path this backend's tree cannot address.
 ///
-/// The counterpart of the file backend's path resolution, which runs once over
-/// the whole record before the first live write and again inside each
-/// operation: a data path while the data root is absent has no root to land in,
-/// and an ancestor that is not a directory is the no-follow parent walk's
-/// refusal, reported by the same component the walk stopped at. An absent
+/// The counterpart of the file backend's path resolution, which runs over the
+/// whole record before the first live write: a data path while the data root is
+/// absent has no root to land in, and an ancestor that is not a directory is the
+/// no-follow parent walk's refusal, reported by the same component the walk stopped at. An absent
 /// ancestor is admitted, because an operation creates the directories its path
 /// needs.
 fn resolve(state: &MemoryRepositoryState, path: &VirtualPath) -> Result<(), RedoApplyError> {
