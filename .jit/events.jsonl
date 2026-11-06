@@ -25735,3 +25735,6 @@
 {"from":"in_progress","id":"947f0c1c-0620-4770-9323-9784788a906d","issue_id":"9623fe6a-d9f9-4a28-80e2-cc490553b7f9","timestamp":"2026-11-06T06:08:37.311372129Z","to":"done","type":"issue_state_changed"}
 {"from":"backlog","id":"219f2916-5d10-4f1e-9981-e305c153f5ee","issue_id":"dfb2f10d-c4fd-4b8d-b7b1-3df71749523a","timestamp":"2026-11-06T06:08:37.311372129Z","to":"ready","type":"issue_state_changed"}
 {"id":"18118418-7ae0-4264-a1dd-60dae5bff97e","issue_id":"9623fe6a-d9f9-4a28-80e2-cc490553b7f9","timestamp":"2026-11-06T06:08:37.311372129Z","type":"issue_completed"}
+{"id":"aba7f4c3-7fa4-4370-b098-f8f61912d46a","issue_id":"0119433b-5379-40bb-a837-21482bd0813a","priority":"high","timestamp":"2026-11-06T06:09:48.199882471Z","title":"Container archive plans treat an outside owner's embedded artifact as ownerless","type":"issue_created"}
+{"id":"7be490ec-14f7-4cab-8ceb-2f9c1f74e40f","issue_id":"d751b190-e38f-47de-9425-8a2e93a11a05","priority":"normal","timestamp":"2026-11-06T06:09:48.315534027Z","title":"Archive citation scan misses path citations with a line suffix","type":"issue_created"}
+{"fields":["dependencies"],"id":"b023d5eb-9127-4e96-8952-7ffb72fca725","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-11-06T06:10:11.000604816Z","type":"issue_updated","updated_by":"dependency-add"}

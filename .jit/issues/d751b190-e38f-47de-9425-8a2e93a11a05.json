@@ -1,0 +1,25 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-06T06:09:48.315534027Z",
+  "dependencies": [],
+  "description": "Report in-content citations of a moving artifact that carry a `:line` or `:line:column` suffix, such as `` `dev/active/<dir>/plan.md:119` ``, as `moving-path-citation` warnings, so an archive preview names every citation the relocation would break.\n\n## Background\n\n- The archive contract reports, and does not rewrite, in-content citations a relocation would break: a preview and an execution emit `moving-path-citation` warnings read from the declared `citation_scan_roots` (`docs/reference/cli-commands.md`, archive section).\n- A citation counts only when the text after the moving path is a citation end (`is_citation_end`, `crates/jit/src/domain/artifact_classifier.rs`): end of text, a delimiter from `is_citation_delimiter`, or a sentence period. `:` is not a delimiter, so `plan.md:119` reads as a longer path and reports nothing.\n- A container preview over `f4d9502a` warns for `` `dev/active/9db27a3a-v1-0/handoff-2026-10-23-codex.md` `` cited without a suffix in `dev/active/df129d9e-rust-code-quality/handoff-10.md`, but reports none of the suffixed citations of the moving `dev/active/f4d9502a-git-cli-module/plan.md`, `breakdown.json` and `investigation.md` in `dev/active/0f8efc37-frontends-share-core/investigation.md` (for example line 22, `plan.md:119`) and `dev/active/f368ce3d-domain-agnostic-engine/investigation.md` (line 73).\n- Repository-relative paths cannot contain `:`: `RootRelativePath::parse` (`crates/jit/src/domain/relative_path.rs`) refuses it, so a `:` directly after a whole moving path cannot extend it into another repository path.\n\n## Success Criteria\n\n- [hard] REQ-01: A moving path followed by `:` and one or more digits (optionally `:` and more digits) is a whole-path citation and earns one `moving-path-citation` warning at the citation's line and column.\n- [hard] REQ-02: Text naming a longer path that ends with the moving path still reports nothing, and the existing citation fixtures pass unchanged.\n- [hard] REQ-03: Unit tests in the classifier own the `path:line` and `path:line:column` cases and a negative case, and a command test shows a preview warning for a `path:line` citation in a scanned file; both fail on the code this issue starts from.\n- [hard] REQ-04: The archive section of `docs/reference/cli-commands.md` states that a citation may carry a `:line` or `:line:column` suffix.\n\n## Notes\n\n- Rewriting citations in other files is outside the archive contract; this issue only makes the advisory warnings complete.\n- Found by a preview of the completed epic `f4d9502a`; no archive run happened.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-06T06:09:48.315534027Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "d751b190-e38f-47de-9425-8a2e93a11a05",
+  "labels": [
+    "milestone:v1.0",
+    "component:core",
+    "component:docs",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Archive citation scan misses path citations with a line suffix",
+  "updated_at": "2026-11-06T06:09:48.315534027Z"
+}

@@ -5,6 +5,7 @@
   "created_at": "2025-12-18T20:35:58.694584821Z",
   "dependencies": [
     "004d10b7-13d7-4a35-9467-f9572a373b27",
+    "0119433b-5379-40bb-a837-21482bd0813a",
     "14f49a28-0f6e-4645-80ce-b8f300f497b2",
     "1f564776-0c6e-4c5b-9300-aa239b48adda",
     "25064508-d563-4073-a970-296607a01adc",
@@ -36,6 +37,7 @@
     "adb5e9df-0fd3-4bf4-8703-d852df09d883",
     "b80e3c70-cf7d-4f72-b53d-6e556363be58",
     "b9255f47-dc01-4ad2-b6c0-a8f6756cb761",
+    "d751b190-e38f-47de-9425-8a2e93a11a05",
     "d7bfd4a4-b2ad-477a-977e-e3242b77b7a2",
     "dbe1e821-f4cb-4ef9-9b61-73c9495ee039",
     "e204e63d-60de-4fc5-a1b7-933cb41d1695",
@@ -74,5 +76,5 @@
   "priority": "critical",
   "state": "backlog",
   "title": "Version 1.0 Production Release",
-  "updated_at": "2026-11-05T00:10:31.529993738Z"
+  "updated_at": "2026-11-06T06:10:11.000604816Z"
 }
