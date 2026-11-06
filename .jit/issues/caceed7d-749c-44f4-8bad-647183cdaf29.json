@@ -13,7 +13,20 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "run_id": "7dd67022-3e6c-4a5e-b3e2-619c55184e9d",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:26:05.762593095Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "495ff02a-6e9c-4628-9763-385a87ea220d",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:25:04.446826701Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "caceed7d-749c-44f4-8bad-647183cdaf29",
   "labels": [
     "type:task",
@@ -27,5 +40,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Contributor documents stop presenting libgit2 as the git integration",
-  "updated_at": "2026-11-06T05:20:41.007785724Z"
+  "updated_at": "2026-11-06T05:26:05.762593095Z"
 }
