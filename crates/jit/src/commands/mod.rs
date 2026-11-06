@@ -802,12 +802,37 @@ fn has_broad_precheck(issue: &Issue, registry: &crate::declarations::GateRegistr
         })
 }
 
+/// The prompt file each of `issue`'s automatic precheck gates passes its checker.
+fn precheck_prompt_paths(
+    layout: &crate::repository_state::RepositoryLayout,
+    issue: &Issue,
+    registry: &crate::declarations::GateRegistry,
+) -> Result<Vec<(GateKey, crate::repository_state::VirtualPath)>> {
+    use crate::declarations::{GateChecker, GateStage};
+
+    issue
+        .gates_required
+        .iter()
+        .filter_map(|key| registry.gates.get(key).map(|gate| (key, gate)))
+        .filter(|(_, gate)| gate.stage == GateStage::Precheck && gate.mode == GateMode::Auto)
+        .filter_map(|(key, gate)| match &gate.checker {
+            Some(GateChecker::Exec {
+                pass_context: true,
+                prompt_file: Some(path),
+                ..
+            }) => Some((key, path)),
+            _ => None,
+        })
+        .map(|(key, path)| Ok((key.clone(), layout.classify_repository_relative(path)?)))
+        .collect()
+}
+
 fn captured_precheck_plan(
     image: &crate::repository_state::RepositoryImage,
     issue: &Issue,
     registry: &crate::declarations::GateRegistry,
 ) -> Result<CapturedPrecheckPlan> {
-    use crate::declarations::{GateChecker, GateStage};
+    use crate::declarations::GateStage;
     use crate::repository_state::VirtualPath;
     use std::collections::{BTreeSet, HashMap};
 
@@ -843,23 +868,12 @@ fn captured_precheck_plan(
         }
     }
     let mut prompts = HashMap::new();
-    for (key, gate) in gates {
-        if gate.mode != GateMode::Auto {
-            continue;
-        }
-        if let Some(GateChecker::Exec {
-            pass_context: true,
-            prompt_file: Some(path),
-            ..
-        }) = &gate.checker
-        {
-            let path = image.layout().classify_repository_relative(path)?;
-            let bytes = image
-                .file_bytes(&path)?
-                .ok_or_else(|| anyhow!("captured precheck prompt file '{:?}' is missing", path))?;
-            prompts.insert(key.clone(), String::from_utf8(bytes.to_vec())?);
-            paths.insert(path);
-        }
+    for (key, path) in precheck_prompt_paths(image.layout(), issue, registry)? {
+        let bytes = image
+            .file_bytes(&path)?
+            .ok_or_else(|| anyhow!("captured precheck prompt file '{:?}' is missing", path))?;
+        prompts.insert(key, String::from_utf8(bytes.to_vec())?);
+        paths.insert(path);
     }
     let inputs = paths
         .into_iter()
@@ -1038,19 +1052,182 @@ impl CapturedLifecycleMutation {
             | Self::AutoDone { issue_id } => issue_id,
         }
     }
+
+    /// The state this transition requests for `issue`.
+    fn requested_state(&self, issue: &Issue) -> State {
+        match (self, issue.state) {
+            (Self::Claim { .. }, State::Ready) => State::InProgress,
+            (Self::Release { .. }, State::InProgress) => State::Ready,
+            (Self::AutoDone { .. }, _) if issue.should_auto_transition_to_done() => State::Done,
+            (_, state) => state,
+        }
+    }
 }
 
 fn lifecycle_requires_prechecks(request: &CapturedLifecycleMutation, issue: &Issue) -> bool {
-    issue.state == State::Ready && matches!(request, CapturedLifecycleMutation::Claim { .. })
+    state_change_requires_prechecks(issue, request.requested_state(issue))
 }
 
-/// The full base a precheck-running lifecycle transition reads before taking
-/// the claims guard, because its precheck gates run outside the lock.
+/// Whether moving `issue` to `target` first runs its precheck gates.
+fn state_change_requires_prechecks(issue: &Issue, target: State) -> bool {
+    issue.state == State::Ready && target == State::InProgress
+}
+
+/// The state a change requesting `requested` moves `issue` to. `Done` with
+/// unpassed gates diverts to `Gated`, returning the gate refusal to report
+/// after publishing (`@/inv/gate-semantics`).
+fn derive_state_target(
+    issue: &Issue,
+    requested: State,
+    evidence: &CapturedTransitionEvidence<'_>,
+) -> Result<(State, Option<crate::errors::TransitionBlockedError>)> {
+    if requested != State::Done || !issue.has_unpassed_gates() {
+        return Ok((requested, None));
+    }
+    let blockers = issue::blocking_dependencies(
+        issue,
+        &crate::domain::queries::build_issue_map(evidence.issues),
+    );
+    if !blockers.is_empty() {
+        return Err(crate::errors::TransitionBlockedError::dependencies(
+            issue.id.clone(),
+            State::Done,
+            issue.state,
+            blockers,
+        )
+        .into());
+    }
+    Ok((
+        State::Gated,
+        Some(crate::errors::TransitionBlockedError::gates(
+            issue.id.clone(),
+            State::Done,
+            State::Gated,
+            unpassed_gate_blockers(issue, &evidence.graph.declarations.gates),
+        )),
+    ))
+}
+
+/// The full base a precheck-running state change reads before taking the
+/// claims guard, because its precheck gates run outside the lock.
 struct PrecheckPreflight {
     plan: CapturedPrecheckPlan,
     image: crate::repository_state::RepositoryImage,
     issue: Issue,
     registry: crate::declarations::GateRegistry,
+}
+
+/// What a state change reads before taking the claims guard: its resolved
+/// target, lease policy, and the precheck base when the change runs prechecks.
+struct StateChangePreflight {
+    target: IssueId,
+    enforcement_mode: crate::config::EnforcementMode,
+    precheck: Option<PrecheckPreflight>,
+}
+
+/// The preflight's precheck runs as recorded under the lock, with their audit
+/// events and whether a precheck refused the change.
+#[derive(Default)]
+struct RecordedPrechecks {
+    runs: Vec<crate::domain::GateRunResult>,
+    events: PhasedEvents,
+    states: Vec<(GateKey, GateState)>,
+    refused: bool,
+}
+
+impl RecordedPrechecks {
+    /// Set the gate states the prechecks decided on each gate `issue` requires.
+    fn record_on(&self, issue: &mut Issue) {
+        issue.gates_status.extend(
+            self.states
+                .iter()
+                .filter(|(key, _)| issue.gates_required.contains(key))
+                .cloned(),
+        );
+    }
+
+    fn intents(self) -> impl Iterator<Item = crate::repository_state::MutationIntent> {
+        use crate::repository_state::MutationIntent;
+
+        self.runs
+            .into_iter()
+            .map(|draft| MutationIntent::RecordGateRun {
+                draft: Box::new(draft),
+            })
+            .chain(
+                self.events
+                    .into_iter()
+                    .map(|(phase, event)| MutationIntent::RecordEvent {
+                        phase,
+                        event: Box::new(event),
+                    }),
+            )
+    }
+}
+
+/// Record `cached`'s precheck runs for `planned`, the captured issue as the
+/// change leaves it, marking each run moved when its inputs changed in
+/// `image` since the preflight.
+fn record_captured_prechecks(
+    cached: Option<&CachedPrecheckExecution>,
+    expected: Option<&CapturedPrecheckPlan>,
+    image: &crate::repository_state::RepositoryImage,
+    planned: &Issue,
+    registry: &crate::declarations::GateRegistry,
+) -> Result<RecordedPrechecks> {
+    let (Some(cached), Some(expected)) = (cached, expected) else {
+        return Ok(RecordedPrechecks::default());
+    };
+    let inputs_moved = expected.evidence != cached.evidence
+        || if cached.evidence.validation_view.is_some() {
+            !cached.evidence.matches(image)?
+        } else {
+            captured_precheck_plan(image, planned, registry)?.evidence != cached.evidence
+        };
+    let runs = cached
+        .execution
+        .runs
+        .iter()
+        .cloned()
+        .map(|mut run| {
+            if inputs_moved {
+                run.evaluation_stability = GateEvaluationStability::InputsMoved;
+            }
+            run
+        })
+        .collect::<Vec<_>>();
+    let states = runs
+        .iter()
+        .map(|run| (run.gate_key.clone(), gate_check::gate_state_from_run(run)))
+        .collect::<Vec<_>>();
+    let events = runs
+        .iter()
+        .zip(&states)
+        .map(|(run, (key, state))| {
+            (
+                1,
+                if state.status == GateStatus::Passed {
+                    EventBody::draft_gate_passed(planned.id.clone(), key.clone(), run.by.clone())
+                } else {
+                    EventBody::draft_gate_failed(planned.id.clone(), key.clone(), run.by.clone())
+                },
+            )
+        })
+        .collect();
+    Ok(RecordedPrechecks {
+        runs,
+        events,
+        states,
+        refused: cached.execution.error.is_some(),
+    })
+}
+
+/// The refusal a failed precheck execution recorded, consuming the execution.
+fn take_precheck_refusal(cached: &mut Option<CachedPrecheckExecution>) -> anyhow::Error {
+    cached
+        .take()
+        .and_then(|cached| cached.execution.error)
+        .unwrap_or_else(|| anyhow!("precheck execution lost its recorded error"))
 }
 
 struct CapturedLifecycleOutcome {
@@ -1576,28 +1753,34 @@ fn derive_draft_promotions(
         .collect()
 }
 
-fn derive_field_update(
+/// A field update's edits applied to one captured issue, before its state change.
+struct ProjectedFieldUpdate {
+    /// The issue after the staged standalone operations.
+    original: Issue,
+    /// The issue after every field edit.
+    issue: Issue,
+    staged: bool,
+    events: PhasedEvents,
+}
+
+/// Apply `request`'s field, gate, and assignee edits to `original`; the state
+/// change and its prechecks read the result.
+fn project_field_update(
     original: Issue,
     request: &CapturedFieldUpdate,
-    evidence: CapturedTransitionEvidence<'_>,
-) -> Result<DerivedFieldUpdate> {
-    use crate::repository_state::MutationIntent;
-
+    registry: &crate::declarations::GateRegistry,
+    context: &crate::repository_state::MutationContext,
+) -> Result<ProjectedFieldUpdate> {
     // A single-issue update stages its gate and assignee changes through the
     // standalone operations, so it records their events; the inline handling
     // below then finds them already applied.
-    let (original, staged, mut events) = request
+    let (original, staged, events) = request
         .issue_local_mutations(&original.id)
         .iter()
         .try_fold(
             (original, false, Vec::new()),
             |(issue, staged, mut events), mutation| {
-                let applied = apply_captured_issue_mutation(
-                    issue,
-                    &evidence.graph.declarations.gates,
-                    mutation,
-                    evidence.graph.context,
-                )?;
+                let applied = apply_captured_issue_mutation(issue, registry, mutation, context)?;
                 events.extend(applied.events);
                 Ok::<_, anyhow::Error>((applied.issue, staged || applied.changed, events))
             },
@@ -1636,7 +1819,7 @@ fn derive_field_update(
     let missing_gates = request
         .add_gates
         .iter()
-        .filter(|key| !evidence.graph.declarations.gates.gates.contains_key(key))
+        .filter(|key| !registry.gates.contains_key(key))
         .cloned()
         .collect::<Vec<_>>();
     if !missing_gates.is_empty() {
@@ -1662,7 +1845,27 @@ fn derive_field_update(
             .retain(|label| !label_utils::is_type_label(label));
         issue.labels.push(label_utils::type_label(kind));
     }
+    Ok(ProjectedFieldUpdate {
+        original,
+        issue,
+        staged,
+        events,
+    })
+}
 
+fn derive_field_update(
+    projected: ProjectedFieldUpdate,
+    request: &CapturedFieldUpdate,
+    evidence: CapturedTransitionEvidence<'_>,
+) -> Result<DerivedFieldUpdate> {
+    use crate::repository_state::MutationIntent;
+
+    let ProjectedFieldUpdate {
+        original,
+        mut issue,
+        staged,
+        mut events,
+    } = projected;
     let mut changed_fields = Vec::new();
     if issue.title != original.title {
         changed_fields.push("title".to_string());
@@ -1686,31 +1889,12 @@ fn derive_field_update(
         changed_fields.push("assignee".to_string());
     }
 
-    let mut gate_error = None;
-    let target = match request.state {
-        Some(State::Done) if issue.has_unpassed_gates() => {
-            let blockers = issue::blocking_dependencies(
-                &issue,
-                &crate::domain::queries::build_issue_map(evidence.issues),
-            );
-            if !blockers.is_empty() {
-                return Err(crate::errors::TransitionBlockedError::dependencies(
-                    issue.id.clone(),
-                    State::Done,
-                    original.state,
-                    blockers,
-                )
-                .into());
-            }
-            gate_error = Some(crate::errors::TransitionBlockedError::gates(
-                issue.id.clone(),
-                State::Done,
-                State::Gated,
-                unpassed_gate_blockers(&issue, &evidence.graph.declarations.gates),
-            ));
-            Some(State::Gated)
+    let (target, gate_error) = match request.state {
+        Some(requested) => {
+            let (target, gate_error) = derive_state_target(&issue, requested, &evidence)?;
+            (Some(target), gate_error)
         }
-        target => target,
+        None => (None, None),
     };
 
     let mut projected = issue.clone();
@@ -2958,6 +3142,142 @@ impl<S: IssueStore> CommandExecutor<S> {
             })
     }
 
+    /// Capture a state change's preflight in its own session, growing it to
+    /// the precheck base when `requires_prechecks` holds for the target,
+    /// because precheck gates run outside the repository lock. The prechecks
+    /// are planned for the issue as `project` leaves it.
+    fn capture_state_change_preflight(
+        &self,
+        layout: &crate::repository_state::RepositoryLayout,
+        issue_id: &IssueId,
+        requires_prechecks: impl FnOnce(&Issue) -> bool,
+        project: impl FnOnce(Issue, &crate::declarations::GateRegistry) -> Result<Issue>,
+    ) -> Result<Option<StateChangePreflight>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let mut session = self.storage.open_mutation_session(layout.clone())?;
+        let Some(light) =
+            self.capture_mutation_preflight(session.as_mut(), issue_id, requires_prechecks)?
+        else {
+            return Ok(None);
+        };
+        let enforcement_mode =
+            crate::repository_state::assemble_config(&light.image)?.enforcement_mode();
+        let target = light.target.id;
+        let Some(issues) = light.issues else {
+            return Ok(Some(StateChangePreflight {
+                target,
+                enforcement_mode,
+                precheck: None,
+            }));
+        };
+        let registry = crate::repository_state::declarations_from_image(&light.image)?.gates;
+        let issue = project(
+            issues
+                .into_iter()
+                .find(|issue| issue.id == target)
+                .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.clone()))?,
+            &registry,
+        )?;
+        // A precheck validating the whole repository runs over the validation
+        // base; the base read the stored issue's prompts, not those of gates
+        // `project` adds.
+        let unread_prompts = precheck_prompt_paths(light.image.layout(), &issue, &registry)?
+            .into_iter()
+            .map(|(_, path)| path)
+            .filter(|path| !light.image.capture_spec().contains_path(path))
+            .collect::<Vec<_>>();
+        let image = match has_broad_precheck(&issue, &registry) || !unread_prompts.is_empty() {
+            false => light.image,
+            true => match self.capture_proposed_base(
+                session.as_mut(),
+                &std::collections::BTreeMap::new(),
+                &unread_prompts,
+                Some(light.image),
+            )? {
+                Some(image) => image,
+                None => return Ok(None),
+            },
+        };
+        let plan = captured_precheck_plan(&image, &issue, &registry)?;
+        Ok(Some(StateChangePreflight {
+            target,
+            enforcement_mode,
+            precheck: Some(PrecheckPreflight {
+                plan,
+                image,
+                issue,
+                registry,
+            }),
+        }))
+    }
+
+    /// Run `precheck`'s gates for `target` unless `cached` already holds their
+    /// execution for it, returning how many runs the change will record.
+    fn execute_preflight_prechecks(
+        &self,
+        cached: &mut Option<CachedPrecheckExecution>,
+        target: &IssueId,
+        precheck: Option<&PrecheckPreflight>,
+        context: &crate::repository_state::MutationContext,
+    ) -> Result<usize>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let Some(precheck) = precheck else {
+            return Ok(0);
+        };
+        if !cached
+            .as_ref()
+            .is_some_and(|cached| &cached.target_id == target)
+        {
+            *cached = Some(CachedPrecheckExecution {
+                target_id: target.clone(),
+                evidence: precheck.plan.evidence.clone(),
+                execution: self.execute_captured_prechecks(
+                    &precheck.image,
+                    &precheck.issue,
+                    &precheck.registry,
+                    &precheck.plan.prompts,
+                    context,
+                )?,
+            });
+        }
+        Ok(cached
+            .as_ref()
+            .map_or(0, |cached| cached.execution.runs.len()))
+    }
+
+    /// Publish the precheck runs that refused a state change on `issue`, the
+    /// captured record the change leaves unchanged, then return the refusal.
+    fn publish_precheck_refusal<T>(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        image: &crate::repository_state::RepositoryImage,
+        context: &crate::repository_state::MutationContext,
+        issue: Issue,
+        recorded: RecordedPrechecks,
+        cached: &mut Option<CachedPrecheckExecution>,
+    ) -> Result<AttemptOutcome<T>> {
+        use crate::repository_state::{finalize, MutationIntent};
+
+        if !recorded.runs.is_empty() {
+            let mut issue = issue;
+            recorded.record_on(&mut issue);
+            let intents = std::iter::once(MutationIntent::UpdateIssue {
+                issue: Box::new(issue),
+            })
+            .chain(recorded.intents())
+            .collect::<Vec<_>>();
+            let plan = finalize(&self.require_layout()?, image, context, &intents, None)?;
+            if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
+                return Ok(AttemptOutcome::Retry);
+            }
+        }
+        Err(take_precheck_refusal(cached))
+    }
+
     fn publish_captured_field_update(
         &self,
         request: CapturedFieldUpdate,
@@ -2965,11 +3285,68 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::finalize;
+        use crate::repository_state::{finalize, MutationIntent};
 
         let layout = self.require_layout()?;
         let context = production_mutation_context();
+        let mut cached_precheck = None::<CachedPrecheckExecution>;
+        let requires_prechecks = |issue: &Issue| {
+            request
+                .state
+                .is_some_and(|target| state_change_requires_prechecks(issue, target))
+        };
         with_mutation_attempts("issue update", || {
+            // Only a change that could start work reads a preflight: its
+            // prechecks run outside the repository lock.
+            let preflight = match request.state == Some(State::InProgress) {
+                false => None,
+                true => match self.capture_state_change_preflight(
+                    &layout,
+                    &request.issue_id,
+                    requires_prechecks,
+                    |issue, registry| {
+                        project_field_update(issue, &request, registry, &context)
+                            .map(|projected| projected.issue)
+                    },
+                )? {
+                    Some(preflight) => Some(preflight),
+                    None => return Ok(AttemptOutcome::Retry),
+                },
+            };
+            let precheck = preflight
+                .as_ref()
+                .and_then(|preflight| preflight.precheck.as_ref());
+            let precheck_run_paths = match (&preflight, precheck) {
+                (Some(preflight), Some(precheck)) => {
+                    if request.enforce_lease {
+                        // Refuse before running prechecks; the held guard repeats this.
+                        let preliminary_guard =
+                            claims_mutation_guard(self.require_worktree_paths()?)?;
+                        refuse_foreign_leases_held(
+                            preflight.enforcement_mode,
+                            std::slice::from_ref(&preflight.target),
+                            preliminary_guard.as_ref(),
+                        )?;
+                    }
+                    let count = self.execute_preflight_prechecks(
+                        &mut cached_precheck,
+                        &preflight.target,
+                        Some(precheck),
+                        &context,
+                    )?;
+                    // The publishing base reads the stored issue's prompts;
+                    // the planned issue may name more.
+                    gate_run_record_paths(&context, &preflight.target, count)
+                        .into_iter()
+                        .chain(
+                            precheck_prompt_paths(&layout, &precheck.issue, &precheck.registry)?
+                                .into_iter()
+                                .map(|(_, path)| path),
+                        )
+                        .collect()
+                }
+                _ => Vec::new(),
+            };
             // The claims guard does not depend on the repository, so it is taken
             // before the one session whose image decides target and lease policy.
             let claims_guard = request
@@ -2978,8 +3355,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .transpose()?
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(crate::commands::validate::MutationBase { image, issues }) =
-                self.capture_mutation_base(session.as_mut(), &[], None)?
+            let Some(crate::commands::validate::MutationBase { image, issues }) = self
+                .capture_mutation_base(
+                    session.as_mut(),
+                    &precheck_run_paths,
+                    precheck.map(|_| &request.issue_id),
+                )?
             else {
                 return Ok(AttemptOutcome::Retry);
             };
@@ -2989,6 +3370,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .find(|issue| issue.id == target)
                 .cloned()
                 .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.clone()))?;
+            if preflight
+                .as_ref()
+                .is_some_and(|preflight| preflight.target != target)
+                || requires_prechecks(&issue) != precheck.is_some()
+            {
+                return Ok(AttemptOutcome::Retry);
+            }
             let graph = CapturedGraphEvidence::capture(&image, &issues, &context)?;
             let lease_warnings = if request.enforce_lease {
                 refuse_foreign_leases_held(
@@ -3001,14 +3389,59 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let mut effective_request = request.clone();
             effective_request.issue_id = target.clone();
+            let mut projected = project_field_update(
+                issue.clone(),
+                &effective_request,
+                &graph.declarations.gates,
+                &context,
+            )?;
+            let recorded = record_captured_prechecks(
+                cached_precheck.as_ref(),
+                precheck.map(|precheck| &precheck.plan),
+                &image,
+                &projected.issue,
+                &graph.declarations.gates,
+            )?;
+            if recorded.refused {
+                return self.publish_precheck_refusal(
+                    session.as_mut(),
+                    &image,
+                    &context,
+                    issue,
+                    recorded,
+                    &mut cached_precheck,
+                );
+            }
+            recorded.record_on(&mut projected.issue);
+            let prechecked = (!recorded.runs.is_empty()).then(|| {
+                let mut issue = issue;
+                recorded.record_on(&mut issue);
+                issue
+            });
             let mut derived = derive_field_update(
-                issue,
+                projected,
                 &effective_request,
                 CapturedTransitionEvidence {
                     issues: &issues,
                     graph: &graph,
                 },
             )?;
+            if let Some(prechecked) = prechecked {
+                // A change that publishes no record of its own still records
+                // the gate states its prechecks set.
+                let updates_target = derived.intents.iter().any(|intent| {
+                    matches!(intent, MutationIntent::UpdateIssue { issue } if issue.id == target)
+                });
+                derived.intents = (!updates_target)
+                    .then(|| MutationIntent::UpdateIssue {
+                        issue: Box::new(prechecked),
+                    })
+                    .into_iter()
+                    .chain(recorded.intents())
+                    .chain(std::mem::take(&mut derived.intents))
+                    .collect();
+                derived.changed = true;
+            }
             let mut lease_warnings = lease_warnings;
             lease_warnings.append(&mut derived.warnings);
             derived.warnings = lease_warnings;
@@ -3103,54 +3536,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut cached_precheck = None::<CachedPrecheckExecution>;
         let coordinate_claims = matches!(request, CapturedLifecycleMutation::Claim { .. });
         with_mutation_attempts("lifecycle mutation", || {
-            let (expected_target, expected_precheck_required, precheck) = {
-                let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                // Precheck gates run outside the repository lock, so a
-                // transition that runs them grows its preflight to the full base.
-                let Some(light) = self.capture_mutation_preflight(
-                    preflight.as_mut(),
-                    request.issue_id(),
-                    |target| lifecycle_requires_prechecks(&request, target),
-                )?
-                else {
-                    return Ok(AttemptOutcome::Retry);
-                };
-                let should_precheck = light.issues.is_some();
-                let precheck = if let Some(issues) = light.issues {
-                    let image = light.image;
-                    let issue = issues
-                        .into_iter()
-                        .find(|issue| issue.id == light.target.id)
-                        .ok_or_else(|| {
-                            crate::storage::IssueNotFoundError::new(light.target.id.clone())
-                        })?;
-                    let declarations = crate::repository_state::declarations_from_image(&image)?;
-                    let registry = declarations.gates;
-                    // A precheck validating the whole repository runs over
-                    // the validation base.
-                    let image = match has_broad_precheck(&issue, &registry) {
-                        false => image,
-                        true => match self.capture_proposed_base(
-                            preflight.as_mut(),
-                            &std::collections::BTreeMap::new(),
-                            &[],
-                            Some(image),
-                        )? {
-                            Some(image) => image,
-                            None => return Ok(AttemptOutcome::Retry),
-                        },
-                    };
-                    let plan = captured_precheck_plan(&image, &issue, &registry)?;
-                    Some(PrecheckPreflight {
-                        plan,
-                        image,
-                        issue,
-                        registry,
-                    })
-                } else {
-                    None
-                };
-                (light.target.id, should_precheck, precheck)
+            let Some(StateChangePreflight {
+                target: expected_target,
+                precheck,
+                ..
+            }) = self.capture_state_change_preflight(
+                &layout,
+                request.issue_id(),
+                |target| lifecycle_requires_prechecks(&request, target),
+                |issue, _| Ok(issue),
+            )?
+            else {
+                return Ok(AttemptOutcome::Retry);
             };
             if let (true, Some(_)) = (coordinate_claims, &precheck) {
                 // Refuse before running prechecks; the held guard repeats this.
@@ -3159,36 +3556,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                     ensure_claim_available(preliminary_guard.as_ref(), &expected_target, assignee)?;
                 }
             }
-            let expected_precheck = precheck.as_ref().map(|precheck| &precheck.plan);
-            if let Some(precheck) = &precheck {
-                let reuse = cached_precheck
-                    .as_ref()
-                    .is_some_and(|cached| cached.target_id == expected_target);
-                if !reuse {
-                    cached_precheck = Some(CachedPrecheckExecution {
-                        target_id: expected_target.clone(),
-                        evidence: precheck.plan.evidence.clone(),
-                        execution: self.execute_captured_prechecks(
-                            &precheck.image,
-                            &precheck.issue,
-                            &precheck.registry,
-                            &precheck.plan.prompts,
-                            &context,
-                        )?,
-                    });
-                }
-            }
-            let mut precheck_runs = cached_precheck
-                .as_ref()
-                .filter(|_| expected_precheck.is_some())
-                .map(|cached| cached.execution.runs.clone())
-                .unwrap_or_default();
-            let precheck_has_error = cached_precheck
-                .as_ref()
-                .filter(|_| expected_precheck.is_some())
-                .is_some_and(|cached| cached.execution.error.is_some());
+            let precheck_run_count = self.execute_preflight_prechecks(
+                &mut cached_precheck,
+                &expected_target,
+                precheck.as_ref(),
+                &context,
+            )?;
             let precheck_run_paths =
-                gate_run_record_paths(&context, &expected_target, precheck_runs.len());
+                gate_run_record_paths(&context, &expected_target, precheck_run_count);
 
             let claims_guard = coordinate_claims
                 .then(|| claims_mutation_guard(self.require_worktree_paths()?))
@@ -3214,95 +3589,31 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .cloned()
                 .ok_or_else(|| crate::storage::IssueNotFoundError::new(expected_target.clone()))?;
             let declarations = crate::repository_state::declarations_from_image(&image)?;
-            let current_precheck_required = lifecycle_requires_prechecks(&request, &issue);
-            if current_precheck_required != expected_precheck_required {
+            if lifecycle_requires_prechecks(&request, &issue) != precheck.is_some() {
                 return Ok(AttemptOutcome::Retry);
-            }
-            let precheck_inputs_moved = if let Some(cached) = cached_precheck.as_ref() {
-                let changed_since_precheck_capture = expected_precheck
-                    .as_ref()
-                    .is_some_and(|plan| plan.evidence != cached.evidence);
-                if changed_since_precheck_capture {
-                    true
-                } else if cached.evidence.validation_view.is_some() {
-                    !cached.evidence.matches(&image)?
-                } else {
-                    captured_precheck_plan(&image, &issue, &declarations.gates)?.evidence
-                        != cached.evidence
-                }
-            } else {
-                false
-            };
-            if precheck_inputs_moved {
-                precheck_runs.iter_mut().for_each(|run| {
-                    run.evaluation_stability = GateEvaluationStability::InputsMoved;
-                });
             }
             if let CapturedLifecycleMutation::Claim { assignee, .. } = &request {
                 ensure_claim_available(claims_guard.as_ref(), &expected_target, assignee)?;
             }
-            let mut precheck_events = Vec::new();
-            if expected_precheck.is_some() {
-                for result in &precheck_runs {
-                    let state = gate_check::gate_state_from_run(result);
-                    let by = result.by.clone();
-                    let status = state.status;
-                    issue.gates_status.insert(result.gate_key.clone(), state);
-                    precheck_events.push((
-                        1,
-                        if status == GateStatus::Passed {
-                            EventBody::draft_gate_passed(
-                                issue.id.clone(),
-                                result.gate_key.clone(),
-                                by,
-                            )
-                        } else {
-                            EventBody::draft_gate_failed(
-                                issue.id.clone(),
-                                result.gate_key.clone(),
-                                by,
-                            )
-                        },
-                    ));
-                }
+            let recorded = record_captured_prechecks(
+                cached_precheck.as_ref(),
+                precheck.as_ref().map(|precheck| &precheck.plan),
+                &image,
+                &issue,
+                &declarations.gates,
+            )?;
+            if recorded.refused {
+                return self.publish_precheck_refusal(
+                    session.as_mut(),
+                    &image,
+                    &context,
+                    issue,
+                    recorded,
+                    &mut cached_precheck,
+                );
             }
-            if precheck_has_error {
-                if precheck_runs.is_empty() {
-                    let error = cached_precheck
-                        .take()
-                        .and_then(|cached| cached.execution.error)
-                        .ok_or_else(|| anyhow!("precheck execution lost its recorded error"))?;
-                    return Err(error);
-                }
-                let intents = std::iter::once(MutationIntent::UpdateIssue {
-                    issue: Box::new(issue),
-                })
-                .chain(
-                    precheck_runs
-                        .into_iter()
-                        .map(|draft| MutationIntent::RecordGateRun {
-                            draft: Box::new(draft),
-                        }),
-                )
-                .chain(precheck_events.into_iter().map(|(phase, event)| {
-                    MutationIntent::RecordEvent {
-                        phase,
-                        event: Box::new(event),
-                    }
-                }))
-                .collect::<Vec<_>>();
-                let plan = finalize(&layout, &image, &context, &intents, None)?;
-                if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
-                    return Ok(AttemptOutcome::Retry);
-                }
-                let error = cached_precheck
-                    .take()
-                    .and_then(|cached| cached.execution.error)
-                    .ok_or_else(|| anyhow!("precheck execution lost its recorded error"))?;
-                return Err(error);
-            }
-            let prechecks_changed = !precheck_runs.is_empty();
-            let target = match &request {
+            recorded.record_on(&mut issue);
+            match &request {
                 CapturedLifecycleMutation::Claim { assignee, .. } => {
                     if let Some(existing) = &issue.assignee {
                         if existing != assignee {
@@ -3334,42 +3645,29 @@ impl<S: IssueStore> CommandExecutor<S> {
                             .into());
                         }
                     }
-                    if issue.state == State::Ready {
-                        State::InProgress
-                    } else {
-                        issue.state
-                    }
                 }
-                CapturedLifecycleMutation::Release { .. } => {
-                    if issue.state == State::InProgress {
-                        State::Ready
-                    } else {
-                        issue.state
-                    }
+                CapturedLifecycleMutation::AutoDone { .. }
+                    if !issue.should_auto_transition_to_done() =>
+                {
+                    return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
+                        issue,
+                        changed: false,
+                    }));
                 }
-                CapturedLifecycleMutation::AutoDone { .. } => {
-                    if !issue.should_auto_transition_to_done() {
-                        return Ok(AttemptOutcome::Done(CapturedLifecycleOutcome {
-                            issue,
-                            changed: false,
-                        }));
-                    }
-                    State::Done
-                }
-            };
+                _ => {}
+            }
+            let prechecks_changed = !recorded.runs.is_empty();
             let graph = CapturedGraphEvidence::capture(&image, &issues, &context)?;
+            let evidence = CapturedTransitionEvidence {
+                issues: &issues,
+                graph: &graph,
+            };
+            let (target, gate_error) =
+                derive_state_target(&issue, request.requested_state(&issue), &evidence)?;
             let (mut warnings, mut events, mut update, blocked) = if issue.state == target {
                 (Vec::new(), Vec::new(), None, None)
             } else {
-                match derive_state_transition(
-                    issue.clone(),
-                    target,
-                    false,
-                    CapturedTransitionEvidence {
-                        issues: &issues,
-                        graph: &graph,
-                    },
-                )? {
+                match derive_state_transition(issue.clone(), target, false, evidence)? {
                     DerivedStateTransition::Applied {
                         issue,
                         warnings,
@@ -3381,6 +3679,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                     }
                 }
             };
+            let RecordedPrechecks {
+                runs: precheck_runs,
+                events: precheck_events,
+                ..
+            } = recorded;
             events.extend(precheck_events);
             if prechecks_changed && update.is_none() {
                 update = Some(issue.clone());
@@ -3431,7 +3734,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let (readiness, readiness_error) = readiness
                 .map(|readiness| (readiness.intents, readiness.error_after_apply))
                 .unwrap_or_default();
-            let blocked = blocked.or(readiness_error);
+            let blocked = blocked.or(gate_error).or(readiness_error);
             let intents = update
                 .into_iter()
                 .map(|issue| MutationIntent::UpdateIssue {

@@ -9,6 +9,7 @@
 
 use crate::domain::relative_path::RootRelativePath;
 use crate::repository_state::{FileMode, RepositoryEntry, RepositoryRootClass, VirtualPath};
+use crate::storage::atomic_write::{is_stage_name, unique_stage_name};
 use crate::storage::capability_fs::{CapabilityRoots, DataRoot};
 use crate::storage::memory::test_fixtures as memory_fixtures;
 use crate::storage::redo_apply::test_fixtures::{
@@ -145,16 +146,14 @@ impl RecordBackend for FileBackend {
         let target = root.join(path.relative().as_path());
         let parent = target.parent().unwrap();
         if parent.is_dir() {
-            let leaf = target.file_name().unwrap().to_string_lossy();
-            std::fs::write(parent.join(format!(".redo.{leaf}.tmp")), b"staged").unwrap();
+            std::fs::write(parent.join(unique_stage_name()), b"staged").unwrap();
         }
     }
 
     fn published_ignoring_stages(&self) -> Self::Published {
         let mut entries = self.published();
         entries.retain(|path, _| {
-            let name = path.file_name().unwrap_or_default().to_string_lossy();
-            !(name.starts_with(".redo.") && name.ends_with(".tmp"))
+            !is_stage_name(&path.file_name().unwrap_or_default().to_string_lossy())
         });
         entries
     }

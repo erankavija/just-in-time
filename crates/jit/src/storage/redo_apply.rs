@@ -14,7 +14,9 @@
 use crate::repository_state::{
     CaptureError, FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
-use crate::storage::atomic_write::sync_capability_directory;
+use crate::storage::atomic_write::{
+    publish_file, sync_capability_directory, write_staged_file, Durability,
+};
 use crate::storage::capability_fs::{
     open_child_dir_nofollow, CapabilityFsError, CapabilityRoots, DataRoot, DirectoryHandles,
 };
@@ -22,7 +24,7 @@ use crate::storage::redo_record::{
     EventAppend, PutFile, RedoRecord, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
 };
 use cap_primitives::fs::FollowSymlinks;
-use cap_std::fs::{Dir, File, OpenOptions};
+use cap_std::fs::{Dir, OpenOptions};
 use std::io::{ErrorKind, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sync::Arc;
@@ -60,7 +62,12 @@ pub fn commit_redo_record(root: &DataRoot, record: &RedoRecord) -> anyhow::Resul
         }
         Err(error) => return Err(error.into()),
     };
-    write_staged_file(&scratch, RECORD_FILE_NAME, &bytes, FileMode::Regular)?;
+    write_staged_file(
+        &scratch,
+        RECORD_FILE_NAME,
+        bytes.as_slice(),
+        FileMode::Regular,
+    )?;
     sync_capability_directory(&scratch).map_err(Into::into)
 }
 
@@ -338,60 +345,18 @@ fn make_directory(
 
 /// Replace a put's path with its bytes, creating the directories it needs.
 ///
-/// The staged bytes are synced before the rename, so a rename that persists
-/// names durable bytes; the entries the put writes are synced with the pass's
-/// other changed directories.
+/// The publication defers its directory sync: the entries the put writes are
+/// synced with the pass's other changed directories.
 fn put_file(handles: &mut DirectoryHandles, put: &PutFile) -> Result<(), RedoApplyError> {
     let (parent, leaf) = handles.open_or_create_parent(put.path.relative().as_path())?;
-    let staged = staged_name();
-    write_staged_file(parent, &staged, &put.bytes, put.mode)?;
-    parent.rename(&staged, parent, &leaf).map_err(Into::into)
-}
-
-/// A stage name beside the target: random, so nothing can be waiting at it, and
-/// `.tmp`, so a staging its apply never renamed is reclaimed by the orphan
-/// sweep in [`super::temp_cleanup`].
-fn staged_name() -> String {
-    format!(".redo.{}.tmp", uuid::Uuid::new_v4().simple())
-}
-
-/// Write `bytes` under `mode` as a new file named `leaf` and return once they
-/// are durable. Shared with the init publisher's staging, so a new file is
-/// written one way whichever publication writes it.
-///
-/// The open creates the file or fails: an occupied name is never opened
-/// through, so no symlink carries the bytes elsewhere and no occupant is
-/// truncated (`@/inv/atomic-writes`).
-pub(in crate::storage) fn write_staged_file(
-    parent: &Dir,
-    leaf: &str,
-    bytes: &[u8],
-    mode: FileMode,
-) -> Result<(), RedoApplyError> {
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    options._cap_fs_ext_follow(FollowSymlinks::No);
-    let mut file = parent.open_with(leaf, &options)?;
-    file.write_all(bytes)?;
-    set_mode(&file, mode)?;
-    file.sync_all().map_err(Into::into)
-}
-
-#[cfg(unix)]
-fn set_mode(file: &File, mode: FileMode) -> Result<(), RedoApplyError> {
-    use cap_std::fs::PermissionsExt;
-
-    let bits = match mode {
-        FileMode::Regular => 0o644,
-        FileMode::Executable => 0o755,
-    };
-    file.set_permissions(cap_std::fs::Permissions::from_mode(bits))?;
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn set_mode(_file: &File, _mode: FileMode) -> Result<(), RedoApplyError> {
-    Ok(())
+    publish_file(
+        parent,
+        &leaf,
+        &put.bytes,
+        put.mode,
+        Durability::Deferred,
+        || Ok(()),
+    )
 }
 
 /// Remove a deleted path, tolerating a target a previous application already
@@ -736,8 +701,6 @@ mod tests {
     use super::test_fixtures::*;
     use super::*;
     use crate::repository_state::FileMode;
-    use crate::storage::temp_cleanup::cleanup_orphaned_temp_files;
-    use std::collections::HashSet;
     use std::path::PathBuf;
     use std::sync::Arc;
     use tempfile::TempDir;
@@ -1120,14 +1083,6 @@ mod tests {
         );
     }
 
-    /// A stage name a test can occupy, standing in for the name a put draws at
-    /// random.
-    const OCCUPIED_STAGE: &str = ".redo.occupied.tmp";
-
-    fn ambient_directory(path: &Path) -> Dir {
-        Dir::open_ambient_dir(path, cap_std::ambient_authority()).unwrap()
-    }
-
     /// A put replaces whatever occupies its path. A symlink there is the one
     /// occupant that could carry the bytes, or a mode, somewhere the roots do
     /// not reach: the staged write plus rename replaces the link itself.
@@ -1174,70 +1129,6 @@ mod tests {
             !is_executable(&outside_target),
             "the put's mode reached a file outside the repository roots"
         );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn test_write_staged_file_refuses_a_symlink_occupying_the_staged_name() {
-        let directory = TempDir::new().unwrap();
-        let unrelated = directory.path().join("unrelated.json");
-        std::fs::write(&unrelated, b"a file the record never named").unwrap();
-        // Relative and in-tree: a confined handle resolves it, where it refuses
-        // an absolute target outright.
-        std::os::unix::fs::symlink("unrelated.json", directory.path().join(OCCUPIED_STAGE))
-            .unwrap();
-        let parent = ambient_directory(directory.path());
-
-        let outcome = write_staged_file(&parent, OCCUPIED_STAGE, b"published", FileMode::Regular);
-
-        assert!(
-            outcome.is_err(),
-            "the staging opened through a symlink waiting at its name"
-        );
-        assert_eq!(
-            std::fs::read(&unrelated).unwrap(),
-            b"a file the record never named",
-            "the staged bytes landed on a path the record never named"
-        );
-    }
-
-    #[test]
-    fn test_write_staged_file_refuses_a_file_occupying_the_staged_name() {
-        let directory = TempDir::new().unwrap();
-        let occupant = directory.path().join(OCCUPIED_STAGE);
-        std::fs::write(&occupant, b"a staging another application holds").unwrap();
-        let parent = ambient_directory(directory.path());
-
-        let outcome = write_staged_file(&parent, OCCUPIED_STAGE, b"published", FileMode::Regular);
-
-        assert!(outcome.is_err(), "the staging truncated an occupied name");
-        assert_eq!(
-            std::fs::read(&occupant).unwrap(),
-            b"a staging another application holds"
-        );
-    }
-
-    #[test]
-    fn test_staged_name_is_unique_across_calls() {
-        let names = (0..64).map(|_| staged_name()).collect::<HashSet<_>>();
-
-        assert_eq!(
-            names.len(),
-            64,
-            "two stagings drew one name, which a create-new open turns into a refused put"
-        );
-    }
-
-    /// The counterpart of the record's survival: a staging is reconstructible
-    /// from the record that named it, so the sweep is its reclaim path.
-    #[test]
-    fn test_staged_name_is_reclaimed_by_the_orphan_temp_sweep() {
-        let directory = TempDir::new().unwrap();
-        let orphan = directory.path().join(staged_name());
-        std::fs::write(&orphan, b"a staging its application never renamed").unwrap();
-
-        assert_eq!(cleanup_orphaned_temp_files(directory.path(), 0).unwrap(), 1);
-        assert!(!orphan.exists(), "the sweep left the orphaned staging");
     }
 
     #[test]

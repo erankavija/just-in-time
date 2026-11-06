@@ -17,6 +17,7 @@ use super::template_expand::{
     validate_delta_acyclic, DeltaEndpoint, PlannedNode, TemplateDelta,
 };
 use super::*;
+use crate::gate_presets::GatePresetCatalog;
 use crate::repository_state::{
     finalize, finalize_gate_registry_edit, render_capture_closure, CaptureBudget, CaptureSpec,
     MutationContext, MutationIntent, RepositoryEntry, RepositoryImage, VirtualPath,
@@ -397,7 +398,7 @@ fn derive_captured_template_apply(
     let template = request.resolve(config)?;
     let bindings = captured_anchor_bindings(request, config, container_id, anchor_bindings);
     let issues = parse_template_issues(image)?;
-    let presets = parse_template_presets(image)?;
+    let presets = GatePresetCatalog::from_image(image)?;
     let registry = parse_template_gate_registry(image)?;
     let graph = super::CapturedGraphEvidence::capture(image, &issues, context)?;
     let derived = derive_template_apply(
@@ -455,7 +456,7 @@ fn capture_template_image(
         let declarations = crate::repository_state::captured_issue_ids(image)?
             .iter()
             .map(|id| Ok(VirtualPath::issue_record(id)))
-            .chain(listed_json_paths(image, &presets_dir)?.into_iter().map(Ok))
+            .chain(GatePresetCatalog::paths(image)?.into_iter().map(Ok))
             .chain(template_declaration_closure(image)?.into_iter().map(Ok))
             .collect::<Result<Vec<_>>>()?;
         let declarations_read = declarations
@@ -500,7 +501,7 @@ fn template_operation_capture_paths(
         &template,
         &config,
         &parse_template_gate_registry(image)?,
-        &parse_template_presets(image)?,
+        GatePresetCatalog::from_image(image)?.definitions(),
     )
     .is_ok();
     let declarations = DocumentDeclarations::from_config(&config)?;
@@ -612,20 +613,6 @@ fn template_document_parent_paths(paths: &[VirtualPath]) -> Result<Vec<VirtualPa
     Ok(parents)
 }
 
-fn listed_json_paths(image: &RepositoryImage, dir: &VirtualPath) -> Result<Vec<VirtualPath>> {
-    let Some(listing) = image.directory_listings().get(dir) else {
-        return Err(anyhow!("complete listing is absent for {dir:?}"));
-    };
-    listing
-        .names()
-        .iter()
-        .filter(|name| name.ends_with(".json"))
-        .map(|name| {
-            VirtualPath::data(format!("{}/{}", dir.relative().as_str(), name)).map_err(Into::into)
-        })
-        .collect()
-}
-
 fn parse_template_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
     crate::repository_state::captured_issue_ids(image)?
         .iter()
@@ -658,25 +645,6 @@ fn parse_template_gate_registry(
     }
 }
 
-fn parse_template_presets(
-    image: &RepositoryImage,
-) -> Result<HashMap<GateKey, crate::gate_presets::GatePresetDefinition>> {
-    let dir = VirtualPath::GATE_PRESETS;
-    let files = listed_json_paths(image, &dir)?
-        .into_iter()
-        .map(|path| {
-            let bytes = image
-                .file_bytes(&path)?
-                .ok_or_else(|| anyhow!("listed custom preset is absent: {path:?}"))?;
-            Ok((path.relative().as_str().to_string(), bytes.to_vec()))
-        })
-        .collect::<Result<Vec<_>>>()?;
-    crate::gate_presets::load_presets_from_custom_files(files)?
-        .into_iter()
-        .map(|(name, preset)| Ok((name.parse()?, preset)))
-        .collect()
-}
-
 #[allow(clippy::too_many_arguments)]
 fn derive_template_apply(
     template: &GraphTemplate,
@@ -686,7 +654,7 @@ fn derive_template_apply(
     roles: &RoleBindings,
     issues: &[Issue],
     mut registry: crate::declarations::GateRegistry,
-    presets: &HashMap<GateKey, crate::gate_presets::GatePresetDefinition>,
+    presets: &GatePresetCatalog,
     config: &crate::config::JitConfig,
     rules: &crate::declarations::rules::RuleSet,
     graph: &super::CapturedGraphEvidence<'_>,
@@ -711,7 +679,7 @@ fn derive_template_apply(
             ))
         }
     }
-    require_template_prerequisites(template, config, &registry, presets)?;
+    require_template_prerequisites(template, config, &registry, presets.definitions())?;
 
     let resolved_bindings = template
         .anchors
@@ -1005,7 +973,7 @@ fn derive_fresh_template(
     delta: &TemplateDelta,
     issues: &[Issue],
     registry: &mut crate::declarations::GateRegistry,
-    presets: &HashMap<GateKey, crate::gate_presets::GatePresetDefinition>,
+    presets: &GatePresetCatalog,
     config: &crate::config::JitConfig,
     rules: &crate::declarations::rules::RuleSet,
     graph: &super::CapturedGraphEvidence<'_>,
@@ -1167,9 +1135,9 @@ fn validate_captured_issue_write(
 fn resolve_captured_gate(
     name: &GateKey,
     registry: &crate::declarations::GateRegistry,
-    presets: &HashMap<GateKey, crate::gate_presets::GatePresetDefinition>,
+    presets: &GatePresetCatalog,
 ) -> Result<TemplateGateResolution> {
-    if let Some(preset) = presets.get(name) {
+    if let Ok(preset) = presets.get(name.as_str()) {
         return Ok(TemplateGateResolution::Preset(preset.clone()));
     }
     if let Some(gate) = registry.gates.get(name) {
@@ -1184,7 +1152,7 @@ fn attach_captured_gates(
     names: &[GateKey],
     issue: &mut Issue,
     registry: &mut crate::declarations::GateRegistry,
-    presets: &HashMap<GateKey, crate::gate_presets::GatePresetDefinition>,
+    presets: &GatePresetCatalog,
     events: &mut Vec<(u8, EventBody)>,
     lease_targets: &mut Vec<IssueId>,
 ) -> Result<()> {

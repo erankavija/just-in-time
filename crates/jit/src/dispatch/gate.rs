@@ -211,7 +211,7 @@ fn show<S: IssueStore>(
     ))
 }
 
-fn preset_list<S: IssueStore>(
+fn preset_list<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
 ) -> HandlerResult<GatePresetListResponse> {
     let presets = ctx.executor.gates().list_gate_presets()?;
@@ -222,7 +222,7 @@ fn preset_list<S: IssueStore>(
     ))
 }
 
-fn preset_show<S: IssueStore>(
+fn preset_show<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     name: String,
 ) -> HandlerResult<GatePresetShowResponse> {

@@ -228,11 +228,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                     .labels
                     .retain(|label| label != &label_utils::type_label(&old_type));
                 issue.labels.push(label_utils::type_label(&new_type));
-                if !dry_run {
-                    fixes
-                        .messages
-                        .extend(self.exec.refuse_foreign_lease(&issue_id)?);
-                }
                 fixes.messages.push(format!(
                     "{} type '{old_type}' with '{new_type}' for issue {issue_id}",
                     if dry_run { "Would replace" } else { "Replaced" }
@@ -2031,6 +2026,37 @@ mod tests {
 
         let (second, _, _, _) = executor.validation().validate_with_fix(false).unwrap();
         assert_eq!(second, 0, "a captured type repair must not repeat");
+    }
+
+    #[test]
+    fn test_validate_type_fix_repairs_another_agents_leased_issue_in_strict_mode() {
+        use crate::commands::test_helpers::{
+            plant_foreign_lease, seed_issue, seed_repo_file, setup_coordinated_with_enforcement,
+        };
+        use crate::storage::IssueStore;
+
+        let executor = setup_coordinated_with_enforcement("strict");
+        seed_repo_file(
+            executor.storage(),
+            ".jit/config.toml",
+            "[worktree]\nenforce_leases = \"strict\"\n\
+             [type_hierarchy.types]\ntask = 4\n\
+             [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        );
+        let mut issue =
+            crate::test_utils::fixture_issue("Type fix lease".to_string(), String::new());
+        issue.labels.push("type:taks".to_string());
+        let issue_id = issue.id.clone();
+        seed_issue(executor.storage(), issue);
+        plant_foreign_lease(&executor, &issue_id);
+
+        let (count, messages, _, _) = executor.validation().validate_with_fix(false).unwrap();
+
+        assert!(count > 0, "{messages:?}");
+        let repaired = executor.storage().load_issue(&issue_id).unwrap();
+        assert!(repaired.labels.iter().any(|label| label == "type:task"));
+        assert!(!repaired.labels.iter().any(|label| label == "type:taks"));
+        assert!(messages.iter().all(|message| !message.contains("lease")));
     }
 
     #[test]

@@ -2883,13 +2883,13 @@ impl GateCommands {
     fn requires_recovery_dispatch(&self) -> bool {
         match self {
             Self::Define { .. }
-            | Self::Update { .. }
             | Self::Remove { .. }
             | Self::Add { .. }
             | Self::Evaluate { .. }
             | Self::EvaluateAll { .. }
             | Self::EvaluateMany { .. }
-            | Self::Fail { .. } => true,
+            | Self::Fail { .. }
+            | Self::Update { .. } => true,
             Self::Preset(command) => command.requires_recovery_dispatch(),
             Self::List { .. }
             | Self::Show { .. }
@@ -3054,9 +3054,9 @@ impl GateCommands {
             | Self::Evaluate { .. }
             | Self::EvaluateAll { .. }
             | Self::EvaluateMany { .. }
-            | Self::Fail { .. } => true,
+            | Self::Fail { .. }
+            | Self::Update { .. } => true,
             Self::Define { .. }
-            | Self::Update { .. }
             | Self::List { .. }
             | Self::Show { .. }
             | Self::Status { .. }
@@ -3086,9 +3086,8 @@ impl DocCommands {
     fn coordinates_claims_first(&self) -> bool {
         match self {
             Self::Assets { command } => command.coordinates_claims_first(),
-            Self::Add { .. }
-            | Self::List { .. }
-            | Self::Remove { .. }
+            Self::Add { .. } | Self::Remove { .. } => true,
+            Self::List { .. }
             | Self::Show { .. }
             | Self::Dir { .. }
             | Self::Conformance { .. }
@@ -3351,7 +3350,10 @@ mod recovery_dispatch_tests {
         "gate evaluate-many",
         "gate fail",
         "gate preset apply",
+        "gate update",
         "gate remove",
+        "doc add",
+        "doc remove",
         "issue assign",
         "issue claim",
         "issue claim-next",
@@ -3473,6 +3475,25 @@ mod recovery_dispatch_tests {
             ("issue unassign", &["jit", "issue", "unassign", "deadbeef"]),
             ("gate add", &["jit", "gate", "add", "deadbeef", "tests"]),
             ("gate remove", &["jit", "gate", "remove", "tests"]),
+            (
+                "gate update",
+                &["jit", "gate", "update", "tests", "--title", "updated"],
+            ),
+            (
+                "doc add",
+                &[
+                    "jit",
+                    "doc",
+                    "add",
+                    "deadbeef",
+                    "docs/guide.md",
+                    "--skip-scan",
+                ],
+            ),
+            (
+                "doc remove",
+                &["jit", "doc", "remove", "deadbeef", "docs/guide.md"],
+            ),
             (
                 "gate evaluate",
                 &["jit", "gate", "evaluate", "deadbeef", "tests"],

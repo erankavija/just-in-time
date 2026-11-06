@@ -1338,17 +1338,6 @@ impl IssueStore for JsonFileStorage {
             .transpose()
     }
 
-    fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
-        let manager = crate::gate_presets::PresetManager::new(self.configured_layout()?)?;
-        Ok(manager.list_presets())
-    }
-
-    fn get_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition> {
-        let manager = crate::gate_presets::PresetManager::new(self.configured_layout()?)?;
-        let preset = manager.get_preset(name)?;
-        Ok(preset.clone())
-    }
-
     fn read_path_bytes(
         &self,
         path: &str,
