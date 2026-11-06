@@ -600,7 +600,9 @@
   "surfaced_pitfalls": [
     {
       "issue": "81664a6a",
-      "note": "Remaining git-spawning sites outside storage/git.rs are not marked as tracked exceptions; only layout detection (until 07663984) is. A reviewer may hold other sites to @/inv/convention-convergence; each is migrated by its own issue in this epic."
+      "note": "Remaining git-spawning sites outside storage/git.rs are not marked as tracked exceptions; only layout detection (until 07663984) is. A reviewer may hold other sites to @/inv/convention-convergence; each is migrated by its own issue in this epic.",
+      "status": "closed",
+      "disposition": "Resolved: 34851181 inventory (REQ-02/REQ-03) shows storage/git.rs is the only production code that constructs a git process or names the executable; Git::with_program is test-support only; d28888f0 holistic-review PASS confirms. No remaining tracked exception needed."
     },
     {
       "issue": "f4d9502a",
@@ -1740,5 +1742,63 @@
       "candidate": "doc check-links could reuse one cat-file Types session for commit resolution and HEAD asset presence in commands/document.rs, saving one process.",
       "status": "noted; not filed unless a D-19/D-20 reason appears (steward 9b)"
     }
-  ]
+  ],
+  "criteria_mapping_2026-11-06": {
+    "REQ-01": [
+      "6fdb2d53",
+      "78cb05ed"
+    ],
+    "REQ-02": [
+      "81664a6a",
+      "34851181"
+    ],
+    "REQ-03": [
+      "81664a6a",
+      "3f8da8c4"
+    ],
+    "REQ-04": [
+      "d68150e2",
+      "07663984"
+    ],
+    "REQ-05": [
+      "4ba18af4",
+      "c140921c"
+    ],
+    "REQ-06": [
+      "7297f922",
+      "1acfa592"
+    ],
+    "REQ-07": [
+      "7297f922",
+      "7aafec83"
+    ],
+    "REQ-08": [
+      "437907da",
+      "f649c144"
+    ],
+    "REQ-09": [
+      "3f8da8c4"
+    ],
+    "REQ-10": [
+      "a273667c",
+      "1acfa592",
+      "7cd27db8",
+      "933ff852",
+      "d9ba0029"
+    ],
+    "REQ-11": [
+      "34851181",
+      "e6ec58f3"
+    ],
+    "REQ-12": [
+      "23b48cf0",
+      "f649c144"
+    ],
+    "REQ-13": [
+      "6fdb2d53",
+      "caceed7d",
+      "23b48cf0"
+    ],
+    "note": "every REQ credited by done children via satisfies labels; checkpoints 34bb375a and d28888f0 holistic-review PASS"
+  }
 }
