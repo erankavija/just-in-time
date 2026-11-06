@@ -3038,9 +3038,7 @@ impl IssueCommands {
 impl DepCommands {
     fn coordinates_claims_first(&self) -> bool {
         match self {
-            // Both CLI verbs use the batch mutation variants, whose current
-            // contract does not enter claims coordination.
-            Self::Add { .. } | Self::Rm { .. } => false,
+            Self::Add { .. } | Self::Rm { .. } => true,
         }
     }
 }
@@ -3344,6 +3342,8 @@ mod recovery_dispatch_tests {
         "claim heartbeat",
         "claim release",
         "claim renew",
+        "dep add",
+        "dep rm",
         "gate add",
         "gate evaluate",
         "gate evaluate-all",
@@ -3523,6 +3523,8 @@ mod recovery_dispatch_tests {
                 &["jit", "issue", "update", "deadbeef", "--title", "updated"],
             ),
             ("issue delete", &["jit", "issue", "delete", "deadbeef"]),
+            ("dep add", &["jit", "dep", "add", "deadbeef", "feedface"]),
+            ("dep rm", &["jit", "dep", "rm", "deadbeef", "feedface"]),
             (
                 "issue claim",
                 &["jit", "issue", "claim", "deadbeef", "agent:test"],
@@ -3596,8 +3598,6 @@ mod recovery_dispatch_tests {
                 "issue release",
                 &["jit", "issue", "release", "deadbeef", "timeout"],
             ),
-            ("dep add", &["jit", "dep", "add", "deadbeef", "feedface"]),
-            ("dep rm", &["jit", "dep", "rm", "deadbeef", "feedface"]),
             (
                 "gate preset create",
                 &["jit", "gate", "preset", "create", "deadbeef", "custom"],

@@ -499,25 +499,31 @@ write_policy = "refuse"    # Linked-checkout write-policy stance
 | `"warn"` | Warn where `strict` would refuse, and allow the write |
 | `"off"` | No lease enforcement |
 
-Leases remain the way to claim exclusive work: acquire one with `jit claim acquire` and other agents' writes to that issue refuse.
+Leases remain the way to claim exclusive work: acquire one with `jit claim acquire`.
 
 The mode is read from the repository's own `.jit/config.toml` only: `off`
 with no `[worktree]` section, the [default mode](runtime-defaults.md) when the
 section omits the key, and the declared value otherwise. `jit config show`, `jit config get`, and write
 commands all resolve it by this rule; environment variables do not change it.
 
-`jit issue update --filter` checks every matched issue and refuses the whole
-operation before writing, naming the leased ones.
-`jit gate remove` and `jit gate update` refuse when another agent leases an
-issue that requires the gate.
+Every user-requested write to an existing issue follows this lease rule:
+`strict` refuses if another agent holds an active lease on any issue the write
+targets; `warn` reports the conflict and allows the write, and `off` skips the
+check. Unleased targets need no lease. This rule applies to issue updates
+(including bulk updates), `dep add` and `dep rm`, assign and unassign, template
+application, and gate operations that target existing issues, including
+gate-definition changes that affect issues requiring the gate.
 
-Some writes reach a leased issue without the check: `jit issue release`
-(timeout recovery with a required reason; its event names who released),
-`jit issue claim` on an unleased issue, promotions of dependents, the rewrite of
-dependents when a dependency is deleted, the type repairs, derived-state repair,
-and transitive reduction performed by `jit validate --fix`, `jit archive
---execute` on a terminal target, and `jit recover`, which replays what already
-committed.
+`jit issue claim` has a separate claim-availability check that refuses another
+agent's active lease regardless of this mode. `jit issue release` is a timeout-
+recovery exception: it requires a reason, and its event records who released
+the assignee.
+
+System-derived writes do not check leases on the issues they update. This
+includes readiness corrections of dependents, dependent rewrites after
+dependency deletion, type and derived-state repairs, transitive reduction by
+`jit validate --fix`, `jit archive --execute` on a terminal target, and replay
+of already-committed work by `jit recover`.
 
 Enforcement happens when a mutation is written; no git hook checks leases, so a
 hand edit of an issue record is not caught at commit.
