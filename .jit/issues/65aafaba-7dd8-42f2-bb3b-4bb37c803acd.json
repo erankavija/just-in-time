@@ -15,7 +15,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "949039b1-f043-40d3-a907-66456a426ec0",
+      "status": "passed",
+      "updated_at": "2026-11-06T04:22:25.961450577Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "65aafaba-7dd8-42f2-bb3b-4bb37c803acd",
   "labels": [
     "type:task",
@@ -31,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Archive preview runs the execute planner read-only",
-  "updated_at": "2026-11-06T03:51:59.183890742Z"
+  "updated_at": "2026-11-06T04:22:25.961450577Z"
 }
