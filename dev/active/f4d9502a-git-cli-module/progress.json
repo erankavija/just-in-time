@@ -469,9 +469,9 @@
           "short_id": "cd603c8e",
           "title": "Document command reference states the show and history semantics",
           "classification": "documentation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "dispatched_out_of_wave_2026-11-06"
+          "worker_status": "landed_5b8b3ab06"
         }
       ]
     },
