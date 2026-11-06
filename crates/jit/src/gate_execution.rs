@@ -1107,13 +1107,16 @@ mod tests {
         let temp = tempfile::TempDir::new().unwrap();
         let repository = crate::test_harness::git::GitRepository::init(temp.path());
         let expected_commit = repository.write("seed.txt", "seed\n").commit("seed");
-        let head = crate::storage::WorktreePaths::detect_from(repository.root())
-            .unwrap()
-            .git()
-            .unwrap()
-            .head()
-            .unwrap()
-            .unwrap();
+        let head = crate::storage::WorktreePaths::detect_for_data_root(
+            &repository.root().join(".jit"),
+            repository.root(),
+        )
+        .unwrap()
+        .git()
+        .unwrap()
+        .head()
+        .unwrap()
+        .unwrap();
         let checker_dir = tempfile::TempDir::new().unwrap();
         let checker = GateChecker::Exec {
             command: "true".to_string(),

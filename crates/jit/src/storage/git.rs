@@ -61,7 +61,9 @@ pub struct Git {
 
 impl Default for Git {
     fn default() -> Self {
-        Self::with_program("git")
+        Self {
+            program: PathBuf::from("git"),
+        }
     }
 }
 
@@ -78,6 +80,7 @@ pub struct ProbedCheckout {
 }
 
 impl Git {
+    #[cfg(feature = "test-support")]
     pub fn with_program(program: impl Into<PathBuf>) -> Self {
         Self {
             program: program.into(),
