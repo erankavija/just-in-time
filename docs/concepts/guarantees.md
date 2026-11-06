@@ -466,7 +466,7 @@ mutation session applies it
 ```bash
 # After an interrupted mutation:
 .jit/tmp/redo.record                           # The mutation, waiting to be applied
-.jit/issues/.redo.<hex>.tmp                    # Staging a rename did not reach
+.jit/issues/.jit-stage.<hex>.tmp               # Staging a rename did not reach
 .jit/issues/abc123.json                        # Previous or new version, never torn
 
 # Every mutating command applies the record before its own work. This one also
