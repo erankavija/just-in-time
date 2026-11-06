@@ -174,8 +174,8 @@ Archive evidence is addressed by its target. A container record is written at
 `.jit/archive-evidence/document/<sha256-of-normalized-path>.json`, where the digest is SHA-256 over the normalized
 repository-relative document path. The archive execution finalizer
 (`finalize_archive_execution`) appends the execution to this record in the same
-redo record as the archive event. The archive preview reader,
-`IssueStore::read_archive_evidence_record(target)`, loads it by target.
+redo record as the archive event. Preview and execution share one planner,
+`capture_archive_plan`, which captures it by target.
 
 ```json
 {

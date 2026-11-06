@@ -1509,11 +1509,12 @@ impl<S: IssueStore> GateOps<'_, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file, setup};
+    use crate::commands::test_helpers::{seed_gate_registry, seed_issue, setup};
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::domain::EventBody;
     use crate::storage::InMemoryStorage;
+    use crate::test_harness::seed_memory_repository_file;
     use std::collections::HashMap;
 
     #[test]
@@ -1986,7 +1987,7 @@ mod tests {
             crate::storage::MutationPoint::BeforeCommitCheck,
         ))));
         let storage = InMemoryStorage::with_mutation_interruptions(failures);
-        seed_repo_file(&storage, ".jit/config.toml", "");
+        seed_memory_repository_file(&storage, ".jit/config.toml", "");
         let recovered = storage.without_mutation_interruptions();
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage)
@@ -2025,7 +2026,7 @@ mod tests {
             crate::storage::MutationPoint::BeforeCommitCheck,
         ))));
         let storage = InMemoryStorage::with_mutation_interruptions(failures);
-        seed_repo_file(
+        seed_memory_repository_file(
             &storage,
             ".jit/config.toml",
             "[worktree]\nenforce_leases = \"off\"\n",
@@ -2231,7 +2232,7 @@ mod tests {
         issue.gates_required.push("review".parse().unwrap());
         let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        seed_repo_file(
+        seed_memory_repository_file(
             executor.storage(),
             ".jit/config/gate-presets/occupied.json",
             "{ malformed",
@@ -2254,8 +2255,8 @@ mod tests {
              target = \"gates.md\"\nstyle = \"full\"\n",
             crate::test_utils::shipped_item_kind_tables(&["gate", "rule"])
         );
-        seed_repo_file(&storage, ".jit/config.toml", &config);
-        seed_repo_file(&storage, ".jit/rules.toml", "");
+        seed_memory_repository_file(&storage, ".jit/config.toml", &config);
+        seed_memory_repository_file(&storage, ".jit/rules.toml", "");
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
 
@@ -2314,7 +2315,7 @@ mod tests {
             stage = \"postcheck\"\n\
             mode = \"manual\"\n";
         let executor = setup();
-        seed_repo_file(executor.storage(), ".jit/gates.toml", authored);
+        seed_memory_repository_file(executor.storage(), ".jit/gates.toml", authored);
 
         executor
             .gates()
@@ -2432,7 +2433,7 @@ mod tests {
         use crate::storage::{RepositoryStateStore, RepositoryStateStoreError};
 
         let storage = InMemoryStorage::new();
-        seed_repo_file(&storage, ".jit/config.toml", "");
+        seed_memory_repository_file(&storage, ".jit/config.toml", "");
         let layout = storage.repository_layout();
         let spec = || {
             let mut spec = CaptureSpec::new(

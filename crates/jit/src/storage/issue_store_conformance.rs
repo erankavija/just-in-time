@@ -7,8 +7,6 @@
 //! state only what that backend adds (`@/inv/orthogonal-tests`).
 
 use crate::declarations::{serialize_gate_registry, GateRegistry, GateStage};
-use crate::domain::artifact_execution::{ArchiveEvidenceRecord, ArchiveExecution};
-use crate::domain::artifact_plan::PlanTarget;
 use crate::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
 use crate::domain::{Event, EventBody, GateRunResult, GateStatus, GateVerdictOrigin, Issue};
 use crate::gate_presets::{GatePresetDefinition, GateTemplate};
@@ -570,42 +568,6 @@ fn test_read_events_rejects_unknown_tags_and_malformed_records<B: Backend>() {
 
         assert_eq!(repository.store.read_events().ok(), expected, "log {log:?}");
     }
-}
-
-fn test_read_archive_evidence_record_is_target_addressed<B: Backend>() {
-    let target = PlanTarget::Document {
-        path: "dev/active/plan.md".to_string(),
-    };
-    let record = ArchiveEvidenceRecord {
-        target: target.clone(),
-        executions: vec![ArchiveExecution {
-            target: target.clone(),
-            destination_root: "dev/archive".to_string(),
-            publications: Vec::new(),
-            reference_changes: Vec::new(),
-            planned_deletions: Vec::new(),
-            reconciling: false,
-        }],
-    };
-    let path = VirtualPath::archive_evidence_record(&target);
-    let repository = Repository::<B>::seeded(&[(path, serde_json::to_string(&record).unwrap())]);
-
-    assert_eq!(
-        repository
-            .store
-            .read_archive_evidence_record(&target)
-            .unwrap(),
-        Some(record)
-    );
-    assert_eq!(
-        repository
-            .store
-            .read_archive_evidence_record(&PlanTarget::Document {
-                path: "dev/active/other.md".to_string(),
-            })
-            .unwrap(),
-        None
-    );
 }
 
 fn test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found<B: Backend>() {
@@ -1402,7 +1364,6 @@ conformance_suite!(
         test_list_issues_is_empty_before_any_issue_is_published,
         test_load_gate_registry_reads_the_declared_gates_and_none_when_absent,
         test_read_events_rejects_unknown_tags_and_malformed_records,
-        test_read_archive_evidence_record_is_target_addressed,
         test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found,
         test_list_gate_runs_for_issue_lists_only_that_issues_runs,
         test_list_gate_runs_for_issue_ignores_clutter_in_the_issue_directory,

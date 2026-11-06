@@ -1,19 +1,20 @@
-use jit::commands::test_helpers::ExecutorTestAccess;
-use jit::domain::artifact_classifier::ArtifactClassificationPolicy;
+use jit::domain::artifact_classifier::{
+    ArtifactClassificationInventory, ArtifactClassificationPolicy,
+};
 use jit::domain::artifact_discovery::{
-    expand_artifact_closure, ArtifactClosure, ArtifactClosureState, ArtifactEvidence,
-    ArtifactEvidenceMap,
+    discover_archive_artifacts, expand_artifact_closure, ArtifactClosure, ArtifactClosureState,
+    ArtifactEvidence, ArtifactEvidenceMap, ArtifactListingScope,
 };
 use jit::domain::artifact_inventory::{
-    inventory_explicit_roots, ExplicitRootTarget, PinnedRootEvidence, PinnedRootEvidenceMap,
+    inventory_explicit_roots, ExplicitRootInventory, ExplicitRootTarget, PinnedRootEvidence,
+    PinnedRootEvidenceMap,
 };
-use jit::domain::artifact_plan::{ArtifactVersion, BlockerCode, EdgeResolutionMode, WarningCode};
+use jit::domain::artifact_plan::{
+    normalize_artifact_path, ArtifactVersion, BlockerCode, EdgeResolutionMode, WarningCode,
+};
 use jit::domain::{Issue, State};
-use jit::storage::{discover_archive_artifacts, JsonFileStorage};
-use jit::test_utils::{document_reference_at, issue_id, setup_test_repo_with_config};
-use jit::CommandExecutor;
-use std::fs;
-use tempfile::TempDir;
+use jit::test_utils::{document_reference_at, issue_id};
+use std::collections::{BTreeMap, BTreeSet};
 
 const OID: &str = "0123456789abcdef0123456789abcdef01234567";
 
@@ -51,33 +52,103 @@ fn test_terminal_evidence_closes_without_parsing_or_more_needs() {
     }
 }
 
-struct Repo {
-    _temp: TempDir,
-    root: std::path::PathBuf,
-    storage: JsonFileStorage,
+/// An in-memory repository of regular files and symbolic links, answering each
+/// path the closure requests with the evidence a no-follow capture reports.
+#[derive(Default)]
+struct Tree {
+    files: BTreeMap<String, Vec<u8>>,
+    symlinks: BTreeSet<String>,
 }
 
-impl From<(TempDir, CommandExecutor<JsonFileStorage>)> for Repo {
-    fn from((temp, executor): (TempDir, CommandExecutor<JsonFileStorage>)) -> Self {
-        Self {
-            root: temp.path().to_path_buf(),
-            storage: executor.storage().clone(),
-            _temp: temp,
+impl Tree {
+    fn write(&mut self, path: &str, content: &str) {
+        self.files
+            .insert(path.to_string(), content.as_bytes().to_vec());
+    }
+
+    fn symlink(&mut self, path: &str) {
+        self.symlinks.insert(path.to_string());
+    }
+
+    /// A link at `path` or at any ancestor is reported as a link, never followed.
+    fn evidence(&self, path: &str) -> ArtifactEvidence {
+        let components = path.split('/').collect::<Vec<_>>();
+        if components
+            .iter()
+            .any(|component| matches!(*component, "" | "." | ".."))
+        {
+            return ArtifactEvidence::InvalidPath;
+        }
+        for depth in 1..=components.len() {
+            let prefix = components[..depth].join("/");
+            if self.symlinks.contains(&prefix) {
+                return ArtifactEvidence::Symlink;
+            }
+            if let Some(bytes) = self.files.get(&prefix) {
+                return if depth == components.len() {
+                    ArtifactEvidence::File(bytes.clone())
+                } else {
+                    ArtifactEvidence::Unsupported
+                };
+            }
+        }
+        let beneath = format!("{path}/");
+        if self
+            .files
+            .keys()
+            .chain(&self.symlinks)
+            .any(|entry| entry.starts_with(&beneath))
+        {
+            ArtifactEvidence::Directory {
+                scope: ArtifactListingScope::MetadataOnly,
+                entries: Vec::new(),
+            }
+        } else {
+            ArtifactEvidence::Missing
         }
     }
-}
 
-impl Repo {
-    fn write(&self, path: &str, content: &str) {
-        let target = self.root.join(path);
-        fs::create_dir_all(target.parent().unwrap()).unwrap();
-        fs::write(target, content).unwrap();
+    /// Close `inventory` and every issue document over this tree, then derive
+    /// the selected artifacts.
+    fn discover_inventory(
+        &self,
+        inventory: ExplicitRootInventory,
+        issues: &[Issue],
+        policy: &ArtifactClassificationPolicy,
+    ) -> ArtifactClassificationInventory {
+        let roots = inventory
+            .artifacts()
+            .iter()
+            .filter(|entry| entry.version() == &ArtifactVersion::WorkingTree)
+            .map(|entry| entry.source().to_string())
+            .chain(
+                issues
+                    .iter()
+                    .flat_map(|issue| issue.documents.iter())
+                    .filter(|document| document.commit.is_none())
+                    .map(|document| normalize_artifact_path(&document.path)),
+            )
+            .collect::<BTreeSet<_>>();
+        let mut evidence = ArtifactEvidenceMap::new();
+        let mut state = ArtifactClosureState::new(roots);
+        let parsed = loop {
+            match expand_artifact_closure(state, &evidence) {
+                ArtifactClosure::Complete(parsed) => break parsed,
+                ArtifactClosure::Needs { paths, state: next } => {
+                    paths.into_iter().for_each(|path| {
+                        let fact = self.evidence(&path);
+                        evidence.insert(path, fact);
+                    });
+                    state = next;
+                }
+            }
+        };
+        discover_archive_artifacts(inventory, issues, &evidence, &parsed, policy)
+            .unwrap()
+            .0
     }
 
-    fn discover(
-        &self,
-        root: &str,
-    ) -> jit::domain::artifact_classifier::ArtifactClassificationInventory {
+    fn discover(&self, root: &str) -> ArtifactClassificationInventory {
         self.discover_with_policy(root, &unbounded_policy())
     }
 
@@ -85,7 +156,7 @@ impl Repo {
         &self,
         root: &str,
         policy: &ArtifactClassificationPolicy,
-    ) -> jit::domain::artifact_classifier::ArtifactClassificationInventory {
+    ) -> ArtifactClassificationInventory {
         let inventory = inventory_explicit_roots(
             &[],
             &jit::test_taxonomy::test_taxonomy().hierarchy_config(),
@@ -93,14 +164,10 @@ impl Repo {
             &PinnedRootEvidenceMap::new(),
         )
         .unwrap();
-        discover_archive_artifacts(&self.storage, inventory, &[], policy, Default::default())
-            .unwrap()
-            .0
+        self.discover_inventory(inventory, &[], policy)
     }
 
-    fn sources(
-        inventory: &jit::domain::artifact_classifier::ArtifactClassificationInventory,
-    ) -> Vec<&str> {
+    fn sources(inventory: &ArtifactClassificationInventory) -> Vec<&str> {
         inventory
             .artifacts()
             .iter()
@@ -111,7 +178,7 @@ impl Repo {
 
 #[test]
 fn test_discover_archive_artifacts_admits_an_out_of_root_artifact_but_none_of_its_descendants() {
-    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
+    let mut repo = Tree::default();
     repo.write("dev/active/plan.md", "[hub](../../README.md)");
     repo.write("README.md", "[guide](docs/guide.md)");
     repo.write("docs/guide.md", "[deeper](reference/deeper.md)");
@@ -119,7 +186,7 @@ fn test_discover_archive_artifacts_admits_an_out_of_root_artifact_but_none_of_it
 
     let unbounded = repo.discover_with_policy("dev/active/plan.md", &unbounded_policy());
     assert_eq!(
-        Repo::sources(&unbounded),
+        Tree::sources(&unbounded),
         [
             "README.md",
             "dev/active/plan.md",
@@ -130,7 +197,7 @@ fn test_discover_archive_artifacts_admits_an_out_of_root_artifact_but_none_of_it
 
     let bounded = repo.discover_with_policy("dev/active/plan.md", &development_root_policy());
     assert_eq!(
-        Repo::sources(&bounded),
+        Tree::sources(&bounded),
         ["README.md", "dev/active/plan.md"],
         "no artifact reached only through the out-of-root hub may join the plan"
     );
@@ -158,7 +225,7 @@ fn test_discover_archive_artifacts_admits_an_out_of_root_artifact_but_none_of_it
 
 #[test]
 fn test_recursive_discovery_reaches_html_css_import_url_figure_and_script_src() {
-    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
+    let mut repo = Tree::default();
     repo.write(
         "slides/index.html",
         r#"<link rel="stylesheet" href="theme.css"><script src="js/app.js"></script>"#,
@@ -225,7 +292,7 @@ fn test_recursive_discovery_reaches_html_css_import_url_figure_and_script_src() 
 
 #[test]
 fn test_markdown_links_preserve_relative_and_root_relative_edge_metadata() {
-    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
+    let mut repo = Tree::default();
     repo.write(
         "notes/readme.md",
         "[Sibling](guide.md) ![Logo](/assets/logo.png) [Web](https://example.test/x)",
@@ -304,7 +371,7 @@ fn test_incremental_closure_reuses_parsed_state_for_shared_cyclic_reachability()
 
 #[test]
 fn test_repository_escape_blocks_and_missing_embedded_target_warns() {
-    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
+    let mut repo = Tree::default();
     repo.write(
         "docs/index.html",
         r#"<img src="../../outside.png"><img src="missing.png">"#,
@@ -343,7 +410,7 @@ fn test_repository_escape_blocks_and_missing_embedded_target_warns() {
 
 #[test]
 fn test_directory_link_target_is_navigation_while_regular_link_target_stays_an_artifact() {
-    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
+    let mut repo = Tree::default();
     repo.write("docs/index.md", "[section](section/) [guide](guide.md)");
     repo.write("docs/guide.md", "guide");
     repo.write("docs/section/child.md", "child");
@@ -382,20 +449,13 @@ fn test_directory_link_target_is_navigation_while_regular_link_target_stays_an_a
     assert!(discovered.blockers.is_empty());
 }
 
-#[cfg(unix)]
 #[test]
 fn test_symlinked_directory_link_target_is_inventoried_rather_than_skipped_as_navigation() {
-    use std::os::unix::fs::symlink;
-
-    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
+    let mut repo = Tree::default();
     repo.write("docs/index.md", "[plain](plain/) [linked](linked/)");
     repo.write("docs/plain/child.md", "child");
     repo.write("referents/bundle/secret.md", "must not be discovered");
-    symlink(
-        repo.root.join("referents/bundle"),
-        repo.root.join("docs/linked"),
-    )
-    .unwrap();
+    repo.symlink("docs/linked");
 
     let discovered = repo.discover("docs/index.md");
 
@@ -610,7 +670,7 @@ fn test_markdown_code_and_prose_dynamic_loading_patterns_warn_textually() {
 }
 
 fn assert_dynamic_loading_warning(path: &str, content: &str) {
-    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
+    let mut repo = Tree::default();
     repo.write(path, content);
     let discovered = repo.discover(path);
     let entry = &discovered.artifacts[0];
@@ -630,7 +690,7 @@ fn assert_dynamic_loading_warning(path: &str, content: &str) {
 }
 
 fn assert_no_dynamic_loading_warning(path: &str, content: &str) {
-    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
+    let mut repo = Tree::default();
     repo.write(path, content);
     let discovered = repo.discover(path);
     let entry = &discovered.artifacts[0];
@@ -673,7 +733,7 @@ fn pinned_issue() -> Issue {
 
 #[test]
 fn test_readable_pinned_root_is_historical_and_never_scanned_or_constrains_working_tree() {
-    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
+    let mut repo = Tree::default();
     repo.write("docs/history.html", r#"<img src="working-tree-bait.png">"#);
     repo.write("docs/working-tree-bait.png", "bait");
     let issues = [pinned_issue()];
@@ -685,15 +745,7 @@ fn test_readable_pinned_root_is_historical_and_never_scanned_or_constrains_worki
     )
     .unwrap();
 
-    let discovered = discover_archive_artifacts(
-        &repo.storage,
-        inventory,
-        &issues,
-        &unbounded_policy(),
-        Default::default(),
-    )
-    .unwrap()
-    .0;
+    let discovered = repo.discover_inventory(inventory, &issues, &unbounded_policy());
     assert_eq!(discovered.artifacts.len(), 1);
     let historical = &discovered.artifacts[0];
     assert!(historical.version().is_pinned());
@@ -704,7 +756,7 @@ fn test_readable_pinned_root_is_historical_and_never_scanned_or_constrains_worki
 
 #[test]
 fn test_failed_pinned_read_stays_pinned_read_failed_without_working_tree_fallback() {
-    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
+    let mut repo = Tree::default();
     repo.write("docs/history.html", "working-tree fallback bait");
     let issues = [pinned_issue()];
     let inventory = inventory_explicit_roots(
@@ -715,26 +767,15 @@ fn test_failed_pinned_read_stays_pinned_read_failed_without_working_tree_fallbac
     )
     .unwrap();
 
-    let discovered = discover_archive_artifacts(
-        &repo.storage,
-        inventory,
-        &issues,
-        &unbounded_policy(),
-        Default::default(),
-    )
-    .unwrap()
-    .0;
+    let discovered = repo.discover_inventory(inventory, &issues, &unbounded_policy());
     assert!(discovered.artifacts.is_empty());
     assert_eq!(discovered.blockers.len(), 1);
     assert_eq!(discovered.blockers[0].code, BlockerCode::PinnedReadFailed);
 }
 
-#[cfg(unix)]
 #[test]
 fn test_symlinked_source_root_is_retained_without_parsing_referent_edges() {
-    use std::os::unix::fs::symlink;
-
-    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
+    let mut repo = Tree::default();
     repo.write(
         "referents/root.md",
         "[referent-only child](secret/child.html)",
@@ -743,12 +784,7 @@ fn test_symlinked_source_root_is_retained_without_parsing_referent_edges() {
         "referents/secret/child.html",
         "<p>must not be discovered</p>",
     );
-    fs::create_dir_all(repo.root.join("docs")).unwrap();
-    symlink(
-        repo.root.join("referents/root.md"),
-        repo.root.join("docs/root.md"),
-    )
-    .unwrap();
+    repo.symlink("docs/root.md");
 
     let discovered = repo.discover("docs/root.md");
 
@@ -763,12 +799,9 @@ fn test_symlinked_source_root_is_retained_without_parsing_referent_edges() {
     assert!(discovered.artifacts[0].edges().is_empty());
 }
 
-#[cfg(unix)]
 #[test]
 fn test_source_beneath_symlinked_directory_is_not_parsed_or_traversed() {
-    use std::os::unix::fs::symlink;
-
-    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
+    let mut repo = Tree::default();
     repo.write(
         "referents/bundle/root.md",
         "[referent-only child](secret.html)",
@@ -777,12 +810,7 @@ fn test_source_beneath_symlinked_directory_is_not_parsed_or_traversed() {
         "referents/bundle/secret.html",
         "<p>must not be discovered</p>",
     );
-    fs::create_dir_all(repo.root.join("docs")).unwrap();
-    symlink(
-        repo.root.join("referents/bundle"),
-        repo.root.join("docs/bundle"),
-    )
-    .unwrap();
+    repo.symlink("docs/bundle");
 
     let discovered = repo.discover("docs/bundle/root.md");
 
@@ -797,12 +825,9 @@ fn test_source_beneath_symlinked_directory_is_not_parsed_or_traversed() {
     assert!(discovered.artifacts[0].edges().is_empty());
 }
 
-#[cfg(unix)]
 #[test]
 fn test_symlinked_embedded_artifact_is_not_traversed_into_referent_closure() {
-    use std::os::unix::fs::symlink;
-
-    let repo = Repo::from(setup_test_repo_with_config("").unwrap());
+    let mut repo = Tree::default();
     repo.write("docs/root.html", r#"<link href="theme.css">"#);
     repo.write(
         "referents/theme.css",
@@ -810,11 +835,7 @@ fn test_symlinked_embedded_artifact_is_not_traversed_into_referent_closure() {
     );
     repo.write("referents/secret.css", "a { color: red }");
     repo.write("referents/secret.png", "must not be discovered");
-    symlink(
-        repo.root.join("referents/theme.css"),
-        repo.root.join("docs/theme.css"),
-    )
-    .unwrap();
+    repo.symlink("docs/theme.css");
 
     let discovered = repo.discover("docs/root.html");
 
