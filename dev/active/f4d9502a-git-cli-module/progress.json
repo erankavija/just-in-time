@@ -387,9 +387,9 @@
           "short_id": "d9ba0029",
           "title": "Archive planning reads pinned evidence through one git process",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "dispatched_2026-11-06"
+          "worker_status": "landed_f7879709a"
         },
         {
           "id": "dcf88b6f-b6d8-4e3d-b4c9-8cb718487b04",
@@ -579,7 +579,8 @@
     "47d62472": 1,
     "9ecde705": 1,
     "fb5e8e8d": 1,
-    "5046408a": 4
+    "5046408a": 4,
+    "933ff852": 1
   },
   "surfaced_pitfalls": [
     {
