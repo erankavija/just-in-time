@@ -530,9 +530,9 @@
   "escalations": [
     {
       "issue": "a273667c",
-      "status": "resolved_user_approved_2026-11-06",
+      "status": "resumed_floor_approved_merging_main",
       "subject": "Git>=2.42 andDocker runtimeTrixie proposal",
-      "evidence": "/tmp/f4d9502a-lead/git-floor-decision.md andgit-floor-decision.patch; stewardpresentingconcreteproposal; noanswerinferred"
+      "evidence": "/tmp/f4d9502a-lead/git-floor-decision.md andgit-floor-decision.patch; stewardpresentingconcreteproposal; noanswerinferred 2026-11-06: user approved floor/runtime (via steward 9b). Branch 43706d377 merged with main: json.rs read_path_bytes conflicts with 504 split-root (selection wrapper + code_checkout_top_level). Resolution dispatched (Sol/high); reviewed bytes change, so full cargo-ci + code-review rerun before landing. Issue criteria unchanged; six-file footprint (incl. Dockerfile/INSTALL.md floor) needs no scope edit. Excluded ancestors d0c98247f/7701663df verified absent."
     },
     {
       "issue": "c140921c",
@@ -864,6 +864,13 @@
       "model": "gpt-6-astra",
       "effort": "xhigh",
       "reason": "Steward option A rework: admission symlink capture and Io display, two files."
+    },
+    {
+      "issue": "a273667c",
+      "vendor": "openai",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Merge main into reviewed floor proposal; resolve read_path_bytes against 504 split-root."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
