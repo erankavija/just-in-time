@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-a273667c",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "debaf50b1138da46a13953388fc31cc10734507c",
+  "completed_at": "2026-11-06T02:30:11.778644651Z",
+  "duration_ms": 329066,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; the prior newline-path defect remains resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a273667c-6902-46f2-9580-b74e1e8abac3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "206ad632-ba1d-4a7d-a149-518d3ef0c937",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T02:24:42.711787361Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:a273667c commits f72d44c, a01cd144, 4945a637, a64bf9d, 9f96bc37, cb9b43c, debaf50b\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/a273667c/requirement/REQ-01, REQ-02, REQ-03; @/issue/f4d9502a/requirement/REQ-01, REQ-10 (issue sources); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-11-06T02:23:44Z; ancestry covers all implementation commits, while debaf50b is only the later gate-record commit\nTruncation recovery: narrowed tagged storage/test diffs, merge hunks, and current source reads; discarded sibling-worktree AGENTS output as outside this repository\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior newline-path defect remains resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
