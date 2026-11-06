@@ -26,7 +26,6 @@ pub(crate) mod gate_run_reader;
 pub mod gate_runs;
 pub mod gate_store;
 pub mod git;
-pub mod git_revision;
 pub mod guard_order;
 pub(crate) mod init_publish;
 #[cfg(test)]
@@ -65,9 +64,7 @@ pub use errors::{
     IssueNotFoundError, PresetNotFoundError, RepositoryFormatUnsupportedError,
     RepositoryNotFoundError,
 };
-pub use git_revision::{
-    GitRevisionError, GitRevisionResolver, PinnedArtifactRead, PinnedTargetRead,
-};
+pub use git::PinnedTargetRead;
 pub use json::{
     read_exact_store, ExactStoreSnapshot, JsonFileStorage, RetainedMutationSessionGuard,
     RetainedSessionSuspendedError,
