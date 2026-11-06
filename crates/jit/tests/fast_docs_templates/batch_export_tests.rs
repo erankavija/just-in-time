@@ -5,15 +5,16 @@
 //! The scenario is a bracketed epic `E` with a plan bracket (`P` planning, `B`
 //! breakdown), two child tasks `c1`/`c2`, and a task `ext` that belongs to a
 //! second epic `E2` but is also depended on by `c1` — so `c1 -> ext` crosses
-//! `E`'s containment boundary. Config/templates/rules are authored on disk so
+//! `E`'s containment boundary. Config/templates/rules are seeded into storage so
 //! the export reads real membership, bracket-type, and identity-namespace
 //! configuration.
 
+use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::commands::BatchIssueDef;
 use jit::declarations::GateMode;
 use jit::domain::identity::IssueId;
 use jit::domain::{Priority, State};
-use jit::storage::IssueStore;
+use jit::storage::{InMemoryStorage, IssueStore};
 use jit::test_harness::TestHarness;
 use jit::test_utils::add_reducing_edge;
 use jit::test_utils::toml_string_array;
@@ -67,23 +68,21 @@ assert = {{ label-coverage = {{ criteria-section = "success_criteria", marker = 
     )
 }
 
-/// Write the config/templates/rules files a batch export reads. Must be called
-/// before any executor operation, since config is cached on first access.
-fn configure(h: &TestHarness) {
-    let layout = h.storage.repository_layout();
+/// A harness whose repository is initialized over the config, templates and
+/// rules a batch export reads.
+fn configured_harness() -> TestHarness {
+    let storage = InMemoryStorage::new();
     let rules = rules_toml();
-    for (virtual_path, contents) in [
-        (jit::repository_state::VirtualPath::CONFIG, CONFIG_TOML),
-        (
-            jit::repository_state::VirtualPath::TEMPLATES,
-            TEMPLATES_TOML,
-        ),
-        (jit::repository_state::VirtualPath::RULES, rules.as_str()),
-    ] {
-        let path = layout.resolve(&virtual_path).unwrap();
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, contents).unwrap();
-    }
+    let executor = memory_executor_declaring(
+        storage.clone(),
+        MemoryDeclarations {
+            config: Some(CONFIG_TOML),
+            templates: Some(TEMPLATES_TOML),
+            rules: Some(&rules),
+            ..MemoryDeclarations::default()
+        },
+    );
+    TestHarness { executor, storage }
 }
 
 fn new_issue(
@@ -127,7 +126,6 @@ struct Scenario {
 
 /// Build the bracketed-epic scenario and return the full ids.
 fn build_scenario(h: &TestHarness) -> Scenario {
-    configure(h);
     h.add_gate(
         &"code-review".parse().unwrap(),
         "Code review",
@@ -204,7 +202,7 @@ fn def_for<'a>(defs: &'a [BatchIssueDef], id: &IssueId) -> &'a BatchIssueDef {
 fn test_batch_export_scope_projects_membership_and_lifts_type() {
     // REQ-01/REQ-02: --scope restricts to the container's containment closure;
     // each node carries key/title/type/priority/gates/depends_on.
-    let h = TestHarness::new();
+    let h = configured_harness();
     let s = build_scenario(&h);
 
     let export = h.executor.graph().export_graph_batch(Some(&s.e)).unwrap();
@@ -237,7 +235,7 @@ fn test_batch_export_scope_projects_membership_and_lifts_type() {
 fn test_batch_export_strips_identity_bound_labels_keeps_generic() {
     // REQ-04: type:* lifted to `type`; membership (epic:), satisfies:, and
     // brackets: stripped; generic labels (component:) survive.
-    let h = TestHarness::new();
+    let h = configured_harness();
     let s = build_scenario(&h);
 
     let export = h.executor.graph().export_graph_batch(Some(&s.e)).unwrap();
@@ -251,7 +249,7 @@ fn test_batch_export_strips_identity_bound_labels_keeps_generic() {
 fn test_batch_export_excludes_bracket_nodes_and_their_edges() {
     // REQ-05: planning/breakdown nodes never appear, and edges touching them
     // (c1 → B, E → B, B → P) are dropped, not reported as boundary crossings.
-    let h = TestHarness::new();
+    let h = configured_harness();
     let s = build_scenario(&h);
 
     let export = h.executor.graph().export_graph_batch(Some(&s.e)).unwrap();
@@ -275,7 +273,7 @@ fn test_batch_export_excludes_bracket_nodes_and_their_edges() {
 fn test_batch_export_reports_boundary_edges() {
     // REQ-06: c1 → ext crosses E's membership boundary; excluded from
     // depends_on and reported (count + node pair).
-    let h = TestHarness::new();
+    let h = configured_harness();
     let s = build_scenario(&h);
 
     let export = h.executor.graph().export_graph_batch(Some(&s.e)).unwrap();
@@ -295,7 +293,7 @@ fn test_batch_export_reports_boundary_edges() {
 fn test_batch_export_omits_lifecycle_and_includes_all_states() {
     // REQ-03: no lifecycle fields; every in-scope node exports regardless of
     // state (here c2 is rejected but still present).
-    let h = TestHarness::new();
+    let h = configured_harness();
     let s = build_scenario(&h);
 
     h.executor
@@ -335,7 +333,7 @@ fn test_scoped_graph_exports_carry_no_out_of_scope_edges() {
     // json/dot/mermaid output as a dangling edge to an unlisted node.
     use jit::commands::GraphExportFormat;
 
-    let h = TestHarness::new();
+    let h = configured_harness();
     let s = build_scenario(&h);
 
     for format in [
@@ -382,7 +380,7 @@ fn test_scoped_graph_exports_carry_no_out_of_scope_edges() {
 fn test_batch_export_whole_graph_without_scope() {
     // REQ-08: no --scope exports the whole graph in batch shape (still minus
     // bracket nodes). Every non-bracket issue, including E2 and ext, appears.
-    let h = TestHarness::new();
+    let h = configured_harness();
     let s = build_scenario(&h);
 
     let export = h.executor.graph().export_graph_batch(None).unwrap();
@@ -407,7 +405,7 @@ fn test_batch_export_roundtrips_into_fresh_repo() {
     // REQ-07: export E's subtree, feed it to batch-create in a fresh repo with
     // compatible config; the recreated subgraph is isomorphic (titles, types,
     // priorities, gates, in-scope edges) and passes repository validation.
-    let source = TestHarness::new();
+    let source = configured_harness();
     let s = build_scenario(&source);
     let export = source
         .executor
@@ -415,8 +413,7 @@ fn test_batch_export_roundtrips_into_fresh_repo() {
         .export_graph_batch(Some(&s.e))
         .unwrap();
 
-    let fresh = TestHarness::new();
-    configure(&fresh);
+    let fresh = configured_harness();
     fresh.add_gate(
         &"code-review".parse().unwrap(),
         "Code review",

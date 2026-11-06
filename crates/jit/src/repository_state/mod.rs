@@ -362,10 +362,11 @@ pub struct RepositoryDeclarations<'a> {
     pub rules: &'a RuleSet,
 }
 
-/// One owned parse of every captured declaration consumed by materialization or
-/// validation.
-pub(crate) struct CapturedRepositoryDeclarations {
+/// One owned parse of every captured declaration consumed by materialization,
+/// validation, or a read.
+pub struct CapturedRepositoryDeclarations {
     item_kinds: ResolvedItemKinds,
+    namespaces: crate::domain::LabelNamespaces,
     pub(crate) config: crate::config::JitConfig,
     pub(crate) gates: GateRegistry,
     pub(crate) rules: RuleSet,
@@ -380,6 +381,7 @@ impl CapturedRepositoryDeclarations {
     ) -> Self {
         Self {
             item_kinds: resolved_item_kinds(&config),
+            namespaces: crate::config_manager::namespaces_from_config(&config),
             config,
             gates,
             rules,
@@ -396,8 +398,28 @@ impl CapturedRepositoryDeclarations {
         }
     }
 
-    pub(crate) fn config(&self) -> &crate::config::JitConfig {
+    /// The assembled repository configuration.
+    pub fn config(&self) -> &crate::config::JitConfig {
         &self.config
+    }
+
+    /// The label namespace registry the configuration declares.
+    pub fn namespaces(&self) -> &crate::domain::LabelNamespaces {
+        &self.namespaces
+    }
+
+    /// The type hierarchy built from [`namespaces`](Self::namespaces).
+    ///
+    /// # Errors
+    ///
+    /// A malformed declared hierarchy.
+    pub fn hierarchy(
+        &self,
+    ) -> Result<
+        crate::domain::type_taxonomy::HierarchyConfig,
+        crate::domain::type_taxonomy::ConfigError,
+    > {
+        crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&self.namespaces)
     }
 
     pub(crate) fn item_kinds(&self) -> Result<&[crate::domain::item::ItemKind], ProducerError> {
@@ -406,11 +428,14 @@ impl CapturedRepositoryDeclarations {
             .map_err(|error| error.clone().into())
     }
 
-    pub(crate) fn rules(&self) -> &RuleSet {
+    /// The effective rule set: authored rules reconciled with the
+    /// registry-derived defaults.
+    pub fn rules(&self) -> &RuleSet {
         &self.rules
     }
 
-    pub(crate) fn gates(&self) -> &GateRegistry {
+    /// The authored gate registry.
+    pub fn gates(&self) -> &GateRegistry {
         &self.gates
     }
 

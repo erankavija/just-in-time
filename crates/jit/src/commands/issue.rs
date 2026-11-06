@@ -664,7 +664,10 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// Build the [`IssueShowResponse`] for one
     /// already-loaded issue: enriched dependencies, gate runs, and the
     /// documents every reader reports ([`DocumentOps::issue_documents`]).
-    pub fn show_response(&self, issue: Issue) -> Result<crate::commands::IssueShowResponse> {
+    pub fn show_response(&self, issue: Issue) -> Result<crate::commands::IssueShowResponse>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let enriched_deps = self.get_dependencies_enriched(&issue);
         let (gate_runs, _) = self
             .exec

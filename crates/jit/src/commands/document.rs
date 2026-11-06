@@ -360,16 +360,19 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     fn with_issue_documents(
         &self,
         issues: Vec<crate::domain::Issue>,
-    ) -> Result<Vec<(crate::domain::Issue, Vec<crate::domain::DocumentReference>)>> {
+    ) -> Result<Vec<(crate::domain::Issue, Vec<crate::domain::DocumentReference>)>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::domain::artifact_discovery::ArtifactListingScope;
 
-        let documentation = self
-            .exec
-            .config_manager
-            .load()?
+        let declarations = self.exec.captured_declarations()?;
+        let documentation = declarations
+            .config()
             .documentation
+            .clone()
             .unwrap_or_default();
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
+        let hierarchy = declarations.hierarchy()?;
         let files = match issues.as_slice() {
             [issue] => crate::domain::artifact_directory::owned_artifact_directories(
                 issue,
@@ -415,7 +418,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     pub fn with_reported_documents(
         &self,
         issues: Vec<crate::domain::Issue>,
-    ) -> Result<Vec<crate::domain::Issue>> {
+    ) -> Result<Vec<crate::domain::Issue>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         Ok(self
             .with_issue_documents(issues)?
             .into_iter()
@@ -428,7 +434,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     pub fn issue_documents(
         &self,
         issue: &crate::domain::Issue,
-    ) -> Result<Vec<crate::domain::DocumentReference>> {
+    ) -> Result<Vec<crate::domain::DocumentReference>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         Ok(self
             .with_reported_documents(vec![issue.clone()])?
             .into_iter()
@@ -448,7 +457,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         &self,
         issue: crate::domain::Issue,
         path: &str,
-    ) -> Result<crate::domain::DocumentReference, crate::storage::PathReadError> {
+    ) -> Result<crate::domain::DocumentReference, crate::storage::PathReadError>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::storage::PathReadError;
 
         let issue_id = issue.id.clone();
@@ -471,7 +483,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         &self,
         issue: crate::domain::Issue,
         path: &str,
-    ) -> Result<crate::domain::DocumentReference> {
+    ) -> Result<crate::domain::DocumentReference>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         Ok(self.find_issue_document(issue, path)?)
     }
 
@@ -480,7 +495,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     pub fn list_document_references(
         &self,
         issue_id: &IssueId,
-    ) -> Result<crate::commands::DocumentListResult> {
+    ) -> Result<crate::commands::DocumentListResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = issue_id.clone();
         let issue = self.exec.storage.load_issue(&full_id)?;
         let documents = self.issue_documents(&issue)?;
@@ -512,16 +530,19 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         &self,
         issue_id: &IssueId,
         area: &str,
-    ) -> Result<crate::commands::ArtifactDirectoryResponse> {
+    ) -> Result<crate::commands::ArtifactDirectoryResponse>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = issue_id.clone();
         let issue = self.exec.storage.load_issue(&full_id)?;
-        let documentation = self
-            .exec
-            .config_manager
-            .load()?
+        let declarations = self.exec.captured_declarations()?;
+        let documentation = declarations
+            .config()
             .documentation
+            .clone()
             .unwrap_or_default();
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
+        let hierarchy = declarations.hierarchy()?;
 
         let directory = crate::domain::artifact_directory::resolve_artifact_directory(
             &issue,
@@ -569,16 +590,19 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     /// a finding, and the usual configuration and storage read failures.
     pub fn report_artifact_conformance(
         &self,
-    ) -> Result<crate::commands::ArtifactConformanceResponse> {
+    ) -> Result<crate::commands::ArtifactConformanceResponse>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::domain::artifact_discovery::ArtifactListingScope;
 
-        let documentation = self
-            .exec
-            .config_manager
-            .load()?
+        let declarations = self.exec.captured_declarations()?;
+        let documentation = declarations
+            .config()
             .documentation
+            .clone()
             .unwrap_or_default();
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
+        let hierarchy = declarations.hierarchy()?;
         let issues = self.exec.storage.list_issues()?;
         let listings =
             self.list_issue_scoped_areas(&documentation, ArtifactListingScope::RecursiveEntries)?;
@@ -748,7 +772,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         issue_id: &IssueId,
         path: &str,
         at_commit: Option<&str>,
-    ) -> Result<DocumentContentResult> {
+    ) -> Result<DocumentContentResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = issue_id.clone();
         let issue = self.exec.storage.load_issue(&full_id)?;
         let doc = self.require_issue_document(issue, path)?;
@@ -768,7 +795,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         &self,
         issue_id: &IssueId,
         path: &str,
-    ) -> Result<crate::commands::DocumentHistory> {
+    ) -> Result<crate::commands::DocumentHistory>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = issue_id.clone();
         let issue = self.exec.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
@@ -796,7 +826,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         path: &str,
         from: &str,
         to: Option<&str>,
-    ) -> Result<DocumentDiffResult> {
+    ) -> Result<DocumentDiffResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = issue_id.clone();
         let issue = self.exec.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
@@ -854,7 +887,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         issue_id: &IssueId,
         path: &str,
         at_commit: Option<&str>,
-    ) -> Result<(String, String), crate::storage::PathReadError> {
+    ) -> Result<(String, String), crate::storage::PathReadError>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let issue = self.load_issue_typed(issue_id)?;
         let doc = self.find_issue_document(issue, path)?;
 
@@ -890,7 +926,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         issue_id: &IssueId,
         path: &str,
         at_commit: Option<&str>,
-    ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
+    ) -> Result<(Vec<u8>, String), crate::storage::PathReadError>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let issue = self.load_issue_typed(issue_id)?;
         let doc = self.find_issue_document(issue, path)?;
 
@@ -922,7 +961,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         &self,
         issue_id: &IssueId,
         path: &str,
-    ) -> Result<Vec<CommitInfo>, crate::storage::PathReadError> {
+    ) -> Result<Vec<CommitInfo>, crate::storage::PathReadError>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::storage::PathReadError;
 
         let issue = self.load_issue_typed(issue_id)?;
@@ -955,7 +997,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         path: &str,
         from: &str,
         to: Option<&str>,
-    ) -> Result<String, crate::storage::PathReadError> {
+    ) -> Result<String, crate::storage::PathReadError>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::storage::PathReadError;
 
         let issue = self.load_issue_typed(issue_id)?;
@@ -996,7 +1041,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     ///
     /// Note: Part of public API used by jit-server search functionality.
     #[allow(dead_code)]
-    pub fn get_issue_document_paths(&self) -> Result<Vec<String>> {
+    pub fn get_issue_document_paths(&self) -> Result<Vec<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         Ok(self
             .with_issue_documents(self.exec.storage.list_issues()?)?
             .into_iter()

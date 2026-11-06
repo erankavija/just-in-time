@@ -1016,14 +1016,16 @@ fn invoke_retryable_reads(json: bool) -> Vec<Output> {
             json,
         ),
         output_in_form(&cli, &["item", "list"], json),
+        output_in_form(&cli, &["label", "namespaces"], json),
         output_in_form(&cli, &["label", "values", "type"], json),
+        output_in_form(&cli, &["config", "show-hierarchy"], json),
         output_in_form(&cli, &["validate"], json),
     ]
 }
 
 row_bindings! {
     test_command_exit_codes_success_emits_0: ("*", 0, false) => invoke_success;
-    test_command_exit_codes_retryable_reads_emit_12: ("archive candidates, archive document, archive container, doc conformance, doc check-links, graph deps, graph rdeps, graph roots, graph tree, graph export, rdeps, invariant check, profile diff, profile apply, profile pack, profile add, query all, query available, query blocked, query strategic, query closed, query count, query divergence, query, status, issue list, issue search, issue batch-create, issue update, issue claim-next, snapshot export, item list, item search, label values, validate", 12, false) => invoke_retryable_reads;
+    test_command_exit_codes_retryable_reads_emit_12: ("archive candidates, archive document, archive container, config show-hierarchy, doc list, doc show, doc dir, doc conformance, doc history, doc diff, doc check-links, graph deps, graph rdeps, graph roots, graph tree, graph export, rdeps, invariant check, profile diff, profile apply, profile pack, profile add, query all, query available, query blocked, query strategic, query closed, query count, query divergence, query, status, issue show, issue list, issue search, issue batch-create, issue update, issue claim-next, snapshot export, item list, item search, item show, item resolve, label namespaces, label values, validate", 12, false) => invoke_retryable_reads;
     test_command_exit_codes_malformed_stored_record_emits_1: ("*", 1, false) => invoke_malformed_stored_record;
     test_command_exit_codes_invalid_argument_emits_2: ("*", 2, false) => invoke_invalid_argument;
     test_command_exit_codes_not_found_emits_3: ("*", 3, false) => invoke_not_found;

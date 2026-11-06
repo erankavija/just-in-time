@@ -149,6 +149,13 @@ commands read through the driver:
 - `jit issue batch-create --dry-run`
 - `jit profile apply --dry-run` and `jit profile diff`
 - `jit profile add --dry-run` and `jit profile pack --dry-run`
+- the declarations of `jit graph tree`, `jit graph export`, `jit query
+  strategic`, `jit query divergence`, `jit item list`, `jit item search`,
+  `jit item show`, `jit item resolve`, `jit issue show`, `jit doc list`,
+  `jit doc show`, `jit doc dir`, `jit doc conformance`, `jit doc history`,
+  `jit doc diff`, `jit label namespaces` and `jit config show-hierarchy`
+- the declarations of the server's `/graph`, `/config/hierarchy`,
+  `/config/namespaces`, issue and document routes
 
 Issue listings also admit one snapshot over every contributing data root before
 serving it. Other read-only commands may read individual files as they stand,

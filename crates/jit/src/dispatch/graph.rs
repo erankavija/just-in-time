@@ -69,7 +69,7 @@ fn roots<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<GraphRoots
     ))
 }
 
-fn tree<S: IssueStore>(
+fn tree<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     root: Option<String>,
 ) -> HandlerResult<GraphTreeResponse> {

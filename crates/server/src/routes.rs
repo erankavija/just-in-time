@@ -24,7 +24,7 @@ use jit::graph::hierarchy::NodeHierarchy;
 use jit::output::failure::classify;
 use jit::output::{ErrorCode, GateRunSummary};
 use jit::search::{SearchOptions, SearchResult};
-use jit::storage::IssueStore;
+use jit::storage::{IssueStore, RepositoryStateStore};
 
 use crate::sse;
 use crate::watcher::ChangeTracker;
@@ -84,7 +84,7 @@ async fn execute_blocking<S, T>(
     work: impl FnOnce(&CommandExecutor<S>) -> anyhow::Result<T> + Send + 'static,
 ) -> Result<T, StatusCode>
 where
-    S: IssueStore + Send + Sync + 'static,
+    S: IssueStore + RepositoryStateStore + Send + Sync + 'static,
     T: Send + 'static,
 {
     let executor = Arc::clone(&state.executor);
@@ -124,7 +124,7 @@ classified_extractor!(Query, Query);
 
 /// Shared application state
 #[derive(Clone)]
-pub struct AppState<S: IssueStore> {
+pub struct AppState<S: IssueStore + RepositoryStateStore> {
     pub executor: Arc<CommandExecutor<S>>,
     pub tracker: Arc<ChangeTracker>,
     pub capture_cache: Arc<ProjectionCache>,
@@ -146,7 +146,7 @@ struct Snapshot {
     graph: OnceCell<GraphData>,
 }
 
-async fn capture_snapshot<S: IssueStore + Send + Sync + 'static>(
+async fn capture_snapshot<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     state: &AppState<S>,
 ) -> Result<Arc<Snapshot>, StatusCode> {
     state
@@ -168,7 +168,9 @@ async fn capture_snapshot<S: IssueStore + Send + Sync + 'static>(
 }
 
 /// Create API routes
-pub fn create_routes<S: IssueStore + Send + Sync + 'static>(state: AppState<S>) -> Router {
+pub fn create_routes<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
+    state: AppState<S>,
+) -> Router {
     Router::new()
         .route("/health", get(health_check))
         .route("/issues", get(list_issues))
@@ -198,7 +200,9 @@ pub fn create_routes<S: IssueStore + Send + Sync + 'static>(state: AppState<S>) 
 }
 
 /// Health check endpoint
-async fn health_check<S: IssueStore>(State(state): State<AppState<S>>) -> impl IntoResponse {
+async fn health_check<S: IssueStore + RepositoryStateStore>(
+    State(state): State<AppState<S>>,
+) -> impl IntoResponse {
     Json(serde_json::json!({
         "status": "ok",
         "service": "jit-api",
@@ -264,7 +268,7 @@ impl Serialize for IssueBody {
 }
 
 /// List all issues, each `documents` explicit and derived from one shared listing of the declared areas.
-async fn list_issues<S: IssueStore + Send + Sync + 'static>(
+async fn list_issues<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<IssueResponse>>, StatusCode> {
     let snapshot = capture_snapshot(&state).await?;
@@ -280,7 +284,7 @@ async fn list_issues<S: IssueStore + Send + Sync + 'static>(
     .await
 }
 
-fn resolve_issue_path_id<S: IssueStore>(
+fn resolve_issue_path_id<S: IssueStore + RepositoryStateStore>(
     executor: &CommandExecutor<S>,
     requested: &str,
 ) -> anyhow::Result<IssueId> {
@@ -289,7 +293,7 @@ fn resolve_issue_path_id<S: IssueStore>(
 }
 
 /// Get single issue by ID, its `documents` explicit and derived.
-async fn get_issue<S: IssueStore + Send + Sync + 'static>(
+async fn get_issue<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path(id): Path<String>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<IssueResponse>, StatusCode> {
@@ -361,7 +365,7 @@ pub struct GraphEdge {
 /// (`jit::graph::hierarchy::resolve_hierarchy`) over the repository's configured
 /// type levels. Resolution is repository-wide, matching `jit graph tree` with no
 /// root.
-async fn get_graph<S: IssueStore + Send + Sync + 'static>(
+async fn get_graph<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<GraphData>, StatusCode> {
     let snapshot = capture_snapshot(&state).await?;
@@ -376,7 +380,7 @@ async fn get_graph<S: IssueStore + Send + Sync + 'static>(
 
                 // Resolve the hierarchy with the core resolver, over the repo's type levels.
                 let issue_refs: Vec<&Issue> = issues.iter().collect();
-                let config = executor.config().get_hierarchy_config()?;
+                let config = executor.config().captured_declarations()?.hierarchy()?;
                 let resolution = jit::graph::hierarchy::resolve_hierarchy(&issue_refs, &config);
 
                 // Create nodes
@@ -449,7 +453,7 @@ pub struct SearchResponse {
 }
 
 /// Search issues and documents
-async fn search_issues<S: IssueStore + Send + Sync + 'static>(
+async fn search_issues<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Query(params): Query<SearchQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<SearchResponse>, StatusCode> {
@@ -543,7 +547,7 @@ struct DocumentByPathQuery {
 ///
 /// Delegates I/O to `DocumentOps::read_path_bytes` so that filesystem/git
 /// reads remain in the domain layer, not in the route handler.
-async fn get_document_by_path<S: IssueStore + Send + Sync + 'static>(
+async fn get_document_by_path<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Query(query): Query<DocumentByPathQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentContentResponse>, StatusCode> {
@@ -735,7 +739,7 @@ struct DocumentContentResponse {
 }
 
 /// Get document content
-async fn get_document_content<S: IssueStore + Send + Sync + 'static>(
+async fn get_document_content<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
@@ -787,7 +791,7 @@ fn raw_document_response(path: &str, bytes: Vec<u8>) -> Response<Body> {
 /// delegates to `IssueStore::read_path_bytes`).  Binary artifacts are served faithfully
 /// without any UTF-8 conversion.  HTML responses for working-tree reads get a
 /// `<base href>` injected so sibling assets resolve via `/api/raw/*path`.
-async fn get_document_raw<S: IssueStore + Send + Sync + 'static>(
+async fn get_document_raw<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
@@ -819,7 +823,7 @@ async fn get_document_raw<S: IssueStore + Send + Sync + 'static>(
 /// invariant-owning for this concern.  Invalid paths and out-of-repo escapes
 /// surface as `PathReadError::InvalidPath` / `PathReadError::OutsideRepoRoot`,
 /// both classified as invalid arguments.
-async fn get_document_raw_by_path<S: IssueStore + Send + Sync + 'static>(
+async fn get_document_raw_by_path<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Query(query): Query<DocumentByPathQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
@@ -848,7 +852,7 @@ async fn get_document_raw_by_path<S: IssueStore + Send + Sync + 'static>(
 /// symlink escapes) is enforced by `JsonFileStorage::read_path_bytes`.  The
 /// resulting `PathReadError::InvalidPath` / `PathReadError::OutsideRepoRoot`
 /// variants classify as invalid arguments.
-async fn get_raw_wildcard<S: IssueStore + Send + Sync + 'static>(
+async fn get_raw_wildcard<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path(path): Path<String>,
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
@@ -883,7 +887,7 @@ struct CommitInfoResponse {
 }
 
 /// Get document history
-async fn get_document_history<S: IssueStore + Send + Sync + 'static>(
+async fn get_document_history<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path((id, path)): Path<(String, String)>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentHistoryResponse>, StatusCode> {
@@ -929,7 +933,7 @@ struct DocumentDiffResponse {
 }
 
 /// Get document diff
-async fn get_document_diff<S: IssueStore + Send + Sync + 'static>(
+async fn get_document_diff<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentDiffQuery>,
     State(state): State<AppState<S>>,
@@ -951,7 +955,7 @@ async fn get_document_diff<S: IssueStore + Send + Sync + 'static>(
 }
 
 /// List all gate definitions from the registry
-async fn list_gates<S: IssueStore + Send + Sync + 'static>(
+async fn list_gates<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<Vec<GateDefinition>>, StatusCode> {
     execute_blocking(&state, |executor| Ok(Json(executor.gates().list_gates()?))).await
@@ -964,7 +968,7 @@ struct GateRunsQuery {
 }
 
 /// List gate run results for an issue (summaries without stdout/stderr for passing runs).
-async fn list_gate_runs<S: IssueStore + Send + Sync + 'static>(
+async fn list_gate_runs<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path(id): Path<String>,
     Query(params): Query<GateRunsQuery>,
     State(state): State<AppState<S>>,
@@ -982,7 +986,7 @@ async fn list_gate_runs<S: IssueStore + Send + Sync + 'static>(
 }
 
 /// Get a single gate run result with full stdout/stderr
-async fn get_gate_run<S: IssueStore + Send + Sync + 'static>(
+async fn get_gate_run<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path((id, run_id)): Path<(String, String)>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<GateRunSummary>, StatusCode> {
@@ -1004,13 +1008,13 @@ struct HierarchyResponse {
 }
 
 /// Get type hierarchy configuration
-async fn get_hierarchy<S: IssueStore + Send + Sync + 'static>(
+async fn get_hierarchy<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<HierarchyResponse>, StatusCode> {
     let (namespaces, icons) = execute_blocking(&state, |executor| {
-        let namespaces = executor.config().get_namespaces()?;
-        let icons = executor.config().get_hierarchy_icons()?;
-        Ok((namespaces, icons))
+        let declarations = executor.config().captured_declarations()?;
+        let icons = jit::type_icons::hierarchy_icons(declarations.config());
+        Ok((declarations.namespaces().clone(), icons))
     })
     .await?;
 
@@ -1037,11 +1041,17 @@ struct NamespaceInfo {
 }
 
 /// Get namespace registry from configuration
-async fn get_namespaces<S: IssueStore + Send + Sync + 'static>(
+async fn get_namespaces<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     State(state): State<AppState<S>>,
 ) -> Result<Json<NamespacesResponse>, StatusCode> {
-    let label_namespaces =
-        execute_blocking(&state, |executor| executor.config().get_namespaces()).await?;
+    let label_namespaces = execute_blocking(&state, |executor| {
+        Ok(executor
+            .config()
+            .captured_declarations()?
+            .namespaces()
+            .clone())
+    })
+    .await?;
 
     let namespaces = label_namespaces
         .namespaces
@@ -1061,7 +1071,9 @@ async fn get_namespaces<S: IssueStore + Send + Sync + 'static>(
 }
 
 /// SSE stream of change events
-async fn events_stream<S: IssueStore>(State(state): State<AppState<S>>) -> impl IntoResponse {
+async fn events_stream<S: IssueStore + RepositoryStateStore>(
+    State(state): State<AppState<S>>,
+) -> impl IntoResponse {
     sse::change_stream(&state.tracker, state.shutdown.clone())
 }
 
@@ -1087,7 +1099,9 @@ mod tests {
         )
     }
 
-    fn test_app<S: IssueStore + Send + Sync + 'static>(executor: CommandExecutor<S>) -> TestServer {
+    fn test_app<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
+        executor: CommandExecutor<S>,
+    ) -> TestServer {
         let state = AppState {
             executor: Arc::new(executor),
             tracker: Arc::new(ChangeTracker::new(16)),

@@ -97,8 +97,7 @@ impl VersionConfig {
 /// The sole home for the project's canonical, human-editable name — not
 /// `index.json`, which carries only machine metadata
 /// (`schema_version`/`deleted_ids`) and is not meant to be hand-edited.
-/// Resolve a present value with
-/// [`ConfigManager::get_project_name`](crate::config_manager::ConfigManager::get_project_name).
+/// Resolve a present value with [`JitConfig::project_name`].
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectConfig {
@@ -1203,6 +1202,15 @@ impl JitConfig {
     /// config decides them.
     pub fn coordination(&self) -> EffectiveCoordination {
         resolve_coordination(self.coordination.as_ref())
+    }
+
+    /// The declared `[project] name`, or `None` when the table or key is absent.
+    pub fn project_name(&self) -> Option<&str> {
+        self.project
+            .as_ref()?
+            .name
+            .as_ref()
+            .map(ProjectName::as_str)
     }
 
     /// The repo-level content format, resolved by [`ValidationConfig::content_format`].

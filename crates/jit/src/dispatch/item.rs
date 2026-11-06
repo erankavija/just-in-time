@@ -1,11 +1,10 @@
 //! `jit item` handlers.
 
-use super::{count_message, CommandContext, HandlerResult, Outcome};
+use super::{count_message, CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::ItemCommands;
 use crate::commands::{ItemListResult, ItemShowResult};
-use crate::storage::IssueStore;
 
-fn list<S: IssueStore>(
+fn list<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     kind: Option<String>,
 ) -> HandlerResult<ItemListResult> {
@@ -14,7 +13,7 @@ fn list<S: IssueStore>(
     Ok(Outcome::success_with(response, message))
 }
 
-fn search<S: IssueStore>(
+fn search<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     query: String,
     kind: Option<String>,
@@ -24,7 +23,7 @@ fn search<S: IssueStore>(
     Ok(Outcome::success_with(response, message))
 }
 
-fn show<S: IssueStore>(
+fn show<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     qualified_id: String,
 ) -> HandlerResult<ItemShowResult> {
@@ -33,12 +32,12 @@ fn show<S: IssueStore>(
 
 command_group! {
     command: ItemCommands,
-    storage: [IssueStore],
+    storage: [HandlerStore],
     leaves: {
         "item_list" => ItemCommands::List { kind } => list(kind) raises [RetryableConflict] -> ItemListResult,
         "item_search" => ItemCommands::Search { query, kind } => search(query, kind) raises [RetryableConflict] -> ItemListResult,
-        "item_show" => ItemCommands::Show { qualified_id } => show(qualified_id) -> ItemShowResult,
-        "item_resolve" => ItemCommands::Resolve { qualified_id } => show(qualified_id) -> ItemShowResult,
+        "item_show" => ItemCommands::Show { qualified_id } => show(qualified_id) raises [RetryableConflict] -> ItemShowResult,
+        "item_resolve" => ItemCommands::Resolve { qualified_id } => show(qualified_id) raises [RetryableConflict] -> ItemShowResult,
     }
 }
 

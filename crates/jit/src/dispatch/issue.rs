@@ -24,7 +24,7 @@ use crate::query_engine::QueryFilter;
 use crate::storage::IssueStore;
 use anyhow::Context as _;
 
-fn show_response<S: IssueStore>(
+fn show_response<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     requested: &str,
 ) -> anyhow::Result<IssueShowResponse> {
@@ -36,7 +36,7 @@ fn show_response<S: IssueStore>(
     issues.show_response(issue)
 }
 
-fn show<S: IssueStore>(
+fn show<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     ids: Vec<String>,
     summary: bool,
@@ -593,7 +593,7 @@ command_group! {
     command: IssueCommands,
     storage: [HandlerStore],
     leaves: {
-        "issue_show" => IssueCommands::Show { ids, summary, field, fields } => show(ids, summary, field, fields) -> IssueShowOutput
+        "issue_show" => IssueCommands::Show { ids, summary, field, fields } => show(ids, summary, field, fields) raises [RetryableConflict] -> IssueShowOutput
             as union [IssueShowResponse, IssueShowSummaryResponse, IssueShowListResponse, ItemShowResult, FieldProjection]
             "Single id: a bare IssueShowResponse (IssueShowSummaryResponse with --summary; the addressed item for an <issue>/<self-id> argument; the projected value with --field/--fields). Multiple ids: the {count, issues} envelope of full IssueShowResponse objects in argument order.",
         "issue_list" => IssueCommands::List { filters, full } => list(filters, full) raises [RetryableConflict] -> IssueListing
