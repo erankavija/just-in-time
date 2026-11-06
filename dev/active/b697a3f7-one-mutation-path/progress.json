@@ -14,7 +14,8 @@
           "title": "Type labels have one exact extraction",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "pending"
+          "status": "done",
+          "landed": "ee9e410db"
         },
         {
           "id": "f6477007-09ab-4d53-8fec-ca4741c3cf78",
@@ -22,7 +23,7 @@
           "title": "Process liveness and signalling go through one PID guard",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "pending"
+          "status": "rework-1"
         },
         {
           "id": "9a2563fd-61ed-45c2-9cfa-b5f006c47afa",
@@ -30,7 +31,7 @@
           "title": "Gate registry edits keep the authored file",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "pending"
+          "status": "rework-1"
         },
         {
           "id": "4334df62-95ca-4d3a-9a56-842b2174a5b5",
@@ -38,7 +39,7 @@
           "title": "The no-follow leaf open exists once and serves storage, profile and exact-store reads",
           "classification": "implementation",
           "worker": "codex gpt-6.1-sol high",
-          "status": "pending"
+          "status": "rework-1"
         },
         {
           "id": "c2b3cefa-d690-4c6c-94dd-feaa3156acea",
@@ -46,7 +47,9 @@
           "title": "Dedicated, gate and template writes check their leases in their publishing session",
           "classification": "implementation",
           "worker": "claude opus (lock order and lease contract)",
-          "status": "pending"
+          "status": "re-landing rework 7b1b087e0",
+          "commit": "df59347fb",
+          "landed": "6672a5e01"
         }
       ]
     },
@@ -123,8 +126,44 @@
   ],
   "later_chain_note": "After wave 2: fe9147fa, 1b7f58ae -> 693a2fdd, a991f42b -> d3c94dc5, 700a96dd -> 850eaad3 -> 93e3f1ad. Blocked externally by f4d9502a (parked): 7cd27db8 -> 30334066 -> 030df4b1, 9623fe6a; d9ba0029 -> 65aafaba -> c0775a83 -> 4e2bed35 -> e73ad8bc, 42046050, 45d0a971; e6ec58f3 -> b2c28ec1.",
   "created_during_execution": [],
-  "escalations": [],
-  "rework_counts": {},
-  "surfaced_pitfalls": [],
-  "started_at": "2026-11-06T01:20:00+02:00"
+  "escalations": [
+    {
+      "to": "steward just-in-time-9b",
+      "category": "blocker outside scope (f4d9502a chain)",
+      "decision": "option 1: accept the wait; re-escalate when the last dispatchable wave is in flight, with remaining reachable count, blocked IDs, and any proposal to decouple a blocked issue; do not reshape the graph unilaterally",
+      "status": "resolved"
+    }
+  ],
+  "rework_counts": {
+    "f6477007": 1,
+    "4334df62": 1,
+    "9a2563fd": 1,
+    "c2b3cefa": 1
+  },
+  "surfaced_pitfalls": [
+    {
+      "found_in": "c2b3cefa review",
+      "subject": "pre-session lease checks with no owning issue",
+      "detail": "After c2b3cefa and planned d3c94dc5, the read form refuse_foreign_lease is still called before the publishing session by dispatch/gate.rs evaluate_many (batch pre-check), commands/document.rs:228 and :546 (document writes) and commands/validate.rs:234. Epic REQ-04 says no pre-session lease check remains, so this is a criterion gap to close with a remediation task inside the epic before the epic gate, not a follow-up. Also dispatch/gate.rs preset_apply discards the read-form result (c2b3cefa rework report); evaluate_many and preset_apply both drop warn-mode findings from that pre-check.",
+      "status": "open"
+    }
+  ],
+  "started_at": "2026-11-06T01:20:00+02:00",
+  "coordination": [
+    {
+      "with": "f4d9502a lead (just-in-time-13)",
+      "item": "cfc87a55",
+      "decision": "order (a): 5046408a lands first, cfc87a55 rebases onto it; no near-term date"
+    },
+    {
+      "with": "f4d9502a lead (just-in-time-13)",
+      "item": "4334df62",
+      "decision": "notify that lead before landing so it can check storage/json.rs against the frozen 5046408a patch"
+    },
+    {
+      "with": "f4d9502a lead (just-in-time-13)",
+      "item": "external chain",
+      "decision": "c140921c after a273667c and 5046408a; then d9ba0029, 7cd27db8, e6ec58f3; that lead notifies on each landing"
+    }
+  ]
 }

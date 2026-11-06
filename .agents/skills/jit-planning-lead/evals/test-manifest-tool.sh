@@ -46,7 +46,7 @@ assert_rejects "already implies" "$tool" validate "$fixtures/manifest-redundant-
 # A cyclic graph reports the cycle alone; reachability would otherwise imply nearly every edge.
 assert_rejects "contains a cycle" "$tool" validate "$fixtures/manifest-cyclic.json" --config "$config" --known-source REQ-01
 ! "$tool" validate "$fixtures/manifest-oversized.json" --config "$config" --known-source REQ-03 --deny-warnings
-! "$tool" validate "$fixtures/manifest-independent-verbs.json" --config "$config" --known-source REQ-04 --deny-warnings
+assert_rejects "independent-verbs" "$tool" validate "$fixtures/manifest-independent-verbs.json" --config "$config" --known-source REQ-04 --deny-warnings
 "$tool" validate "$fixtures/manifest-indivisible-evidence.json" --config "$config" --known-source REQ-05 --deny-warnings --json > "$tmp_result"
 python3 -c 'import json,sys; result=json.load(open(sys.argv[1])); assert result["valid"] and result["overridden_warnings"]' "$tmp_result"
 
@@ -67,6 +67,11 @@ assert_rejects "cannot produce plan-fixed contract" "$tool" validate "$fixtures/
 assert_rejects "non-empty footprint" "$tool" validate "$fixtures/manifest-missing-footprint.json" --config "$config" --known-source REQ-12
 # Sizing cuts both ways: an in-module chain link and an over-budget manifest both fail.
 assert_rejects "chain-link" "$tool" validate "$fixtures/manifest-chain-link.json" --config "$config" --known-source REQ-13 --deny-warnings
+# Adding a form, moving its callers, and deleting the old form is one change, not independent verbs.
+"$tool" validate "$fixtures/manifest-form-lifecycle.json" --config "$config" --known-source REQ-14 --deny-warnings
+python3 -c 'import json,sys; base=json.load(open(sys.argv[1]))[0]; json.dump([dict(base, key=f"chunk-{chr(97 + i // 26)}{chr(97 + i % 26)}") for i in range(51)], open(sys.argv[2], "w"))' "$fixtures/manifest-form-lifecycle.json" "$tmp_result"
+assert_rejects "over the budget of 50" "$tool" validate "$tmp_result" --config "$config" --known-source REQ-14
+"$tool" validate "$tmp_result" --config "$config" --known-source REQ-14 --max-issues 51 > /dev/null
 assert_rejects "over the budget of 0" "$tool" validate "$fixtures/manifest-valid.json" --config "$config" --known-source REQ-01 --plan "$fixtures/plan-stale.md" --max-issues 0
 ! "$tool" render "$fixtures/manifest-valid.json" "$tmp_plan" --check
 "$tool" render "$fixtures/manifest-valid.json" "$tmp_plan" --write

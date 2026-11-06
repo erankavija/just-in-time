@@ -417,6 +417,47 @@ impl LeaseNotFoundError {
     }
 }
 
+/// An active lease another agent holds on an issue a write targets.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{issue_id} is leased by {holder}")]
+pub struct ForeignLease {
+    pub issue_id: IssueId,
+    pub holder: crate::domain::Assignee,
+}
+
+/// A `strict`-mode refusal of a write to issues other agents lease.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub struct ForeignLeaseError {
+    leases: Vec<ForeignLease>,
+}
+
+impl ForeignLeaseError {
+    pub fn new(leases: Vec<ForeignLease>) -> Self {
+        Self { leases }
+    }
+
+    /// Each refused issue with its holder.
+    pub fn leases(&self) -> &[ForeignLease] {
+        &self.leases
+    }
+}
+
+impl fmt::Display for ForeignLeaseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let named = self
+            .leases
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(
+            f,
+            "Refusing to write: {named}.\nCoordinate with the holder, or wait for the lease to end. \
+             If the lease is yours, set your identity with JIT_AGENT_ID."
+        )
+    }
+}
+
 /// The missing Git precondition, determining the appropriate remediation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GitRequirementGap {

@@ -489,6 +489,11 @@ mod tests {
         assert_eq!(type_value_of("type:@/kind/self-id"), Some("@/kind/self-id"));
     }
 
+    #[test]
+    fn test_type_value_of_preserves_exact_value() {
+        assert_eq!(type_value_of("type:Epic"), Some("Epic"));
+    }
+
     // Tests for TYPE_NAMESPACE and type_label_value
     #[test]
     fn test_type_label_value_type_present() {

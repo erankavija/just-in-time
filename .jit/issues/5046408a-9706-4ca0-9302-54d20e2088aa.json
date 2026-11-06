@@ -100,6 +100,27 @@
       "format": "markdown",
       "label": "Diagnostics design review R2",
       "path": "dev/active/5046408a/diagnostics-design-review-r2.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/5046408a/boundary-proposal.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/5046408a/boundary-design-review-r1.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/5046408a/boundary-design-review-r2.md"
     }
   ],
   "first_ready_at": "2026-10-24T18:36:32.241578953Z",
@@ -120,5 +141,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Configurable worktree root independent of the data root",
-  "updated_at": "2026-11-05T07:40:41.051048311Z"
+  "updated_at": "2026-11-05T23:39:19.937600931Z"
 }

@@ -3395,6 +3395,34 @@ jit apply <TEMPLATE> <CONTAINER> [--anchor <ROLE=ID>] [--force]
 
 The container's `type:` label must be one of the template's `applies_to` types.
 
+Applying a template requires the repository declarations it names: each node
+`type` in `[type_hierarchy].types`, each namespace of a label a node writes in
+`[namespaces]`, each node or anchor gate as a gate preset or in the gate
+registry, and each node `doc_area` in `[documentation] issue_scoped_areas`. An
+empty type hierarchy or namespace registry requires nothing. Apply checks every
+requirement before it creates anything, and one failure (`VALIDATION_FAILED`)
+names all the unmet ones. `--json` puts them in `details`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "details": {
+      "template": "plan",
+      "unmet": [
+        { "kind": "type", "name": "planning" },
+        { "kind": "label-namespace", "name": "brackets" },
+        { "kind": "gate", "name": "plan-review" },
+        { "kind": "documentation-area", "name": "dev/active" }
+      ]
+    }
+  }
+}
+```
+
+`jit validate` reports a template node type the declared hierarchy lacks
+before the template is applied.
+
 ```bash
 jit apply plan epic-123
 jit apply plan epic-123 --json
@@ -3412,6 +3440,22 @@ JSON returns the role-to-id map plus the created issues:
   "anchor_dependency_snapshots": {},
   "created_issues": { "planning": { "id": "<uuid>", "title": "..." } },
   "message": "Applied template 'plan' to epic-123"
+}
+```
+
+When a transform moves dependencies the container already had, the result
+carries an advisory `upstream_move` report naming the container and, for each
+moved edge, the dependency, the receiving role, and its node; text output lists
+each moved dependency as now blocking that node. The moves are applied either
+way, so audit them: on a populated container they include its existing children.
+An empty container produces no report and no `upstream_move` key:
+
+```json
+{
+  "upstream_move": {
+    "container": "epic-123",
+    "moves": [{ "dependency": "<uuid>", "role": "planning", "node": "<uuid>" }]
+  }
 }
 ```
 

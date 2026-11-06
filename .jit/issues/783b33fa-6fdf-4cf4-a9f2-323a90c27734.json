@@ -14,12 +14,26 @@
       "path": "dev/active/783b33fa/plan.md"
     }
   ],
+  "done_at": "2026-11-06T00:03:35.896614835Z",
   "first_ready_at": "2026-11-05T07:40:20.352306336Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2caf3bd3-cf69-40f9-b87e-8b44ce29e56f",
+      "status": "passed",
+      "updated_at": "2026-11-06T00:03:27.388943862Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cb1c768f-c99b-41ff-9eec-ca29adf04549",
+      "status": "passed",
+      "updated_at": "2026-11-05T23:58:41.474211447Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "783b33fa-6fdf-4cf4-a9f2-323a90c27734",
   "labels": [
     "epic:git-cli-module",
@@ -28,7 +42,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Allow an explicit acting identity for issue release",
-  "updated_at": "2026-11-05T07:42:15.562898809Z"
+  "updated_at": "2026-11-06T00:03:35.896614835Z"
 }

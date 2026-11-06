@@ -8,6 +8,7 @@ use crate::commands::{
     ArtifactConformanceResponse, ArtifactDirectoryResponse, ContainerProgressResponse,
     DivergenceResponse, DivergenceView, GateStatusEntry, GraphDepsTreeResponse, GraphRootsResponse,
     GraphTreeResponse, IssueChildrenResponse, IssueShowResponse, IssueStatusResponse, StateRollup,
+    UpstreamMoveReport,
 };
 use crate::domain::identity::GateKey;
 use crate::domain::Assignee;
@@ -1409,6 +1410,10 @@ pub struct TemplateApplyResponse {
     pub created_node_ids_by_role: std::collections::BTreeMap<String, IssueId>,
     pub anchor_dependency_snapshots: std::collections::BTreeMap<String, Vec<IssueId>>,
     pub created_issues: std::collections::BTreeMap<String, Issue>,
+    /// Container dependencies a transform moved onto a created node; absent
+    /// when nothing moved.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub upstream_move: Option<UpstreamMoveReport>,
 }
 
 impl TemplateApplyResponse {

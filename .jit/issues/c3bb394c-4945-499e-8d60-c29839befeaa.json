@@ -1,0 +1,46 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-05T23:38:10.153768672Z",
+  "dependencies": [
+    "3204f6a5-322a-42a9-b782-b8caf040935f"
+  ],
+  "description": "After the plan-review checkpoint passes, decompose the plan for Take engine vocabulary and test switches only from declarations and caller inputs (f368ce3d) into well-ordered implementation issues.",
+  "documents": [],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_at": "2026-11-05T23:38:10.153768672Z",
+      "updated_by": null
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_at": "2026-11-05T23:38:10.153768672Z",
+      "updated_by": null
+    }
+  },
+  "id": "c3bb394c-4945-499e-8d60-c29839befeaa",
+  "labels": [
+    "epic:domain-agnostic-engine",
+    "milestone:v1.0",
+    "component:core",
+    "component:cli",
+    "component:gates",
+    "component:validation",
+    "component:web",
+    "component:tooling",
+    "per:@/charter/D-18",
+    "per:@/charter/D-21",
+    "per:@/charter/D-4",
+    "type:breakdown",
+    "brackets:f368ce3d"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "breakdown: Take engine vocabulary and test switches only from declarations and caller inputs",
+  "updated_at": "2026-11-05T23:38:10.153768672Z"
+}
