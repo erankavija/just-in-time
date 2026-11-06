@@ -3415,6 +3415,22 @@ JSON returns the role-to-id map plus the created issues:
 }
 ```
 
+When a transform moves dependencies the container already had, the result
+carries an advisory `upstream_move` report naming the container and, for each
+moved edge, the dependency, the receiving role, and its node; text output lists
+each moved dependency as now blocking that node. The moves are applied either
+way, so audit them: on a populated container they include its existing children.
+An empty container produces no report and no `upstream_move` key:
+
+```json
+{
+  "upstream_move": {
+    "container": "epic-123",
+    "moves": [{ "dependency": "<uuid>", "role": "planning", "node": "<uuid>" }]
+  }
+}
+```
+
 Under `--quiet` the command prints one created id per line. Templates and their
 node types are repository configuration: the `plan` template used in the examples
 above is this repository's own declaration, not a shipped default.

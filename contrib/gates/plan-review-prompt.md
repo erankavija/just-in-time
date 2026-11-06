@@ -47,7 +47,7 @@ contract must have exactly one producer transitively reachable by each consumer.
 Inspect all footprint creates/touches, uncertainties, and overlap advisories;
 greenfield work must disclose created paths.
 
-Verify prior findings were resolved by replacement and consolidation. When
+Verify prior findings were resolved by replacing or merging tasks. When
 `run_history` shows prior review rounds, fail only for regressions, unresolved
 prior blocking findings, or new blocking findings under the policy below; a
 minor issue of a kind that existed unchanged in a previously reviewed revision
@@ -63,8 +63,9 @@ Every finding must include `disposition` (`blocking` or `advisory`) and
 `origin` (`issue-impact` or `pre-existing`). A finding is blocking only if
 instantiating the manifest as written would violate a container criterion or a
 cited invariant, break the dependency graph or a green intermediate state,
-lose or weaken semantic coverage, or leave a leaf one worker cannot complete
-in one focused cycle. Wording and rationale-text mismatches,
+lose or weaken semantic coverage, leave a leaf one worker cannot complete
+in one focused cycle, or over-split work into chain-link leaves, bridge
+producer and remover pairs, or a manifest over the issue budget. Wording and rationale-text mismatches,
 redundant-but-harmless edges, citation typos, and improvable phrasing are
 advisory. A defect in material the plan merely cites, introduced outside this
 bracket, is `pre-existing` and cannot fail this review. The verdict is `FAIL`
@@ -73,7 +74,9 @@ passing verdict may therefore contain advisory findings; passing with
 advisories is a successful review, not a lenient one. Do not perform an
 exhaustive presentation audit.
 
-Report findings with artifact/code citations and exact corrections. End with
+Report the manifest issue count and its change from the prior round, then
+findings with artifact/code citations and exact corrections that replace or
+merge tasks. End with
 exactly one line and no following text:
 
 `VERDICT: PASS`

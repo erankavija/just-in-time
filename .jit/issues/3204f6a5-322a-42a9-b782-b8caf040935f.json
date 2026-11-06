@@ -1,0 +1,80 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-05T23:38:10.153768672Z",
+  "dependencies": [
+    "2195c98f-95a9-45d0-8582-d93c1d1fec45"
+  ],
+  "description": "Plan Take engine vocabulary and test switches only from declarations and caller inputs (f368ce3d) against every hard success criterion, write the concise design at dev/active/f368ce3d-domain-agnostic-engine/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.",
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "9cf090e44c5b46d875de8af0f9b2bd7759e50fe3405a5a21f3bab4adf6ebcf59",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f368ce3d-domain-agnostic-engine/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "7d02b96fb862701262ec306960efac9996fc53360bb75731755c8f03b2db7bca",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f368ce3d-domain-agnostic-engine/investigation.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "plan",
+      "path": "dev/active/f368ce3d-domain-agnostic-engine/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "breakdown",
+      "format": "markdown",
+      "label": "breakdown",
+      "path": "dev/active/f368ce3d-domain-agnostic-engine/breakdown.json"
+    },
+    {
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": "investigation",
+      "path": "dev/active/f368ce3d-domain-agnostic-engine/investigation.md"
+    }
+  ],
+  "first_ready_at": "2026-11-05T23:38:10.153768672Z",
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_at": "2026-11-05T23:38:10.153768672Z",
+      "updated_by": null
+    }
+  },
+  "id": "3204f6a5-322a-42a9-b782-b8caf040935f",
+  "labels": [
+    "epic:domain-agnostic-engine",
+    "milestone:v1.0",
+    "component:core",
+    "component:cli",
+    "component:gates",
+    "component:validation",
+    "component:web",
+    "component:tooling",
+    "per:@/charter/D-18",
+    "per:@/charter/D-21",
+    "per:@/charter/D-4",
+    "type:planning"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "planning: Take engine vocabulary and test switches only from declarations and caller inputs",
+  "updated_at": "2026-11-05T23:59:53.967062859Z"
+}

@@ -191,12 +191,14 @@ def sizing_warnings(entry, is_chain_link=False):
     if re.search(r"\b(all|every|entire|repo-wide|across the (?:repo|codebase|project))\b", text):
         warnings.append(("broad-quantifier", "uses a broad quantifier"))
     verb = r"(?:add|build|create|define|delete|deploy|document|implement|migrate|publish|release|remove|render|update|validate|wire)"
+    # Only separate clauses are independent: a serial list (add, move callers, and
+    # delete) states one coherent change, and mixing deliverable classes is no warning.
     independent_verbs = any(
-        re.search(rf"\b{verb}\w*\b.*(?:[;,.]|\band\b).*\b{verb}\w*\b", field)
+        re.search(rf"\b{verb}\w*\b.*(?:;|\.\s).*\b{verb}\w*\b", field)
         for field in (title, outcome)
     )
     if independent_verbs:
-        warnings.append(("independent-verbs", "states multiple independent verbs"))
+        warnings.append(("independent-verbs", "states independent clauses with separate verbs"))
     if re.search(r"[,/]|\band\b", terminal["consumer_family"].lower()):
         warnings.append(("multiple-consumer-families", "names more than one consumer family"))
     if re.search(r"[,/]|\band\b", terminal["test_boundary"].lower()):

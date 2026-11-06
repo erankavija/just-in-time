@@ -78,7 +78,7 @@ impl TemplateRequest<'_> {
 /// lets the transform move exactly
 /// the container's ORIGINAL upstream deps (and never the freshly-wired scaffold
 /// edges). It is also surfaced for callers/tests that inspect the pre-apply
-/// shape.
+/// shape, alongside the advisory [`UpstreamMoveReport`] of what moved.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct TemplateApplyResult {
     /// The applied template's name (e.g. `"plan"`).
@@ -95,6 +95,67 @@ pub struct TemplateApplyResult {
     /// mutation. Consumed by the `move-upstream-to-role` transform and surfaced
     /// for callers inspecting the pre-apply shape.
     pub anchor_dependency_snapshots: BTreeMap<String, Vec<IssueId>>,
+    /// Advisory report of the container dependencies a transform moved onto a
+    /// created node; `None` when nothing moved (an empty container, or a
+    /// `--force` refresh, which replays no transform).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub upstream_move: Option<UpstreamMoveReport>,
+}
+
+/// The dependencies a fresh application moved off a populated container.
+///
+/// Containment and prerequisite edges are structurally identical, so the
+/// transform moves both; the report lets the caller audit which moved edges now
+/// block the receiving node. It describes the applied graph and changes nothing.
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema, PartialEq, Eq)]
+pub struct UpstreamMoveReport {
+    /// The container the dependencies moved off.
+    pub container: IssueId,
+    /// Each moved edge, in transform order.
+    pub moves: Vec<UpstreamMove>,
+}
+
+/// One container dependency that now blocks the created node of `role`.
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema, PartialEq, Eq)]
+pub struct UpstreamMove {
+    /// The moved dependency.
+    pub dependency: IssueId,
+    /// The template role of the receiving node.
+    pub role: String,
+    /// The receiving node.
+    pub node: IssueId,
+}
+
+impl UpstreamMoveReport {
+    /// The report for `delta`'s moves, with each role resolved through
+    /// `created`; `None` when the delta moves nothing.
+    fn from_delta(
+        container: &IssueId,
+        delta: &TemplateDelta,
+        created: &BTreeMap<String, IssueId>,
+    ) -> Result<Option<Self>> {
+        let moves = delta
+            .upstream_moves
+            .iter()
+            .map(|planned| {
+                let node = created.get(&planned.role).ok_or_else(|| {
+                    anyhow!(
+                        "internal error: moved dependency targets uncreated role '{}'",
+                        planned.role
+                    )
+                })?;
+                Ok(UpstreamMove {
+                    dependency: planned.dependency.clone(),
+                    role: planned.role.clone(),
+                    node: node.clone(),
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok((!moves.is_empty()).then(|| Self {
+            container: container.clone(),
+            moves,
+        }))
+    }
 }
 
 impl TemplateApplyResult {
@@ -203,38 +264,7 @@ impl<S: IssueStore> TemplateOps<'_, S> {
         let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("template apply", || {
-            let (lease_targets, lease_mode) = {
-                let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
-                let Some(image) =
-                    capture_template_image(&mut *session, &context, &request, container_id)?
-                else {
-                    return Ok(AttemptOutcome::Retry);
-                };
-                let captured = derive_captured_template_apply(
-                    &image,
-                    &request,
-                    container_id,
-                    anchor_bindings,
-                    force,
-                    &context,
-                )?;
-                (
-                    existing_template_lease_targets(
-                        &captured.issues,
-                        &captured.derived.lease_targets,
-                    ),
-                    captured.declarations.config().enforcement_mode(),
-                )
-            };
-            let warnings = super::refuse_foreign_leases_read(
-                self.exec.require_worktree_paths()?,
-                lease_mode,
-                &lease_targets,
-            )?
-            .into_iter()
-            .map(|(_, warning)| warning)
-            .collect::<Vec<_>>();
-
+            let claims_guard = super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
             let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
             let Some(image) =
                 capture_template_image(&mut *session, &context, &request, container_id)?
@@ -249,14 +279,11 @@ impl<S: IssueStore> TemplateOps<'_, S> {
                 force,
                 &context,
             )?;
-            if captured.declarations.config().enforcement_mode() != lease_mode
-                || existing_template_lease_targets(
-                    &captured.issues,
-                    &captured.derived.lease_targets,
-                ) != lease_targets
-            {
-                return Ok(AttemptOutcome::Retry);
-            }
+            let warnings = super::refuse_foreign_leases_held(
+                captured.declarations.config().enforcement_mode(),
+                &existing_template_lease_targets(&captured.issues, &captured.derived.lease_targets),
+                claims_guard.as_ref(),
+            )?;
             if captured.derived.intents.is_empty() {
                 captured.derived.result.populate_created_issues(&image)?;
                 return Ok(AttemptOutcome::Done((captured.derived.result, warnings)));
@@ -711,13 +738,16 @@ fn derive_template_apply(
     // application and a refresh resolve one declaration to one path.
     let declarations = DocumentDeclarations::from_config(config)?;
     let mut events = Vec::new();
-    let FreshTemplateDerivation {
-        created: created_node_ids_by_role,
-        candidate,
-        created_order,
-        lease_targets,
-        error_after_apply,
-    } = if let Some(breakdown_id) = existing_breakdown {
+    let (
+        FreshTemplateDerivation {
+            created: created_node_ids_by_role,
+            candidate,
+            created_order,
+            lease_targets,
+            error_after_apply,
+        },
+        upstream_move,
+    ) = if let Some(breakdown_id) = existing_breakdown {
         let (mapping, updates) = derive_template_refresh(
             template,
             roles,
@@ -727,13 +757,16 @@ fn derive_template_apply(
             &declarations,
             &mut events,
         )?;
-        FreshTemplateDerivation {
-            created: mapping,
-            candidate: updates,
-            created_order: Vec::new(),
-            lease_targets: Vec::new(),
-            error_after_apply: None,
-        }
+        (
+            FreshTemplateDerivation {
+                created: mapping,
+                candidate: updates,
+                created_order: Vec::new(),
+                lease_targets: Vec::new(),
+                error_after_apply: None,
+            },
+            None,
+        )
     } else {
         let delta = expand_template(
             template,
@@ -744,7 +777,7 @@ fn derive_template_apply(
             &declarations.hierarchy,
         )?;
         prevalidate_captured_delta(template, &delta, issues)?;
-        derive_fresh_template(
+        let derivation = derive_fresh_template(
             template,
             &delta,
             issues,
@@ -754,7 +787,10 @@ fn derive_template_apply(
             rules,
             graph,
             &mut events,
-        )?
+        )?;
+        let report =
+            UpstreamMoveReport::from_delta(&full_container_id, &delta, &derivation.created)?;
+        (derivation, report)
     };
 
     let original = issues
@@ -805,6 +841,7 @@ fn derive_template_apply(
             created_node_ids_by_role,
             created_issues: BTreeMap::new(),
             anchor_dependency_snapshots,
+            upstream_move,
         },
         registry,
         intents,

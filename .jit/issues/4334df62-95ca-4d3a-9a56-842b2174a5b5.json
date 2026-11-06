@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:b697a3f7-lead",
+  "claimed_at": "2026-11-05T23:20:22.236791059Z",
   "context": {},
   "created_at": "2026-10-24T21:22:37.717854234Z",
   "dependencies": [
@@ -27,7 +28,7 @@
     "satisfies:b697a3f7/REQ-20"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "The no-follow leaf open exists once and serves storage, profile and exact-store reads",
-  "updated_at": "2026-11-04T15:45:23.815621481Z"
+  "updated_at": "2026-11-05T23:20:22.236791059Z"
 }

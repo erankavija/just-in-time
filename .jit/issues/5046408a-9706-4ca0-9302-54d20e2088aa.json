@@ -5,12 +5,21 @@
   "created_at": "2026-10-24T18:36:32.241578953Z",
   "dependencies": [
     "3f8da8c4-4fb4-4191-bec4-d496155b6266",
+    "783b33fa-6fdf-4cf4-a9f2-323a90c27734",
     "a807e699-a7ed-474e-b6af-2ed4086a9dad"
   ],
   "description": "Let a repository name its code worktree root independently of its data root. Then the issue data can live in its own git repository, and the code repository carries only code commits.\n\n## Background\n\njit takes the worktree root from the git repository that contains the selected data root (`WorktreePaths::detect_for_data_root`, `crates/jit/src/storage/worktree_paths.rs`). Two layouts that keep issue history out of the code repository fail because of this:\n\n- **Data root with its own `.git`.** A `.jit/` inside the code checkout that holds its own `.git` makes git report `.jit` as the worktree root. `RepositoryLayout::new` (`crates/jit/src/repository_state/path.rs`) then rejects the overlapping roots, and every command fails with `failed to construct repository layout`.\n- **Data root in a separate checkout**, selected through `JIT_DATA_DIR`. Commands work, but the worktree root becomes the tracker checkout. Gate checkers run there instead of in the code tree, and gate runs record the tracker's commit and branch instead of the code's.\n\nThe one working arrangement today keeps the data repository's git directory outside `.jit/` and drives it with `--git-dir`/`--work-tree`. Every git command has to pass those options, and plain `git` inside `.jit/` operates on the code repository.\n\nIn a split layout the two roots have separate roles:\n\n```mermaid\nflowchart LR\n    W[Code worktree root] -->|checker cwd, gate commit and branch evidence| G[Gate runs]\n    D[Data root] -->|issue storage| S[Store]\n    D -->|git common dir of the data repository| L[Advisory leases and claims lock]\n```\n\n## Success Criteria\n\n- [hard] REQ-01: The data root's `config.toml` accepts a worktree-root setting. A relative value resolves against the data root, so a committed value names no host-specific path.\n- [hard] REQ-02: A `JIT_WORKTREE_ROOT` environment variable supplies the worktree root and takes precedence over the config setting. A host-specific root works with nothing committed.\n- [hard] REQ-03: With neither set, the worktree root is derived exactly as before this change.\n- [hard] REQ-04: A data root that holds its own `.git` and has a configured worktree root opens normally. Commands no longer fail with the overlapping-roots layout error.\n- [hard] REQ-05: With a configured worktree root, gate checkers run in that root and gate runs record its commit and branch.\n- [hard] REQ-06: With a configured worktree root, advisory leases and the claims lock live in the git common directory of the repository that contains the data root.\n- [hard] REQ-07: A configured worktree root that does not exist, is not a directory, or is the data root or inside it fails with a typed error naming the path and the setting that supplied it.\n- [hard] REQ-08: The storage-format reference documents the split layout, the setting, the environment variable, their precedence, and where leases live. The deployment docs list the environment variable next to `JIT_DATA_DIR`.\n\n## Notes\n\n- Root resolution belongs to the invocation's single layout detection. A configured root replaces only the derivation of the worktree root, and every consumer still receives the layout from that one detection.\n- No global CLI flag is added. `JIT_DATA_DIR` has none either, so a flag would be a parallel selection mechanism. Add one for both roots together if per-invocation selection is wanted.\n\nRetirement of the MCP server follows @/charter/D-23.\n",
   "documents": [
     {
       "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "6a84be3b84ff2e9c85f90cb856d7f7333155fe56400f7654a55b12c69dfb11a9",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "diagnostics-design-review-r2.md",
+          "resolved_path": "dev/active/5046408a/diagnostics-design-review-r2.md"
+        },
         {
           "asset_type": "local",
           "content_hash": "b359bdf6a7ffb0b3d50bc35b86b351eaeadc6f2070b45c429e4a77a928f242af",
@@ -21,17 +30,33 @@
         },
         {
           "asset_type": "local",
-          "content_hash": "497e6578a1b39ee027f01bc2bcb5430c8424c7b01af2a8fba0ca1c5925107f68",
+          "content_hash": "953f1c3bc181f3cbee23268d63d03e0c616439bb5a6ad5275862201625fd7b9f",
           "is_shared": false,
           "mime_type": null,
           "original_path": "../f4d9502a-git-cli-module/progress.json",
           "resolved_path": "dev/active/f4d9502a-git-cli-module/progress.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "4e83dfa505d3de1b3c012cd55eb7b6b9fccf9b31ca785e67cb927aba8c32cafe",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "diagnostics-proposal.md",
+          "resolved_path": "dev/active/5046408a/diagnostics-proposal.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "3be13174d26d8c4eed477a341760134f565863c46aad925a11be3c198edb538c",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "diagnostics-design-review-r1.md",
+          "resolved_path": "dev/active/5046408a/diagnostics-design-review-r1.md"
         }
       ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
-      "label": "Accepted split-root recovery design",
+      "label": "Accepted split-root recovery and diagnostics design",
       "path": "dev/active/5046408a/design.md"
     },
     {
@@ -54,6 +79,48 @@
       "format": "markdown",
       "label": "design-review-r3",
       "path": "dev/active/5046408a/design-review-r3.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Reviewed diagnostics correction proposal",
+      "path": "dev/active/5046408a/diagnostics-proposal.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "review",
+      "format": "markdown",
+      "label": "Diagnostics design review R1",
+      "path": "dev/active/5046408a/diagnostics-design-review-r1.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "review",
+      "format": "markdown",
+      "label": "Diagnostics design review R2",
+      "path": "dev/active/5046408a/diagnostics-design-review-r2.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/5046408a/boundary-proposal.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/5046408a/boundary-design-review-r1.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/5046408a/boundary-design-review-r2.md"
     }
   ],
   "first_ready_at": "2026-10-24T18:36:32.241578953Z",
@@ -61,14 +128,7 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {
-    "cargo-ci": {
-      "run_id": "f604a1fc-d5f9-4548-8dd1-5ed1f0c04d4d",
-      "status": "failed",
-      "updated_at": "2026-11-05T06:06:31.017611928Z",
-      "updated_by": "auto:executor"
-    }
-  },
+  "gates_status": {},
   "id": "5046408a-9706-4ca0-9302-54d20e2088aa",
   "labels": [
     "type:enhancement",
@@ -81,5 +141,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Configurable worktree root independent of the data root",
-  "updated_at": "2026-11-05T06:06:31.017611928Z"
+  "updated_at": "2026-11-05T23:39:19.937600931Z"
 }

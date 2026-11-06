@@ -667,6 +667,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issues = Vec::from_iter(captured_issue_record(&bound, issue_id)?);
         let target_id = super::require_issue_in_capture(&issues, issue_id)?;
         let mut paths = vec![
+            VirtualPath::CONFIG,
             VirtualPath::issue_record(&target_id),
             VirtualPath::GATES,
             VirtualPath::GATE_RUNS,
@@ -748,6 +749,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         self.check_gate_with(issue_id, gate_key, VerdictSource::ReuseUnchangedInputs)
+            .map(|(result, _)| result)
     }
 
     /// Check a single gate, choosing whether a recorded verdict may stand in
@@ -760,12 +762,16 @@ impl<S: IssueStore> GateOps<'_, S> {
     /// at most once during this invocation: publication races retry the cheap record operation
     /// without re-running it. The verdict is recorded against the image captured before the
     /// checker started, with any post-run input drift reported on the record.
+    ///
+    /// The issue's lease is checked under a claims guard in the inputs session,
+    /// before any verdict lookup or checker run, and again in the session that
+    /// records the run, whose lease warnings are returned with the result.
     pub fn check_gate_with(
         &self,
         issue_id: &IssueId,
         gate_key: &GateKey,
         source: VerdictSource,
-    ) -> Result<GateRunResult>
+    ) -> Result<(GateRunResult, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -778,6 +784,8 @@ impl<S: IssueStore> GateOps<'_, S> {
         let run_paths = super::gate_run_record_paths(&mutation, issue_id, 1);
         let (target_id, image, issue, issues, registry, runs, captured) =
             with_mutation_attempts("gate evaluation inputs", || {
+                let claims_guard =
+                    super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
                 let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
                 let Some((image, target_id)) = self.exec.capture_gate_evaluation_image(
                     session.as_mut(),
@@ -788,6 +796,11 @@ impl<S: IssueStore> GateOps<'_, S> {
                 else {
                     return Ok(AttemptOutcome::Retry);
                 };
+                super::refuse_foreign_leases_held(
+                    crate::repository_state::assemble_config(&image)?.enforcement_mode(),
+                    std::slice::from_ref(&target_id),
+                    claims_guard.as_ref(),
+                )?;
                 let issue = captured_bound_issue(&image, &target_id)?;
                 let registry = captured_gate_registry(&image)?;
                 let gate = required_automated_gate(&issue, &registry, gate_key)?;
@@ -854,6 +867,7 @@ impl<S: IssueStore> GateOps<'_, S> {
             .collect::<Vec<_>>();
 
         with_mutation_attempts("gate evaluation record", || {
+            let claims_guard = super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
             let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
             let Some((final_image, _)) = self.exec.capture_gate_evaluation_image(
                 session.as_mut(),
@@ -864,6 +878,11 @@ impl<S: IssueStore> GateOps<'_, S> {
             else {
                 return Ok(AttemptOutcome::Retry);
             };
+            let warnings = super::refuse_foreign_leases_held(
+                crate::repository_state::assemble_config(&final_image)?.enforcement_mode(),
+                std::slice::from_ref(&target_id),
+                claims_guard.as_ref(),
+            )?;
             let mut final_issue = captured_bound_issue(&final_image, &target_id)?;
             let final_registry = captured_gate_registry(&final_image)?;
             let final_gate = required_automated_gate(&final_issue, &final_registry, gate_key)?;
@@ -912,7 +931,7 @@ impl<S: IssueStore> GateOps<'_, S> {
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
-            Ok(AttemptOutcome::Done(result.clone()))
+            Ok(AttemptOutcome::Done((result.clone(), warnings)))
         })
     }
 }
@@ -1775,6 +1794,54 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
     }
 
     #[test]
+    fn test_check_gate_strict_refuses_another_agents_lease_before_the_checker_runs() {
+        let executor = crate::commands::test_helpers::setup_coordinated_with_enforcement("strict");
+        let marker_dir = tempfile::tempdir().unwrap();
+        let marker = marker_dir.path().join("checker-ran");
+        let key: GateKey = "recording-gate".parse().unwrap();
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            key.clone(),
+            crate::declarations::GateDefinition {
+                version: 1,
+                key: key.clone(),
+                title: "Recording".to_string(),
+                description: String::new(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: format!("touch '{}'", marker.display()),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
+                }),
+                priority: 100,
+                reserved: HashMap::new(),
+                inputs: None,
+            },
+        );
+        seed_gate_registry(executor.storage(), &registry);
+        let mut issue = crate::test_utils::fixture_issue("Leased".to_string(), String::new());
+        issue.gates_required = vec![key.clone()];
+        let issue_id = issue.id.clone();
+        seed_issue(executor.storage(), issue);
+        crate::commands::test_helpers::plant_foreign_lease(&executor, &issue_id);
+
+        let error = executor.gates().check_gate(&issue_id, &key).unwrap_err();
+
+        assert!(
+            error
+                .downcast_ref::<crate::errors::ForeignLeaseError>()
+                .is_some(),
+            "{error:#}"
+        );
+        assert!(!marker.exists(), "the checker ran despite the refusal");
+    }
+
+    #[test]
     fn test_check_gate_automated_success() {
         let executor = setup();
 
@@ -2441,7 +2508,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         fixture.seed(Some((&["workspace"], &[])), 0);
         let executed = fixture.evaluate(&fixture.issue("Test", "Test"));
 
-        let forced = fixture
+        let (forced, _) = fixture
             .executor
             .gates()
             .check_gate_with(
@@ -2519,7 +2586,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         .with_layout(layout)
         .unwrap();
 
-        let forced = racing
+        let (forced, _) = racing
             .gates()
             .check_gate_with(
                 &fixture.issue("Test", "Test"),
