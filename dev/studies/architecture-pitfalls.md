@@ -214,7 +214,8 @@ fn test_config() {
     std::fs::write(storage.root().join("config.toml"), "...").unwrap();
     
     // Test config loading
-    let config = JitConfig::load(storage.root()).unwrap();
+    let layout = jit::storage::discover_repository_layout(temp_dir.path(), storage.root()).unwrap();
+    let config = jit::storage::configuration_store::load_configuration(&layout).unwrap();
     // ... assertions
 }
 ```

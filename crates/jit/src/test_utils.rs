@@ -2354,7 +2354,10 @@ mod tests {
     #[test]
     fn test_setup_test_repo_with_taxonomy_declares_and_exposes_exact_vocabulary() {
         let (_temp, storage, taxonomy) = setup_test_repo_with_taxonomy().unwrap();
-        let config = crate::config::JitConfig::load(&storage.repository_layout().unwrap()).unwrap();
+        let config = crate::storage::configuration_store::load_configuration(
+            &storage.repository_layout().unwrap(),
+        )
+        .unwrap();
         let hierarchy = config
             .type_hierarchy
             .expect("taxonomy fixture must declare a type hierarchy");
