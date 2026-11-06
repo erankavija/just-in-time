@@ -503,7 +503,7 @@
           "classification": "documentation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "dispatched_2026-11-06"
+          "worker_status": "gates_passed_landing"
         },
         {
           "id": "34851181-7812-4cef-9347-9b80c7fd288f",
@@ -594,7 +594,8 @@
     "9ecde705": 1,
     "fb5e8e8d": 1,
     "5046408a": 4,
-    "933ff852": 1
+    "933ff852": 1,
+    "23b48cf0": 2
   },
   "surfaced_pitfalls": [
     {
