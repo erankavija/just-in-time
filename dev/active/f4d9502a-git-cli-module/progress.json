@@ -538,9 +538,9 @@
     },
     {
       "issue": "c140921c",
-      "status": "conditional_design_recorded",
+      "status": "implementing_footprint_extended_to_5",
       "subject": "Preserve originalrevisionexpression beforepeeling canonicalcommit",
-      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded. Snapshot uses code_checkout; explicit 504 Done prerequisite recorded after steward approval. 2026-11-06: floor/runtime approved by user (via steward); 504 Done. Remaining prerequisite: a273667c Done."
+      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded. Snapshot uses code_checkout; explicit 504 Done prerequisite recorded after steward approval. 2026-11-06: floor/runtime approved by user (via steward); 504 Done. Remaining prerequisite: a273667c Done. 2026-11-06 steward 9b: footprint extended to a fifth file, crates/jit/src/storage/repository_state_store_tests.rs, limited to the two pinned-capture process assertions (~1750, ~1915): identify the resolution child as the shared cat-file --batch-check -Z Types session with one shared predicate form, counts unchanged; missed file per plan lines 68/99, not new scope."
     },
     {
       "issue": "5046408a",
