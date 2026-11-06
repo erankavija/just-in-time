@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:f4d9502a-lead",
+  "claimed_at": "2026-11-06T03:25:36.666723407Z",
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
@@ -28,7 +29,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Document diff reads both versions through one git process",
-  "updated_at": "2026-11-06T03:24:05.568345089Z"
+  "updated_at": "2026-11-06T03:25:36.666723407Z"
 }
