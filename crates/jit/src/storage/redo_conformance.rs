@@ -7,7 +7,8 @@
 //! same [`RedoPoint`] values in the same order. A backend's own suite states
 //! only what that backend adds (`@/inv/orthogonal-tests`).
 
-use crate::repository_state::{FileMode, RepositoryEntry, VirtualPath};
+use crate::domain::relative_path::RootRelativePath;
+use crate::repository_state::{FileMode, RepositoryEntry, RepositoryRootClass, VirtualPath};
 use crate::storage::capability_fs::{CapabilityRoots, DataRoot};
 use crate::storage::memory::test_fixtures as memory_fixtures;
 use crate::storage::redo_apply::test_fixtures::{
@@ -68,6 +69,11 @@ trait RecordBackend {
     fn published(&self) -> Self::Published;
     /// Whether a record is still waiting for an application to carry it forward.
     fn holds_record(&self) -> bool;
+    /// Leave a stage no rename consumed beside `path`, where its parent exists.
+    fn leave_stage(&self, path: &VirtualPath);
+    /// [`Self::published`] without the stages lost renames left, which the
+    /// orphan sweep rather than the record reclaims.
+    fn published_ignoring_stages(&self) -> Self::Published;
 }
 
 struct FileBackend {
@@ -114,6 +120,28 @@ impl RecordBackend for FileBackend {
     fn holds_record(&self) -> bool {
         self.record_path().exists()
     }
+
+    fn leave_stage(&self, path: &VirtualPath) {
+        let root = match path.root_class() {
+            RepositoryRootClass::Data => data_root(&self.worktree),
+            RepositoryRootClass::Worktree => self.worktree.path().to_path_buf(),
+        };
+        let target = root.join(path.relative().as_path());
+        let parent = target.parent().unwrap();
+        if parent.is_dir() {
+            let leaf = target.file_name().unwrap().to_string_lossy();
+            std::fs::write(parent.join(format!(".redo.{leaf}.tmp")), b"staged").unwrap();
+        }
+    }
+
+    fn published_ignoring_stages(&self) -> Self::Published {
+        let mut entries = self.published();
+        entries.retain(|path, _| {
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            !(name.starts_with(".redo.") && name.ends_with(".tmp"))
+        });
+        entries
+    }
 }
 
 struct MemoryBackend(InMemoryStorage);
@@ -144,6 +172,13 @@ impl RecordBackend for MemoryBackend {
 
     fn holds_record(&self) -> bool {
         memory_fixtures::semantic_state(&self.0).2.is_some()
+    }
+
+    /// This backend writes no stage: a put lands in one assignment.
+    fn leave_stage(&self, _path: &VirtualPath) {}
+
+    fn published_ignoring_stages(&self) -> Self::Published {
+        self.published()
     }
 }
 
@@ -332,6 +367,165 @@ fn replay_converges<B: RecordBackend>(
     Ok(())
 }
 
+/// One operation of a record, so a subset of them can be cut out as a record
+/// of its own.
+#[derive(Debug, Clone)]
+enum Operation {
+    MakeDirectory(VirtualPath),
+    Put(PutFile),
+    Delete(VirtualPath),
+    Append(EventAppend),
+}
+
+impl Operation {
+    /// The path a creating operation walks to, creating what it lacks.
+    fn created(&self) -> Option<&VirtualPath> {
+        match self {
+            Self::MakeDirectory(path) => Some(path),
+            Self::Put(put) => Some(&put.path),
+            Self::Delete(_) | Self::Append(_) => None,
+        }
+    }
+}
+
+fn operations(record: &RedoRecord) -> Vec<Operation> {
+    record
+        .make_directories()
+        .iter()
+        .cloned()
+        .map(Operation::MakeDirectory)
+        .chain(record.puts().iter().cloned().map(Operation::Put))
+        .chain(record.deletes().iter().cloned().map(Operation::Delete))
+        .chain(record.event_append().cloned().map(Operation::Append))
+        .collect()
+}
+
+/// The record of the operations `selected` keeps, in the order `operations`
+/// lists them.
+fn sub_record<'a>(selected: impl Iterator<Item = &'a Operation>) -> RedoRecord {
+    let (mut made, mut puts, mut deletes, mut append) = (Vec::new(), Vec::new(), Vec::new(), None);
+    selected.for_each(|operation| match operation.clone() {
+        Operation::MakeDirectory(path) => made.push(path),
+        Operation::Put(put) => puts.push(put),
+        Operation::Delete(path) => deletes.push(path),
+        Operation::Append(appended) => append = Some(appended),
+    });
+    RedoRecord::new(made, puts, deletes, append).expect("a subset of a disjoint record is disjoint")
+}
+
+/// What a crash may persist of the operations it lost: for each, the depth of
+/// ancestors a creating operation made before its own entry, whether a put's
+/// stage survived without its rename, and bytes the lost append wrote past its
+/// offset.
+#[derive(Debug, Clone)]
+struct LostResidue {
+    ancestor_depths: Vec<usize>,
+    stage: bool,
+    log: bool,
+}
+
+fn arbitrary_lost_residue() -> impl Strategy<Value = LostResidue> {
+    (
+        prop::collection::vec(0usize..4, 7),
+        any::<bool>(),
+        any::<bool>(),
+    )
+        .prop_map(|(ancestor_depths, stage, log)| LostResidue {
+            ancestor_depths,
+            stage,
+            log,
+        })
+}
+
+/// The ancestor of `path` `depth` components below its root, clamped to its
+/// parent; `None` for the root itself.
+fn ancestor_at(path: &VirtualPath, depth: usize) -> Option<VirtualPath> {
+    let relative = path.relative().as_path();
+    let ancestors = relative
+        .ancestors()
+        .skip(1)
+        .filter(|ancestor| !ancestor.as_os_str().is_empty())
+        .collect::<Vec<_>>();
+    let depth = depth.min(ancestors.len());
+    (depth > 0).then(|| {
+        VirtualPath::from_root(
+            path.root_class(),
+            RootRelativePath::parse(ancestors[ancestors.len() - depth]).unwrap(),
+        )
+        .unwrap()
+    })
+}
+
+/// Seed `initial`, leave the crash residue of the operations outside
+/// `persisted`, and apply the persisted ones uninterrupted.
+fn crash_state<B: RecordBackend>(
+    initial: &InitialState,
+    operations: &[Operation],
+    persisted: u32,
+    residue: &LostResidue,
+) -> B {
+    let backend = B::seeded(initial);
+    let kept = |index: usize| persisted & (1 << index) != 0;
+    operations
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| !kept(*index))
+        .for_each(|(index, operation)| {
+            let depth = residue.ancestor_depths[index];
+            if let Some(ancestor) = operation
+                .created()
+                .and_then(|path| ancestor_at(path, depth))
+            {
+                let made = RedoRecord::new(vec![ancestor], Vec::new(), Vec::new(), None).unwrap();
+                uninterrupted(&backend, &made);
+            }
+            match operation {
+                Operation::Put(put) if residue.stage => backend.leave_stage(&put.path),
+                Operation::Append(_) if residue.log => {
+                    let lost = EventAppend {
+                        offset: CAPTURED_LOG.len() as u64,
+                        bytes: b"{\"tag\":\"lost\"}\n".to_vec(),
+                    };
+                    let residue = RedoRecord::new(Vec::new(), Vec::new(), Vec::new(), Some(lost));
+                    uninterrupted(&backend, &residue.unwrap());
+                }
+                _ => {}
+            }
+        });
+    let persisted_record = sub_record(
+        operations
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| kept(*index))
+            .map(|(_, operation)| operation),
+    );
+    uninterrupted(&backend, &persisted_record);
+    backend
+}
+
+/// Replaying `record` over every crash state of it converges on `converged`.
+fn replay_converges_from_every_subset<B: RecordBackend>(
+    initial: &InitialState,
+    record: &RedoRecord,
+    residue: &LostResidue,
+) -> Result<(), TestCaseError> {
+    let converged = applied_cleanly::<B>(initial, record).0;
+    let operations = operations(record);
+    for persisted in 0..1u32 << operations.len() {
+        let backend = crash_state::<B>(initial, &operations, persisted, residue);
+        backend.commit(record);
+        uninterrupted(&backend, record);
+        prop_assert_eq!(
+            backend.published_ignoring_stages(),
+            converged.clone(),
+            "replay over the persisted subset {:#b} of {:?} diverged",
+            persisted,
+            operations
+        );
+    }
+    Ok(())
+}
+
 /// Every point the enum names is reached and interrupted, on both backends, so
 /// the matrix's coverage is the enum's rather than one generated record's shape.
 #[test]
@@ -478,5 +672,33 @@ proptest! {
             replay_converges::<FileBackend>(&initial, &record, point, injector.clone(), &file_converged)?;
             replay_converges::<MemoryBackend>(&initial, &record, point, injector, &memory_converged)?;
         }
+    }
+}
+
+proptest! {
+    // Each case applies the record once per subset of its operations, at most
+    // 2^7, on both backends, so the case count stays low.
+    #![proptest_config(ProptestConfig::with_cases(8))]
+
+    /// A crash that keeps an arbitrary subset of a pass's unsynced entries
+    /// leaves a state the record replays to completion, on both backends.
+    ///
+    /// Crash model: file data is durable once its `sync_all` returns, a
+    /// directory entry once its directory's fsync returns, and any subset of
+    /// entries not yet synced may persist; the record is durable before the
+    /// first live write and removed only after the pass. A persisted operation
+    /// is applied whole, because a put renames bytes already synced and every
+    /// other operation is one entry; a lost one may still have left the
+    /// ancestors it created, the stage its rename never consumed, or appended
+    /// bytes past its offset. Operations are pairwise path-disjoint, so the
+    /// order in which entries persisted does not matter.
+    #[test]
+    fn prop_replay_converges_from_any_subset_of_persisted_operations(
+        record in arbitrary_record(),
+        initial in arbitrary_initial_state(),
+        residue in arbitrary_lost_residue(),
+    ) {
+        replay_converges_from_every_subset::<FileBackend>(&initial, &record, &residue)?;
+        replay_converges_from_every_subset::<MemoryBackend>(&initial, &record, &residue)?;
     }
 }
