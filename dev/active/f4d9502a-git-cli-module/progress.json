@@ -450,8 +450,9 @@
           "short_id": "e6ec58f3",
           "title": "Remove the revision resolver bridge",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "done",
+          "external_blockers": [],
+          "worker_status": "landed"
         }
       ]
     },
