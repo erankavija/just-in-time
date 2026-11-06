@@ -199,12 +199,24 @@ fn test_doc_show_at_specific_commit() {
 
     // Create issue with document reference
     let issue_id = cli.create_issue(["--title", "API work"]).unwrap();
-    cli.run(["doc", "add", issue_id.as_str(), "docs/api.md"])
-        .unwrap();
+    cli.run([
+        "doc",
+        "add",
+        issue_id.as_str(),
+        "docs/api.md",
+        "--commit",
+        "HEAD",
+    ])
+    .unwrap();
 
-    // Test: View document at old commit
-    let output = cli
-        .command([
+    let pinned = cli
+        .run_json(["doc", "show", issue_id.as_str(), "docs/api.md"])
+        .unwrap();
+    assert_eq!(pinned["commit"], "HEAD");
+    assert!(pinned["content"].as_str().unwrap().contains("API v3"));
+
+    let overridden = cli
+        .run_json([
             "doc",
             "show",
             issue_id.as_str(),
@@ -212,44 +224,30 @@ fn test_doc_show_at_specific_commit() {
             "--at",
             commit1,
         ])
-        .output()
         .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // Should show v1 content
-    assert!(stdout.contains("API v1"));
-    assert!(stdout.contains("GET /users"));
-    assert!(!stdout.contains("POST /users"));
-    assert!(!stdout.contains("DELETE /users"));
+    assert_eq!(overridden["commit"], commit1);
+    assert_eq!(overridden["content"], "# API v1\n- GET /users");
 }
 
 #[test]
-fn test_doc_show_at_head_by_default() {
+fn test_doc_show_reads_working_tree_by_default() {
     let cli = JitCli::initialised().unwrap();
     cli.init_git().unwrap();
 
     write_file(&cli, "docs/readme.md", "# Original");
     cli.commit("Initial readme").unwrap();
 
-    write_file(&cli, "docs/readme.md", "# Updated");
-    cli.commit("Update readme").unwrap();
-
     let issue_id = cli.create_issue(["--title", "Test"]).unwrap();
     cli.run(["doc", "add", issue_id.as_str(), "docs/readme.md"])
         .unwrap();
+    write_file(&cli, "docs/readme.md", "# Uncommitted edit");
 
-    // Without --at flag, should show HEAD
-    let output = cli
-        .command(["doc", "show", issue_id.as_str(), "docs/readme.md"])
-        .output()
+    let document = cli
+        .run_json(["doc", "show", issue_id.as_str(), "docs/readme.md"])
         .unwrap();
 
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Updated"));
-    assert!(!stdout.contains("Original"));
+    assert_eq!(document["content"], "# Uncommitted edit");
+    assert_eq!(document["commit"], "working-tree");
 }
 
 #[test]
@@ -264,7 +262,6 @@ fn test_doc_show_at_invalid_commit() {
     cli.run(["doc", "add", issue_id.as_str(), "docs/test.md"])
         .unwrap();
 
-    // Invalid commit hash
     let output = cli
         .command([
             "doc",
@@ -273,11 +270,45 @@ fn test_doc_show_at_invalid_commit() {
             "docs/test.md",
             "--at",
             "invalid123",
+            "--json",
         ])
         .output()
         .unwrap();
 
-    assert!(!output.status.success());
+    let code = jit::output::ErrorCode::DocumentNotFound;
+    assert_eq!(output.status.code(), Some(3));
+    let failure: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(failure["error"]["code"], code.as_str());
+}
+
+#[test]
+fn test_doc_show_pinned_path_absent_at_commit_reports_document_not_found() {
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
+    cli.commit("Before document exists").unwrap();
+    let commit = cli.git(["rev-parse", "HEAD"]).unwrap();
+    write_file(&cli, "docs/later.md", "# Only in the working tree");
+    let issue_id = cli.create_issue(["--title", "Test"]).unwrap();
+    cli.run([
+        "doc",
+        "add",
+        issue_id.as_str(),
+        "docs/later.md",
+        "--commit",
+        commit.trim(),
+        "--skip-scan",
+    ])
+    .unwrap();
+
+    let output = cli
+        .command(["doc", "show", issue_id.as_str(), "docs/later.md", "--json"])
+        .output()
+        .unwrap();
+
+    let code = jit::output::ErrorCode::DocumentNotFound;
+    assert_eq!(output.status.code(), Some(3));
+    let failure: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(failure["error"]["code"], code.as_str());
 }
 
 #[test]
