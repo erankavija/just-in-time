@@ -2,7 +2,7 @@
   "epic_id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
   "epic_short_id": "b697a3f7",
   "lead_agent_id": "agent:b697a3f7-lead",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -151,6 +151,20 @@
           "status": "done"
         }
       ]
+    },
+    {
+      "wave_number": 7,
+      "label": "4",
+      "issues": [
+        {
+          "short_id": "d3c94dc5",
+          "status": "dispatched (codex gpt-6-luna xhigh)"
+        },
+        {
+          "short_id": "700a96dd",
+          "status": "rework-1 (REQ-05 registry in return value and record comparison)"
+        }
+      ]
     }
   ],
   "later_chain_note": "After wave 2: fe9147fa, 1b7f58ae -> 693a2fdd, a991f42b -> d3c94dc5, 700a96dd -> 850eaad3 -> 93e3f1ad. Blocked externally by f4d9502a (parked): 7cd27db8 -> 30334066 -> 030df4b1, 9623fe6a; d9ba0029 -> 65aafaba -> c0775a83 -> 4e2bed35 -> e73ad8bc, 42046050, 45d0a971; e6ec58f3 -> b2c28ec1.",
@@ -196,7 +210,8 @@
     "4334df62": 1,
     "9a2563fd": 1,
     "c2b3cefa": 2,
-    "d2acb105": 1
+    "d2acb105": 1,
+    "700a96dd": 1
   },
   "surfaced_pitfalls": [
     {
