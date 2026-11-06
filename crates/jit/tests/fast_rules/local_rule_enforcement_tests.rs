@@ -1101,17 +1101,6 @@ impl IssueStore for FailingMutationStorage {
         self.inner.read_repo_file(rel_path)
     }
 
-    fn list_gate_presets(&self) -> anyhow::Result<Vec<jit::gate_presets::PresetInfo>> {
-        self.inner.list_gate_presets()
-    }
-
-    fn get_gate_preset(
-        &self,
-        name: &str,
-    ) -> anyhow::Result<jit::gate_presets::GatePresetDefinition> {
-        self.inner.get_gate_preset(name)
-    }
-
     fn read_path_bytes(
         &self,
         path: &str,
