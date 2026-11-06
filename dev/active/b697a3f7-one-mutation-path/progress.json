@@ -23,7 +23,7 @@
           "title": "Process liveness and signalling go through one PID guard",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "escalated (code-review F1 90b9291f)",
+          "status": "rework-3 (steward-authorized final)",
           "landed": "7c6855d8a"
         },
         {
@@ -139,11 +139,12 @@
       "category": "rework exceeded MAX_REWORK_ATTEMPTS",
       "issue": "f6477007",
       "detail": "third distinct code-review finding (run 90b9291f): exited-process test lacks #[cfg(unix)]; requested one more round",
-      "status": "open"
+      "status": "resolved",
+      "decision": "steward: one final round, scope = #[cfg(unix)] on unix-dependent tests in process.rs only; if code-review fails again, do not rework, send the finding to the steward"
     }
   ],
   "rework_counts": {
-    "f6477007": 2,
+    "f6477007": 3,
     "4334df62": 1,
     "9a2563fd": 1,
     "c2b3cefa": 2
