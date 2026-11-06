@@ -4,7 +4,9 @@
 # engine logic — the strings (types, roles, gates, docs) come from THIS file.
 # Validated at every `jit` config load by the templates loader (templates.rs):
 # roles unique; depends_on/anchor_edges/transforms reference declared
-# roles/anchors; node `type`s exist in [type_hierarchy]; internal edges acyclic.
+# roles/anchors; applies_to types exist in [type_hierarchy]; internal edges
+# acyclic. `jit apply` checks the declarations the template requires (node
+# types, label namespaces, gates, doc areas) and names every unmet one at once.
 
 # The block between the delimiters below is GENERATED from the template
 # contributions of the packaged jit-dogfood profile, which are their authority:

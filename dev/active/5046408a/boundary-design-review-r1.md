@@ -1,0 +1,67 @@
+# 5046408a selected-A boundary amendment — independent design review R1
+
+Verdict: **FAIL — DESIGN ONLY.** One blocking specification gap remains: the data-root identity handoff across exec's potentially blocking lock acquisition. The selected-A operation boundaries, typed adapters and I/O-source repair are otherwise coherent. This review does not reopen A versus B and does not accept implementation, tests, a configured gate or issue completion.
+
+## Review basis
+
+Read the assigned brief, selected-A proposal and cycle-3 result in full; authoritative main `dev/active/5046408a/design.md`, `diagnostics-proposal.md`, diagnostics reviews R1/R2 and original design review R3 in full; root AGENTS.md and content standards. The worker AGENTS.md matches main and no additional subtree AGENTS.md was found. Resolved D-20/D-25/D-26/D-27 and architecture dependency direction, semantic types, convention convergence, canonical cutover and orthogonal tests with `jit item show`; checked the authoritative charter's D-25/D-26/D-27 text.
+
+Inspected relevant frozen declaration, config, bootstrap, storage, capability, lock, command, dispatch, classifier, registry and test owners and their callers. Verified worker HEAD `376978ed05c011717ab7c2d88fab54954f045f15`, the ten changed paths, and binary diff SHA256 `f0c5fd8a3e18932804cd4f02b412b9d1540321d408522733e66601a7ce22b9a3`. Source references below are relative to that worker tree unless identified as proposal/main.
+
+## Blocking finding
+
+1. **Exec's root precheck and subsequent guarded work are not specified as one identity-bound handoff.**
+
+   Proposal lines 42 and 47–50 carry a storage/path plus cwd, perform a root-only precheck, acquire the canonical lock chain, inspect pending presence and then use shared initialized validation. They do not require retaining the precheck's root evidence or comparing that evidence after acquisition and across the pending/index capture. Saying to propagate a conflict *if* initialized validation produces one does not establish this missing relationship.
+
+   The actual owners do not supply it implicitly:
+
+   - `storage/json.rs:509–540` constructs locks from pathnames; `:1073` acquires that lock chain without root evidence.
+   - `storage/repo_lock.rs:222–295` may wait after opening a pathname-based file lock. `RepoWriteGuard` at `:330` retains the lock and predecessor, not the data-root identity. Its correct drop order does not bind a later capture to the directory containing the opened lock.
+   - `storage/json.rs:842–860` opens a **new** `DataReadSession` and admits that new capture. It has no relationship to a prior root-only probe or pending-presence observation. `DataReadSession::admit` at `repository_state_store.rs:492` detects replacement since that session opened, not replacement since a discarded earlier precheck.
+   - The existing replacement test at `repository_state_store_tests.rs:3401` proves the retained-session comparison; it does not prove this new composition.
+
+   Concrete counterexample: the precheck observes directory A; exec opens A's repository-lock file and waits for its current holder; a non-cooperating filesystem change renames A and publishes initialized directory B at the selected path; A's holder releases. Exec now holds A's old lock. A fresh capability probe and fresh initialized capture can both accept clean B, so the child starts against the selected pathname without holding B's repository lock. No change crosses the fresh index capture, so its existing admission need not return `RetryableConflict`. This is a gap in the proposed composition, not a request to reimplement read admission or to relabel that conflict as pending refusal.
+
+   **Required resolution before edits:** specify that the storage-owned root-only capability/evidence survives lock acquisition and binds the under-lock presence check and initialized capture to the same selected root. Revalidate that retained evidence after acquiring the chain and across the capture before child launch; a changed, missing or unsafe root must release the acquired guards and return the appropriate typed capability/conflict failure without starting the child. A replacement cannot silently become a fresh accepted root while the old guard remains held. Reuse/factor `DataReadSession`'s existing evidence and `CapabilityRoots::open_data` identity checks in their canonical storage owner; do not add a private command-layer identity protocol or an artificial layout.
+
+   Name the owning deterministic handoff/replacement assertion in `repository_state_store_tests.rs`, with only command composition wiring in `commands/worktree.rs` if needed. Preserve the existing storage race matrix rather than copying it. The specification must also state what is retained for the data-bootstrap predecessor when root ancestry changes. This clarification appears feasible within the thirteen named files through the already-authorized shared root-capability factoring; no mandatory fourteenth file is established by this review. If the chosen implementation needs lock-handle capabilities outside those owners, return that exact owner for footprint acceptance before editing it.
+
+## Criterion and contract coverage
+
+| Criterion | Assessment |
+| --- | --- |
+| Precise item adapter provenance | Covered. `commands/mod.rs:2908–2920` owns the existing `InvalidArgumentError` computation. Extracting that computation once and feeding it only a typed failure from the known required projection preserves the registry contract. `ConfigurationObservation::worktree` already returns `ConfigurationAssemblyError` directly. Preserve explicit provenance at this call boundary; broad downcasting of arbitrary bootstrap chains would not meet the proposal. |
+| Recovery adapter and D-27 | Covered. Existing recovery at `commands/bootstrap.rs:94–99` precedes required projection at `:109–110`; `RecoveryFailedError` already serves startup leftover failures and `dispatch/claim.rs:151–157`. The proposal adapts only the authored projection error after committed recovery, leaving root, index, I/O and admission failures untouched. It does not reauthorize replay or create audit bytes. |
+| Canonical parsing and full consumers | Covered. `declarations/mod.rs:22–112` supplies one syntax document and consumed/full views. An env-selected root removes only that projection requirement. Full item consumers still reach the shared argument adapter; no parse failure becomes absence or a guessed code root. |
+| Data-only exec and one computation | Covered. The sole in-tree `worktrees().exec` caller is `dispatch/worktree.rs:64`; replacement/extraction into a command-owned data-only operation is concrete. `commands::worktree` is already public. Registration can delegate with its real `JsonFileStorage`; no fake executor/layout, Git probe, config assembly or extra schema leaf is necessary. |
+| Root precheck, no creation, root/lock identity | **Blocked by finding 1.** Root-only factoring is possible in `repository_state_store.rs`, preserving `discover_data_read_evidence` and the published-ancestor guard. Current `DataReadSession::open` also observes commits/event tail, so calling it unchanged is not the promised root-only precheck. |
+| Lock chain and timeout | Covered, subject to the identity handoff. `JsonFileStorage` already composes data-bootstrap → repository lock; `RepoWriteGuard::drop` releases repository before predecessor. No worktree/events guard or mutation/recovery session is needed. An occupied lock can return `LockTimeout` before pending inspection. |
+| Pending versus index/config precedence | Covered for the selected data root. Under the held chain, regular pending bytes win before index validation and are neither parsed nor replayed. `open_leftover_record` at `repository_state_store.rs:697–712` is the existing bounded no-follow presence owner. Its errors remain typed. The command owns only the established refusal message, not a second record parser. |
+| Clean initialized admission | Covered apart from identity handoff. `validate_captured_index` and `load_index` own format/missing-index semantics. An admitted invalid index never launches the child; a real conflict remains retryable. An uninitialized but present safe root may acquire/release lock files without publishing repository content. Discovery remains the existing selected-data discovery; pending precedence does not redefine which ancestor discovery selects. |
+| Cwd, argv, streams, environment and status | Covered. Proposal explicitly captures caller cwd and sets child `current_dir` to it, independently of data/code roots. Exact arguments, inherited streams/environment, integer child status and numeric-code fallback remain specified. Spawn failure retains the wrapper generic error. No process-global cwd/env mutation is allowed. |
+| Cleanup and presentation | Covered. One scoped RAII guard spans presence/index checking and child wait, including every error path. No manual lock-file deletion. `Outcome::Exited` remains the sole child-status result; wrapper errors use existing rendering. Registered `worktree_exec` leaf admission must precede the common emitter on both routes, following the existing config diagnostic composition. |
+| D-25 | Covered. Exec is the explicitly requested mutex/child operation. Ordinary readers continue lock-free capture/admission with bounded conflict and no replay. The unchanged CLI suite owns child read success and child mutation lock timeout. |
+| D-26/D-27 | Covered. Exec never recovers. Ordinary mutation/recovery keeps original-root replay and original audit bytes before selecting/authorizing new work. The amendment introduces no alternate recovery mechanism. |
+| Concrete I/O source | Covered. `RepositoryStateStoreError::Io` currently uses transparent delegation at `:89–90`, while `output/failure.rs:483–492` searches for concrete `std::io::Error` in the chain. `#[error("{0}")]` with the existing `#[from]` retains that concrete source without changing the classifier or taxonomy. The storage chain assertion plus unchanged permission projection are the correct owners. |
+| Registry, output and test contracts | Covered. Item list/search registry arms require `INVALID_ARGUMENT`; recover requires `recovery_failed`. Existing exec tests require GenericError, absolute pending path/recovery guidance, unchanged record bytes and no child. The proposal keeps all of these assertions and the complete failure corpus unchanged. |
+
+## Exact footprint and test ownership
+
+The proposed thirteen files consist of the verified frozen ten plus `commands/mod.rs`, `commands/worktree.rs` and `dispatch/worktree.rs`. Those additions have concrete owners: shared argument-error computation, one data-only exec computation, and one registered status/presentation adapter. `main.rs` forwards the inferred bootstrap result; no main/CLI/schema change is inherently required. Existing module visibility permits the new route without `storage/mod.rs` changes.
+
+Finding 1 prevents unconditional acceptance of the footprint/semantics combination as written, but does not demonstrate a required expansion. The existing storage implementation/test owners already fall within the thirteen. Resolve the retained-evidence contract there explicitly before implementation. Do not preserve old `WorktreeOps::exec` as a second implementation or manufacture compatibility state to fit the limit.
+
+Keep pure parser/projection ownership in declarations, adapter comparison at its command/bootstrap boundary, storage I/O and identity/admission properties in the existing storage suite, new exec ordering/cwd/cleanup composition in `commands/worktree.rs`, and the existing CLI exec boundary matrix unchanged. Full CLI/contracts, affected owners, fmt/Clippy and later configured gates/implementation reviews remain appropriate obligations after implementation. Their pending execution is not a missing design deliverable and is not the reason for this FAIL.
+
+## Separate pre-existing observations and limits
+
+- The two actor failures are separately reproduced on unchanged main according to the assigned baseline evidence and steward direction. They remain a separate task: no actor API, test or ambient-identity workaround is authorized within 504. Their presence does not block this design on its merits or justify altering its tests.
+- The existing general lock implementation opens pathnames with `std::fs::OpenOptions` (`storage/lock.rs:324–331`) and provides no live lock-file-inode identity API. Arbitrary replacement/symlinking of the lock-file entry itself is a pre-existing shared lock concern, distinct from finding 1's new data-root handoff. This review neither authorizes a lock subsystem rewrite nor claims that the proposed precheck fixes that baseline concern. If stronger lock-entry hardening becomes a required implementation dependency, escalate its canonical owner rather than adding an exec-only workaround.
+- The five focused-test failures and two historical full-gate failures remain recorded evidence. No checks were rerun, and no design verdict can turn them into implementation/gate acceptance or reset retry limits.
+
+Only this scratch report was written. No source/tracker changes, builds, tests, gates, recovery, claims, agents, commits or merges were performed.
+
+## Next decision
+
+Amend selected A to make the retained data-root/lock handoff and its owning assertion explicit, then resolve this bounded design finding. No reconsideration of B, registry cutover, actor scope or retry budget is requested.

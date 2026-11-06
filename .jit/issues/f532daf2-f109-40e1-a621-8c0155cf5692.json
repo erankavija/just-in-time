@@ -1,0 +1,23 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-05T23:40:17.819231476Z",
+  "dependencies": [],
+  "description": "Repository and coordination file locks are opened by pathname and expose no identity for the inode they hold, so a holder cannot tell whether its lock still guards the file now at that path. Every caller that infers \"I hold the lock for this directory\" from a held guard inherits the gap.\n\n## Background\n\n`FileLocker` in `crates/jit/src/storage/lock.rs` opens each lock file with `OpenOptions` on a path (`open_or_create`, `open_for_shared`) and returns a `LockGuard` carrying the path and the open file, with no recorded device/inode. `RepoWriteLock` in `storage/repo_lock.rs` builds on it, and its `RepoWriteGuard` retains the lock and its predecessor but no identity of the lock file it opened.\n\nIf a lock-file entry, or the directory containing it, is replaced while a caller waits on or holds the lock, the caller can end up holding a lock on an unlinked or relocated inode while another process locks the new file at the same path. Both believe they hold the repository lock. Root-identity checks cannot detect an A→B→A interleaving: the root is swapped to B while the waiter opens B's lock file, then swapped back to A, so every root comparison sees A while the held lock belongs to B.\n\nShared users of these locks include the JSON-file storage mutation and recovery sessions (`storage/json.rs`, `storage/repository_state_store.rs`), claim coordination (`storage/claim_coordinator.rs`, `commands/claim.rs`), worktree identity (`storage/worktree_identity.rs`) and worktree exec (`commands/worktree.rs`). The capability layer already compares directory identities (`capability_metadata_identity` in `storage/capability_fs.rs`); locks have no equivalent.\n\nThe independent boundary design review for worktree exec identified this as a pre-existing shared limitation that root-evidence comparison cannot close: `dev/active/5046408a/boundary-design-review-r2.md` (advisory section) and `dev/active/5046408a/boundary-design-review-r1.md` (pre-existing observations).\n\n## Success Criteria\n\n- [hard] REQ-01: A held lock guard records the identity of the lock file it opened, and the lock owner can verify that the file currently at the lock path is that same file.\n- [hard] REQ-02: Acquisition whose opened lock file is no longer the file at its path, through entry replacement or a replaced containing directory, either retries against the current file or fails with a typed error; it never returns a guard for a detached inode.\n- [hard] REQ-03: Every shared lock user receives the identity guarantee through the canonical lock owner, with no per-caller identity protocol.\n- [hard] REQ-04: A deterministic storage test replaces the lock-file entry between open and lock acquisition, and another replaces it in an A→B→A sequence, and both observe the REQ-02 outcome.\n\n## Notes\n\nThe mechanism belongs in `storage/lock.rs`, with propagation through `storage/repo_lock.rs` as needed. Worktree exec's retained data-root evidence (5046408a) deliberately does not attempt this and does not depend on it.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-05T23:40:17.819231476Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "f532daf2-f109-40e1-a621-8c0155cf5692",
+  "labels": [
+    "component:storage",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Lock guards verify the identity of the lock file they hold",
+  "updated_at": "2026-11-05T23:41:05.612050441Z"
+}

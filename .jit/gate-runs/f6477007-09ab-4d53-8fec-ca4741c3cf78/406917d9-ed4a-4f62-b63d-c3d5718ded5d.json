@@ -1,0 +1,44 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d82da9b3cc598c5ed15cbb78704983a859990c53",
+  "completed_at": "2026-11-06T00:22:11.063304680Z",
+  "duration_ms": 168577,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/serve_cli_tests.rs",
+        "id": "F1",
+        "line": 581,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/pid-safety",
+          "@/invariant/convention-convergence",
+          "@/charter/D-20",
+          "@/issue/b697a3f7/requirement/REQ-20"
+        ],
+        "severity": "high",
+        "summary": "Integration-test process-group signal and liveness helpers retain a duplicate PID guard rather than the new process-module form."
+      }
+    ],
+    "summary": "A direct integration-test signal/liveness helper still duplicates the PID guard instead of using the new single form.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f6477007-09ab-4d53-8fec-ca4741c3cf78",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "406917d9-ed4a-4f62-b63d-c3d5718ded5d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T00:19:22.485563081Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2153 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1ae39-71a8-7700-b46c-a4e3a448512d\n--------\nuser\n--- 2140 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: cb4a03bd6bad357d94411328604c4fe817a3ee4c (`jit:f6477007`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/pid-safety (.jit/invariants.toml); @/invariant/convention-convergence (.jit/invariants.toml); @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/b697a3f7/requirement/REQ-20 (issue description)\nGate evidence: cargo-ci passed (exit 0); its run commit d82da9b3cc598c5ed15cbb78704983a859990c53 contains cb4a03bd6bad357d94411328604c4fe817a3ee4c\nTruncation recovery: none\n\n1. [blocking, issue-impact] `crates/jit/tests/cli_repo_workflow/serve_cli_tests.rs:581` retains a separate PID-to-process-group conversion and signal implementation; `process_group_survives` repeats the guard at line 596. The new `process` module is therefore not the single PID guard for every liveness and signal site, leaving the issue’s hard convergence criterion unmet. References: @/invariant/pid-safety, @/invariant/convention-convergence, @/charter/D-20, @/issue/b697a3f7/requirement/REQ-20.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A direct integration-test signal/liveness helper still duplicates the PID guard instead of using the new single form.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Integration-test process-group signal and liveness helpers retain a duplicate PID guard rather than the new process-module form.\",\"file\":\"crates/jit/tests/cli_repo_workflow/serve_cli_tests.rs\",\"line\":581,\"references\":[\"@/invariant/pid-safety\",\"@/invariant/convention-convergence\",\"@/charter/D-20\",\"@/issue/b697a3f7/requirement/REQ-20\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

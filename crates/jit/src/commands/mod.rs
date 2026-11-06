@@ -120,10 +120,10 @@ pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use query::QueryOps;
 pub use query::{ByStateKey, RollupTotals, StateCount, StateRollup};
 pub use search::{ContentMatch, SemanticIssueMatch, SemanticSearchOptions};
-pub use template::{TemplateApplyResult, TemplateOps};
+pub use template::{TemplateApplyResult, TemplateOps, UpstreamMove, UpstreamMoveReport};
 pub use template_expand::{
     expand_template, validate_delta_acyclic, AnchorGates, DeltaEdge, DeltaEndpoint, PlannedNode,
-    TemplateDelta,
+    PlannedUpstreamMove, TemplateDelta,
 };
 pub use validate::ValidationOps;
 
@@ -915,9 +915,10 @@ fn claims_mutation_guard(
         .map(Some)
 }
 
-/// The lease rule every issue-record write obeys: `strict` refuses when another
-/// agent holds an active lease on a target, naming each; `warn` answers the same
-/// findings; `off` answers none.
+/// The lease rule every issue-record write obeys: `strict` refuses with a
+/// [`ForeignLeaseError`](crate::errors::ForeignLeaseError) when another agent
+/// holds an active lease on a target; `warn` answers each such lease as a
+/// finding; `off` answers none.
 fn refuse_foreign_leases(
     mode: crate::config::EnforcementMode,
     targets: &[IssueId],
@@ -928,28 +929,29 @@ fn refuse_foreign_leases(
     if mode == EnforcementMode::Off {
         return Ok(Vec::new());
     }
-    let findings = targets
+    let leases = targets
         .iter()
         .filter_map(|id| {
             conflicting_holder(id)
                 .map(|holder| {
-                    holder.map(|holder| (id.clone(), format!("{id} is leased by {holder}")))
+                    holder.map(|holder| crate::errors::ForeignLease {
+                        issue_id: id.clone(),
+                        holder,
+                    })
                 })
                 .transpose()
         })
         .collect::<Result<Vec<_>>>()?;
-    if mode == EnforcementMode::Strict && !findings.is_empty() {
-        let named = findings
-            .iter()
-            .map(|(_, finding)| finding.as_str())
-            .collect::<Vec<_>>()
-            .join(", ");
-        anyhow::bail!(
-            "Refusing to write: {named}.\nCoordinate with the holder, or wait for the lease to end. \
-             If the lease is yours, set your identity with JIT_AGENT_ID."
-        );
+    if mode == EnforcementMode::Strict && !leases.is_empty() {
+        return Err(crate::errors::ForeignLeaseError::new(leases).into());
     }
-    Ok(findings)
+    Ok(leases
+        .into_iter()
+        .map(|lease| {
+            let finding = lease.to_string();
+            (lease.issue_id, finding)
+        })
+        .collect())
 }
 
 /// [`refuse_foreign_leases`] over the leases a held claims guard read.
@@ -2640,11 +2642,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// record, capture closure, or arbitrary patch. A conflict reopens a session
     /// and derives again under a fresh context, so the identity and time an
     /// attempt publishes are sampled under the write lock that publishes them,
-    /// so an attestation's run time is its publication time.
+    /// so an attestation's run time is its publication time. The target's lease
+    /// is checked in that session under a claims guard taken before it, by the
+    /// captured enforcement mode; the outcome carries its warnings.
     fn publish_captured_issue_mutation(
         &self,
         request: CapturedIssueMutation,
-    ) -> Result<(Issue, CapturedIssueMutationOutcome)>
+    ) -> Result<(Issue, CapturedIssueMutationOutcome, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -2652,6 +2656,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use std::collections::BTreeSet;
 
         let layout = self.require_layout()?;
+        let claims_guard = claims_mutation_guard(self.require_worktree_paths()?)?;
         with_mutation_session(
             &self.storage,
             &layout,
@@ -2663,7 +2668,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 } else {
                     Vec::new()
                 };
-                let mut paths = BTreeSet::from([VirtualPath::issue_record(request.issue_id())]);
+                let mut paths = BTreeSet::from([
+                    VirtualPath::CONFIG,
+                    VirtualPath::issue_record(request.issue_id()),
+                ]);
                 if request.captures_gate_registry() {
                     paths.insert(VirtualPath::GATES);
                 }
@@ -2715,6 +2723,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                     crate::declarations::GateRegistry::default()
                 };
 
+                let warnings = refuse_foreign_leases_held(
+                    crate::repository_state::assemble_config(&image)?.enforcement_mode(),
+                    std::slice::from_ref(request.issue_id()),
+                    claims_guard.as_ref(),
+                )?;
                 let derived = derive_captured_issue_mutation(issue, &registry, &request, &context)?;
                 let issue_result = crate::repository_state::mutated_issue(
                     &image,
@@ -2723,10 +2736,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                     context.timestamp(),
                 )?;
                 if derived.intents.is_empty() {
-                    return Ok(SessionStep::Done((issue_result, derived.outcome)));
+                    return Ok(SessionStep::Done((issue_result, derived.outcome, warnings)));
                 }
                 let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
-                Ok(SessionStep::Apply(plan, (issue_result, derived.outcome)))
+                Ok(SessionStep::Apply(
+                    plan,
+                    (issue_result, derived.outcome, warnings),
+                ))
             },
         )
     }
@@ -3052,11 +3068,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         .map(|outcome| outcome.issue)
     }
 
-    fn publish_captured_release(&self, issue_id: &IssueId, reason: String) -> Result<Issue>
+    fn publish_captured_release(
+        &self,
+        issue_id: &IssueId,
+        reason: String,
+        released_by: crate::domain::Assignee,
+    ) -> Result<Issue>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let released_by = claim::resolve_release_actor(self.require_worktree_paths()?)?;
         let outcome =
             self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Release {
                 issue_id: issue_id.clone(),
@@ -3530,6 +3550,31 @@ impl<S: IssueStore> CommandExecutor<S> {
 mod tests {
     use super::*;
     use crate::domain::EventBody;
+
+    #[test]
+    fn test_refuse_foreign_leases_strict_refusal_downcasts_to_foreign_lease_error() {
+        let leased = crate::test_utils::issue_id(1);
+        let holder: crate::domain::Assignee = "agent:holder".parse().unwrap();
+
+        let error = refuse_foreign_leases(
+            crate::config::EnforcementMode::Strict,
+            std::slice::from_ref(&leased),
+            |_| Ok(Some(holder.clone())),
+        )
+        .unwrap_err();
+
+        let refusal = error
+            .downcast_ref::<crate::errors::ForeignLeaseError>()
+            .expect("a strict refusal is a ForeignLeaseError");
+        assert_eq!(
+            refusal
+                .leases()
+                .iter()
+                .map(|lease| (&lease.issue_id, &lease.holder))
+                .collect::<Vec<_>>(),
+            [(&leased, &holder)]
+        );
+    }
 
     #[test]
     fn test_claims_mutation_guard_rejects_invalid_root_path_fallback_and_names_source() {

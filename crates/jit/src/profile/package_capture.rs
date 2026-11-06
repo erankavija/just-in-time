@@ -18,7 +18,7 @@
 //! the package author's and is carried as written.
 //!
 //! Every source is read through one no-follow open beneath a handle on the
-//! worktree root (`nofollow`), so that open is where containment is
+//! worktree root (`storage::capability_fs`), so that open is where containment is
 //! established rather than checked: a resolution leaving the worktree is
 //! refused, a link at the name itself is refused, and the bytes and the mode a
 //! source is judged against both come from the handle it returns. Whether a
@@ -28,12 +28,14 @@
 //! Publication belongs to the caller — this module reads and validates, and the
 //! command layer packs or places the result.
 
-use super::nofollow::{classify_open_failure, is_executable, open_path_nofollow, OpenRefusal};
 use super::{
     ProfilePackage, ProfilePackageError, ProfilePackageModel, LIVE_ASSET_SOURCE_PREFIX,
     MANIFEST_FILE_NAME,
 };
 use crate::repository_state::{FileMode, RepositoryLayout, RepositoryLayoutError, VirtualPath};
+use crate::storage::capability_fs::{
+    classify_open_failure, is_executable, open_path_nofollow, LeafKind, OpenRefusal,
+};
 use cap_std::ambient_authority;
 use cap_std::fs::Dir as CapDir;
 use std::collections::{BTreeMap, BTreeSet};
@@ -301,19 +303,15 @@ fn read_confined(
         source,
     };
     let relative = worktree_relative(path, layout, declared)?;
-    let opened =
-        open_path_nofollow(worktree, &relative, false).map_err(
-            |error| match classify_open_failure(&error) {
-                OpenRefusal::Symlink => refusal(symlinked_source),
-                OpenRefusal::Escape => refusal(source_outside_worktree),
-                OpenRefusal::Unopenable => refusal(irregular_source),
-                OpenRefusal::Io => unreadable(error),
-            },
-        )?;
+    let opened = open_path_nofollow(worktree, &relative, LeafKind::File).map_err(|error| {
+        match classify_open_failure(&error) {
+            OpenRefusal::Symlink => refusal(symlinked_source),
+            OpenRefusal::Escape => refusal(source_outside_worktree),
+            OpenRefusal::Unopenable => refusal(irregular_source),
+            OpenRefusal::Io => unreadable(error),
+        }
+    })?;
     let metadata = opened.metadata().map_err(unreadable)?;
-    if !metadata.is_file() {
-        return Err(refusal(irregular_source));
-    }
     let mut bytes = Vec::new();
     (&opened).read_to_end(&mut bytes).map_err(unreadable)?;
     Ok(ReadSource {

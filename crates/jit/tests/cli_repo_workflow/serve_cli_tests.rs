@@ -355,19 +355,17 @@ fn test_serve_status_json_has_required_fields_when_not_running() {
     assert!(v.get("status").is_some(), "must have 'status' field");
 }
 
-// ── --stop: stale PID with pid=0 guard ───────────────────────────────────────
+// ── --stop: reject a PID the process guard refuses ───────────────────────────
 
 #[test]
 fn test_serve_stop_rejects_pid_zero_gracefully() {
     let cli = JitCli::initialised().unwrap();
-    // A PID of 0 is not alive (is_process_alive returns false), so it should
-    // be treated as stale and cleaned up rather than attempting to signal it.
+    // PID 0 is refused before the signal path and its record remains for inspection.
     write_stale_pid(&cli, 0, 3052);
+    let pid_file = cli.root().join(".jit").join("server.pid.json");
 
-    assert!(cli
-        .run(["serve", "--stop"])
-        .unwrap()
-        .contains("not running"));
+    assert!(cli.run(["serve", "--stop"]).is_err());
+    assert!(pid_file.exists());
 }
 
 // ── serve end-to-end: the parent must release the recovery lock ───────────────

@@ -117,19 +117,16 @@ mod tests {
     }
 
     #[test]
-    fn test_assemble_configuration_rejects_template_type_outside_declared_hierarchy() {
+    fn test_assemble_configuration_rejects_template_container_type_outside_declared_hierarchy() {
         let error = assemble_configuration(
             Some(b"[type_hierarchy]\ntypes = { epic = 1, task = 2 }\n"),
-            Some(
-                b"[[template]]\nname = \"t\"\napplies_to = [\"epic\"]\n\
-                  [[template.nodes]]\nrole = \"r\"\ntype = \"undeclared\"\n",
-            ),
+            Some(b"[[template]]\nname = \"t\"\napplies_to = [\"undeclared\"]\n"),
             None,
         )
         .unwrap_err();
         assert!(matches!(
             error,
-            ConfigurationAssemblyError::Templates(TemplateConfigError::UnknownType { .. })
+            ConfigurationAssemblyError::Templates(TemplateConfigError::UnknownAppliesToType { .. })
         ));
     }
 

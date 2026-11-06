@@ -733,21 +733,16 @@ impl<S: IssueStore> GateOps<'_, S> {
             return Err(anyhow!("Must provide at least one gate key"));
         }
 
-        let full_id = issue_id.clone();
-
-        // Collect warnings instead of printing
-        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
-
+        let (_, outcome, warnings) =
+            self.exec
+                .publish_captured_issue_mutation(CapturedIssueMutation::AddGates {
+                    issue_id: issue_id.clone(),
+                    gate_keys: gate_keys.to_vec(),
+                })?;
         let CapturedIssueMutationOutcome::GatesAdded {
             added,
             already_exist,
-        } = self
-            .exec
-            .publish_captured_issue_mutation(CapturedIssueMutation::AddGates {
-                issue_id: full_id,
-                gate_keys: gate_keys.to_vec(),
-            })?
-            .1
+        } = outcome
         else {
             return Err(anyhow!("unexpected result from captured gate addition"));
         };
@@ -777,19 +772,13 @@ impl<S: IssueStore> GateOps<'_, S> {
             return Err(anyhow!("Must provide at least one gate key"));
         }
 
-        let full_id = issue_id.clone();
-
-        // Collect warnings instead of printing
-        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
-
-        let CapturedIssueMutationOutcome::GatesRemoved { removed, not_found } = self
-            .exec
-            .publish_captured_issue_mutation(CapturedIssueMutation::RemoveGates {
-                issue_id: full_id,
-                gate_keys: gate_keys.to_vec(),
-            })?
-            .1
-        else {
+        let (_, outcome, warnings) =
+            self.exec
+                .publish_captured_issue_mutation(CapturedIssueMutation::RemoveGates {
+                    issue_id: issue_id.clone(),
+                    gate_keys: gate_keys.to_vec(),
+                })?;
+        let CapturedIssueMutationOutcome::GatesRemoved { removed, not_found } = outcome else {
             return Err(anyhow!("unexpected result from captured gate removal"));
         };
 
@@ -838,10 +827,6 @@ impl<S: IssueStore> GateOps<'_, S> {
             .map(|s| s.parse::<crate::domain::Assignee>())
             .transpose()?;
         let full_id = issue_id.clone();
-
-        // Collect warnings instead of printing
-        let mut warnings = self.exec.refuse_foreign_lease(&full_id)?;
-
         let issue = self.exec.storage.load_issue(&full_id)?;
 
         if !issue.gates_required.contains(gate_key) {
@@ -868,7 +853,7 @@ impl<S: IssueStore> GateOps<'_, S> {
             } else {
                 crate::commands::VerdictSource::ReuseUnchangedInputs
             };
-            let result = self.check_gate_with(&full_id, gate_key, source)?;
+            let (result, mut warnings) = self.check_gate_with(&full_id, gate_key, source)?;
             if result.status != GateRunStatus::Passed {
                 return Err(GatePassFailed {
                     issue_id: full_id,
@@ -899,13 +884,14 @@ impl<S: IssueStore> GateOps<'_, S> {
             .into());
         };
 
-        self.exec
-            .publish_captured_issue_mutation(CapturedIssueMutation::SetManualGateStatus {
+        let (_, _, warnings) = self.exec.publish_captured_issue_mutation(
+            CapturedIssueMutation::SetManualGateStatus {
                 issue_id: full_id.clone(),
                 gate_key: gate_key.clone(),
                 status: GateStatus::Passed,
                 by: Some(by),
-            })?;
+            },
+        )?;
 
         Ok(GatePassOutcome { warnings })
     }
@@ -996,10 +982,6 @@ impl<S: IssueStore> GateOps<'_, S> {
             .map(|s| s.parse::<crate::domain::Assignee>())
             .transpose()?;
         let full_id = issue_id.clone();
-
-        // Collect warnings instead of printing
-        let warnings = self.exec.refuse_foreign_lease(&full_id)?;
-
         let issue = self.exec.storage.load_issue(&full_id)?;
 
         if !issue.gates_required.contains(gate_key) {
@@ -1021,13 +1003,14 @@ impl<S: IssueStore> GateOps<'_, S> {
             }
         }
 
-        self.exec
-            .publish_captured_issue_mutation(CapturedIssueMutation::SetManualGateStatus {
+        let (_, _, warnings) = self.exec.publish_captured_issue_mutation(
+            CapturedIssueMutation::SetManualGateStatus {
                 issue_id: full_id,
                 gate_key: gate_key.clone(),
                 status: GateStatus::Failed,
                 by,
-            })?;
+            },
+        )?;
 
         Ok(warnings)
     }
