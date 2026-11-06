@@ -104,7 +104,9 @@ One image carries the whole containerized deployment: a single `jit-server`
 process serving the API and the built web UI on port 3000, against a whole
 repository bind-mounted at `/repo`. `.jit/` and the project documents linked
 from it stay in their repository context, so search and document reads resolve
-the same paths they do natively.
+the same paths they do natively. The runtime image includes the `git`
+executable for document history, diffs, and reads at a commit in the mounted
+Git repository.
 
 ### Build the Image
 

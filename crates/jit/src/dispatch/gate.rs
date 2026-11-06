@@ -591,6 +591,7 @@ const EVALUATION_FAILURE_CODES: &[ErrorCode] = &[
     ErrorCode::RepositoryNotFound,
     ErrorCode::RepositoryFormatUnsupported,
     ErrorCode::LockTimeout,
+    ErrorCode::RetryableConflict,
 ];
 
 /// Each requested issue in argument order, an unresolved id failing its own
@@ -700,9 +701,9 @@ command_group! {
         "gate_status-all" => GateCommands::StatusAll { id, full } => status_all(id, full)
             findings GateFailed "One or more required gates have not passed." -> ForIssue<GateCheckAllResponse>,
         "gate_evaluate" => GateCommands::Evaluate { id, gate_key, gate_flag, by, force } => evaluate(id, gate_key, gate_flag, by, force)
-            raises [GateFailed] -> GateEvaluateResponse,
+            raises [GateFailed, RetryableConflict] -> GateEvaluateResponse,
         "gate_evaluate-all" => GateCommands::EvaluateAll { id, by, force } => evaluate_all(id, by, force)
-            raises [GateFailed] -> GateEvaluateAllResponse,
+            raises [GateFailed, RetryableConflict] -> GateEvaluateAllResponse,
         "gate_evaluate-many" => GateCommands::EvaluateMany { gate_key, ids, by, force } => evaluate_many(gate_key, ids, by, force)
             findings [EVALUATION_FAILURE_CODES] "The first failing target determines the classified code and status; the findings report retains every target's result."
             -> GateEvaluateManyResponse,

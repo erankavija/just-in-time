@@ -1094,7 +1094,7 @@ fn test_read_repo_file_reads_present_files_and_refuses_unsafe_paths<B: Backend>(
     assert_eq!(read("project-items.md").unwrap().as_deref(), Some("hello"));
     assert_eq!(read(".jit/notes.md").unwrap().as_deref(), Some("data"));
     assert_eq!(read("missing.md").unwrap(), None);
-    for path in ["", "/etc/passwd", "../escape.md"] {
+    for path in ["", "/etc/passwd", "../escape.md", "./a"] {
         assert!(
             matches!(read(path), Err(PathReadError::InvalidPath(_))),
             "{path:?} was not refused"

@@ -10,6 +10,7 @@ use super::gate_run_reader::TreeNode;
 use crate::declarations::GateRegistry;
 use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
+use crate::domain::relative_path::RootRelativePath;
 use crate::domain::{Event, Issue};
 use crate::repository_state::{
     RepositoryIndex, RepositoryIndexError, RepositoryLayout, RepositoryRootClass, VirtualPath,
@@ -519,8 +520,10 @@ impl JsonFileStorage {
             .unwrap_or_else(|_| Path::new(""));
         let translate = |request: &(String, String)| {
             let path = if prefix.as_os_str().is_empty()
-                || crate::storage::validate_repo_relative_path(&request.1).is_err()
-            {
+                || !matches!(
+                    RootRelativePath::parse(&request.1),
+                    Ok(RootRelativePath::Descendant(_))
+                ) {
                 request.1.clone()
             } else {
                 prefix.join(&request.1).to_string_lossy().replace('\\', "/")
@@ -1207,7 +1210,13 @@ impl IssueStore for JsonFileStorage {
         rel_path: &str,
     ) -> Result<Option<String>, crate::storage::PathReadError> {
         use crate::storage::PathReadError;
-        crate::storage::validate_repo_relative_path(rel_path)?;
+        let relative = RootRelativePath::parse(rel_path)
+            .map_err(|error| PathReadError::InvalidPath(error.to_string()))?;
+        if relative.is_root() {
+            return Err(PathReadError::InvalidPath(
+                "repository root is not a file path".to_string(),
+            ));
+        }
         let layout = self.configured_layout().map_err(PathReadError::Other)?;
         let path = layout
             .classify_repository_relative(rel_path)
@@ -1233,12 +1242,13 @@ impl IssueStore for JsonFileStorage {
     ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
         use crate::storage::PathReadError;
 
-        // Uniform repo-relative path validation (applied for both git-commit
-        // reads and working-tree reads): reject empty paths, absolute paths,
-        // and any `..` segment used for traversal.  This moves the invariant
-        // out of individual route handlers and into the storage boundary so
-        // every caller inherits it.
-        crate::storage::validate_repo_relative_path(path)?;
+        let relative = RootRelativePath::parse(path)
+            .map_err(|error| PathReadError::InvalidPath(error.to_string()))?;
+        if relative.is_root() {
+            return Err(PathReadError::InvalidPath(
+                "repository root is not a file path".to_string(),
+            ));
+        }
 
         let layout = self.configured_layout().map_err(PathReadError::Other)?;
         let repo_root = layout.worktree_root();
@@ -1284,7 +1294,7 @@ impl IssueStore for JsonFileStorage {
                 let tree_path = repo_root
                     .strip_prefix(top)
                     .unwrap_or_else(|_| Path::new(""))
-                    .join(path);
+                    .join(relative.as_path());
                 let tree_path = tree_path.to_str().ok_or_else(|| {
                     PathReadError::InvalidPath("Git path is not valid UTF-8".to_string())
                 })?;
@@ -1303,8 +1313,6 @@ impl IssueStore for JsonFileStorage {
                 }
                 Ok((blob.bytes().to_vec(), commit_id[..7].to_string()))
             } else {
-                let relative = crate::domain::relative_path::RootRelativePath::parse(path)
-                    .map_err(|error| PathReadError::InvalidPath(error.to_string()))?;
                 crate::storage::capability_fs::read_repository_file_confined(repo_root, &relative)
                     .map_err(|error| map_confined_read_error(error, path))?
                     .map(|bytes| (bytes, "working-tree".to_string()))
@@ -2751,7 +2759,7 @@ mod tests {
         let worktree = TempDir::new().unwrap();
         let repository = GitRepository::init(worktree.path());
         let expected = b"binary\0bytes\xff\n";
-        repository.write("assets/data\n.bin", expected);
+        repository.write("assets/data.bin", expected);
         let commit = repository.commit("binary asset");
         repository.git(&["tag", "-a", "asset-tag", "-m", "tag"]);
         let stand_in = GitStandIn::new();
@@ -2759,7 +2767,7 @@ mod tests {
         let storage = JsonFileStorage::with_git(&data, Git::with_program(stand_in.program()));
         configure_test_layout(&storage, worktree.path(), &data);
 
-        let result = storage.read_path_bytes("assets/data\n.bin", Some("asset-tag"));
+        let result = storage.read_path_bytes("assets/data.bin", Some("asset-tag"));
 
         assert_eq!(
             result.unwrap(),
@@ -2810,6 +2818,15 @@ mod tests {
             storage.read_path_bytes("assets/missing.bin", Some(&commit)),
             Err(PathReadError::NotFound(_))
         ));
+        for path in ["a//b", "a:b"] {
+            assert!(
+                matches!(
+                    storage.read_path_bytes(path, Some(&commit)),
+                    Err(PathReadError::InvalidPath(_))
+                ),
+                "pinned read of {path:?} was not refused as an invalid path"
+            );
+        }
     }
 
     #[test]

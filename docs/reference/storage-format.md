@@ -149,6 +149,13 @@ commands read through the driver:
 - `jit issue batch-create --dry-run`
 - `jit profile apply --dry-run` and `jit profile diff`
 - `jit profile add --dry-run` and `jit profile pack --dry-run`
+- the declarations of `jit graph tree`, `jit graph export`, `jit query
+  strategic`, `jit query divergence`, `jit item list`, `jit item search`,
+  `jit item show`, `jit item resolve`, `jit issue show`, `jit doc list`,
+  `jit doc show`, `jit doc dir`, `jit doc conformance`, `jit doc history`,
+  `jit doc diff`, `jit label namespaces` and `jit config show-hierarchy`
+- the declarations of the server's `/graph`, `/config/hierarchy`,
+  `/config/namespaces`, issue and document routes
 
 Issue listings also admit one snapshot over every contributing data root before
 serving it. Other read-only commands may read individual files as they stand,
@@ -510,8 +517,9 @@ the **shared control plane**, not `.jit/`. `.jit/` is per-worktree data;
 common directory), because a lease must be visible to every worktree racing to
 claim the same issue. The repository is the one holding the data root; for a
 data root outside every checkout, it is the one holding the invoking directory.
-`jit claim` requires a git repository for this reason: with neither, it fails
-with exit code 10 rather than falling back to a
+`jit claim` requires the `git` executable on `PATH` and a Git repository for
+this reason ([Git Optional](../concepts/guarantees.md#git-optional)): with
+neither, it fails with exit code 10 rather than falling back to a
 per-worktree lease store.
 
 ```

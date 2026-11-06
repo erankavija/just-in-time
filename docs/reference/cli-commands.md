@@ -549,7 +549,7 @@ one `[variables]` string table) and repeated `--set NAME=VALUE` flags. Values
 resolve in declaration-default, values-file, declared-environment, then
 command-line order; later `--set` occurrences win.
 
-Inside a git repository, init also creates a worktree identity
+When the `git` executable on `PATH` identifies a Git repository ([Git Optional](../concepts/guarantees.md#git-optional)), init also creates a worktree identity
 (`repository_id`, format `wt:<8-hex>`) used for lease/claim coordination, and
 sets up a `.gitattributes` union-merge driver for `events.jsonl` under the
 selected data directory (default `.jit/events.jsonl`, so concurrent worktrees'
@@ -594,8 +594,9 @@ existed without the jit merge-driver block, this run instead appends to it and
 lists it under `modified_paths`; if it already carried the block, neither list
 mentions it.
 
-`repository_id` is `null` outside a git repository. The
-unsupported-repository-format startup failure (see **Scripting and Automation
+`repository_id` is `null` when the `git` executable is unavailable on `PATH` or
+does not identify a Git repository ([Git Optional](../concepts/guarantees.md#git-optional)).
+The unsupported-repository-format startup failure (see **Scripting and Automation
 § Exit Codes** below) emits the standard `--json` error envelope
 (`REPOSITORY_FORMAT_UNSUPPORTED` / exit `10`).
 
@@ -729,9 +730,10 @@ and all coupled derived targets publish through that one redo record, with
 strict managed-region composition as described in
 [Repository Profiles](profiles.md).
 
-In a git repository, apply refuses with `PROFILE_UNCOMMITTED_TARGETS` (exit
+When the `git` executable on `PATH` identifies a Git repository, apply refuses
+with `PROFILE_UNCOMMITTED_TARGETS` (exit
 `4`) while a path it would write differs from HEAD (modified, staged, or
-untracked), and `--dry-run` refuses the same way. Each written path is judged by
+untracked), and `--dry-run` refuses the same way ([Git Optional](../concepts/guarantees.md#git-optional)). Each written path is judged by
 the checkout that holds it, and a path in no checkout is never refused. The
 error's `details.paths` lists each such path and `details.resolution` states
 that committing or discarding those changes lets the apply proceed; the
@@ -2742,9 +2744,11 @@ issue can find the design note, spec, or report that belongs with it. The file
 itself stays in the repository; jit stores the reference. `jit document` is a
 visible alias of `jit doc`.
 
-Reading a document at a commit needs a git repository: `history` and `diff`
-always, and `show` whenever `--at` is given or the reference itself is pinned to
-a commit. The rest of the family works without git.
+Reading a document at a commit requires both the `git` executable on `PATH` and
+a Git repository ([Git Optional](../concepts/guarantees.md#git-optional)):
+`history` and `diff` always, and `show` whenever `--at` is given or the
+reference itself is pinned to a commit. The rest of the family works without
+git.
 
 ### `jit doc add`
 
@@ -3285,7 +3289,7 @@ jit validate --branch-drift [--leases]
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
 | `--scope <ID>` | Reports the findings of the issues in a container's transitive dependency closure, bounded at its template's breakdown node, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
 | `--fix` | Publish every automatic rule/graph/state fix and derived-state repair through one mutation, then report over the fixed repository as plain `validate` does, exit status included, whether or not a fix applied. `--dry-run` reports what would be fixed and writes nothing. See [repairs](worktree-validate.md#repairs). |
-| `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires git. |
+| `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires the `git` executable on `PATH` and a Git repository ([Git Optional](../concepts/guarantees.md#git-optional)). |
 | `--leases` | Check lease records for expiry and references to missing worktrees or issues. Plain validation does not check leases. |
 
 The per-issue, `--rule`, `--explain`, and `--scope` modes are views: selections
@@ -3359,8 +3363,10 @@ The human error reports the same cause, and no repair target is written.
 Like every mutating command, apply a leftover redo record when the session
 opens ([Publication and Recovery](storage-format.md#publication-and-recovery)),
 then run the repair routines in sequence: repair declaration-derived state
-through the `jit validate --fix` path; in a Git repository, clear claim locks
-left by dead processes (checked by PID), evict expired leases, reclaim indefinite leases whose
+through the `jit validate --fix` path; when the `git` executable on `PATH`
+identifies a Git repository ([Git Optional](../concepts/guarantees.md#git-optional)),
+clear claim locks left by dead processes (checked by PID), evict expired leases,
+reclaim indefinite leases whose
 heartbeat is [stale](claim.md#staleness), and remove interrupted lease
 operations' stage files; and remove orphaned `*.tmp` files under `.jit/` and
 under `.git/jit/leases/` older than the [cleanup threshold](runtime-defaults.md).
@@ -3672,9 +3678,9 @@ jit snapshot export [OPTIONS]
 | `--out <OUT>` | Output path. Defaults to `snapshot-YYYYMMDD-HHMMSS`. |
 | `--format <FORMAT>` | `dir` (default) or `tar`. |
 | `--scope <SCOPE>` | `all` (default), `issue:<ID>`, or `label:<namespace>:<value>`. |
-| `--at <AT>` | Export the documents as of a git commit or tag. Requires a git repository. |
+| `--at <AT>` | Export the documents as of a git commit or tag. Requires the `git` executable on `PATH` and a Git repository ([Git Optional](../concepts/guarantees.md#git-optional)). |
 | `--working-tree` | Export the documents from the working tree instead of git. |
-| `--committed-only` | Fail when uncommitted documents or assets exist. Requires git, and implies `--at HEAD`. |
+| `--committed-only` | Fail when uncommitted documents or assets exist. Requires the `git` executable on `PATH` and a Git repository ([Git Optional](../concepts/guarantees.md#git-optional)); implies `--at HEAD`. |
 | `--force` | Skip repository validation before exporting. |
 
 ```bash

@@ -16,7 +16,7 @@ This tutorial guides you through setting up parallel work using git worktrees. Y
 ## Before You Start
 
 You need:
-- A git repository with jit initialized
+- A Git repository with jit initialized and the `git` executable on `PATH` ([Git Optional](../concepts/guarantees.md#git-optional))
 - Basic understanding of git worktrees ([git-worktree docs](https://git-scm.com/docs/git-worktree))
 
 ## Step 1: Create a Secondary Worktree

@@ -1,0 +1,38 @@
+{
+  "branch": "worktree-agent-23b48cf0",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "08a7080d1583a099ee3917dcc7a22f0a4a8e0aa6",
+  "completed_at": "2026-11-06T05:28:58.384834810Z",
+  "duration_ms": 168573,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/claim.md",
+        "id": "F1",
+        "line": 104,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Git-dependent command references name only a repository, omitting the required git executable on PATH."
+      }
+    ],
+    "summary": "Git-executable prerequisites remain omitted from directly affected command references.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "23b48cf0-02af-4286-a788-bcda0ec32abf",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9c0843d7-855b-46f5-acfa-82f8e19196ee",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T05:26:09.811721062Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 33283 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /mnt/nvme/jit/agents/worktrees/agent-23b48cf0\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1af52-5145-7a93-be03-964e1adabecf\n--------\nuser\n--- 33270 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `task` is a configured leaf (level 4) with no resolved children. I inspected both reachable `jit:23b48cf0` commits separately; only `ab7d3b0` changes adopter documentation.\n\nThe central guarantee, installation note, and deployment guide are accurate, but directly affected command references still describe a Git repository as the only prerequisite.\n\n1. **F1 — blocking, issue-impact (high):** Git-dependent command references omit the required `git` executable on `PATH`. Update [docs/reference/claim.md](/mnt/nvme/jit/agents/worktrees/agent-23b48cf0/docs/reference/claim.md:104), [docs/reference/cli-commands.md](/mnt/nvme/jit/agents/worktrees/agent-23b48cf0/docs/reference/cli-commands.md:2745), [docs/reference/cli-commands.md](/mnt/nvme/jit/agents/worktrees/agent-23b48cf0/docs/reference/cli-commands.md:3675), and [docs/reference/storage-format.md](/mnt/nvme/jit/agents/worktrees/agent-23b48cf0/docs/reference/storage-format.md:513) to say these operations require both the executable and a Git repository (and a resolvable `HEAD` for leases).\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Git-executable prerequisites remain omitted from directly affected command references.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Git-dependent command references name only a repository, omitting the required git executable on PATH.\",\"file\":\"docs/reference/claim.md\",\"line\":104}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

@@ -65,7 +65,7 @@ use super::package::{
     ProfilePackage, ProfilePackageError, MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
 };
 use crate::domain::identity::ProfileId;
-use crate::domain::repository_inputs::is_safe_relative_path;
+use crate::domain::relative_path::RootRelativePath;
 use crate::repository_state::FileMode;
 use crate::tar_format::reproducible_tar_header;
 use serde::{Deserialize, Serialize};
@@ -574,7 +574,10 @@ fn entry_name<R: Read>(entry: &tar::Entry<'_, R>) -> Result<String, PackageArchi
     // A tar directory entry conventionally carries a trailing separator, which
     // the shared path rule refuses as an empty final segment.
     let name = name.strip_suffix('/').unwrap_or(name);
-    if !is_safe_relative_path(name) {
+    if !matches!(
+        RootRelativePath::parse(name),
+        Ok(RootRelativePath::Descendant(_))
+    ) {
         return Err(unsafe_path());
     }
     Ok(name.to_string())

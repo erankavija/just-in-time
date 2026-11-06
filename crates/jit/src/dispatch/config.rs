@@ -70,7 +70,7 @@ pub(super) fn dispatch_validation(
     crate::output::emit_outcome(&outcome, mode, out, err)
 }
 
-fn show_hierarchy<S: IssueStore>(
+fn show_hierarchy<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
 ) -> HandlerResult<TypeHierarchyResponse> {
     Ok(Outcome::success_with(
@@ -88,7 +88,7 @@ command_group! {
         "config_set" => ConfigCommands::Set { key, value } => set(key, value) -> ConfigSetResponse,
         "config_validate" => ConfigCommands::Validate => validate()
             findings ValidationFailed "The repo or environment-variable configuration failed to load or carried an invalid value." -> ConfigValidateResponse,
-        "config_show-hierarchy" => ConfigCommands::ShowHierarchy => show_hierarchy() -> TypeHierarchyResponse,
+        "config_show-hierarchy" => ConfigCommands::ShowHierarchy => show_hierarchy() raises [RetryableConflict] -> TypeHierarchyResponse,
     }
 }
 
