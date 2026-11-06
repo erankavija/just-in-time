@@ -3395,6 +3395,34 @@ jit apply <TEMPLATE> <CONTAINER> [--anchor <ROLE=ID>] [--force]
 
 The container's `type:` label must be one of the template's `applies_to` types.
 
+Applying a template requires the repository declarations it names: each node
+`type` in `[type_hierarchy].types`, each namespace of a label a node writes in
+`[namespaces]`, each node or anchor gate as a gate preset or in the gate
+registry, and each node `doc_area` in `[documentation] issue_scoped_areas`. An
+empty type hierarchy or namespace registry requires nothing. Apply checks every
+requirement before it creates anything, and one failure (`VALIDATION_FAILED`)
+names all the unmet ones. `--json` puts them in `details`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "details": {
+      "template": "plan",
+      "unmet": [
+        { "kind": "type", "name": "planning" },
+        { "kind": "label-namespace", "name": "brackets" },
+        { "kind": "gate", "name": "plan-review" },
+        { "kind": "documentation-area", "name": "dev/active" }
+      ]
+    }
+  }
+}
+```
+
+`jit validate` reports a template node type the declared hierarchy lacks
+before the template is applied.
+
 ```bash
 jit apply plan epic-123
 jit apply plan epic-123 --json

@@ -156,6 +156,15 @@ fn derive_guidance(error: &anyhow::Error) -> Guidance {
     if let Some(batch) = error.downcast_ref::<DependencyBatchRejectedError>() {
         return Guidance::of(dependency_batch_json_error(batch));
     }
+    if let Some(unmet) = error.downcast_ref::<crate::templates::TemplatePrerequisitesUnmetError>() {
+        return Guidance {
+            details: Some(serde_json::json!({
+                "template": unmet.template(),
+                "unmet": unmet.unmet(),
+            })),
+            suggestions: Vec::new(),
+        };
+    }
     if let Some(id_error) = id_resolution_error(error) {
         return Guidance::of(id_error);
     }
@@ -324,6 +333,9 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
             .is_some()
         || error
             .downcast_ref::<crate::repository_state::ManagedDocumentError>()
+            .is_some()
+        || error
+            .downcast_ref::<crate::templates::TemplatePrerequisitesUnmetError>()
             .is_some()
     {
         return ErrorCode::ValidationFailed;

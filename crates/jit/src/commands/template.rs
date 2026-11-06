@@ -24,6 +24,7 @@ use crate::repository_state::{
 use crate::storage::IssueNotFoundError;
 use crate::templates::{
     declared_container_label, GraphTemplate, InterpolationContext, RoleBindings,
+    TemplatePrerequisitesUnmetError,
 };
 use serde::Serialize;
 
@@ -155,6 +156,25 @@ impl UpstreamMoveReport {
             container: container.clone(),
             moves,
         }))
+    }
+}
+
+/// Check every requirement of `template` against the repository's declarations.
+///
+/// # Errors
+///
+/// [`TemplatePrerequisitesUnmetError`] naming every unmet requirement.
+fn require_template_prerequisites(
+    template: &GraphTemplate,
+    config: &crate::config::JitConfig,
+    registry: &crate::declarations::GateRegistry,
+    presets: &HashMap<GateKey, crate::gate_presets::GatePresetDefinition>,
+) -> std::result::Result<(), TemplatePrerequisitesUnmetError> {
+    let unmet = template.unmet_requirements(config, registry, presets);
+    if unmet.is_empty() {
+        Ok(())
+    } else {
+        Err(TemplatePrerequisitesUnmetError::new(&template.name, unmet))
     }
 }
 
@@ -474,12 +494,25 @@ fn template_operation_capture_paths(
     let issues = parse_template_issues(image)?;
     let full_container_id = super::require_issue_in_capture(&issues, container_id)?;
     let container = template_issue(&issues, &full_container_id)?;
+    // A template with unmet prerequisites writes no document; the derivation
+    // reports them after its container checks.
+    let prerequisites_met = require_template_prerequisites(
+        &template,
+        &config,
+        &parse_template_gate_registry(image)?,
+        &parse_template_presets(image)?,
+    )
+    .is_ok();
     let declarations = DocumentDeclarations::from_config(&config)?;
-    let mut paths =
+    let documents = if prerequisites_met {
         template_document_paths(&template, &config.templates.roles, container, &declarations)?
-            .into_iter()
-            .map(|document| VirtualPath::worktree(document).map_err(Into::into))
-            .collect::<Result<Vec<_>>>()?;
+    } else {
+        Vec::new()
+    };
+    let mut paths = documents
+        .into_iter()
+        .map(|document| VirtualPath::worktree(document).map_err(Into::into))
+        .collect::<Result<Vec<_>>>()?;
     let already_applied =
         find_captured_breakdown(&template, &config.templates.roles, container, &issues)?.is_some();
     if !already_applied {
@@ -678,6 +711,7 @@ fn derive_template_apply(
             ))
         }
     }
+    require_template_prerequisites(template, config, &registry, presets)?;
 
     let resolved_bindings = template
         .anchors
@@ -1330,6 +1364,7 @@ mod tests {
     use super::*;
     use crate::commands::template_expand::test_declarations as declared;
     use crate::domain::artifact_directory::ArtifactDirectoryError;
+    use crate::templates::TemplateRequirement;
 
     #[test]
     fn test_named_template_resolution_returns_typed_invalid_argument_for_unknown_name() {
@@ -1571,6 +1606,97 @@ mod tests {
         assert!(message.contains(&undeclared), "{message}");
         assert!(message.contains(declared::AREA), "{message}");
         assert!(refresh(declared::AREA).is_ok());
+    }
+
+    /// The shared bracket template with a gate on each of its nodes, so it
+    /// requires every requirement kind.
+    fn gated_template() -> GraphTemplate {
+        let mut template =
+            declared::document_template("{container.dir}/plan.md", Some(declared::AREA));
+        template
+            .nodes
+            .iter_mut()
+            .for_each(|node| node.gates = vec![format!("{}-review", node.role).parse().unwrap()]);
+        template
+    }
+
+    fn config_from(toml: &str) -> crate::config::JitConfig {
+        toml::from_str(toml).expect("fixture configuration parses")
+    }
+
+    #[test]
+    fn test_require_template_prerequisites_reports_every_unmet_requirement_with_its_kind() {
+        let template = gated_template();
+        // A repository with a vocabulary of its own: it declares the type label
+        // namespace and nothing else the template needs.
+        let config = config_from(&format!(
+            "[type_hierarchy]\ntypes = {{ epic = 1 }}\n\
+             [namespaces.{}]\ndescription = \"Issue type\"\nunique = true\n\
+             [documentation]\nissue_scoped_areas = [\"elsewhere\"]\n",
+            crate::labels::TYPE_NAMESPACE
+        ));
+
+        let error = require_template_prerequisites(
+            &template,
+            &config,
+            &crate::declarations::GateRegistry::default(),
+            &HashMap::new(),
+        )
+        .unwrap_err();
+
+        let met = TemplateRequirement::LabelNamespace(crate::labels::TYPE_NAMESPACE.to_string());
+        let expected = template
+            .requirements()
+            .into_iter()
+            .filter(|requirement| requirement != &met)
+            .collect::<Vec<_>>();
+        assert_eq!(error.unmet(), expected.as_slice());
+        let kinds = error
+            .unmet()
+            .iter()
+            .map(std::mem::discriminant)
+            .collect::<HashSet<_>>();
+        assert_eq!(kinds.len(), 4, "every requirement kind is reported");
+        let message = error.to_string();
+        assert!(
+            expected
+                .iter()
+                .all(|requirement| message.contains(&requirement.to_string())),
+            "{message}"
+        );
+    }
+
+    #[test]
+    fn test_require_template_prerequisites_accepts_a_repository_declaring_every_requirement() {
+        let template = gated_template();
+        let config = config_from(&format!(
+            "[type_hierarchy]\ntypes = {{ epic = 1, planning = 2, breakdown = 2 }}\n\
+             [namespaces.{}]\ndescription = \"Issue type\"\nunique = true\n\
+             [namespaces.brackets]\ndescription = \"Bracketed container\"\nunique = false\n\
+             [documentation]\nissue_scoped_areas = [\"{}\"]\n",
+            crate::labels::TYPE_NAMESPACE,
+            declared::AREA
+        ));
+        let registry = crate::test_harness::manual_gate_registry(
+            &crate::test_harness::template_gate_keys(&template),
+        );
+
+        require_template_prerequisites(&template, &config, &registry, &HashMap::new()).unwrap();
+    }
+
+    #[test]
+    fn test_require_template_prerequisites_requires_no_vocabulary_of_an_empty_registry() {
+        let template = declared::document_template("{container.dir}/plan.md", None);
+        // No type hierarchy and no namespace registry: the repository declares
+        // no vocabulary, so the template's types and namespaces require none.
+        let unmet = require_template_prerequisites(
+            &template,
+            &config_from(""),
+            &crate::declarations::GateRegistry::default(),
+            &HashMap::new(),
+        );
+
+        assert!(unmet.is_ok(), "{unmet:?}");
     }
 
     #[test]

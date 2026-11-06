@@ -49,7 +49,7 @@ command_group! {
     storage: [HandlerStore],
     leaves: {
         "apply" => ApplyArgs { template, container, anchor, force } => apply(&template, &container, &anchor, force)
-            raises [CycleDetected] -> TemplateApplyResponse,
+            raises [CycleDetected, ValidationFailed] -> TemplateApplyResponse,
     }
 }
 
