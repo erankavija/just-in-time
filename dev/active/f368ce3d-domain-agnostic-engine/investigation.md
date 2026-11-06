@@ -192,13 +192,13 @@ Production sources searched: `crates/*/src` (test modules excluded), `web/src` (
 | REQ | Sites | Overlapping work |
 |---|---|---|
 | REQ-02 | `labels.rs`, `commands/issue.rs:1051-1067`, `commands/mod.rs:1323-1331`, `config.rs:378-389`, `cli.rs:1115` | 783b33fa (`commands/issue.rs`, `commands/mod.rs`; release actor, different function); b697a3f7 field-update and readiness work in `issue.rs`/`mod.rs`; c2b3cefa (`cli.rs`). |
-| REQ-04 | `templates.rs:841-955`, `template_expand.rs:196-211,350`, `commands/template.rs:942,1016` | cd1da611 adds a `{container.slug}` token to `InterpolationContext` (its text cites `commands/template.rs`; the struct is in `templates.rs:841`); 0723860e (template apply prerequisites, `template_expand.rs`/`template.rs`); c2b3cefa and 1a737bb4 (`commands/template.rs`); b697a3f7 (`TemplateRegistry::load`). |
+| REQ-04 | `templates.rs:841-955`, `template_expand.rs:196-211,350`, `commands/template.rs:942,1016` | cd1da611 adds a `{container.slug}` token to `InterpolationContext` (its text cites `commands/template.rs`; the struct is in `templates.rs:841`); 0723860e (template apply prerequisites, `template_expand.rs`/`template.rs`); c2b3cefa and 1a737bb4 (`commands/template.rs`); b697a3f7 / cfc87a55 (registry file loaders in `templates.rs` removed in favour of the storage configuration loader). |
 | REQ-05 | `link_validator.rs`, `commands/document.rs:1261` | b697a3f7 ("snapshot and link-check scopes, with one scope type"). |
 | REQ-06 | `labels.rs`, `cli.rs:135-149`, `commands/query.rs`, `commands/search.rs` | c2b3cefa, 1a737bb4 (`cli.rs`). |
 | REQ-07 | `commands/query.rs:139-160` | 030df4b1 (read paths from captured declarations); b697a3f7 REQ-10 (no disk config caches). |
 | REQ-08 | `web/src/utils/*`, `GraphView.tsx`; `graph/hierarchy.rs:94-100` | 030df4b1 moves server config reads (`routes.rs:1007`). |
 | REQ-09 | `commands/snapshot.rs:396-480` | c140921c (in progress, same file); 19404174 (b697a3f7 child) REQ-04 copies every declaration file, changing what the README describes. |
-| REQ-11/12 | `worktree.rs:108-126`, `gate.rs:1143-1260`, `validate.rs:1190-1229`, `cli.rs:257-262,2598-2605`, `output/validate.rs:152`, `hooks.rs`, `scripts/hooks/`, `config.rs` (new key), `full_snapshot` | c2b3cefa, 9a2563fd, 1a737bb4 (`gate.rs`, `cli.rs`); b697a3f7 (`JitConfig::load`, `EffectiveConfig::load`, `commands/config.rs`). |
+| REQ-11/12 | `worktree.rs:108-126`, `gate.rs:1143-1260`, `validate.rs:1190-1229`, `cli.rs:257-262,2598-2605`, `output/validate.rs:152`, `hooks.rs`, `scripts/hooks/`, `config.rs` (new key), `full_snapshot` | c2b3cefa, 9a2563fd, 1a737bb4 (`gate.rs`, `cli.rs`); b697a3f7 / cfc87a55 (configuration loading moves to `storage::configuration_store::load_configuration`; `commands/config.rs`, `full_snapshot`). |
 | REQ-01 sweep | S1 `templates.rs:807`; S2 `commands/init.rs:307`; S5 `snapshot.rs` | b697a3f7 (`templates.rs`); c140921c (S5). |
 
 ## 8. Open decisions
