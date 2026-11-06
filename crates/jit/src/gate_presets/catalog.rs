@@ -1,6 +1,6 @@
 use super::{load_presets_from_custom_files, GatePresetDefinition, PresetInfo};
 use crate::domain::identity::GateKey;
-use crate::repository_state::{RepositoryEntry, RepositoryImage, VirtualPath};
+use crate::repository_state::{CaptureError, RepositoryEntry, RepositoryImage, VirtualPath};
 use crate::storage::PresetNotFoundError;
 use anyhow::Result;
 use std::collections::HashMap;
@@ -14,18 +14,18 @@ pub struct GatePresetCatalog {
 impl GatePresetCatalog {
     /// JSON paths named by the captured preset-directory listing, for capture discovery.
     pub fn paths(image: &RepositoryImage) -> Result<Vec<VirtualPath>> {
-        let directory = VirtualPath::GATE_PRESETS;
-        match image.entry(&directory)? {
-            RepositoryEntry::Absent | RepositoryEntry::Directory { .. } => {}
-            _ => {
-                return Err(crate::errors::InvalidArgumentError::new(format!(
-                    "Custom preset root '{}' must be an ordinary directory",
-                    directory.relative().as_str()
-                ))
-                .into());
-            }
-        }
-        Ok(image.listed_json_files(&directory)?)
+        image
+            .listed_json_files(&VirtualPath::GATE_PRESETS)
+            .map_err(|error| match error {
+                CaptureError::NotADirectory(directory) => {
+                    crate::errors::InvalidArgumentError::new(format!(
+                        "Custom preset root '{}' must be an ordinary directory",
+                        directory.relative().as_str()
+                    ))
+                    .into()
+                }
+                error => error.into(),
+            })
     }
 
     /// Parse every listed JSON file; refuse absent files and non-file occupants.

@@ -5,7 +5,7 @@ use crate::document::{AdapterRegistry, AssetScanner};
 use crate::domain::identity::IssueId;
 use crate::domain::{DocumentReference, Issue, State};
 use crate::repository_state::{
-    CaptureBudget, CaptureSpec, RepositoryEntry, RepositoryImage, VirtualPath,
+    CaptureBudget, CaptureError, CaptureSpec, RepositoryImage, VirtualPath,
 };
 use crate::snapshot::{
     compute_sha256, AssetSnapshot, DocumentSnapshot, IssuesInfo, MetadataInfo, RepoInfo,
@@ -83,14 +83,16 @@ fn scope_issue_ids(image: &RepositoryImage, scope: &SnapshotScope) -> Result<Vec
 fn declaration_paths(image: &RepositoryImage) -> Result<Vec<VirtualPath>> {
     let listed = VirtualPath::DECLARATION_DIRECTORIES
         .iter()
-        .map(|directory| match image.entry(directory)? {
-            RepositoryEntry::Absent | RepositoryEntry::Directory { .. } => {
-                Ok(image.listed_json_files(directory)?)
-            }
-            _ => Err(anyhow!(
-                "declaration directory '{}' must be an ordinary directory",
-                directory.repository_relative()
-            )),
+        .map(|directory| {
+            image
+                .listed_json_files(directory)
+                .map_err(|error| match error {
+                    CaptureError::NotADirectory(directory) => anyhow!(
+                        "declaration directory '{}' must be an ordinary directory",
+                        directory.repository_relative()
+                    ),
+                    error => error.into(),
+                })
         })
         .collect::<Result<Vec<_>>>()?;
     Ok(VirtualPath::DECLARATION_FILES
@@ -826,6 +828,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::repository_state::RepositoryEntry;
     use crate::snapshot::{
         DocumentSnapshot, IssuesInfo, MetadataInfo, RepoInfo, SnapshotManifest, SourceInfo,
         VerificationInfo,
