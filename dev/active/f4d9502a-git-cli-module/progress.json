@@ -542,10 +542,10 @@
     },
     {
       "issue": "5046408a",
-      "status": "escalated_full_gate_failure_cycle3",
+      "status": "rework_4_dispatched_steward_option_A",
       "subject": "Eager full configuration assembly blocks existing diagnostics and repair",
       "evidence": "Cycle3 original config report/repair regressions pass; complete CLI1222pass/3fail and contracts548pass/2fail. Full registry sweep adds hidden item search/recover mismatches. Source frozen at376978ed0 + ten-file difff0c5fd8a; no new full gate. 2026-11-06: amended selected-A (DataRootHandle retained across lock chain) passed independent Astra/high R2 within 13 files; dev/active/5046408a/boundary-proposal.md, boundary-design-review-r1.md, -r2.md. 2026-11-06: frozen patch committed e16a759e6 (diff f0c5fd8a preserved), main merged at 6c6bdd57e (only tracker JSON conflicted; resolved to main). 13-file boundary implementation dispatched. 2026-11-06: boundary a35dc6226 (6 files), main merged 262b3ccc4; forced full cargo-ci FAILED run 1620bbb2 (recorded 939a10e57): test_read_exact_store_refuses_symlinked_records_and_a_fifo_record_without_blocking - DataReadSession tail observation read_link on absolute symlink gives raw Io before typed no-follow read. Non-fail-fast: only failure. Io Display duplicates message. Escalated to steward 9b with options A/B/C.",
-      "ruling": "Steward chooses A: shared typed item/recover adapters and data-only worktree exec with its own under-lock pending refusal; Io source fix approved. Exact13files subject to fresh independent bounded design review before edits. No contract cutover B or retry reset. Release actor concern excluded from504: reproduce unchanged main under same sanitized inputs, audit injection; if reproduced propose separate bounded same-epic task outside53manifest/noREQcredit for approval before creation/dispatch."
+      "ruling": "Steward chooses A: shared typed item/recover adapters and data-only worktree exec with its own under-lock pending refusal; Io source fix approved. Exact13files subject to fresh independent bounded design review before edits. No contract cutover B or retry reset. Release actor concern excluded from504: reproduce unchanged main under same sanitized inputs, audit injection; if reproduced propose separate bounded same-epic task outside53manifest/noREQcredit for approval before creation/dispatch. 2026-11-06 steward 9b: option A, one bounded rework (Astra/xhigh) limited to repository_state_store.rs + tests; reuse capability_fs primitives, no local UnsafeTarget mapping; missing primitive returns as option B; Io displays once with source reachable; another full-gate failure or scope gap returns to steward; no further cycles. Lead lesson: run main-changed storage lib tests before forcing full cargo-ci on an integrated branch."
     },
     {
       "issue": "783b33fa",
@@ -574,7 +574,7 @@
     "47d62472": 1,
     "9ecde705": 1,
     "fb5e8e8d": 1,
-    "5046408a": 3
+    "5046408a": 4
   },
   "surfaced_pitfalls": [
     {
@@ -857,6 +857,13 @@
       "effort": "xhigh",
       "reason": "Cycle 3 continued: implement R2-accepted selected-A boundary within 13 files; same steward-recorded tier.",
       "base": "6c6bdd57e"
+    },
+    {
+      "issue": "5046408a",
+      "vendor": "openai",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "reason": "Steward option A rework: admission symlink capture and Io display, two files."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
