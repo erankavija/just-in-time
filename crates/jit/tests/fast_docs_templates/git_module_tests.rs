@@ -1,4 +1,6 @@
-use jit::storage::git::{BaseComparison, Git, GitCheckout, GitError, ProbedCheckout};
+use jit::storage::git::{
+    BaseComparison, CommitResolution, Git, GitCheckout, GitError, ProbedCheckout,
+};
 use jit::test_harness::git::GitRepository;
 #[cfg(unix)]
 use jit::test_harness::git::GitStandIn;
@@ -1007,18 +1009,45 @@ fn test_git_checkout_canonicalizes_symbolic_abbreviated_and_full_revisions() {
     let dir = TempDir::new().unwrap();
     let repo = GitRepository::init(dir.path().join("repo"));
     repo.write("docs/history.bin", b"historical\0bytes");
-    let oid = repo.commit("history");
-    let abbreviated = &oid[..8];
+    let oid = repo.commit("unique needle\nbody");
+    repo.git(&["tag", "--annotate", "inner", "--message", "inner", &oid]);
+    repo.git(&["tag", "--annotate", "outer", "--message", "outer", "inner"]);
+    repo.write("docs/history.bin", b"later");
+    repo.commit("later");
     let resolver = checkout(Git::default(), repo.root());
-
-    for revision in ["HEAD", abbreviated, oid.as_str()] {
-        let resolved = resolver.resolve_commit(revision).unwrap();
-        assert_eq!(resolved.as_str(), oid);
-        let read = resolver
-            .read_pinned_path(revision, "docs/history.bin")
-            .unwrap();
-        assert_eq!(read.version().as_str(), oid);
+    let revisions = [
+        "HEAD~1",
+        &oid[..8],
+        oid.as_str(),
+        "outer",
+        "outer^{commit}",
+        ":/unique needle",
+        ":/unique needle\nbody",
+    ];
+    let requests = revisions
+        .iter()
+        .map(|revision| (revision.to_string(), "docs/history.bin".to_string()))
+        .collect();
+    let bulk = resolver.inspect_pinned_targets(&requests, &BTreeSet::new(), &mut BTreeMap::new());
+    let mut reader = resolver.object_reader().unwrap();
+    let mut failures = Vec::new();
+    for revision in revisions {
+        let unary = resolver.resolve_commit(revision);
+        if unary.as_ref().map(|version| version.as_str()).ok() != Some(oid.as_str()) {
+            failures.push(format!("unary {revision:?}: {unary:?}"));
+        }
+        let result = &bulk[&(revision.to_owned(), "docs/history.bin".to_owned())];
+        if result.as_ref().map(|read| read.version().as_str()).ok() != Some(oid.as_str()) {
+            failures.push(format!("bulk {revision:?}: {result:?}"));
+        }
     }
+    for revision in revisions {
+        let result = reader.resolve_commit(revision);
+        if !matches!(&result, Ok(CommitResolution::Commit(commit)) if commit.as_str() == oid) {
+            failures.push(format!("reader {revision:?}: {result:?}"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 #[test]
@@ -1048,6 +1077,169 @@ fn test_git_checkout_never_falls_back_on_invalid_revision_or_failed_blob_read() 
         .read_pinned_path(&empty_oid, "docs/working.md")
         .unwrap();
     assert_eq!(historical.bytes(), b"working tree content");
+}
+
+#[test]
+fn test_commit_resolution_distinguishes_absence_from_existing_noncommits() {
+    let dir = TempDir::new().unwrap();
+    let repo = committed_repository(&dir);
+    let handle = checkout(Git::default(), repo.root());
+    let mut reader = handle.object_reader().unwrap();
+    for (revision, expected) in [
+        ("", CommitResolution::Missing),
+        ("not-a-revision", CommitResolution::Missing),
+        ("HEAD..HEAD", CommitResolution::Missing),
+        ("--all", CommitResolution::Missing),
+        ("HEAD^{tree}", CommitResolution::NonCommit),
+        ("HEAD:README.md", CommitResolution::NonCommit),
+    ] {
+        assert!(
+            matches!(
+                handle.resolve_commit(revision),
+                Err(GitError::RevisionNotFound { .. })
+            ),
+            "{revision:?}"
+        );
+        assert_eq!(
+            reader.resolve_commit(revision).unwrap(),
+            expected,
+            "{revision:?}"
+        );
+    }
+    assert!(matches!(
+        reader.resolve_commit("HEAD\0suffix"),
+        Err(GitError::InvalidPath(_))
+    ));
+    assert!(matches!(
+        reader.resolve_commit("HEAD").unwrap(),
+        CommitResolution::Commit(_)
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_commit_resolution_ambiguity_and_missing_preserve_valid_neighbors() {
+    let dir = TempDir::new().unwrap();
+    let handle = scripted_object_checkout(
+        &dir,
+        r#"
+[[ "$3" == cat-file ]] || exit 0
+while IFS= read -r -d '' request; do
+    case "$request" in
+        ambiguous) printf '%s ambiguous\0' "$request" ;;
+        missing) printf '%s missing\0' "$request" ;;
+        *) printf '%040d commit 0\0' 1
+           [[ "$4" == --batch ]] && printf '\0' ;;
+    esac
+done
+exit 0
+"#,
+    );
+    let requests = ["aaa-valid", "ambiguous", "missing", "zzz-valid"]
+        .into_iter()
+        .map(|revision| (revision.to_owned(), "path".to_owned()))
+        .collect();
+    let results = handle.inspect_pinned_targets(&requests, &requests, &mut BTreeMap::new());
+    for (revision, _) in &requests {
+        let result = &results[&(revision.clone(), "path".to_owned())];
+        if revision.ends_with("valid") {
+            assert!(result.is_ok(), "{revision}: {result:?}");
+        } else {
+            assert!(
+                matches!(result, Err(GitError::RevisionNotFound { .. })),
+                "{revision}: {result:?}"
+            );
+        }
+    }
+    assert!(matches!(
+        handle.resolve_commit("ambiguous"),
+        Err(GitError::RevisionNotFound { .. })
+    ));
+    let mut reader = handle.object_reader().unwrap();
+    assert_eq!(
+        reader.resolve_commit("ambiguous").unwrap(),
+        CommitResolution::Ambiguous
+    );
+    assert!(matches!(
+        reader.read("ambiguous"),
+        Err(GitError::UnexpectedOutput { .. })
+    ));
+    assert_eq!(
+        reader.resolve_commit("missing").unwrap(),
+        CommitResolution::Missing
+    );
+    assert!(matches!(
+        reader.resolve_commit("valid").unwrap(),
+        CommitResolution::Commit(_)
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_commit_resolution_drains_large_noncommit_body_before_following_content() {
+    let dir = TempDir::new().unwrap();
+    let handle = scripted_object_checkout(
+        &dir,
+        r#"
+read -r -d '' request
+printf '%040d blob 131072\0' 1
+head -c 131072 /dev/zero
+printf '\0'
+read -r -d '' request
+[[ "$request" == 0000000000000000000000000000000000000001'^{commit}' ]] || exit 9
+printf '%s missing\0' "$request"
+read -r -d '' request
+printf '%064d blob 3\0a\0b\0' 2
+read -r -d '' request
+"#,
+    );
+    let mut reader = handle.object_reader().unwrap();
+    assert_eq!(
+        reader.resolve_commit("large").unwrap(),
+        CommitResolution::NonCommit
+    );
+    let object = reader.read("following").unwrap().unwrap();
+    assert_eq!(object.bytes(), b"a\0b");
+    assert_eq!(object.id().as_str().len(), 64);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_commit_resolution_bulk_protocol_failure_invalidates_prior_success() {
+    let dir = TempDir::new().unwrap();
+    let handle = scripted_object_checkout(
+        &dir,
+        r#"
+read -r -d '' request
+printf '%064d commit 0\0' 1
+read -r -d '' request
+printf 'malformed\0'
+"#,
+    );
+    let requests = ["first", "second"]
+        .into_iter()
+        .map(|revision| (revision.to_owned(), "path".to_owned()))
+        .collect();
+    let results = handle.inspect_pinned_targets(&requests, &requests, &mut BTreeMap::new());
+    assert!(
+        results
+            .values()
+            .all(|result| matches!(result, Err(GitError::UnexpectedOutput { .. }))),
+        "{results:?}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_resolve_commit_and_read_pinned_path_keep_process_budgets() {
+    let dir = TempDir::new().unwrap();
+    let repo = committed_repository(&dir);
+    let stand_in = GitStandIn::new();
+    let handle = checkout(Git::with_program(stand_in.program()), repo.root());
+    handle.resolve_commit("HEAD").unwrap();
+    assert_eq!(stand_in.invocations().len(), 1);
+    handle.read_pinned_path("HEAD", "README.md").unwrap();
+    assert_eq!(stand_in.invocations().len(), 4);
 }
 
 #[cfg(unix)]
@@ -1250,9 +1442,14 @@ fn test_inspect_pinned_targets_classifies_every_target_class() {
             .unavailable_reason(),
         Some("not found in commit tree")
     );
-    assert!(stand_in.invocations().iter().any(
-        |invocation| invocation.args() == ["rev-parse", "--verify", "not-a-revision^{commit}"]
-    ));
+    assert_eq!(
+        stand_in
+            .invocations()
+            .iter()
+            .filter(|invocation| invocation.args() == ["cat-file", "--batch-check", "-Z"])
+            .count(),
+        1
+    );
     assert_eq!(cache.len(), 12);
 }
 
@@ -1286,10 +1483,9 @@ fn test_inspect_pinned_targets_scales_one_revision_independently_of_reference_co
 
     let processes = stand_in.invocations();
     assert_eq!(processes.len(), 6);
-    assert!(processes.iter().any(|invocation| invocation
-        .args()
-        .first()
-        .is_some_and(|argument| argument == "rev-parse")));
+    assert!(processes
+        .iter()
+        .any(|invocation| invocation.args() == ["cat-file", "--batch-check", "-Z"]));
     let listing = processes
         .iter()
         .skip(3)
@@ -1390,10 +1586,7 @@ fn test_inspect_pinned_targets_resolves_distinct_revisions_in_one_success_proces
     assert_eq!(
         processes
             .iter()
-            .filter(|invocation| invocation
-                .args()
-                .first()
-                .is_some_and(|argument| argument == "rev-parse"))
+            .filter(|invocation| invocation.args() == ["cat-file", "--batch-check", "-Z"])
             .count(),
         1
     );
@@ -1742,7 +1935,7 @@ fn test_object_reader_rejects_malformed_headers_and_truncated_object_frames() {
         format!("{oid} blob -1\0"),
         format!("{oid} blob 18446744073709551616\0"),
         "different-name missing\0".to_owned(),
-        "requested-name ambiguous\0".to_owned(),
+        "different-name ambiguous\0".to_owned(),
         "requested-name unknown-status\0".to_owned(),
         "not-an-oid submodule\0".to_owned(),
         format!("{oid} submodule extra\0"),
@@ -1761,6 +1954,16 @@ fn test_object_reader_rejects_malformed_headers_and_truncated_object_frames() {
                 "read -r -d '' request\nprintf '%b' '{}'",
                 response.replace('\0', "\\0")
             ),
+        );
+        assert!(
+            matches!(
+                handle
+                    .object_reader()
+                    .unwrap()
+                    .resolve_commit("requested-name"),
+                Err(GitError::UnexpectedOutput { .. })
+            ),
+            "metadata drain: {response:?}"
         );
         let mut reader = handle.object_reader().unwrap();
         assert!(
@@ -1856,12 +2059,16 @@ fn test_object_types_checks_process_exit_and_rejects_extra_responses() {
             let dir = TempDir::new().unwrap();
             let handle = scripted_object_checkout(
                 &dir,
-                &format!("read -r -d '' request\nprintf '%040d blob 0\\0' 0\nread -r -d '' request\n{ending}"),
+                &format!("read -r -d '' request\nprintf '%040d commit 0\\0' 0\nread -r -d '' request\n{ending}"),
             );
             assert!(matches!(
                 handle.object_types(["object"]),
                 Err(GitError::UnexpectedOutput { .. })
             ));
+            assert!(matches!(handle.resolve_commit("object"), Err(GitError::UnexpectedOutput { .. })));
+            let requests = [("object".to_string(), "path".to_string())].into_iter().collect();
+            let results = handle.inspect_pinned_targets(&requests, &requests, &mut BTreeMap::new());
+            assert!(results.values().all(|result| matches!(result, Err(GitError::UnexpectedOutput { .. }))));
         });
 }
 

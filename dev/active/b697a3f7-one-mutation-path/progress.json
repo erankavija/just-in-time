@@ -182,6 +182,13 @@
       "detail": "third distinct code-review finding (run 90b9291f): exited-process test lacks #[cfg(unix)]; requested one more round",
       "status": "resolved",
       "decision": "steward: one final round, scope = #[cfg(unix)] on unix-dependent tests in process.rs only; if code-review fails again, do not rework, send the finding to the steward"
+    },
+    {
+      "to": "steward just-in-time-9b",
+      "category": "issue scope (criteria contradiction)",
+      "issue": "693a2fdd",
+      "detail": "code-review 3fe7575a F1: REQ-03 '(modified and failed)' vs REQ-01 'remaining tests pass unchanged' (test_apply_bulk_update_best_effort asserts errors-only). Recommended: comply with REQ-03, update the one test.",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -197,6 +204,12 @@
       "subject": "pre-session lease checks with no owning issue",
       "detail": "After c2b3cefa and planned d3c94dc5, the read form refuse_foreign_lease is still called before the publishing session by dispatch/gate.rs evaluate_many (batch pre-check), commands/document.rs:228 and :546 (document writes) and commands/validate.rs:234. Epic REQ-04 says no pre-session lease check remains, so this is a criterion gap to close with a remediation task inside the epic before the epic gate, not a follow-up. Also dispatch/gate.rs preset_apply discards the read-form result (c2b3cefa rework report); evaluate_many and preset_apply both drop warn-mode findings from that pre-check.",
       "status": "closed by 905364c1 (bulk and dep remain with d3c94dc5)"
+    },
+    {
+      "found_in": "bb596228 benchmark",
+      "subject": "lock-free read conflicts under a continuous writer",
+      "detail": "Tip doc check-links reads exit 12 (RETRYABLE_CONFLICT) in 5.1% of N=1 and 3.2% of N=8 reads beside a back-to-back writer; 1,356 of 1,593 failures report 'Failed to read configuration' although the writer never changes configuration. Reconcile against epic REQ-21 (bounded refused attempts, then locked fallback vs D-25 retryable conflict) before the epic gate; at minimum the diagnostic misattributes the cause.",
+      "status": "open"
     }
   ],
   "started_at": "2026-11-06T01:20:00+02:00",
@@ -215,6 +228,11 @@
       "with": "f4d9502a lead (just-in-time-13)",
       "item": "external chain",
       "decision": "c140921c after a273667c and 5046408a; then d9ba0029, 7cd27db8, e6ec58f3; that lead notifies on each landing"
+    },
+    {
+      "with": "f4d9502a lead (just-in-time-13)",
+      "item": "external chain",
+      "decision": "c140921c landed df02f5271; d9ba0029 and 7cd27db8 ready and being dispatched by that lead; e6ec58f3 after d9ba0029. Git commit resolution now spawns cat-file --batch-check -Z, not rev-parse: tests counting git children by argv[0]=='rev-parse' must follow."
     }
   ],
   "notes": [
@@ -225,6 +243,16 @@
       "story": "a991f42b",
       "result": "done",
       "evidence": "children 1b7f58ae, 4334df62, f7a59f5f done (+4d834432, 7fefd776, d58f80c9, 01a88d32 for REQ-02..04); main sweep: only publish_file stages and renames in production storage/serve code; one read leaf-open sequence"
+    }
+  ],
+  "decisions": [
+    {
+      "issue": "693a2fdd",
+      "decision": "A Done request diverted to Gated stays reported in errors only (today's behaviour): REQ-03's parenthetical '(modified and failed), as today' contradicts today's code, and REQ-01 requires test_apply_bulk_update_best_effort (errors-only) to pass unchanged."
+    },
+    {
+      "issue": "bb596228",
+      "decision": "Accept base-ratio premise difference (base R(8)/R(1)=16.6 because a single base reader waits behind the writer); README records it; tip verdict passes on the fixed thresholds."
     }
   ]
 }

@@ -9,12 +9,26 @@
   ],
   "description": "Correct the document command reference for the versions `jit doc show` reads and for what `jit doc history` lists.\n\n## Background\n\n- `docs/reference/cli-commands.md:2856` says an unpinned `jit doc show` reads the committed tree at `HEAD` when git exists, so an uncommitted derived file cannot be shown. An unpinned show now reads the working tree.\n- `docs/reference/cli-commands.md:2862` describes `jit doc history`, which now follows git's history of the path, including the commit that deleted it and omitting merges identical to a parent.\n\n## Success Criteria\n\n- [hard] REQ-01: The reference states that `jit doc show` reads an unpinned document from the working tree and a pinned or `--at` read at that commit, and that an uncommitted derived document can be shown.\n- [hard] REQ-02: The reference states that `jit doc history` lists git's history of the path, including the commit that deleted it.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-06T03:24:48.318206614Z",
   "first_ready_at": "2026-11-06T02:57:25.211377476Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "run_id": "d4e3ceb6-2e3f-41a7-8f2e-7210a74654b2",
+      "status": "passed",
+      "updated_at": "2026-11-06T03:05:05.500971525Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "2d24a597-d392-40a9-ad65-d34131ef17d2",
+      "status": "passed",
+      "updated_at": "2026-11-06T03:24:47.929751432Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cd603c8e-c2a8-43b8-afd5-7419d8d667f3",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Document command reference states the show and history semantics",
-  "updated_at": "2026-11-06T02:58:36.705150596Z"
+  "updated_at": "2026-11-06T03:24:48.318206614Z"
 }

@@ -733,12 +733,13 @@ fn test_check_document_links_batches_head_asset_presence_into_one_cat_file_proce
         )
         .output()
         .unwrap();
+    // Count document-reading commit resolution and the single HEAD asset-presence batch.
     let cat_file_calls = stand_in
         .invocations()
         .into_iter()
-        .filter(|call| call.args().first().is_some_and(|arg| arg == "cat-file"))
+        .filter(|call| call.args() == ["cat-file", "--batch-check", "-Z"])
         .collect::<Vec<_>>();
-    assert_eq!(cat_file_calls.len(), 1, "{cat_file_calls:?}");
+    assert_eq!(cat_file_calls.len(), 2, "{cat_file_calls:?}");
     assert!(
         output.status.success(),
         "committed assets must remain present: {output:?}"

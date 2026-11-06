@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:b697a3f7-lead",
+  "claimed_at": "2026-11-06T03:26:21.792552351Z",
   "context": {},
   "created_at": "2026-10-24T21:22:37.717854234Z",
   "dependencies": [
@@ -7,6 +8,7 @@
   ],
   "description": "Move the lease checks of bulk update and the CLI dependency edits into their publishing session, classify `dep add` and `dep rm` claims-first, and state in the adopter docs which writes the lease rule covers.\n\n## Background\n\n- Bulk update builds its requests with `enforce_lease: false` (`CapturedFieldUpdate::bulk`, `crates/jit/src/commands/mod.rs`) and checks its matched issues through `refuse_foreign_leases` before its session opens (`crates/jit/src/commands/bulk_update.rs`), outside the claims lock.\n- `jit dep add` and `jit dep rm` publish the batch variants `CapturedDependencyMutation::Batch` and `RemoveBatch` (`crates/jit/src/commands/dependency.rs`), which check the dependent issue through `refuse_foreign_lease` before the session opens; only the single variants check inside the session under a claims guard. `DepCommands::coordinates_claims_first` (`crates/jit/src/cli.rs`) classifies both verbs repository-first; `CLAIM_FIRST_LEAF_COMMANDS` and its inventory test pin the classification.\n- The in-session form is `refuse_foreign_leases_held` (`commands/mod.rs`) with a `claims_mutation_guard` taken before the session. A write refuses only when another agent holds an active lease on its target; an unleased issue has nothing to refuse (17fbcf25). Strict refusals downcast to `ForeignLeaseError` (`foreign-lease-error`).\n- System-derived writes (readiness corrections of dependents, validate repairs, archive, recovery) are not user requests for the issues they touch.\n- `docs/reference/configuration.md` and `docs/reference/claim.md` say lease enforcement covers \"structural issue operations\" and \"selected write commands\" without saying which.\n\n## Success Criteria\n\n- [hard] REQ-01: Bulk update checks each matched issue it changes through `refuse_foreign_leases_held` inside its publishing session, holding the claims guard taken before it, and no longer calls the read form; in strict mode an issue under another agent's lease is reported in `errors` and the others still apply, and in warn mode the warning is reported for that issue.\n- [hard] REQ-02: `dep add` and `dep rm` check the dependent issue's lease the same way inside their publishing session and no longer call the read form, and both are classified claims-first in the classification and its inventory test.\n- [hard] REQ-03: Harness tests show strict mode refusing a bulk update and a `dep add` on another agent's lease with an error that downcasts to `ForeignLeaseError`, the same writes on an unleased issue succeeding, and no lease check for readiness corrections of dependents.\n- [hard] REQ-04: The configuration and claim references state the lease-checked writes as a rule (every user-requested write to an existing issue refuses when another agent holds an active lease on an issue it targets, including bulk update, `dep add`/`dep rm`, assign, unassign, template application and the gate commands; system-derived writes check nothing) rather than a hand-kept command list, and no other page restates it (`@/charter/D-13`).\n\n## Notes\n\n- Behaviour change: bulk update and `dep add`/`dep rm` read leases under the claims lock, and the two dependency verbs lock claims before the repository; which writes refuse is unchanged.\n- Written against the code as it stands after the changes this one follows; locate symbols by name.\n",
   "documents": [],
+  "first_ready_at": "2026-11-06T03:25:45.985710953Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +27,7 @@
     "satisfies:b697a3f7/REQ-04"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Bulk and dependency edits check leases in their publishing session",
-  "updated_at": "2026-11-03T21:02:03.047949402Z"
+  "updated_at": "2026-11-06T03:26:21.792552351Z"
 }

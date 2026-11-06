@@ -376,7 +376,9 @@ pub enum MutationIntent {
     /// Semantic full-issue update of an issue that ALREADY EXISTS in the captured
     /// image. The finalizer stamps `updated_at` from the mutation clock and derives
     /// `created_at`/`first_ready_at` from the captured preimage (they are not the
-    /// caller's to set), and names in each gate status the run a
+    /// caller's to set), stamping `first_ready_at` when the issue enters `Ready`
+    /// in this mutation, even on its way to another state, and names in each
+    /// gate status the run a
     /// [`MutationIntent::RecordGateRun`] of the same mutation records for that
     /// issue and gate; every other field is taken verbatim from `issue`. Index
     /// membership is unchanged (no id is allocated), and a target absent from the
@@ -756,7 +758,13 @@ fn updated_issue(
     updated.first_ready_at = preimage.first_ready_at;
     updated.claimed_at = preimage.claimed_at;
     updated.done_at = preimage.done_at;
-    if preimage.state != State::Ready && updated.state == State::Ready {
+    let enters_ready = intents.iter().any(|intent| {
+        matches!(intent, MutationIntent::RecordEvent { event, .. } if matches!(
+            &**event,
+            EventBody::IssueStateChanged { issue_id, to: State::Ready, .. } if issue_id == &updated.id
+        ))
+    });
+    if preimage.state != State::Ready && (updated.state == State::Ready || enters_ready) {
         updated.mark_first_ready(now);
     }
     if preimage.assignee.is_none() && updated.assignee.is_some() {
@@ -2928,6 +2936,60 @@ mod tests {
         assert_eq!(persisted.created_at, created_at);
         assert_eq!(persisted.updated_at, fixed_instant());
         assert_eq!(persisted.done_at, Some(fixed_instant()));
+    }
+
+    /// An issue entering `Ready` on its way to another state within one
+    /// mutation keeps its first-ready stamp.
+    #[test]
+    fn test_update_issue_through_ready_to_done_stamps_first_ready_at() {
+        let mut issue = seeded_issue(
+            &crate::test_utils::issue_id(0x2222_4222_8222_2222_2222_2222_2222_2223),
+            None,
+        );
+        issue.state = State::Backlog;
+        let mut updated = issue.clone();
+        updated.state = State::Done;
+        let bytes = serialize_issue(&issue).unwrap();
+        let image = ImageBuilder::new()
+            .entry(VirtualPath::issue_record(&issue.id), file_entry(&bytes))
+            .build();
+        let entering_ready = |from, to| MutationIntent::RecordEvent {
+            phase: 2,
+            event: Box::new(EventBody::draft_issue_state_changed(
+                issue.id.clone(),
+                from,
+                to,
+            )),
+        };
+
+        let plan = finalize(
+            &synthetic_layout(),
+            &image,
+            &ctx(),
+            &[
+                MutationIntent::UpdateIssue {
+                    issue: Box::new(updated),
+                },
+                entering_ready(State::Backlog, State::Ready),
+                entering_ready(State::Ready, State::Done),
+            ],
+            None,
+        )
+        .unwrap();
+        let persisted = plan
+            .delta()
+            .actions()
+            .iter()
+            .find_map(|action| match action {
+                RepositoryAction::WriteFile { path, bytes, .. }
+                    if path == &VirtualPath::issue_record(&issue.id) =>
+                {
+                    Some(serde_json::from_slice::<Issue>(bytes).unwrap())
+                }
+                _ => None,
+            })
+            .expect("the update writes the issue record");
+        assert_eq!(persisted.first_ready_at, Some(fixed_instant()));
     }
 
     /// The finalizer's event-log action over `image`: its offset and bytes.

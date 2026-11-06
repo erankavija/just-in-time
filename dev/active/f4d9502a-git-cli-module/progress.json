@@ -377,9 +377,9 @@
           "short_id": "c140921c",
           "title": "Snapshot source and repository facts come from the module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "dispatched_2026-11-06",
+          "worker_status": "landed_df02f5271",
           "worker": "agent:f4d9502a-lead"
         },
         {
@@ -387,8 +387,9 @@
           "short_id": "d9ba0029",
           "title": "Archive planning reads pinned evidence through one git process",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatched_2026-11-06"
         },
         {
           "id": "dcf88b6f-b6d8-4e3d-b4c9-8cb718487b04",
@@ -440,8 +441,9 @@
           "short_id": "7cd27db8",
           "title": "Snapshot export reads committed files through one git process",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatched_2026-11-06"
         },
         {
           "id": "e6ec58f3-94d4-4886-85ef-fae12decaeba",
@@ -461,17 +463,18 @@
           "short_id": "933ff852",
           "title": "Document diff reads both versions through one git process",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatched_2026-11-06"
         },
         {
           "id": "cd603c8e-c2a8-43b8-afd5-7419d8d667f3",
           "short_id": "cd603c8e",
           "title": "Document command reference states the show and history semantics",
           "classification": "documentation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "dispatched_out_of_wave_2026-11-06"
+          "worker_status": "landed_5b8b3ab06"
         }
       ]
     },
@@ -538,9 +541,9 @@
     },
     {
       "issue": "c140921c",
-      "status": "conditional_design_recorded",
+      "status": "done_2026-11-06",
       "subject": "Preserve originalrevisionexpression beforepeeling canonicalcommit",
-      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded. Snapshot uses code_checkout; explicit 504 Done prerequisite recorded after steward approval. 2026-11-06: floor/runtime approved by user (via steward); 504 Done. Remaining prerequisite: a273667c Done."
+      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded. Snapshot uses code_checkout; explicit 504 Done prerequisite recorded after steward approval. 2026-11-06: floor/runtime approved by user (via steward); 504 Done. Remaining prerequisite: a273667c Done. 2026-11-06 steward 9b: footprint extended to a fifth file, crates/jit/src/storage/repository_state_store_tests.rs, limited to the two pinned-capture process assertions (~1750, ~1915): identify the resolution child as the shared cat-file --batch-check -Z Types session with one shared predicate form, counts unchanged; missed file per plan lines 68/99, not new scope. 2026-11-06 steward 9b: sixth (final for this class) file crates/jit/tests/cli_query_graph/check_links_tests.rs, assertion at line 741 only: exactly 2 cat-file --batch-check -Z children (resolution session + presence batch; per-asset regression gives 4), shared predicate form. Any further argv-shape failure: sweep all and send one list."
     },
     {
       "issue": "5046408a",
@@ -894,6 +897,30 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "One-file docs correction with exact criteria; out of wave order per steward."
+    },
+    {
+      "issue": "d9ba0029",
+      "vendor": "openai",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Archive planner resolution semantics on shared reader; counting test.",
+      "base": "28d98ee40"
+    },
+    {
+      "issue": "7cd27db8",
+      "vendor": "openai",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Bounded snapshot reader migration with exact criteria.",
+      "base": "28d98ee40"
+    },
+    {
+      "issue": "933ff852",
+      "vendor": "openai",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Bounded document diff reader migration with exact criteria.",
+      "base": "28d98ee40"
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -1651,8 +1678,19 @@
         {
           "issue": "cd603c8e",
           "note": "explicitly approved (option 1) before the rule; docs/reference/cli-commands.md only; lands after c140921c"
+        },
+        {
+          "issue": "933ff852",
+          "note": "wave 8 dispatched alongside wave 6/7 d9ba0029 and 7cd27db8: DAG-ready, footprint document.rs/history tests disjoint from archive.rs and snapshot.rs; no earlier-wave issue changes doc diff"
         }
       ]
+    }
+  ],
+  "follow_up_candidates": [
+    {
+      "from": "c140921c",
+      "candidate": "doc check-links could reuse one cat-file Types session for commit resolution and HEAD asset presence in commands/document.rs, saving one process.",
+      "status": "noted; not filed unless a D-19/D-20 reason appears (steward 9b)"
     }
   ]
 }

@@ -302,7 +302,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             |session| {
                 let Some(crate::commands::validate::MutationBase { image, issues }) = self
                     .exec
-                    .capture_mutation_base(session, &issue_paths, None)?
+                    .capture_mutation_base(session, &issue_paths, &[])?
                 else {
                     return Ok(SessionStep::Retry);
                 };
@@ -579,7 +579,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             "batch validation",
             |session| {
                 let Some(crate::commands::validate::MutationBase { image, issues }) =
-                    self.exec.capture_mutation_base(session, &[], None)?
+                    self.exec.capture_mutation_base(session, &[], &[])?
                 else {
                     return Ok(None);
                 };
