@@ -47,7 +47,10 @@ reaches the repository.
 A live repository also carries gitignored, machine-local files directly under
 `.jit/`: `server.log`, `server.pid.json`, a fixed set of lock files, `tmp/`, and,
 for a data root inside a checkout, `worktree.json` (see
-[Worktree Identity](#worktree-identity)). The data root's own `.gitignore` is derived state, not
+[Worktree Identity](#worktree-identity)). `server.pid.json` and `worktree.json`
+are each replaced by a synced, uniquely named `*.tmp` stage file renamed over
+them, followed by a directory sync, through a data root reached without
+following symlinks. The data root's own `.gitignore` is derived state, not
 authored: the engine composes its delimited engine-owned region, whose single
 entry is the scratch directory `tmp/`, so a repository never commits a pending
 redo record. Initialization writes it and `jit validate --fix` restores it,
@@ -525,13 +528,14 @@ separate from the claims state.
   `acquired_at`, `expires_at`, and `last_beat`. A `ttl_secs` of `0` marks an
   indefinite lease, kept alive by `jit claim heartbeat` updating `last_beat`.
   Claim operations change a record under `locks/claims.lock` by writing a
-  synced stage file, renaming it over the record and syncing the directory, or
-  by unlinking it; that rename or unlink commits the change. Other names in
-  `leases/`, such as an interrupted operation's `{issue-id}.json.tmp` stage
+  synced, uniquely named `*.tmp` stage file, renaming it over the record and
+  syncing the directory, or by unlinking it; that rename or unlink commits the
+  change. Other names in `leases/`, such as an interrupted operation's stage
   file, are not leases; `jit recover` removes stale stage files.
   `jit claim list` and `status` read the records without the lock.
 - **`claims.seq`**: the last sequence number handed to `claims.jsonl`, as a
-  decimal integer, advanced after each committed change.
+  decimal integer, advanced after each committed change and replaced the same
+  way as a lease record.
 - **`claims.jsonl`**: an append-only, newline-delimited history of claim
   operations (`Acquire`, `Renew`, `Heartbeat`, `Release`, `AutoEvict`,
   `ForceEvict`, and `Reclaim`, recorded when `jit recover` removes a stale
