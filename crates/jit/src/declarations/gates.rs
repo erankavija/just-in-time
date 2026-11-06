@@ -182,18 +182,249 @@ pub fn parse_gate_registry(bytes: &[u8]) -> Result<GateRegistry, GateDeclaration
         })
 }
 
-/// Serialize a registry deterministically while preserving authored fields.
-pub fn serialize_gate_registry(registry: &GateRegistry) -> Result<Vec<u8>, GateDeclarationError> {
-    let mut gates = registry.gates.values().cloned().collect::<Vec<_>>();
-    gates.sort_by(|left, right| left.key.cmp(&right.key));
-    for gate in &mut gates {
+/// Remove reserved null values that a TOML document cannot represent.
+pub(crate) fn normalize_gate_registry_for_document(registry: &mut GateRegistry) {
+    registry.gates.values_mut().for_each(|gate| {
         gate.reserved.retain(|_, value| !value.is_null());
-    }
+    });
+}
+
+/// Serialize a registry as deterministic TOML for a new document.
+pub fn serialize_gate_registry(registry: &GateRegistry) -> Result<Vec<u8>, GateDeclarationError> {
+    let mut registry = registry.clone();
+    normalize_gate_registry_for_document(&mut registry);
+    let mut gates = registry.gates.into_values().collect::<Vec<_>>();
+    gates.sort_by(|left, right| left.key.cmp(&right.key));
     let mut bytes = toml::to_string_pretty(&AuthoredGateFile { gates })?.into_bytes();
     if !bytes.ends_with(b"\n") {
         bytes.push(b'\n');
     }
     Ok(bytes)
+}
+
+/// Apply a registry proposal to an authored gates document without replacing
+/// declarations that did not change.
+pub fn edit_gate_registry_document(
+    authored: Option<&[u8]>,
+    registry: &GateRegistry,
+) -> Result<Vec<u8>, GateDeclarationError> {
+    use toml_edit::{ArrayOfTables, DocumentMut, Item};
+
+    let previous = authored
+        .map(parse_gate_registry)
+        .transpose()?
+        .unwrap_or_default();
+    let mut document = authored
+        .map(std::str::from_utf8)
+        .transpose()?
+        .map(str::parse::<DocumentMut>)
+        .transpose()?
+        .unwrap_or_default();
+
+    match document.get("gates") {
+        None => {
+            document
+                .as_table_mut()
+                .insert("gates", Item::ArrayOfTables(ArrayOfTables::new()));
+        }
+        Some(item) if item.as_array_of_tables().is_some() => {}
+        Some(item) if item.as_array().is_some_and(|array| array.is_empty()) => {
+            document
+                .as_table_mut()
+                .insert("gates", Item::ArrayOfTables(ArrayOfTables::new()));
+        }
+        Some(_) => return Err(GateDeclarationError::MalformedDocument),
+    }
+
+    let gates = document
+        .get_mut("gates")
+        .and_then(Item::as_array_of_tables_mut)
+        .ok_or(GateDeclarationError::MalformedDocument)?;
+    let removed = gates
+        .iter()
+        .enumerate()
+        .map(|(index, table)| {
+            gate_table_key(table).map(|key| (index, !registry.gates.contains_key(&key)))
+        })
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter_map(|(index, should_remove)| should_remove.then_some(index))
+        .collect::<Vec<_>>();
+    removed
+        .into_iter()
+        .rev()
+        .for_each(|index| gates.remove(index));
+
+    for table in gates.iter_mut() {
+        let key = gate_table_key(table)?;
+        if let (Some(previous), Some(updated)) =
+            (previous.gates.get(&key), registry.gates.get(&key))
+        {
+            if previous != updated {
+                let previous_rendered = render_gate_table(previous)?;
+                let rendered = render_gate_table(updated)?;
+                update_gate_table(table, &previous_rendered, &rendered);
+            }
+        }
+    }
+
+    let present = gates
+        .iter()
+        .map(gate_table_key)
+        .collect::<Result<std::collections::HashSet<_>, _>>()?;
+    let mut added = registry
+        .gates
+        .iter()
+        .filter(|(key, _)| !present.contains(*key))
+        .collect::<Vec<_>>();
+    added.sort_by_key(|(key, _)| *key);
+    for (_, gate) in added {
+        gates.push(render_gate_table(gate)?);
+    }
+
+    let mut bytes = document.to_string().into_bytes();
+    if !bytes.is_empty() && !bytes.ends_with(b"\n") {
+        bytes.push(b'\n');
+    }
+    Ok(bytes)
+}
+
+fn gate_table_key(table: &toml_edit::Table) -> Result<GateKey, GateDeclarationError> {
+    table
+        .get("key")
+        .and_then(toml_edit::Item::as_str)
+        .ok_or(GateDeclarationError::MalformedDocument)?
+        .parse()
+        .map_err(|_| GateDeclarationError::MalformedDocument)
+}
+
+fn render_gate_table(gate: &GateDefinition) -> Result<toml_edit::Table, GateDeclarationError> {
+    use toml_edit::{DocumentMut, Item};
+
+    let registry = GateRegistry {
+        gates: HashMap::from([(gate.key.clone(), gate.clone())]),
+    };
+    let bytes = serialize_gate_registry(&registry)?;
+    let text = std::str::from_utf8(&bytes)?;
+    let document = text.parse::<DocumentMut>()?;
+    let mut table = document
+        .get("gates")
+        .and_then(Item::as_array_of_tables)
+        .and_then(|gates| gates.get(0))
+        .cloned()
+        .ok_or(GateDeclarationError::MalformedDocument)?;
+    if gate.reserved.is_empty() {
+        table.remove("reserved");
+    }
+    // Cloned table positions refer to the temporary document, not this one.
+    set_table_positions(&mut table, usize::MAX);
+    Ok(table)
+}
+
+fn update_gate_table(
+    table: &mut toml_edit::Table,
+    previous: &toml_edit::Table,
+    rendered: &toml_edit::Table,
+) {
+    let inserted_table_position = table.position().unwrap_or_default().saturating_add(1);
+    let fields = previous
+        .iter()
+        .map(|(name, _)| name.to_owned())
+        .chain(rendered.iter().map(|(name, _)| name.to_owned()))
+        .collect::<std::collections::BTreeSet<_>>();
+
+    fields.into_iter().for_each(|name| {
+        let previous_item = render_table_item(previous, &name);
+        let rendered_item = render_table_item(rendered, &name);
+        if previous_item == rendered_item {
+            return;
+        }
+        match rendered.get(&name) {
+            Some(incoming) => match table.get_mut(&name) {
+                Some(existing) => merge_authored_item(existing, incoming, inserted_table_position),
+                None => {
+                    table.insert(&name, incoming.clone());
+                }
+            },
+            None => {
+                table.remove(&name);
+            }
+        }
+    });
+}
+
+fn render_table_item(table: &toml_edit::Table, name: &str) -> Option<String> {
+    table.get(name).map(|item| {
+        let mut document = toml_edit::DocumentMut::new();
+        document.as_table_mut().insert(name, item.clone());
+        document.to_string()
+    })
+}
+
+fn merge_authored_item(
+    existing: &mut toml_edit::Item,
+    incoming: &toml_edit::Item,
+    inserted_table_position: usize,
+) {
+    match (existing, incoming) {
+        (toml_edit::Item::Value(existing), toml_edit::Item::Value(incoming)) => {
+            let decor = existing.decor().clone();
+            let mut updated = incoming.clone();
+            *updated.decor_mut() = decor;
+            *existing = updated;
+        }
+        (toml_edit::Item::Table(existing), toml_edit::Item::Table(incoming)) => {
+            merge_authored_table(existing, incoming, inserted_table_position);
+        }
+        (existing, incoming) => *existing = incoming.clone(),
+    }
+}
+
+fn merge_authored_table(
+    existing: &mut toml_edit::Table,
+    incoming: &toml_edit::Table,
+    inserted_table_position: usize,
+) {
+    let existing_keys = existing
+        .iter()
+        .map(|(key, _)| key.to_string())
+        .collect::<Vec<_>>();
+    for key in existing_keys {
+        match incoming.get(&key) {
+            Some(incoming_item) => {
+                if let Some(existing_item) = existing.get_mut(&key) {
+                    merge_authored_item(existing_item, incoming_item, inserted_table_position);
+                }
+            }
+            None => {
+                existing.remove(&key);
+            }
+        }
+    }
+    for (key, incoming_item) in incoming.iter() {
+        if existing.get(key).is_none() {
+            let mut incoming_item = incoming_item.clone();
+            set_item_table_positions(&mut incoming_item, inserted_table_position);
+            existing.insert(key, incoming_item);
+        }
+    }
+}
+
+fn set_table_positions(table: &mut toml_edit::Table, position: usize) {
+    table.set_position(position);
+    table.iter_mut().for_each(|(_, item)| {
+        set_item_table_positions(item, position);
+    });
+}
+
+fn set_item_table_positions(item: &mut toml_edit::Item, position: usize) {
+    match item {
+        toml_edit::Item::Table(table) => set_table_positions(table, position),
+        toml_edit::Item::ArrayOfTables(tables) => tables
+            .iter_mut()
+            .for_each(|table| set_table_positions(table, position)),
+        _ => {}
+    }
 }
 
 /// Invalid authored gate declaration.
@@ -205,6 +436,10 @@ pub enum GateDeclarationError {
     Toml(#[from] toml::de::Error),
     #[error("gate registry cannot be serialized: {0}")]
     Serialize(#[from] toml::ser::Error),
+    #[error("gate registry document cannot be edited because its gates table is malformed")]
+    MalformedDocument,
+    #[error("gate registry TOML cannot be edited: {0}")]
+    Edit(#[from] toml_edit::TomlError),
     #[error("duplicate gate key '{0}'")]
     DuplicateKey(GateKey),
 }
@@ -381,9 +616,9 @@ mode = "manual"
         assert_eq!(parse_gate_registry(&bytes).unwrap(), registry);
     }
 
-    /// An authored registry re-serializes to a fixed point holding the same
-    /// declarations, and the stage and mode tokens it carries are the
-    /// vocabulary's own. Authored comments and ordering are not preserved.
+    /// The canonical serializer reaches a fixed point over declarations. Edits
+    /// to an existing file use edit_gate_registry_document to preserve its
+    /// authored comments and order.
     #[test]
     fn test_serialize_gate_registry_reaches_a_fixed_point_over_authored_declarations() {
         let authored = br#"
