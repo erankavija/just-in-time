@@ -2086,8 +2086,8 @@ is reusable.
 Issues are evaluated in argument order. Evaluation is serialised per issue,
 and the command continues after a checker failure, runner error, lookup error,
 or manual-gate attestation error. Under strict lease enforcement, another
-agent's lease on any requested issue refuses the whole batch before any
-evaluation. Exit `0` means every issue passed; otherwise
+agent's lease on a requested issue refuses only that issue's entry, reported as
+a per-entry finding, and the other issues are still evaluated. Exit `0` means every issue passed; otherwise
 the command returns the first failing issue's code from the [`jit gate
 evaluate`](#jit-gate-evaluate) taxonomy.
 

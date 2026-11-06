@@ -112,8 +112,21 @@ pub fn finalize_gate_registry_edit(
     let record_plan =
         finalize(layout, base, context, intents, None).map_err(GateRegistryEditError::Mutation)?;
     let gate_path = VirtualPath::GATES;
-    let gate_bytes = crate::declarations::serialize_gate_registry(registry)
-        .map_err(GateRegistryEditError::GateDeclaration)?;
+    let gate_bytes = match record_plan
+        .delta()
+        .actions()
+        .iter()
+        .find_map(|action| match action {
+            RepositoryAction::WriteFile { path, bytes, .. } if path == &gate_path => Some(bytes),
+            _ => None,
+        }) {
+        Some(bytes) => bytes.clone(),
+        None => base
+            .file_bytes(&gate_path)
+            .map_err(GateRegistryEditError::Capture)?
+            .map(|bytes| bytes.to_vec())
+            .ok_or(GateRegistryEditError::MissingDocument)?,
+    };
     let overlaid = apply_overlay(base, std::iter::once((gate_path, Some(gate_bytes))))
         .map_err(GateRegistryEditError::Overlay)?;
     let mut actions = record_plan.delta().actions().to_vec();
@@ -125,7 +138,7 @@ pub fn finalize_gate_registry_edit(
 
 /// A typed failure raised while finalizing a gate-registry edit.
 ///
-/// Composed into [`RepositoryStateError::GateRegistryEdit`]. The three
+/// Composed into [`RepositoryStateError::GateRegistryEdit`]. The four
 /// invariant-shaped variants carry no message text of their own beyond their
 /// `Display` impl; every propagated leaf retains its concrete source so
 /// rendering stays in `Display` rather than at the call site.
@@ -137,15 +150,21 @@ pub enum GateRegistryEditError {
     /// More than one typed `EditGateRegistry` intent was present.
     #[error("gate registry finalization requires exactly one typed edit")]
     MultipleEdits,
+    /// The captured registry bytes could not be read.
+    #[error(transparent)]
+    Capture(#[from] CaptureError),
     /// The typed edit's registry disagreed with the projection declarations.
     #[error("gate registry edit and projection declarations disagree")]
     DeclarationMismatch,
     /// The record finalizer failed.
     #[error(transparent)]
     Mutation(#[from] MutationError),
-    /// The edited registry could not be serialized canonically.
+    /// The edited registry document could not be materialized.
     #[error(transparent)]
     GateDeclaration(#[from] crate::declarations::GateDeclarationError),
+    /// The record plan and captured image both lacked the resulting document.
+    #[error("gate registry edit produced no document bytes")]
+    MissingDocument,
     /// The proposed-state overlay could not be closed.
     #[error(transparent)]
     Overlay(#[from] OverlayError),

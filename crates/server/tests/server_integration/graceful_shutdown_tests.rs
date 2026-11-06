@@ -527,16 +527,10 @@ fn open_registered_stalled_connection(port: u16, first_reads: &FirstReads) -> Tc
 
 /// Sends `signal` to the server process.
 ///
-/// `@/inv/pid-safety`: a PID that does not convert to a positive `i32` is
-/// rejected before the syscall, so a lossy conversion can never turn this
-/// targeted signal into `kill(-1, …)` against every process the user owns.
+/// PID validity is enforced by the shared `jit::process` guard.
 fn send_signal(pid: u32, signal: Signal) {
-    let target =
-        i32::try_from(pid).unwrap_or_else(|_| panic!("PID {pid} is out of range for kill(2)"));
-    assert!(
-        target > 0,
-        "refusing to signal PID {pid}: the value would target a process group"
-    );
+    let target = jit::process::checked_pid(pid)
+        .unwrap_or_else(|| panic!("refusing to signal invalid PID {pid}"));
     kill(Pid::from_raw(target), signal).unwrap_or_else(|error| {
         panic!("send {signal} to the server: {error}");
     });

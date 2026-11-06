@@ -16,15 +16,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "66ce0205-1124-4b2f-b260-50d97fb54e03",
+      "run_id": "62080cc2-a5c1-45cd-9285-f2986129a73b",
       "status": "passed",
-      "updated_at": "2026-11-06T00:03:09.439112382Z",
+      "updated_at": "2026-11-06T00:42:12.411336387Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "fab37724-82a5-4157-9a97-f38a093eb913",
+      "run_id": "1a117d4f-b6ad-48c4-ae1a-8465d7d93238",
       "status": "failed",
-      "updated_at": "2026-11-06T00:07:03.782596146Z",
+      "updated_at": "2026-11-06T00:47:01.531134151Z",
       "updated_by": "auto:executor"
     }
   },
@@ -43,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Dedicated, gate and template writes check their leases in their publishing session",
-  "updated_at": "2026-11-06T00:07:03.782596146Z"
+  "updated_at": "2026-11-06T00:47:01.531134151Z"
 }
