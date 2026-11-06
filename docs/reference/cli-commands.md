@@ -3656,6 +3656,11 @@ assets those documents use, a manifest of SHA256 hashes, and a README describing
 the contents. A snapshot preserves its provenance: git commit, source mode, and
 timestamps.
 
+In git mode (`--at`, `--committed-only`, or the default when git is available), a
+referenced document or asset missing from the selected commit fails export with a
+not-found error (exit `3`); working-tree exports continue to warn for missing
+documents and skip missing assets.
+
 ```bash
 jit snapshot export [OPTIONS]
 ```
