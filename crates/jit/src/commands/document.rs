@@ -238,7 +238,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         use crate::domain::artifact_discovery::ArtifactEvidence;
 
         Ok(
-            match crate::storage::artifact_planning::inspect_artifact_evidence(
+            match crate::storage::artifact_inspection::inspect_artifact_evidence(
                 &self.exec.storage,
                 root,
                 scope,

@@ -236,6 +236,23 @@ impl TestHarness {
     }
 }
 
+/// Seed one exact repository-file precondition, at its repository-relative
+/// `path`, into the in-memory aggregate.
+pub fn seed_memory_repository_file(storage: &InMemoryStorage, path: &str, content: &str) {
+    let layout = storage.repository_layout();
+    let path = layout
+        .classify_repository_relative(path)
+        .expect("fixture path is canonical");
+    match path.root_class() {
+        crate::repository_state::RepositoryRootClass::Data => {
+            storage.add_data_file(path.relative().as_path(), content)
+        }
+        crate::repository_state::RepositoryRootClass::Worktree => {
+            storage.add_worktree_file(path.relative().as_path(), content)
+        }
+    }
+}
+
 /// Seed one exact issue preimage into the in-memory aggregate without exercising
 /// a repository publisher that the test is not about.
 pub fn seed_memory_issue(storage: &InMemoryStorage, issue: &Issue) {
