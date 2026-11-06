@@ -17,7 +17,14 @@
     "code-review",
     "dependency-audit"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "0a4d6311-89fc-4d6a-ad3c-1a7fc212f956",
+      "status": "passed",
+      "updated_at": "2026-11-06T04:46:29.350457994Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6fdb2d53-bc92-424e-bc74-455f21f2cc26",
   "labels": [
     "type:task",
@@ -36,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remove the libgit2 binding from the workspace",
-  "updated_at": "2026-11-06T04:26:35.514122598Z"
+  "updated_at": "2026-11-06T04:46:29.350457994Z"
 }
