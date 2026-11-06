@@ -247,3 +247,75 @@ fn test_apply_rejects_malformed_anchor() {
         .failure()
         .stderr(predicates::str::contains("role=id"));
 }
+
+/// REQ-05 (jit:0723860e): `--json` carries every unmet prerequisite as a
+/// structured `{kind, name}` entry, beside the template it belongs to.
+#[test]
+fn test_apply_json_reports_unmet_prerequisites_structurally() {
+    let config = format!(
+        "[type_hierarchy]\ntypes = {{ epic = 1 }}\n\
+         [namespaces.{}]\ndescription = \"Issue type\"\nunique = true\n",
+        jit::labels::TYPE_NAMESPACE
+    );
+    let cli = JitCli::with_repository(
+        jit::test_utils::setup_test_repo_with_config(&config)
+            .unwrap()
+            .0,
+    );
+    let templates = r#"
+[[template]]
+name       = "unprepared"
+applies_to = ["epic"]
+  [[template.anchors]]
+  name  = "container"
+  gates = ["container-review"]
+  [[template.nodes]]
+  role     = "planning"
+  type     = "planning"
+  gates    = ["plan-review"]
+  doc      = "{container.dir}/plan.md"
+  doc_area = "plans"
+  labels   = ["brackets:{container.short_id}"]
+"#;
+    std::fs::write(cli.root().join(".jit/templates.toml"), templates).unwrap();
+    let epic = super::create_epic(&cli, "Unprepared epic");
+
+    let output = cli
+        .command(["apply", "unprepared", &epic, "--json"])
+        .output()
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+
+    let error = &json["error"];
+    assert_eq!(
+        error["code"],
+        serde_json::to_value(jit::output::ErrorCode::ValidationFailed).unwrap(),
+        "{json}"
+    );
+    assert_eq!(error["details"]["template"], "unprepared", "{json}");
+    // Everything the template requires except the type namespace the
+    // repository declares, each as a structured entry.
+    let met = jit::templates::TemplateRequirement::LabelNamespace(
+        jit::labels::TYPE_NAMESPACE.to_string(),
+    );
+    let expected = jit::templates::TemplateRegistry::from_toml_str(templates, &[] as &[&str])
+        .unwrap()
+        .get("unprepared")
+        .unwrap()
+        .requirements()
+        .into_iter()
+        .filter(|requirement| requirement != &met)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        error["details"]["unmet"],
+        serde_json::to_value(&expected).unwrap(),
+        "{json}"
+    );
+    let kinds = error["details"]["unmet"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["kind"].as_str().unwrap())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(kinds.len(), 4, "{json}");
+}

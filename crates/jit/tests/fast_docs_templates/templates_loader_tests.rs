@@ -80,16 +80,13 @@ fn test_config_load_succeeds_without_templates_file() {
 }
 
 #[test]
-fn test_config_load_fails_on_invalid_template_unknown_type() {
-    // `type = "bogus"` is absent from [type_hierarchy].types, so config load
-    // must fail with a clear, attributable error.
+fn test_config_load_fails_on_invalid_template_unknown_container_type() {
+    // `applies_to = ["bogus"]` is absent from [type_hierarchy].types, so config
+    // load must fail with a clear, attributable error.
     let bad = r#"
 [[template]]
 name = "plan"
-applies_to = ["epic"]
-[[template.nodes]]
-role = "planning"
-type = "bogus"
+applies_to = ["bogus"]
 "#;
     let temp = declaration_dir(&[
         ("config.toml", CONFIG_WITH_HIERARCHY),
