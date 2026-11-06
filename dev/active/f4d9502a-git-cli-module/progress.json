@@ -519,9 +519,9 @@
           "short_id": "78cb05ed",
           "title": "Build-policy check rejects native git and OpenSSL linkage",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "dispatched_2026-11-06"
+          "worker_status": "landed_020828cf5"
         },
         {
           "id": "caceed7d-749c-44f4-8bad-647183cdaf29",
