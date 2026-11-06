@@ -71,7 +71,7 @@ pub(in crate::storage) use mutation_interruption::SessionRedoInterruptions;
 pub use mutation_interruption::{
     MutationInterruptionInjector, MutationPoint, NoMutationInterruptions,
 };
-pub use path_errors::{validate_repo_relative_path, PathReadError};
+pub use path_errors::PathReadError;
 pub use redo_apply::{
     commit_redo_record, NoRedoInterruptions, RedoApplier, RedoApplyError, RedoInterruptionInjector,
     RedoPoint,
@@ -328,9 +328,8 @@ pub trait IssueStore: Clone {
     /// This is the storage-owned read entry point for command/domain code that needs to
     /// read a config-declared file (e.g. a project-scope item source) WITHOUT
     /// reaching into the filesystem directly. Writes use [`RepositoryStateStore`]
-    /// instead. The path is enforced repository-local:
-    /// an absolute path or any `..` traversal is rejected with the typed
-    /// [`PathReadError::InvalidPath`] before any I/O.
+    /// instead. [`RootRelativePath::parse`](crate::domain::relative_path::RootRelativePath::parse)
+    /// validates the path before any I/O; only descendants are accepted.
     ///
     /// Returns:
     /// - `Ok(None)` when the file is **absent** (a graceful "no content" so callers
@@ -341,8 +340,9 @@ pub trait IssueStore: Clone {
     ///
     /// # Errors
     ///
-    /// - [`PathReadError::InvalidPath`] for an empty, absolute, or `..`-bearing
-    ///   path.
+    /// - [`PathReadError::InvalidPath`] when parsing with
+    ///   [`RootRelativePath::parse`](crate::domain::relative_path::RootRelativePath::parse)
+    ///   fails or yields the repository root.
     /// - [`PathReadError::OutsideRepoRoot`] when the resolved path escapes the repo
     ///   root (e.g. via a symlink).
     /// - [`PathReadError::Other`] for any other read failure.

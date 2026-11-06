@@ -27,13 +27,11 @@ use crate::domain::artifact_plan::{
 #[cfg(test)]
 use crate::domain::artifact_plan::{ArtifactAction, WarningCode};
 use crate::domain::identity::IssueId;
+use crate::domain::relative_path::RootRelativePath;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::Issue;
 use crate::storage::artifact_inspection::collect_citation_scan_evidence;
-use crate::storage::{
-    validate_repo_relative_path, IssueStore, JsonFileStorage, RepositoryReadSession,
-    RepositoryStateStore,
-};
+use crate::storage::{IssueStore, JsonFileStorage, RepositoryReadSession, RepositoryStateStore};
 use anyhow::{bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -252,9 +250,10 @@ fn capture_artifact_evidence(
 ) -> Result<bool> {
     let paths = paths.into_iter().collect::<BTreeSet<_>>();
     for path in &paths {
-        if validate_repo_relative_path(path).is_err()
-            || crate::domain::relative_path::RootRelativePath::parse(path).is_err()
-        {
+        if !matches!(
+            RootRelativePath::parse(path),
+            Ok(RootRelativePath::Descendant(_))
+        ) {
             evidence.insert(path.clone(), ArtifactEvidence::InvalidPath);
         }
     }

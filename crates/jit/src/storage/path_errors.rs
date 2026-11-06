@@ -15,11 +15,12 @@ pub enum PathReadError {
     /// The supplied git commit reference could not be resolved.
     #[error("Commit not found: {0}")]
     CommitNotFound(String),
-    /// The supplied path is not a valid repo-relative path.
+    /// The supplied path is not a valid descendant path.
     ///
-    /// Raised when the path is empty, absolute (leading `/`), or contains
-    /// a `..` segment used for traversal.  Route handlers should map this
-    /// to HTTP 400.
+    /// Paths are checked with
+    /// [`RootRelativePath::parse`](crate::domain::relative_path::RootRelativePath::parse),
+    /// and file-reading operations refuse the root itself. Route handlers
+    /// should map this to HTTP 400.
     #[error("Invalid path: {0}")]
     InvalidPath(String),
     /// The resolved path escapes the repository root (e.g. via a symlink
@@ -41,34 +42,4 @@ impl From<std::io::Error> for PathReadError {
             PathReadError::Other(anyhow::Error::from(e))
         }
     }
-}
-
-/// Validate that `path` is a safe repo-relative input before any I/O.
-///
-/// The single shape-level path check shared by every storage backend, so that
-/// `IssueStore::read_repo_file` (and `read_path_bytes`) reject the same inputs
-/// regardless of backend. Rejects:
-/// - empty paths (`""`),
-/// - absolute paths (a leading `/`) — callers must pass a repo-relative path,
-/// - any `..` segment used for traversal (e.g. `../etc/passwd`, `a/../b`, `foo/..`).
-///
-/// Dots *inside* a segment (e.g. `foo..bar.txt`) are allowed: they are legitimate
-/// filenames that cannot traverse upward.
-pub fn validate_repo_relative_path(path: &str) -> Result<(), PathReadError> {
-    if path.is_empty() {
-        return Err(PathReadError::InvalidPath(
-            "path must not be empty".to_string(),
-        ));
-    }
-    if path.starts_with('/') {
-        return Err(PathReadError::InvalidPath(format!(
-            "absolute paths are not permitted: {path}"
-        )));
-    }
-    if path.split('/').any(|segment| segment == "..") {
-        return Err(PathReadError::InvalidPath(format!(
-            "'..' segment not permitted: {path}"
-        )));
-    }
-    Ok(())
 }

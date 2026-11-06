@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f1b85fad77e110c40678e9f2e7df556b5c6025f0",
+  "completed_at": "2026-11-06T05:34:57.834140384Z",
+  "duration_ms": 362147,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/validation/graph.rs",
+        "id": "F1",
+        "line": 1,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/b2c28ec1/requirement/REQ-06"
+        ],
+        "severity": "medium",
+        "summary": "validation/graph.rs rustdoc does not name RootRelativePath::parse as required by hard REQ-06."
+      }
+    ],
+    "summary": "One hard documentation success criterion remains unmet.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b2c28ec1-4178-4e77-9153-b86aefae1056",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e3ff064f-dd20-4877-aea5-f7034b157762",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T05:28:55.686830148Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5584 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1af54-d955-73e2-be28-4d306e85b826\n--------\nuser\n--- 5571 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 687707c77b977f473eecbca89e8e1e040f0d9a08, b85ca2bb4a52cc861e7cfcd2b59a348940ffb8d7\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/issue/b697a3f7/requirement/REQ-20 and @/issue/b2c28ec1/requirement/REQ-01, REQ-02, REQ-04, REQ-05, REQ-06 (.jit issue sources); @/invariant/convention-convergence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0; 2026-11-06T05:27:12Z; run commit covers both attributable commits); code-review pending\nTruncation recovery: narrowed per-commit patches and targeted parser, storage, classifier, test, and graph-rustdoc reads after broad-search truncation\n\n1. **[blocking][issue-impact] F1 (medium)** `crates/jit/src/validation/graph.rs:1` does not name `RootRelativePath::parse` anywhere in its rustdoc (or file), while hard REQ-06 explicitly requires that alongside the updated `IssueStore::read_repo_file` contract. Neither attributable commit updates this file. References: `@/issue/b2c28ec1/requirement/REQ-06`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One hard documentation success criterion remains unmet.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"validation/graph.rs rustdoc does not name RootRelativePath::parse as required by hard REQ-06.\",\"file\":\"crates/jit/src/validation/graph.rs\",\"line\":1,\"references\":[\"@/issue/b2c28ec1/requirement/REQ-06\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

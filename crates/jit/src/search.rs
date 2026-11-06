@@ -9,6 +9,7 @@
 //! If not found, search operations return a helpful error message with installation instructions.
 
 use crate::domain::identity::IssueId;
+use crate::domain::relative_path::RootRelativePath;
 use crate::repository_state::VirtualPath;
 use anyhow::Result;
 use schemars::JsonSchema;
@@ -125,8 +126,11 @@ pub fn search_files(
     let root = data_dir.canonicalize()?;
     let mut paths = Vec::new();
     for file in files {
-        crate::storage::validate_repo_relative_path(file)?;
-        let candidate = root.join(file);
+        let relative = RootRelativePath::parse(file)?;
+        if relative.is_root() {
+            anyhow::bail!("search path must name a descendant: {file}");
+        }
+        let candidate = root.join(relative.as_path());
         let resolved = match candidate.canonicalize() {
             Ok(path) => path,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,

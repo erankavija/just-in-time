@@ -11,8 +11,8 @@ use std::thread;
 use thiserror::Error;
 
 use crate::domain::artifact_plan::{ArtifactVersion, CanonicalCommitOid};
+use crate::domain::relative_path::RootRelativePath;
 use crate::repository_state::RepositoryTargetKind;
-use crate::storage::validate_repo_relative_path;
 
 /// Errors from running git.
 #[derive(Debug, Clone, Error)]
@@ -1390,7 +1390,14 @@ fn parse_pinned_tree_entries(output: &[u8]) -> Result<Vec<(Vec<u8>, TreeEntry)>,
 }
 
 fn validate_path(path: &str) -> Result<(), GitError> {
-    validate_repo_relative_path(path).map_err(|error| GitError::InvalidPath(error.to_string()))
+    let relative =
+        RootRelativePath::parse(path).map_err(|error| GitError::InvalidPath(error.to_string()))?;
+    if relative.is_root() {
+        return Err(GitError::InvalidPath(
+            "repository root is not a file path".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn stderr(output: &Output) -> String {
