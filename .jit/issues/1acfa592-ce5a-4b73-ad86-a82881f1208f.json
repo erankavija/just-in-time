@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "59308bcd-c683-4535-8029-3f607ff99180",
+      "status": "passed",
+      "updated_at": "2026-11-06T02:51:09.020488820Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "77945b07-aaee-4898-b8c3-a5cf4be472f0",
+      "status": "passed",
+      "updated_at": "2026-11-06T02:53:48.858785184Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1acfa592-ce5a-4b73-ad86-a82881f1208f",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Document show reads through storage at the version it names",
-  "updated_at": "2026-11-06T02:36:17.679669652Z"
+  "updated_at": "2026-11-06T02:53:48.858785184Z"
 }

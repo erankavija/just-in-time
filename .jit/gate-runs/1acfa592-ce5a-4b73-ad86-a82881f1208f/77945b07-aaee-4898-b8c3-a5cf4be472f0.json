@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-1acfa592",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9af59a3754f1551cab28abe7ed316e02c9ce510d",
+  "completed_at": "2026-11-06T02:53:48.857071234Z",
+  "duration_ms": 159592,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed implementation uses storage-backed document reads, preserves requested references, and adds focused behavior and error-classification coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1acfa592-ce5a-4b73-ad86-a82881f1208f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "77945b07-aaee-4898-b8c3-a5cf4be472f0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T02:51:09.264490802Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fbc38bc7090795db73744482dc1fab76ba5e3191, 9af59a3754f1551cab28abe7ed316e02c9ce510d\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/f4d9502a/requirement/REQ-06 and REQ-10 (issue description); @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0; run fbc38bc7090795db73744482dc1fab76ba5e3191 covers fbc38bc7090795db73744482dc1fab76ba5e3191 and not 9af59a3754f1551cab28abe7ed316e02c9ce510d\nTruncation recovery: none\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed implementation uses storage-backed document reads, preserves requested references, and adds focused behavior and error-classification coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
