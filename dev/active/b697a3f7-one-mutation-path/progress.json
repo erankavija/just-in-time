@@ -48,7 +48,7 @@
           "title": "Dedicated, gate and template writes check their leases in their publishing session",
           "classification": "implementation",
           "worker": "claude opus (lock order and lease contract)",
-          "status": "re-landing rework 7b1b087e0",
+          "status": "rework-2 (code-review F1 1a117d4f: evaluate-many pre-check)",
           "commit": "df59347fb",
           "landed": "6672a5e01"
         }
@@ -139,7 +139,7 @@
     "f6477007": 2,
     "4334df62": 1,
     "9a2563fd": 1,
-    "c2b3cefa": 1
+    "c2b3cefa": 2
   },
   "surfaced_pitfalls": [
     {
