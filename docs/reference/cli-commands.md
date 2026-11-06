@@ -1037,10 +1037,10 @@ jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
 
 **Bulk operation semantics:**
 - **Literal updates:** Sets exactly what you specify on each matched issue
-- **Atomic per-issue:** Each issue update publishes its own redo record, with its dependents' [readiness corrections](../concepts/core-model.md#issue-lifecycle)
+- **One session, batch-atomic:** The update matches over one captured view of the repository, derives each matched issue's change against the changes before it, and publishes every change that is not rejected, with its dependents' [readiness corrections](../concepts/core-model.md#issue-lifecycle), in one redo record; a concurrent write retries the whole batch
 - **Predictable:** Safer for large-scale changes
-- **Clear reporting:** Shows modified/skipped/error counts
-- **Same state derivation:** Single-issue and bulk updates run prechecks on `ready → in_progress`, refusing the change when one fails, and divert a `done` request with unpassed gates to `gated`
+- **Clear reporting:** Shows modified/skipped/error counts; a rejected issue is reported in `errors` without stopping the others
+- **Same state derivation:** `issue update --state in_progress` and a bulk transition into `in_progress` both run a `ready` issue's prechecks, refusing that issue's change when one fails; both divert a `done` request with unpassed gates to `gated`
 - **Same field derivation:** A gate or assignee change writes the same issue state and events whether a bulk update, a single-issue update, or the dedicated assign and gate commands request it
 
 **When to use bulk vs single-issue update:**

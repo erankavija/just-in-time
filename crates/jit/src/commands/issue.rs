@@ -1018,7 +1018,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
             let Some(crate::commands::validate::MutationBase { image, issues }) = self
                 .exec
-                .capture_mutation_base(session.as_mut(), &[], None)?
+                .capture_mutation_base(session.as_mut(), &[], &[])?
             else {
                 return Ok(AttemptOutcome::Retry);
             };

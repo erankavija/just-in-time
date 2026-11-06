@@ -11,9 +11,7 @@ use anyhow::Context;
 #[derive(Clone, Copy)]
 enum BaseCapturePurpose<'a> {
     Validation,
-    Mutation {
-        precheck_target: Option<&'a IssueId>,
-    },
+    Mutation { precheck_targets: &'a [IssueId] },
     Repair,
     Archive,
 }
@@ -402,19 +400,41 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     }
 
     /// The base an issue mutation derives from: the registries, every issue,
-    /// and the plan documents its transition rules read.
+    /// the plan documents its transition rules read, and what the prechecks of
+    /// `precheck_targets` read.
     pub(crate) fn capture_mutation_base(
         &self,
         session: &mut (dyn crate::storage::RepositoryReadSession + '_),
         extra_paths: &[crate::repository_state::VirtualPath],
-        precheck_target: Option<&IssueId>,
+        precheck_targets: &[IssueId],
+    ) -> Result<Option<MutationBase>> {
+        self.capture_mutation_base_from(session, None, extra_paths, precheck_targets)
+    }
+
+    /// [`Self::capture_mutation_base`] grown from `start`, an image this
+    /// session's round has read.
+    pub(crate) fn extend_mutation_base(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryReadSession + '_),
+        start: crate::repository_state::RepositoryImage,
+        precheck_targets: &[IssueId],
+    ) -> Result<Option<MutationBase>> {
+        self.capture_mutation_base_from(session, Some(start), &[], precheck_targets)
+    }
+
+    fn capture_mutation_base_from(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryReadSession + '_),
+        start: Option<crate::repository_state::RepositoryImage>,
+        extra_paths: &[crate::repository_state::VirtualPath],
+        precheck_targets: &[IssueId],
     ) -> Result<Option<MutationBase>> {
         self.capture_proposed_base_inner(
             session,
-            None,
+            start,
             &std::collections::BTreeMap::new(),
             extra_paths,
-            BaseCapturePurpose::Mutation { precheck_target },
+            BaseCapturePurpose::Mutation { precheck_targets },
         )
         .and_then(|captured| {
             captured
@@ -468,24 +488,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 issues: None,
             }));
         }
-        let grown = self.capture_proposed_base_inner(
-            session,
-            Some(image),
-            &std::collections::BTreeMap::new(),
-            &[],
-            BaseCapturePurpose::Mutation {
-                precheck_target: Some(issue_id),
-            },
-        )?;
-        grown
-            .map(|(image, (issues, _))| {
-                Ok(MutationPreflight {
-                    image,
-                    target,
-                    issues: Some(issues?),
-                })
-            })
-            .transpose()
+        Ok(self
+            .extend_mutation_base(session, image, std::slice::from_ref(issue_id))?
+            .map(|MutationBase { image, issues }| MutationPreflight {
+                image,
+                target,
+                issues: Some(issues),
+            }))
     }
 
     /// The base an archive plan reads: the event log's length and tail, with
@@ -511,7 +520,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// final-line tail, which determine the append offset, and the caller's
     /// paths (a `mutation` also parses issues strictly); then the closure those
     /// registries plan. Validation and mutation passes also read linked plan
-    /// documents; a mutation's precheck target adds prompt files and gate-run
+    /// documents; a mutation's precheck targets add prompt files and gate-run
     /// results.
     /// Repair and archive omit these rule-evaluation inputs.
     fn capture_proposed_base_inner(
@@ -530,9 +539,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         };
 
         let mutation = matches!(purpose, BaseCapturePurpose::Mutation { .. });
-        let precheck_target = match purpose {
-            BaseCapturePurpose::Mutation { precheck_target } => precheck_target,
-            _ => None,
+        let precheck_targets = match purpose {
+            BaseCapturePurpose::Mutation { precheck_targets } => precheck_targets,
+            _ => &[],
         };
         // An archive rerun enumerates every directory below its existing
         // container destination, so it is allowed a listing per directory an
@@ -648,7 +657,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                         parsed.as_deref().unwrap_or_default(),
                         &config,
                         &effective_virtual_path,
-                        precheck_target,
+                        precheck_targets,
                     )?;
                 }
                 issues = Some((parsed, values));
@@ -923,7 +932,7 @@ fn effective_config(
     )?)
 }
 
-/// Add what the captured `issues` name to `spec`: the plan documents, and a
+/// Add what the captured `issues` name to `spec`: the plan documents, and each
 /// precheck target's prompt files and, when one of its precheck gates consumes
 /// run history, the runs its required gates' states name.
 fn discover_issue_closure(
@@ -932,65 +941,64 @@ fn discover_issue_closure(
     issues: &[Issue],
     config: &JitConfig,
     effective: &EffectiveVirtualPath<'_>,
-    precheck_target: Option<&IssueId>,
+    precheck_targets: &[IssueId],
 ) -> Result<()> {
     use crate::declarations::{GateChecker, GateMode, GateStage};
 
-    let (issue, precheck) = match precheck_target {
-        Some(raw_target) => {
-            let target = super::require_issue_in_capture(issues, raw_target)?;
-            let issue = issues
-                .iter()
-                .find(|issue| issue.id == target)
-                .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.clone()))?;
-            let gates = match effective(image, &crate::repository_state::VirtualPath::GATES)? {
-                Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
-                None => crate::declarations::GateRegistry::default(),
-            };
-            let precheck = issue
-                .gates_required
-                .iter()
-                .filter_map(|key| gates.gates.get(key))
-                .filter(|gate| gate.stage == GateStage::Precheck)
-                .cloned()
-                .collect();
-            (Some(issue), precheck)
-        }
-        None => (None, Vec::new()),
-    };
     spec.discover_paths(plan_document_paths(issues, config)?)?;
-    let automated = || {
-        precheck
-            .iter()
-            .filter(|gate| gate.mode == GateMode::Auto)
-            .filter_map(|gate| gate.checker.as_ref())
-    };
-    spec.discover_paths(
-        automated()
-            .filter_map(|checker| match checker {
-                GateChecker::Exec {
-                    pass_context: true,
-                    prompt_file: Some(path),
-                    ..
-                } => Some(path),
-                _ => None,
-            })
-            .map(|path| {
-                image
-                    .layout()
-                    .classify_repository_relative(path)
-                    .map_err(|_| anyhow!("prompt_file '{}' resolves outside the repository", path))
-            })
-            .collect::<Result<Vec<_>>>()?,
-    )?;
-    if let Some(issue) = issue.filter(|_| automated().any(super::checker_consumes_run_history)) {
-        spec.discover_paths(
-            super::named_gate_run_records(issue)
-                .map(|(_, _, path)| path)
-                .collect::<Vec<_>>(),
-        )?;
+    if precheck_targets.is_empty() {
+        return Ok(());
     }
-    Ok(())
+    let gates = match effective(image, &crate::repository_state::VirtualPath::GATES)? {
+        Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
+        None => crate::declarations::GateRegistry::default(),
+    };
+    precheck_targets.iter().try_for_each(|raw_target| {
+        let target = super::require_issue_in_capture(issues, raw_target)?;
+        let issue = issues
+            .iter()
+            .find(|issue| issue.id == target)
+            .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.clone()))?;
+        let automated = issue
+            .gates_required
+            .iter()
+            .filter_map(|key| gates.gates.get(key))
+            .filter(|gate| gate.stage == GateStage::Precheck && gate.mode == GateMode::Auto)
+            .filter_map(|gate| gate.checker.as_ref())
+            .collect::<Vec<_>>();
+        spec.discover_paths(
+            automated
+                .iter()
+                .filter_map(|checker| match checker {
+                    GateChecker::Exec {
+                        pass_context: true,
+                        prompt_file: Some(path),
+                        ..
+                    } => Some(path),
+                    _ => None,
+                })
+                .map(|path| {
+                    image
+                        .layout()
+                        .classify_repository_relative(path)
+                        .map_err(|_| {
+                            anyhow!("prompt_file '{}' resolves outside the repository", path)
+                        })
+                })
+                .collect::<Result<Vec<_>>>()?,
+        )?;
+        if automated
+            .iter()
+            .any(|checker| super::checker_consumes_run_history(checker))
+        {
+            spec.discover_paths(
+                super::named_gate_run_records(issue)
+                    .map(|(_, _, path)| path)
+                    .collect::<Vec<_>>(),
+            )?;
+        }
+        Ok(())
+    })
 }
 
 /// Capture budget for mutation bases and preflights.
@@ -2220,7 +2228,7 @@ kind = \"enforced\"
             .unwrap()
             .expect("a settled capture");
         let mutation = executor
-            .capture_mutation_base(session.as_mut(), &[], None)
+            .capture_mutation_base(session.as_mut(), &[], &[])
             .unwrap()
             .expect("a settled capture")
             .image;
@@ -2285,7 +2293,7 @@ kind = \"enforced\"
             (BaseCapturePurpose::Validation, ReadMode::Tail),
             (
                 BaseCapturePurpose::Mutation {
-                    precheck_target: Some(&target),
+                    precheck_targets: std::slice::from_ref(&target),
                 },
                 ReadMode::Tail,
             ),
@@ -2538,7 +2546,7 @@ depends_on = ["planning"]
         let (executor, target_id, mut counter) = counted_session();
 
         let base = executor
-            .capture_mutation_base(&mut counter, &[], Some(&target_id))
+            .capture_mutation_base(&mut counter, &[], std::slice::from_ref(&target_id))
             .unwrap()
             .expect("a settled capture");
 
