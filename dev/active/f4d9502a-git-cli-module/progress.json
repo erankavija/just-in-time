@@ -528,9 +528,9 @@
           "short_id": "caceed7d",
           "title": "Contributor documents stop presenting libgit2 as the git integration",
           "classification": "documentation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "dispatched_2026-11-06"
+          "worker_status": "landed_6ed498d0b"
         }
       ]
     }

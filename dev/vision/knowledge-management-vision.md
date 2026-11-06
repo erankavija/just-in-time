@@ -120,14 +120,14 @@ jit validate docs <issue-id>
 
 **Actions:**
 - [ ] Create `validation` module
-- [ ] Implement git integration (use `git2-rs` crate)
+- Superseded by @/charter/D-21: Git access goes through the storage-owned module that runs the git CLI.
 - [ ] Check if file exists at HEAD
 - [ ] Check if file existed at specific commit
 - [ ] Validate commit hash format and existence
 - [ ] Report validation errors with suggestions
 - [ ] Add to existing `jit validate` command
 
-**Dependencies**: `git2 = "0.18"` crate
+**Dependencies (superseded by @/charter/D-21)**: The proposed `git2 = "0.18"` dependency is obsolete; git access goes through the storage-owned module that runs the git CLI.
 **Tests**: 15-20 tests (mocking git operations)
 **Estimated**: 6-8 hours
 
@@ -349,7 +349,7 @@ web/
 ### Backend
 - **Rust**: Core library (existing)
 - **Axum**: Web server framework
-- **Git2**: Git integration for historical access
+- **Git access (superseded by @/charter/D-21)**: Historical access was planned through Git2; current access goes through the storage-owned module that runs the git CLI.
 - **Tantivy**: Full-text search
 - **Tower**: HTTP middleware
 
@@ -536,7 +536,7 @@ just-in-time/
 ## Questions for Consideration
 
 1. **Storage format**: Keep JSON files or migrate to SQLite for better query performance?
-2. **Git integration**: Embed `git2-rs` or shell out to `git` CLI?
+2. **Git integration (superseded by @/charter/D-21)**: Git access goes through the storage-owned module that runs the git CLI.
 3. **Frontend hosting**: Separate web server or embed in Rust binary with `include_dir!`?
 4. **Authentication**: Add user authentication or rely on file system permissions?
 5. **Real-time updates**: Use WebSockets for live collaboration or poll periodically?

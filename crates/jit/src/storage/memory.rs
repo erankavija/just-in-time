@@ -251,13 +251,18 @@ impl InMemoryStorage {
         Arc::clone(&self.active_mutation_layout)
     }
 
-    /// Classify an `IssueStore` repository-relative input through the canonical
-    /// layout authority.
+    /// Parse and classify an `IssueStore` repository-relative descendant.
     fn repo_file_vpath(
         &self,
         rel_path: &str,
     ) -> Result<crate::repository_state::VirtualPath, crate::storage::PathReadError> {
-        crate::storage::validate_repo_relative_path(rel_path)?;
+        let relative = RootRelativePath::parse(rel_path)
+            .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))?;
+        if relative.is_root() {
+            return Err(crate::storage::PathReadError::InvalidPath(
+                "repository root is not a file path".to_string(),
+            ));
+        }
         self.repository_layout()
             .classify_repository_relative(rel_path)
             .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))
@@ -928,10 +933,8 @@ impl IssueStore for InMemoryStorage {
         &self,
         rel_path: &str,
     ) -> Result<Option<String>, crate::storage::PathReadError> {
-        // Enforce the SAME repo-relative path contract as JsonFileStorage (reject
-        // empty, absolute, or `..`-bearing paths), then serve from the aggregate
-        // repository image (the one store a mutation session captures): a captured
-        // File -> Some, absent or non-file -> None.
+        // Serve from the aggregate repository image: a captured File returns
+        // Some, while an absent or non-file entry returns None.
         use crate::repository_state::RepositoryEntry;
         let vpath = self.repo_file_vpath(rel_path)?;
         Ok(match self.read_repository_state()?.entries.get(&vpath) {
