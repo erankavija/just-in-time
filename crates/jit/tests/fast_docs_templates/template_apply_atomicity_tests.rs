@@ -18,12 +18,10 @@ use jit::commands::test_helpers::{memory_executor_wrapping, MemoryDeclarations};
 use jit::declarations::{GateChecker, GateMode, GateRegistry, GateStage};
 use jit::domain::identity::IssueId;
 use jit::domain::{Event, Issue, Priority};
-use jit::gate_presets::{GatePresetDefinition, PresetInfo};
 use jit::repository_state::{CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath};
 use jit::storage::claim_coordinator::ClaimCoordinator;
 use jit::storage::{
     FileLocker, InMemoryStorage, IssueStore, JsonFileStorage, PathReadError, RepositoryStateStore,
-    WorktreePaths,
 };
 use jit::templates::{GraphTemplate, TemplateRegistry};
 use jit::test_taxonomy::{test_taxonomy, TestTaxonomy};
@@ -47,6 +45,7 @@ struct PublicationProbeStore<S: IssueStore> {
     attempts: Arc<Mutex<Vec<Vec<Issue>>>>,
     apply_calls: Arc<AtomicUsize>,
     active_sessions: Arc<AtomicUsize>,
+    session_opens: Arc<AtomicUsize>,
     resolve_calls: Arc<AtomicUsize>,
     captures: Arc<Mutex<Vec<RepositoryImage>>>,
     closure_rewrite: Option<(PathBuf, String)>,
@@ -66,6 +65,7 @@ impl<S: IssueStore> PublicationProbeStore<S> {
             attempts: Arc::new(Mutex::new(Vec::new())),
             apply_calls: Arc::new(AtomicUsize::new(0)),
             active_sessions: Arc::new(AtomicUsize::new(0)),
+            session_opens: Arc::new(AtomicUsize::new(0)),
             resolve_calls: Arc::new(AtomicUsize::new(0)),
             captures: Arc::new(Mutex::new(Vec::new())),
             closure_rewrite: None,
@@ -125,6 +125,10 @@ impl<S: IssueStore> PublicationProbeStore<S> {
 
     fn resolve_calls(&self) -> usize {
         self.resolve_calls.load(Ordering::SeqCst)
+    }
+
+    fn session_opens(&self) -> usize {
+        self.session_opens.load(Ordering::SeqCst)
     }
 }
 
@@ -197,12 +201,6 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn read_repo_file(&self, rel_path: &str) -> Result<Option<String>, PathReadError> {
         self.inner.read_repo_file(rel_path)
     }
-    fn list_gate_presets(&self) -> Result<Vec<PresetInfo>> {
-        self.inner.list_gate_presets()
-    }
-    fn get_gate_preset(&self, name: &str) -> Result<GatePresetDefinition> {
-        self.inner.get_gate_preset(name)
-    }
     fn read_path_bytes(
         &self,
         path: &str,
@@ -224,8 +222,6 @@ struct PublicationProbeSession {
     apply_calls: Arc<AtomicUsize>,
     active_sessions: Arc<AtomicUsize>,
     captures: Arc<Mutex<Vec<RepositoryImage>>>,
-    closure_rewrite: Option<(PathBuf, String)>,
-    closure_rewritten: Arc<AtomicBool>,
 }
 
 impl Drop for PublicationProbeSession {
@@ -245,16 +241,6 @@ impl jit::storage::RepositoryReadSession for PublicationProbeSession {
     ) -> Result<RepositoryImage, jit::storage::RepositoryStateStoreError> {
         let image = self.inner.capture(spec)?;
         self.captures.lock().unwrap().push(image.clone());
-        if self.armed.load(Ordering::SeqCst)
-            && self
-                .closure_rewritten
-                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-                .is_ok()
-        {
-            if let Some((path, content)) = &self.closure_rewrite {
-                std::fs::write(path, content).unwrap();
-            }
-        }
         Ok(image)
     }
 
@@ -335,8 +321,19 @@ impl<S: IssueStore + RepositoryStateStore> RepositoryStateStore for PublicationP
         Box<dyn jit::storage::RepositoryMutationSession>,
         jit::storage::RepositoryStateStoreError,
     > {
+        if self.armed.load(Ordering::SeqCst)
+            && self
+                .closure_rewritten
+                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+        {
+            if let Some((path, content)) = &self.closure_rewrite {
+                std::fs::write(path, content).unwrap();
+            }
+        }
         let inner = self.inner.open_mutation_session(layout)?;
         self.active_sessions.fetch_add(1, Ordering::SeqCst);
+        self.session_opens.fetch_add(1, Ordering::SeqCst);
         Ok(Box::new(PublicationProbeSession {
             inner,
             armed: Arc::clone(&self.armed),
@@ -349,8 +346,6 @@ impl<S: IssueStore + RepositoryStateStore> RepositoryStateStore for PublicationP
             apply_calls: Arc::clone(&self.apply_calls),
             active_sessions: Arc::clone(&self.active_sessions),
             captures: Arc::clone(&self.captures),
-            closure_rewrite: self.closure_rewrite.clone(),
-            closure_rewritten: Arc::clone(&self.closure_rewritten),
         }))
     }
 
@@ -714,8 +709,15 @@ fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
         }));
 }
 
-#[test]
-fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
+/// A template fixture in a Git checkout enforcing `mode`, whose container
+/// another agent leases.
+fn leased_container_fixture(
+    mode: &str,
+) -> (
+    CommandExecutor<PublicationProbeStore<InMemoryStorage>>,
+    PublicationProbeStore<InMemoryStorage>,
+    IssueId,
+) {
     let taxonomy = test_taxonomy();
     let executor = memory_executor_wrapping(
         InMemoryStorage::new(),
@@ -730,15 +732,19 @@ fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
     store.inner.add_data_file(
         "config.toml",
         &format!(
-            "[worktree]\nenforce_leases = \"warn\"\n\n{}",
+            "[worktree]\nenforce_leases = \"{mode}\"\n\n{}",
             taxonomy.config_fragment()
         ),
     );
-    let layout = store.inner.repository_layout();
-    let paths =
-        WorktreePaths::detect_for_data_root(layout.data_root(), layout.worktree_root()).unwrap();
+    let root = store
+        .inner
+        .repository_layout()
+        .worktree_root()
+        .to_path_buf();
+    jit::test_cli::init_git_repository_with_commit(&root).unwrap();
+    let paths = jit::test_utils::primary_checkout_paths(&root);
     let holder = ClaimCoordinator::new(
-        paths,
+        paths.clone(),
         FileLocker::new(Duration::from_secs(5)),
         "wt:holder".parse().unwrap(),
         "agent:holder".parse().unwrap(),
@@ -753,6 +759,13 @@ fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
             |_| Ok(()),
         )
         .unwrap();
+    (executor.with_worktree_paths(paths), store, container)
+}
+
+#[test]
+fn test_lease_check_never_resolves_an_issue_under_repository_session() {
+    let taxonomy = test_taxonomy();
+    let (executor, store, container) = leased_container_fixture("warn");
     let resolves_before = store.resolve_calls();
 
     let (_, warnings) = executor
@@ -769,10 +782,57 @@ fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
         warnings
             .iter()
             .any(|warning| warning.contains("agent:holder")),
-        "the preflight must observe the lease: {warnings:?}"
+        "the lease check must observe the lease: {warnings:?}"
     );
     assert_eq!(store.resolve_calls(), resolves_before);
     assert_eq!(store.active_sessions.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn test_apply_template_with_opens_one_session_per_successful_attempt() {
+    let taxonomy = test_taxonomy();
+    let (executor, store, container) = leased_container_fixture("warn");
+    let opens_before = store.session_opens();
+
+    executor
+        .templates()
+        .apply_template_with(
+            &plan_template(&taxonomy),
+            &container,
+            &bindings(&container),
+            false,
+        )
+        .unwrap();
+
+    assert_eq!(store.session_opens() - opens_before, 1);
+}
+
+#[test]
+fn test_apply_template_with_strict_refuses_an_edited_issue_another_agent_leases() {
+    let taxonomy = test_taxonomy();
+    let (executor, store, container) = leased_container_fixture("strict");
+    let before = repository_image(&store);
+    let applies_before = store.apply_calls();
+
+    let error = executor
+        .templates()
+        .apply_template_with(
+            &plan_template(&taxonomy),
+            &container,
+            &bindings(&container),
+            false,
+        )
+        .unwrap_err();
+
+    let refusal = error
+        .downcast_ref::<jit::errors::ForeignLeaseError>()
+        .expect("the refusal is a ForeignLeaseError");
+    assert!(refusal
+        .leases()
+        .iter()
+        .any(|lease| lease.issue_id == container));
+    assert_eq!(store.apply_calls(), applies_before);
+    assert_eq!(repository_image(&store), before);
 }
 
 /// A closure changed before the round reads the configuration is discovered

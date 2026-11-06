@@ -1,21 +1,13 @@
-//! Gate preset management system
-//!
-//! This module provides functionality for managing gate presets - pre-configured
-//! bundles of quality gates that can be applied to issues. A preset captures a
-//! repeated gate set (a project's CI bundle, a review workflow) so it attaches in
-//! one command instead of gate-by-gate.
-//!
-//! Every preset is a project's own: [`PresetManager`] loads them from
-//! `.jit/config/gate-presets/`, where gate keys, titles, and checkers belong
-//! (`@/inv/domain-agnostic`, `@/charter/D-2`). The test-support `reference`
-//! submodule projects the preset contract and the portable checker syntax into
-//! the committed markdown reference.
+//! Project-defined bundles of quality gates applied to issues together.
+//! [`GatePresetCatalog`] lists and looks up presets from captured repository
+//! files; gate keys, titles, and checkers belong to the project
+//! (`@/inv/domain-agnostic`, `@/charter/D-2`).
 
-mod manager;
+mod catalog;
 #[cfg(any(test, feature = "test-support"))]
 pub mod reference;
 
-pub use manager::PresetManager;
+pub use catalog::GatePresetCatalog;
 #[cfg(any(test, feature = "test-support"))]
 pub use reference::render_reference_markdown;
 
@@ -151,10 +143,9 @@ pub fn validate_preset_name(name: &str) -> Result<()> {
 
 /// Parse a captured set of a project's preset JSON files.
 ///
-/// This is the single pure policy boundary shared by filesystem and captured
-/// readers: canonical names, filename/name agreement, and deterministic
-/// file-order diagnostics.
-pub(crate) fn load_presets_from_custom_files(
+/// Enforces canonical names, filename/name agreement, and deterministic
+/// file-order diagnostics for the catalog.
+fn load_presets_from_custom_files(
     mut files: Vec<(String, Vec<u8>)>,
 ) -> Result<HashMap<String, GatePresetDefinition>> {
     files.sort_by(|left, right| left.0.cmp(&right.0));

@@ -1,25 +1,30 @@
 //! Applying a redo record to the repository's filesystem roots.
 //!
-//! One forward pass over the record's operations, then the record is removed.
-//! Re-application is the same pass: a made directory tolerates a directory
-//! already there, a put overwrites, a delete tolerates absence, the append
-//! rewrites its bytes at its offset, so a record applied twice converges. A
-//! session's apply writes one and applies it; a session open applies the one a
-//! crash left.
+//! One forward pass over the record's operations through one directory-handle
+//! map per root, opened before the first live write, then one fsync per changed
+//! directory, then the record is removed. Re-application is the same pass: a
+//! made directory tolerates a directory already there, a put overwrites, a
+//! delete tolerates absence, the append rewrites its bytes at its offset, so a
+//! record applied twice converges, and it converges from whatever subset of
+//! unsynced entries a crash keeps, which is why directory syncs wait for the
+//! pass's end. Staged-file and event-log data syncs stay per operation, so a
+//! rename that persists names durable bytes. A session's apply writes one record
+//! and applies it; a session open applies the one a crash left.
 
 use crate::repository_state::{
     CaptureError, FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
-use crate::storage::atomic_write::sync_capability_directory;
+use crate::storage::atomic_write::{
+    publish_file, sync_capability_directory, write_staged_file, Durability,
+};
 use crate::storage::capability_fs::{
-    open_capability_parent, open_child_dir_nofollow, open_or_create_capability_parent,
-    CapabilityFsError, CapabilityRoots, DataRoot,
+    open_child_dir_nofollow, CapabilityFsError, CapabilityRoots, DataRoot, DirectoryHandles,
 };
 use crate::storage::redo_record::{
     EventAppend, PutFile, RedoRecord, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
 };
 use cap_primitives::fs::FollowSymlinks;
-use cap_std::fs::{Dir, File, OpenOptions};
+use cap_std::fs::{Dir, OpenOptions};
 use std::io::{ErrorKind, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sync::Arc;
@@ -57,7 +62,12 @@ pub fn commit_redo_record(root: &DataRoot, record: &RedoRecord) -> anyhow::Resul
         }
         Err(error) => return Err(error.into()),
     };
-    write_staged_file(&scratch, RECORD_FILE_NAME, &bytes, FileMode::Regular)?;
+    write_staged_file(
+        &scratch,
+        RECORD_FILE_NAME,
+        bytes.as_slice(),
+        FileMode::Regular,
+    )?;
     sync_capability_directory(&scratch).map_err(Into::into)
 }
 
@@ -117,6 +127,12 @@ impl RedoInterruptionInjector for NoRedoInterruptions {
 /// Failures of one record application.
 #[derive(Debug, thiserror::Error)]
 pub enum RedoApplyError {
+    #[error("original redo worktree {path} is unavailable: {source}")]
+    OriginalWorktree {
+        path: std::path::PathBuf,
+        #[source]
+        source: anyhow::Error,
+    },
     #[error("redo record addresses {path}, which the selected roots do not hold")]
     Unaddressable { path: String },
     #[error("redo application interrupted at {point:?}: {source}")]
@@ -170,28 +186,33 @@ impl RedoApplier {
         roots: &CapabilityRoots,
         record: &RedoRecord,
     ) -> Result<(), RedoApplyError> {
+        roots.validate_record_root(record)?;
         self.apply_operations(roots, record)?;
         let injector = &*self.injector;
         check_interruption(injector, RedoPoint::BeforeRecordRemoval)?;
+        roots.validate_record_root(record)?;
         remove_record(roots)?;
         check_interruption(injector, RedoPoint::AfterApply)
     }
 
-    /// The forward pass over every operation, before the record is consumed.
-    fn apply_operations(
+    /// The forward pass over every operation, before the record is consumed,
+    /// returning the handles it ran through once every directory it changed is
+    /// synced.
+    fn apply_operations<'r>(
         &self,
-        roots: &CapabilityRoots,
+        roots: &'r CapabilityRoots,
         record: &RedoRecord,
-    ) -> Result<(), RedoApplyError> {
+    ) -> Result<PassHandles<'r>, RedoApplyError> {
         let injector = &*self.injector;
         let event_log = VirtualPath::EVENTS;
+        let mut handles = PassHandles::new(roots);
         record
             .make_directories()
             .iter()
             .chain(record.puts().iter().map(|put| &put.path))
             .chain(record.deletes().iter())
             .chain(record.event_append().iter().map(|_| &event_log))
-            .try_for_each(|path| resolve(roots, path).map(|_| ()))?;
+            .try_for_each(|path| handles.resolve(path))?;
         check_interruption(injector, RedoPoint::BeforeApply)?;
         record
             .make_directories()
@@ -199,7 +220,8 @@ impl RedoApplier {
             .enumerate()
             .try_for_each(|(index, path)| {
                 check_interruption(injector, RedoPoint::BeforeMakeDirectory { index })?;
-                make_directory(roots, path)
+                roots.validate_record_root(record)?;
+                make_directory(handles.of(path)?, path)
             })?;
         record
             .puts()
@@ -207,7 +229,8 @@ impl RedoApplier {
             .enumerate()
             .try_for_each(|(index, put)| {
                 check_interruption(injector, RedoPoint::BeforePut { index })?;
-                put_file(roots, put)
+                roots.validate_record_root(record)?;
+                put_file(handles.of(&put.path)?, put)
             })?;
         record
             .deletes()
@@ -215,15 +238,73 @@ impl RedoApplier {
             .enumerate()
             .try_for_each(|(index, path)| {
                 check_interruption(injector, RedoPoint::BeforeDelete { index })?;
-                delete_file(roots, path)
+                roots.validate_record_root(record)?;
+                delete_file(handles.of(path)?, path)
             })?;
-        match record.event_append() {
-            Some(append) => {
-                check_interruption(injector, RedoPoint::BeforeEventAppend)?;
-                append_events(roots, append)
-            }
-            None => Ok(()),
+        if let Some(append) = record.event_append() {
+            check_interruption(injector, RedoPoint::BeforeEventAppend)?;
+            roots.validate_record_root(record)?;
+            append_events(handles.of(&VirtualPath::EVENTS)?, append)?;
         }
+        handles.sync_changed()?;
+        Ok(handles)
+    }
+}
+
+/// One pass's directory handles over each root it addresses.
+struct PassHandles<'r> {
+    worktree: Option<DirectoryHandles<'r>>,
+    data: Option<DirectoryHandles<'r>>,
+}
+
+impl<'r> PassHandles<'r> {
+    fn new(roots: &'r CapabilityRoots) -> Self {
+        Self {
+            worktree: roots
+                .root(RepositoryRootClass::Worktree)
+                .map(DirectoryHandles::new),
+            data: roots
+                .root(RepositoryRootClass::Data)
+                .map(DirectoryHandles::new),
+        }
+    }
+
+    /// The handles of the root `path` is addressed within.
+    fn of(&mut self, path: &VirtualPath) -> Result<&mut DirectoryHandles<'r>, RedoApplyError> {
+        match path.root_class() {
+            RepositoryRootClass::Worktree => self.worktree.as_mut(),
+            RepositoryRootClass::Data => self.data.as_mut(),
+        }
+        .ok_or_else(|| unaddressable(path))
+    }
+
+    /// Open the existing ancestors of `path`.
+    ///
+    /// The parent chain is walked no-follow here rather than at the write, so a
+    /// symlinked ancestor — the one escape a canonical identity cannot carry — is
+    /// refused while the repository is still untouched.
+    fn resolve(&mut self, path: &VirtualPath) -> Result<(), RedoApplyError> {
+        self.of(path)?.open_parent(path.relative().as_path())?;
+        Ok(())
+    }
+
+    /// Each root's handles, mutably.
+    fn each(&mut self) -> impl Iterator<Item = &mut DirectoryHandles<'r>> {
+        self.worktree.iter_mut().chain(self.data.iter_mut())
+    }
+
+    fn sync_changed(&mut self) -> std::io::Result<()> {
+        self.each().try_for_each(DirectoryHandles::sync_changed)
+    }
+
+    #[cfg(test)]
+    fn opens(&mut self) -> usize {
+        self.each().map(|handles| handles.opens()).sum()
+    }
+
+    #[cfg(test)]
+    fn syncs(&mut self) -> usize {
+        self.each().map(|handles| handles.syncs()).sum()
     }
 }
 
@@ -239,33 +320,19 @@ pub(in crate::storage) fn check_interruption(
         .map_err(|source| RedoApplyError::Interrupted { point, source })
 }
 
-/// The root handle a path is addressed within, with its root-relative portion.
-///
-/// The parent chain is walked no-follow here rather than at the write, so a
-/// symlinked ancestor — the one escape a canonical identity cannot carry — is
-/// refused while the repository is still untouched.
-fn resolve<'a>(
-    roots: &'a CapabilityRoots,
-    path: &'a VirtualPath,
-) -> Result<(&'a Dir, &'a Path), RedoApplyError> {
-    let root = roots
-        .root(path.root_class())
-        .ok_or_else(|| unaddressable(path))?;
-    open_capability_parent(root, path.relative().as_path())?;
-    Ok((root, path.relative().as_path()))
-}
-
 /// Make one directory, creating the directories it needs.
 ///
 /// A directory already there is the re-application case and succeeds; any other
 /// occupant is refused, because a record whose directory a regular file or a
 /// symlink occupies can never apply (OD-7). The occupant is read no-follow, so a
 /// link to a directory is that other occupant rather than the directory it names.
-fn make_directory(roots: &CapabilityRoots, path: &VirtualPath) -> Result<(), RedoApplyError> {
-    let (root, relative) = resolve(roots, path)?;
-    let (parent, leaf) = open_or_create_capability_parent(root, relative)?;
+fn make_directory(
+    handles: &mut DirectoryHandles,
+    path: &VirtualPath,
+) -> Result<(), RedoApplyError> {
+    let (parent, leaf) = handles.open_or_create_parent(path.relative().as_path())?;
     match parent.create_dir(&leaf) {
-        Ok(()) => sync_capability_directory(&parent).map_err(Into::into),
+        Ok(()) => Ok(()),
         Err(error) if error.kind() == ErrorKind::AlreadyExists => {
             match parent.symlink_metadata(&leaf)?.is_dir() {
                 true => Ok(()),
@@ -278,76 +345,36 @@ fn make_directory(roots: &CapabilityRoots, path: &VirtualPath) -> Result<(), Red
 
 /// Replace a put's path with its bytes, creating the directories it needs.
 ///
-/// Every directory the put creates is durable before the pass reaches
-/// [`RedoPoint::BeforeRecordRemoval`], so a crash cannot drop an ancestor entry
-/// while removing the record that would replay the put.
-fn put_file(roots: &CapabilityRoots, put: &PutFile) -> Result<(), RedoApplyError> {
-    let (root, relative) = resolve(roots, &put.path)?;
-    let (parent, leaf) = open_or_create_capability_parent(root, relative)?;
-    let staged = staged_name();
-    write_staged_file(&parent, &staged, &put.bytes, put.mode)?;
-    parent.rename(&staged, &parent, &leaf)?;
-    sync_capability_directory(&parent).map_err(Into::into)
-}
-
-/// A stage name beside the target: random, so nothing can be waiting at it, and
-/// `.tmp`, so a staging its apply never renamed is reclaimed by the orphan
-/// sweep in [`super::temp_cleanup`].
-fn staged_name() -> String {
-    format!(".redo.{}.tmp", uuid::Uuid::new_v4().simple())
-}
-
-/// Write `bytes` under `mode` as a new file named `leaf` and return once they
-/// are durable. Shared with the init publisher's staging, so a new file is
-/// written one way whichever publication writes it.
-///
-/// The open creates the file or fails: an occupied name is never opened
-/// through, so no symlink carries the bytes elsewhere and no occupant is
-/// truncated (`@/inv/atomic-writes`).
-pub(in crate::storage) fn write_staged_file(
-    parent: &Dir,
-    leaf: &str,
-    bytes: &[u8],
-    mode: FileMode,
-) -> Result<(), RedoApplyError> {
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    options._cap_fs_ext_follow(FollowSymlinks::No);
-    let mut file = parent.open_with(leaf, &options)?;
-    file.write_all(bytes)?;
-    set_mode(&file, mode)?;
-    file.sync_all().map_err(Into::into)
-}
-
-#[cfg(unix)]
-fn set_mode(file: &File, mode: FileMode) -> Result<(), RedoApplyError> {
-    use cap_std::fs::PermissionsExt;
-
-    let bits = match mode {
-        FileMode::Regular => 0o644,
-        FileMode::Executable => 0o755,
-    };
-    file.set_permissions(cap_std::fs::Permissions::from_mode(bits))?;
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn set_mode(_file: &File, _mode: FileMode) -> Result<(), RedoApplyError> {
-    Ok(())
+/// The publication defers its directory sync: the entries the put writes are
+/// synced with the pass's other changed directories.
+fn put_file(handles: &mut DirectoryHandles, put: &PutFile) -> Result<(), RedoApplyError> {
+    let (parent, leaf) = handles.open_or_create_parent(put.path.relative().as_path())?;
+    publish_file(
+        parent,
+        &leaf,
+        &put.bytes,
+        put.mode,
+        Durability::Deferred,
+        || Ok(()),
+    )
 }
 
 /// Remove a deleted path, tolerating a target a previous application already
 /// removed.
-fn delete_file(roots: &CapabilityRoots, path: &VirtualPath) -> Result<(), RedoApplyError> {
-    let (root, relative) = resolve(roots, path)?;
-    let Some((parent, leaf)) = open_capability_parent(root, relative)? else {
+///
+/// The parent is marked changed even then: the application that removed it
+/// may never have synced it.
+fn delete_file(handles: &mut DirectoryHandles, path: &VirtualPath) -> Result<(), RedoApplyError> {
+    let relative = path.relative().as_path();
+    let Some((parent, leaf)) = handles.open_parent(relative)? else {
         return Ok(());
     };
     match parent.remove_file(&leaf) {
-        Ok(()) => sync_capability_directory(&parent).map_err(Into::into),
-        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(error.into()),
+        Err(error) if error.kind() != ErrorKind::NotFound => return Err(error.into()),
+        _ => {}
     }
+    handles.mark_parent_changed(relative);
+    Ok(())
 }
 
 /// Write the appended bytes at their offset.
@@ -355,12 +382,17 @@ fn delete_file(roots: &CapabilityRoots, path: &VirtualPath) -> Result<(), RedoAp
 /// The log is opened for positioned writing rather than in append mode, which
 /// ignores the offset and would append the bytes a second time, and it is
 /// truncated to the offset plus their length, so a log a previous application
-/// already extended converges.
-fn append_events(roots: &CapabilityRoots, append: &EventAppend) -> Result<(), RedoApplyError> {
+/// already extended converges. Its parent is marked changed, since an
+/// application may have created the log.
+fn append_events(
+    handles: &mut DirectoryHandles,
+    append: &EventAppend,
+) -> Result<(), RedoApplyError> {
     let log = VirtualPath::EVENTS;
-    let (root, relative) = resolve(roots, &log)?;
-    let (parent, leaf) =
-        open_capability_parent(root, relative)?.ok_or_else(|| unaddressable(&log))?;
+    let relative = log.relative().as_path();
+    let (parent, leaf) = handles
+        .open_parent(relative)?
+        .ok_or_else(|| unaddressable(&log))?;
     let mut options = OpenOptions::new();
     options.write(true).create(true);
     options._cap_fs_ext_follow(FollowSymlinks::No);
@@ -368,7 +400,9 @@ fn append_events(roots: &CapabilityRoots, append: &EventAppend) -> Result<(), Re
     file.seek(SeekFrom::Start(append.offset))?;
     file.write_all(&append.bytes)?;
     file.set_len(append.offset + append.bytes.len() as u64)?;
-    file.sync_all().map_err(Into::into)
+    file.sync_all()?;
+    handles.mark_parent_changed(relative);
+    Ok(())
 }
 
 /// Remove the applied record, tolerating one a previous application already
@@ -647,7 +681,8 @@ pub(crate) mod test_fixtures {
                         (puts, deletes)
                     },
                 );
-                RedoRecord::new(
+                RedoRecord::for_layout(
+                    &crate::storage::InMemoryStorage::new().repository_layout(),
                     make_directories,
                     puts,
                     deletes,
@@ -666,8 +701,6 @@ mod tests {
     use super::test_fixtures::*;
     use super::*;
     use crate::repository_state::FileMode;
-    use crate::storage::temp_cleanup::cleanup_orphaned_temp_files;
-    use std::collections::HashSet;
     use std::path::PathBuf;
     use std::sync::Arc;
     use tempfile::TempDir;
@@ -681,7 +714,8 @@ mod tests {
     }
 
     fn sample_record() -> RedoRecord {
-        RedoRecord::new(
+        RedoRecord::for_layout(
+            &crate::storage::InMemoryStorage::new().repository_layout(),
             vec![VirtualPath::data("templates").unwrap()],
             vec![put(VirtualPath::data("records/a.json").unwrap(), b"a")],
             vec![VirtualPath::worktree("dev/note.md").unwrap()],
@@ -825,7 +859,8 @@ mod tests {
         std::fs::write(data_root(&worktree).join("index.json"), b"captured").unwrap();
         std::fs::write(worktree.path().join("stale.md"), b"stale").unwrap();
         std::fs::write(data_root(&worktree).join("events.jsonl"), CAPTURED_LOG).unwrap();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             vec![VirtualPath::data("templates").unwrap()],
             vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
             vec![VirtualPath::worktree("stale.md").unwrap()],
@@ -859,7 +894,8 @@ mod tests {
     #[test]
     fn test_redo_applier_apply_removes_the_record_it_applied() {
         let (worktree, roots) = repository();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
             Vec::new(),
@@ -880,7 +916,8 @@ mod tests {
     #[test]
     fn test_redo_applier_apply_creates_the_directories_a_put_needs() {
         let (worktree, roots) = repository();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             vec![put(
                 VirtualPath::data("issues/2026/a.json").unwrap(),
@@ -906,7 +943,8 @@ mod tests {
     fn test_redo_applier_apply_keeps_the_record_until_a_fresh_nested_put_is_published() {
         let (worktree, roots) = repository();
         let nested = VirtualPath::data("issues/2026/09/a.json").unwrap();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             vec![put(nested, b"published")],
             Vec::new(),
@@ -946,7 +984,8 @@ mod tests {
     #[test]
     fn test_redo_applier_apply_gives_each_put_the_mode_it_carries() {
         let (worktree, roots) = repository();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             vec![PutFile {
                 path: VirtualPath::worktree("scripts/publish.sh").unwrap(),
@@ -977,7 +1016,8 @@ mod tests {
         let target = VirtualPath::data("templates").unwrap();
         std::os::unix::fs::symlink(outside.path(), data_root(&worktree).join("templates")).unwrap();
 
-        let outcome = make_directory(&roots, &target);
+        let mut handles = PassHandles::new(&roots);
+        let outcome = make_directory(handles.of(&target).unwrap(), &target);
 
         assert!(
             matches!(outcome, Err(RedoApplyError::OccupiedDirectory { .. })),
@@ -985,12 +1025,62 @@ mod tests {
         );
     }
 
-    /// A stage name a test can occupy, standing in for the name a put draws at
-    /// random.
-    const OCCUPIED_STAGE: &str = ".redo.occupied.tmp";
+    /// Targets sharing ancestors are reached through one handle per ancestor,
+    /// whichever operations and the pre-pass walk through it.
+    #[test]
+    fn test_redo_applier_apply_opens_each_shared_ancestor_directory_once() {
+        let (worktree, roots) = repository();
+        std::fs::create_dir_all(data_root(&worktree).join("issues/2026")).unwrap();
+        std::fs::write(data_root(&worktree).join("issues/stale.json"), b"stale").unwrap();
+        std::fs::write(data_root(&worktree).join("events.jsonl"), CAPTURED_LOG).unwrap();
+        let record = RedoRecord::new(
+            vec![VirtualPath::data("issues/2026/09").unwrap()],
+            vec![
+                put(VirtualPath::data("issues/2026/a.json").unwrap(), b"a"),
+                put(VirtualPath::data("issues/2026/b.json").unwrap(), b"b"),
+                put(VirtualPath::data("issues/c.json").unwrap(), b"c"),
+            ],
+            vec![VirtualPath::data("issues/stale.json").unwrap()],
+            Some(EventAppend {
+                offset: CAPTURED_LOG.len() as u64,
+                bytes: b"{\"tag\":\"issue_claimed\"}\n".to_vec(),
+            }),
+        )
+        .unwrap();
+        let ancestors = ["issues", "issues/2026"].len();
 
-    fn ambient_directory(path: &Path) -> Dir {
-        Dir::open_ambient_dir(path, cap_std::ambient_authority()).unwrap()
+        let mut handles = uninterrupted().apply_operations(&roots, &record).unwrap();
+
+        assert_eq!(
+            handles.opens(),
+            ancestors,
+            "an ancestor several targets share was opened more than once"
+        );
+    }
+
+    /// Puts sharing a parent cost that parent one fsync, after the last of them.
+    #[test]
+    fn test_redo_applier_apply_syncs_a_parent_its_puts_share_once() {
+        let (_worktree, roots) = repository();
+        let record = RedoRecord::new(
+            Vec::new(),
+            vec![
+                put(VirtualPath::data("index.json").unwrap(), b"index"),
+                put(VirtualPath::data("config.toml").unwrap(), b"config"),
+                put(VirtualPath::data("gates.toml").unwrap(), b"gates"),
+            ],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+
+        let mut handles = uninterrupted().apply_operations(&roots, &record).unwrap();
+
+        assert_eq!(
+            handles.syncs(),
+            1,
+            "the data root was synced once per put rather than once per application"
+        );
     }
 
     /// A put replaces whatever occupies its path. A symlink there is the one
@@ -1008,7 +1098,8 @@ mod tests {
         let target = VirtualPath::data("index.json").unwrap();
         std::os::unix::fs::symlink(&outside_target, data_root(&worktree).join("index.json"))
             .unwrap();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             vec![PutFile {
                 path: target.clone(),
@@ -1040,70 +1131,6 @@ mod tests {
         );
     }
 
-    #[cfg(unix)]
-    #[test]
-    fn test_write_staged_file_refuses_a_symlink_occupying_the_staged_name() {
-        let directory = TempDir::new().unwrap();
-        let unrelated = directory.path().join("unrelated.json");
-        std::fs::write(&unrelated, b"a file the record never named").unwrap();
-        // Relative and in-tree: a confined handle resolves it, where it refuses
-        // an absolute target outright.
-        std::os::unix::fs::symlink("unrelated.json", directory.path().join(OCCUPIED_STAGE))
-            .unwrap();
-        let parent = ambient_directory(directory.path());
-
-        let outcome = write_staged_file(&parent, OCCUPIED_STAGE, b"published", FileMode::Regular);
-
-        assert!(
-            outcome.is_err(),
-            "the staging opened through a symlink waiting at its name"
-        );
-        assert_eq!(
-            std::fs::read(&unrelated).unwrap(),
-            b"a file the record never named",
-            "the staged bytes landed on a path the record never named"
-        );
-    }
-
-    #[test]
-    fn test_write_staged_file_refuses_a_file_occupying_the_staged_name() {
-        let directory = TempDir::new().unwrap();
-        let occupant = directory.path().join(OCCUPIED_STAGE);
-        std::fs::write(&occupant, b"a staging another application holds").unwrap();
-        let parent = ambient_directory(directory.path());
-
-        let outcome = write_staged_file(&parent, OCCUPIED_STAGE, b"published", FileMode::Regular);
-
-        assert!(outcome.is_err(), "the staging truncated an occupied name");
-        assert_eq!(
-            std::fs::read(&occupant).unwrap(),
-            b"a staging another application holds"
-        );
-    }
-
-    #[test]
-    fn test_staged_name_is_unique_across_calls() {
-        let names = (0..64).map(|_| staged_name()).collect::<HashSet<_>>();
-
-        assert_eq!(
-            names.len(),
-            64,
-            "two stagings drew one name, which a create-new open turns into a refused put"
-        );
-    }
-
-    /// The counterpart of the record's survival: a staging is reconstructible
-    /// from the record that named it, so the sweep is its reclaim path.
-    #[test]
-    fn test_staged_name_is_reclaimed_by_the_orphan_temp_sweep() {
-        let directory = TempDir::new().unwrap();
-        let orphan = directory.path().join(staged_name());
-        std::fs::write(&orphan, b"a staging its application never renamed").unwrap();
-
-        assert_eq!(cleanup_orphaned_temp_files(directory.path(), 0).unwrap(), 1);
-        assert!(!orphan.exists(), "the sweep left the orphaned staging");
-    }
-
     #[test]
     fn test_redo_applier_apply_writes_the_append_at_its_offset_over_a_longer_log() {
         let (worktree, roots) = repository();
@@ -1116,7 +1143,8 @@ mod tests {
             [CAPTURED_LOG, &b"{\"tag\":\"residue\"}\n".repeat(3)].concat(),
         )
         .unwrap();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             Vec::new(),
             Vec::new(),
@@ -1141,14 +1169,16 @@ mod tests {
     fn test_redo_applier_apply_checks_every_application_through_the_held_injector() {
         let (_worktree, roots) = repository();
         let (recorded, applier) = recording_applier();
-        let published = RedoRecord::new(
+        let published = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
             Vec::new(),
             None,
         )
         .unwrap();
-        let removed = RedoRecord::new(
+        let removed = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             Vec::new(),
             vec![VirtualPath::data("index.json").unwrap()],
@@ -1179,7 +1209,8 @@ mod tests {
     fn test_redo_applier_apply_checks_every_interruption_point_in_order() {
         let (worktree, roots) = repository();
         std::fs::write(data_root(&worktree).join("events.jsonl"), CAPTURED_LOG).unwrap();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             vec![VirtualPath::data("templates").unwrap()],
             vec![
                 put(VirtualPath::data("index.json").unwrap(), b"published"),
@@ -1217,7 +1248,8 @@ mod tests {
         let (worktree, roots) = repository();
         let outside = TempDir::new().unwrap();
         std::os::unix::fs::symlink(outside.path(), data_root(&worktree).join("escape")).unwrap();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
             Vec::new(),
             vec![
                 put(VirtualPath::data("inside.json").unwrap(), b"published"),

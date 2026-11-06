@@ -25,8 +25,7 @@ use crate::storage::{
     RedoApplyError, RedoRecord, RepoWriteGuard, SessionRedoInterruptions, RECORD_FILE_NAME,
     RECORD_SCRATCH_DIR,
 };
-use cap_primitives::fs::FollowSymlinks;
-use cap_std::fs::{Dir, OpenOptions};
+use cap_std::fs::Dir;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{ErrorKind, Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
@@ -86,7 +85,7 @@ pub enum RepositoryStateStoreError {
     RedoApply(#[source] Box<RedoApplyError>),
     #[error("unsafe repository mutation target: {0}")]
     UnsafeTarget(String),
-    #[error(transparent)]
+    #[error("{0}")]
     Io(#[from] std::io::Error),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
@@ -439,6 +438,299 @@ impl CommitObservation {
     }
 }
 
+struct DataRootHandle {
+    data_root: PathBuf,
+    evidence: RepositoryRootEvidence,
+    roots: CapabilityRoots,
+}
+
+impl DataRootHandle {
+    fn open_after_missing(
+        data: &Path,
+        after_missing: impl FnMut(),
+    ) -> Result<Self, RepositoryStateStoreError> {
+        let data_root = lexical_absolute(data)?;
+        let evidence = discover_data_read_evidence(&data_root, after_missing)?;
+        let (roots, _, _) = CapabilityRoots::open_data(&evidence)?;
+        // An ancestor can prove absence, but its contents are never this store's data.
+        if evidence.path() != data_root && roots.root(RepositoryRootClass::Data).is_some() {
+            return Err(RepositoryStateStoreError::RetryableConflict {
+                path: data_root.display().to_string(),
+            });
+        }
+        Ok(Self {
+            data_root,
+            evidence,
+            roots,
+        })
+    }
+
+    fn is_current(&self) -> Result<bool, RepositoryStateStoreError> {
+        Ok(discover_data_read_evidence(&self.data_root, || {})? == self.evidence)
+    }
+
+    fn reopen(&self) -> Result<CapabilityRoots, RepositoryStateStoreError> {
+        let (roots, _, _) = CapabilityRoots::open_data(&self.evidence)?;
+        Ok(roots)
+    }
+}
+
+/// A lock-free data capability, usable before a code root is selected.
+pub(crate) struct DataReadSession {
+    root: DataRootHandle,
+    opened: CommitObservation,
+}
+
+impl DataReadSession {
+    pub(crate) fn open(data: &Path) -> Result<Self, RepositoryStateStoreError> {
+        Self::open_after_missing(data, || {})
+    }
+
+    fn open_after_missing(
+        data: &Path,
+        after_missing: impl FnMut(),
+    ) -> Result<Self, RepositoryStateStoreError> {
+        let root = DataRootHandle::open_after_missing(data, after_missing)?;
+        let opened = observe_json_commits(&root.roots)?;
+        Ok(Self { root, opened })
+    }
+
+    pub(crate) fn has_data_root(&self) -> bool {
+        self.root.roots.root(RepositoryRootClass::Data).is_some()
+    }
+
+    pub(crate) fn read(
+        &self,
+        path: &VirtualPath,
+        mode: ReadMode,
+    ) -> Result<RepositoryEntry, RepositoryStateStoreError> {
+        self.opened.ensure_capturable()?;
+        if path.root_class() != RepositoryRootClass::Data {
+            return Err(RepositoryStateStoreError::UnsafeTarget(format!("{path:?}")));
+        }
+        inspect_capability_path(&self.root.roots, path, mode)
+    }
+
+    pub(crate) fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError> {
+        if !self.root.is_current()? {
+            return Ok(ReadAdmission::Moved);
+        }
+        self.opened
+            .admit(observe_json_commits(&self.root.reopen()?))
+    }
+
+    fn declarations(&self) -> Result<[Option<Vec<u8>>; 3], RepositoryStateStoreError> {
+        let read = |path: &VirtualPath| -> Result<Option<Vec<u8>>, RepositoryStateStoreError> {
+            match self.read(path, ReadMode::Whole)? {
+                RepositoryEntry::Absent => Ok(None),
+                RepositoryEntry::File { content, .. } => Ok(Some(content.bytes().to_vec())),
+                _ => Err(RepositoryStateStoreError::UnsafeTarget(format!("{path:?}"))),
+            }
+        };
+        Ok([
+            read(&VirtualPath::CONFIG)?,
+            read(&VirtualPath::TEMPLATES)?,
+            read(&VirtualPath::INVARIANTS)?,
+        ])
+    }
+}
+
+/// A present data root bound to its precheck, with repository released before bootstrap.
+pub(crate) struct HeldDataRoot {
+    _root: DataRootHandle,
+    _repository: RepoWriteGuard,
+    _bootstrap: RepoWriteGuard,
+}
+
+pub(crate) enum DataRootHold {
+    PendingRecord(PathBuf),
+    Initialized(HeldDataRoot),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HoldPoint {
+    LockChainAcquired,
+    IndexCaptured,
+}
+
+impl JsonFileStorage {
+    pub(crate) fn hold_initialized_data_root(
+        &self,
+    ) -> Result<DataRootHold, RepositoryStateStoreError> {
+        self.hold_initialized_data_root_at(|_| {})
+    }
+
+    fn hold_initialized_data_root_at(
+        &self,
+        mut at: impl FnMut(HoldPoint),
+    ) -> Result<DataRootHold, RepositoryStateStoreError> {
+        let mut root = DataRootHandle::open_after_missing(self.root(), || {})?;
+        if root.roots.root(RepositoryRootClass::Data).is_none() {
+            return Err(RepositoryStateStoreError::Other(
+                crate::storage::RepositoryNotFoundError::new(root.data_root.display().to_string())
+                    .into(),
+            ));
+        }
+        let conflict = || RepositoryStateStoreError::RetryableConflict {
+            path: root.data_root.display().to_string(),
+        };
+        let bootstrap = self.acquire_bootstrap_write_lock()?;
+        if !root.is_current()? {
+            return Err(conflict());
+        }
+        let repository = self.acquire_repo_write_lock_raw()?;
+        at(HoldPoint::LockChainAcquired);
+        if !root.is_current()? {
+            return Err(conflict());
+        }
+        let roots = root.reopen()?;
+        if open_leftover_record(&roots)?.is_some() {
+            if !root.is_current()? {
+                return Err(conflict());
+            }
+            return Ok(DataRootHold::PendingRecord(
+                root.data_root
+                    .join(RECORD_SCRATCH_DIR)
+                    .join(RECORD_FILE_NAME),
+            ));
+        }
+        let index = inspect_capability_path(&roots, &VirtualPath::INDEX, ReadMode::Whole);
+        at(HoldPoint::IndexCaptured);
+        if !root.is_current()? {
+            return Err(conflict());
+        }
+        super::json::validate_captured_index(&root.data_root, true, &index?)?;
+        root.roots = roots;
+        Ok(DataRootHold::Initialized(HeldDataRoot {
+            _root: root,
+            _repository: repository,
+            _bootstrap: bootstrap,
+        }))
+    }
+}
+
+/// An absent data tree is observed through its first missing component's parent identity.
+fn discover_data_read_evidence(
+    data_root: &Path,
+    mut after_missing: impl FnMut(),
+) -> Result<RepositoryRootEvidence, RepositoryStateStoreError> {
+    data_root
+        .ancestors()
+        .map(|candidate| {
+            let result = discover_root_evidence(candidate, true);
+            if matches!(&result, Err(RepositoryStateStoreError::Io(error)) if error.kind() == ErrorKind::NotFound) {
+                after_missing();
+            }
+            result
+        })
+        .find(|result| {
+            !matches!(result, Err(RepositoryStateStoreError::Io(error)) if error.kind() == ErrorKind::NotFound)
+        })
+        .unwrap_or_else(|| {
+            Err(RepositoryStateStoreError::UnsafeTarget(data_root.display().to_string()))
+        })
+}
+
+/// The configuration and commit observation that selected one invocation's roots.
+#[derive(Clone)]
+pub(crate) struct ConfigurationObservation {
+    data_root: PathBuf,
+    evidence: RepositoryRootEvidence,
+    opened: CommitObservation,
+    declarations: [Option<Vec<u8>>; 3],
+    document: crate::declarations::ConfigurationDocument,
+}
+
+impl ConfigurationObservation {
+    pub(crate) fn capture(data: &Path) -> anyhow::Result<Self> {
+        retry_optimistic_reads("configuration selection", || {
+            Self::attempt(data, false, || {})
+        })
+    }
+
+    pub(crate) fn capture_initialized(data: &Path) -> anyhow::Result<Self> {
+        retry_optimistic_reads("initialized configuration", || {
+            Self::attempt(data, true, || {})
+        })
+    }
+
+    fn attempt(
+        data: &Path,
+        initialized: bool,
+        after_index: impl FnOnce(),
+    ) -> anyhow::Result<Option<anyhow::Result<Self>>> {
+        let session = match DataReadSession::open(data) {
+            Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
+            other => other?,
+        };
+        let index = initialized.then(|| session.read(&VirtualPath::INDEX, ReadMode::Whole));
+        after_index();
+        let declarations = session.declarations();
+        if session.admit()? != ReadAdmission::Granted {
+            return Ok(None);
+        }
+        Ok(Some((|| {
+            if let Some(index) = index {
+                super::json::validate_captured_index(
+                    &session.root.data_root,
+                    session.has_data_root(),
+                    &index?,
+                )?;
+            }
+            let declarations = declarations?;
+            let document =
+                crate::declarations::ConfigurationDocument::parse(declarations[0].as_deref());
+            Ok(Self {
+                data_root: session.root.data_root,
+                evidence: session.root.evidence,
+                opened: session.opened,
+                declarations,
+                document,
+            })
+        })()))
+    }
+
+    pub(crate) fn assemble(
+        &self,
+    ) -> Result<crate::config::JitConfig, crate::declarations::ConfigurationAssemblyError> {
+        self.document.assemble(
+            self.declarations[1].as_deref(),
+            self.declarations[2].as_deref(),
+        )
+    }
+
+    pub(crate) fn worktree(
+        &self,
+        needs_root: bool,
+        needs_policy: bool,
+    ) -> Result<crate::config::WorktreeConfig, crate::declarations::ConfigurationAssemblyError>
+    {
+        self.document.worktree(needs_root, needs_policy)
+    }
+
+    pub(in crate::storage) fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError> {
+        let current = DataReadSession::open(&self.data_root)?;
+        if current.root.evidence != self.evidence {
+            return Ok(ReadAdmission::Moved);
+        }
+        let admission = self.opened.admit(Ok(current.opened.clone()))?;
+        if admission != ReadAdmission::Granted {
+            return Ok(admission);
+        }
+        if current.declarations()? != self.declarations {
+            return Ok(ReadAdmission::Moved);
+        }
+        current.admit()
+    }
+}
+
+pub(crate) struct BootstrapSelection {
+    initial: Option<ConfigurationObservation>,
+    configured_root: Option<PathBuf>,
+    overridden: bool,
+    policy: Option<crate::domain::LinkedCheckoutWriteStance>,
+}
+
 /// The record [`read_leftover_record`] found, applied and cleared: one, or
 /// none.
 ///
@@ -461,21 +753,37 @@ fn apply_leftover_record(
 
 /// Runs before the record is applied, so a record this open refuses is refused
 /// over an untouched repository.
+#[derive(Debug, PartialEq, Eq)]
+struct ObservedRedoRecord {
+    record: RedoRecord,
+    identity: String,
+}
+
 fn read_leftover_record(
     roots: &CapabilityRoots,
 ) -> Result<Option<RedoRecord>, RepositoryStateStoreError> {
+    Ok(observe_leftover_record(roots)?.map(|observed| observed.record))
+}
+
+fn observe_leftover_record(
+    roots: &CapabilityRoots,
+) -> Result<Option<ObservedRedoRecord>, RepositoryStateStoreError> {
     let Some(mut file) = open_leftover_record(roots)? else {
         return Ok(None);
     };
-    let relative = Path::new(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME);
+    let identity = capability_metadata_identity(&file.metadata()?)?;
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)?;
-    RedoRecord::parse(&bytes).map(Some).map_err(|source| {
+    let record = RedoRecord::parse(&bytes).map_err(|source| {
         RepositoryStateStoreError::UnreadableRedoRecord {
-            path: relative.display().to_string(),
+            path: Path::new(RECORD_SCRATCH_DIR)
+                .join(RECORD_FILE_NAME)
+                .display()
+                .to_string(),
             source,
         }
-    })
+    })?;
+    Ok(Some(ObservedRedoRecord { record, identity }))
 }
 
 /// The leftover record, opened by name. A repository holding none pays one look
@@ -501,6 +809,7 @@ fn open_leftover_record(
 /// [`apply_leftover_record`] over the record the in-memory backend holds.
 fn apply_memory_leftover_record(
     storage: &InMemoryStorage,
+    layout: &RepositoryLayout,
     record: Option<RedoRecord>,
     interruptions: Arc<dyn MutationInterruptionInjector>,
 ) -> Result<usize, RepositoryStateStoreError> {
@@ -508,7 +817,7 @@ fn apply_memory_leftover_record(
         return Ok(0);
     };
     MemoryRedoApplier::new(SessionRedoInterruptions::new(interruptions))
-        .apply(storage, &record)
+        .apply_for_layout(storage, &record, layout)
         .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))?;
     Ok(1)
 }
@@ -563,6 +872,7 @@ struct JsonReadSession {
     storage: JsonFileStorage,
     roots: CapabilityRoots,
     opened: CommitObservation,
+    selection: Option<ConfigurationObservation>,
 }
 
 /// A lock-free read over the in-memory backend's entry map.
@@ -573,6 +883,165 @@ struct MemoryReadSession {
 }
 
 impl JsonFileStorage {
+    pub(crate) fn bind_selection(
+        &self,
+        observation: ConfigurationObservation,
+        overridden: bool,
+        guard_policy: bool,
+    ) -> anyhow::Result<()> {
+        let worktree = observation.worktree(!overridden, guard_policy)?;
+        let policy = guard_policy.then(|| worktree.write_policy());
+        let configured_root = worktree.root;
+        *self
+            .bootstrap_selection
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(BootstrapSelection {
+            initial: Some(observation),
+            configured_root,
+            overridden,
+            policy,
+        });
+        Ok(())
+    }
+
+    pub(in crate::storage) fn selection_observation(
+        &self,
+        mutation: bool,
+    ) -> Result<Option<ConfigurationObservation>, RepositoryStateStoreError> {
+        let (initial, configured_root, overridden, expected_policy) = {
+            let mut selected = self
+                .bootstrap_selection
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let Some(binding) = selected.as_mut() else {
+                return Ok(None);
+            };
+            (
+                binding.initial.take(),
+                binding.configured_root.clone(),
+                binding.overridden,
+                binding.policy,
+            )
+        };
+        let observation = match initial {
+            Some(initial) => initial,
+            None => ConfigurationObservation::capture(self.root()).map_err(|error| {
+                error
+                    .downcast::<RepositoryStateStoreError>()
+                    .unwrap_or_else(RepositoryStateStoreError::Other)
+            })?,
+        };
+        let worktree = observation
+            .worktree(!overridden, mutation && expected_policy.is_some())
+            .map_err(|error| RepositoryStateStoreError::Other(error.into()))?;
+        let root = worktree.root.as_ref();
+        let policy = worktree.write_policy();
+        if (!overridden && root != configured_root.as_ref())
+            || (mutation && expected_policy.is_some_and(|expected| expected != policy))
+            || observation.admit()? != ReadAdmission::Granted
+        {
+            return Err(RepositoryStateStoreError::RetryableConflict {
+                path: "configuration selected different repository roots or write policy".into(),
+            });
+        }
+        Ok(Some(observation))
+    }
+
+    /// Complete committed work against its recorded root, before selecting new work.
+    pub fn recover_pending_records(
+        &self,
+    ) -> Result<RecoveryDispatchReport, RepositoryStateStoreError> {
+        self.recover_after_peek(|| {})
+    }
+
+    fn recover_after_peek(
+        &self,
+        mut after_peek: impl FnMut(),
+    ) -> Result<RecoveryDispatchReport, RepositoryStateStoreError> {
+        for _ in 0..READ_OPTIMISTIC_ATTEMPTS {
+            let evidence = discover_root_evidence(&lexical_absolute(self.root())?, true)?;
+            let (mut roots, _, _) = CapabilityRoots::open_data(&evidence)?;
+            let Some(observed) = observe_leftover_record(&roots)? else {
+                return Ok(RecoveryDispatchReport::default());
+            };
+            after_peek();
+            let _order_guard = crate::storage::guard_order::RepositoryOrderGuard::enter();
+            let candidate = &observed.record;
+            let recovery_error = |source: anyhow::Error| {
+                RepositoryStateStoreError::RedoApply(Box::new(RedoApplyError::OriginalWorktree {
+                    path: candidate
+                        .worktree_binding()
+                        .map(|binding| binding.path())
+                        .unwrap_or(self.root())
+                        .to_path_buf(),
+                    source,
+                }))
+            };
+            // The peek selects locks only. No worktree lock is acquired under a data lock.
+            let worktree_guard = (|| -> Result<_, RepositoryStateStoreError> {
+                let Some(binding) = candidate.worktree_binding() else {
+                    return Ok(None);
+                };
+                roots
+                    .bind_worktree(binding)
+                    .map_err(|error| recovery_error(error.into()))?;
+                RepositoryLayout::new(
+                    RepositoryRootEvidence::new(binding.path(), binding.identity(), true),
+                    evidence.clone(),
+                )
+                .map_err(|error| recovery_error(error.into()))?;
+                self.acquire_worktree_bootstrap_lock(binding.path())
+                    .map(Some)
+                    .map_err(&recovery_error)
+            })();
+            let worktree_guard = match worktree_guard {
+                Ok(guard) => guard,
+                Err(error) => {
+                    // A replaced peek cannot make its obsolete root an authority for failure.
+                    let current = discover_root_evidence(evidence.path(), true)?;
+                    if current != evidence {
+                        continue;
+                    }
+                    let (current_roots, _, _) = CapabilityRoots::open_data(&current)?;
+                    if observe_leftover_record(&current_roots)?.as_ref() != Some(&observed) {
+                        continue;
+                    }
+                    return Err(error);
+                }
+            };
+            let bootstrap_guard = self.acquire_bootstrap_write_lock()?;
+            if discover_root_evidence(evidence.path(), true)? != evidence {
+                continue;
+            }
+            let repository_guard = self.acquire_repo_write_lock_raw()?;
+            let events_guard = self.acquire_events_write_lock()?;
+            let (mut locked_roots, _, _) = CapabilityRoots::open_data(&evidence)?;
+            if observe_leftover_record(&locked_roots)?.as_ref() != Some(&observed) {
+                continue;
+            }
+            if let Some(binding) = candidate.worktree_binding() {
+                locked_roots
+                    .bind_worktree(binding)
+                    .map_err(|error| recovery_error(error.into()))?;
+            }
+            self.mutation_interruptions()
+                .check(&MutationPoint::SessionOpen)?;
+            let applied_records = apply_leftover_record(
+                &locked_roots,
+                Some(observed.record),
+                self.mutation_interruptions(),
+            )?;
+            drop(events_guard);
+            drop(repository_guard);
+            drop(bootstrap_guard);
+            drop(worktree_guard);
+            return Ok(RecoveryDispatchReport { applied_records });
+        }
+        Err(RepositoryStateStoreError::RetryableConflict {
+            path: self.root().display().to_string(),
+        })
+    }
+
     /// The layout a session opens: the one this storage is bound to when it
     /// names the same roots, refused when it names others.
     fn session_layout(
@@ -609,14 +1078,13 @@ impl JsonFileStorage {
 /// The record probe, then the event log's tail: a commit removes its record
 /// only after its append.
 fn observe_json_commits(
-    layout: &RepositoryLayout,
     roots: &CapabilityRoots,
 ) -> Result<CommitObservation, RepositoryStateStoreError> {
     let record = open_leftover_record(roots)?.is_some();
     Ok(CommitObservation {
         data_root: roots.root(RepositoryRootClass::Data).is_some(),
         record,
-        log: live_event_log_tail(layout, roots)?,
+        log: live_event_log_tail(roots)?,
     })
 }
 
@@ -643,6 +1111,7 @@ impl RepositoryStateStore for JsonFileStorage {
         &self,
         layout: RepositoryLayout,
     ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
+        let recovered = self.recover_pending_records()?;
         let layout = self.session_layout(layout)?;
         // A retained session may reenter the reentrant lock chain only for the
         // same canonical layout.
@@ -673,19 +1142,19 @@ impl RepositoryStateStore for JsonFileStorage {
         let leftover_record = read_leftover_record(&roots)?;
         interruptions.check(&MutationPoint::SessionOpen)?;
 
-        let (repository_guard, applied_records) = if roots.root(RepositoryRootClass::Data).is_some()
-        {
+        let repository_guard = if roots.root(RepositoryRootClass::Data).is_some() {
             let repository_guard = self.acquire_repo_write_lock_raw()?;
             let _events_guard = self.acquire_events_write_lock()?;
-            // Inside both locks, because the record writes repository state.
-            // The record lives inside the data root, so the absent-root branch
-            // has none to apply.
-            let applied_records =
-                apply_leftover_record(&roots, leftover_record, Arc::clone(&interruptions))?;
-            (Some(repository_guard), applied_records)
+            if leftover_record.is_some() || read_leftover_record(&roots)?.is_some() {
+                return Err(RepositoryStateStoreError::RetryableConflict {
+                    path: self.root().display().to_string(),
+                });
+            }
+            Some(repository_guard)
         } else {
-            (None, 0)
+            None
         };
+        self.selection_observation(true)?;
         let events_lock = roots
             .root(RepositoryRootClass::Data)
             .map(|_| self.events_lock_spec());
@@ -694,7 +1163,7 @@ impl RepositoryStateStore for JsonFileStorage {
         Ok(Box::new(JsonMutationSession {
             layout,
             storage: self.clone(),
-            recovery_report: RecoveryDispatchReport { applied_records },
+            recovery_report: recovered,
             roots,
             data_parent,
             data_leaf,
@@ -712,17 +1181,19 @@ impl RepositoryStateStore for JsonFileStorage {
         &self,
         layout: RepositoryLayout,
     ) -> Result<Box<dyn OptimisticReadSession>, RepositoryStateStoreError> {
+        let selection = self.selection_observation(false)?;
         let layout = self.session_layout(layout)?;
         revalidate_layout(&layout)?;
         let (roots, _, _) = CapabilityRoots::open(&layout)?;
         self.mutation_interruptions()
             .check(&MutationPoint::ReadSessionOpen)?;
-        let opened = observe_json_commits(&layout, &roots)?;
+        let opened = observe_json_commits(&roots)?;
         Ok(Box::new(JsonReadSession {
             layout,
             storage: self.clone(),
             roots,
             opened,
+            selection,
         }))
     }
 }
@@ -745,7 +1216,7 @@ impl RepositoryStateStore for InMemoryStorage {
         // Where the JSON open applies it, gated on the data root for the same
         // reason: a record's home is inside it.
         let applied_records = match data_exists {
-            true => apply_memory_leftover_record(self, leftover_record, interruptions)?,
+            true => apply_memory_leftover_record(self, &layout, leftover_record, interruptions)?,
             false => 0,
         };
         Ok(Box::new(MemoryMutationSession {
@@ -809,9 +1280,15 @@ impl JsonReadSession {
 
 impl OptimisticReadSession for JsonReadSession {
     fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError> {
+        if let Some(selection) = &self.selection {
+            let admission = selection.admit()?;
+            if admission != ReadAdmission::Granted {
+                return Ok(admission);
+            }
+        }
         self.opened.admit(
             revalidate_layout_capabilities(&self.layout, &self.roots)
-                .and_then(|()| observe_json_commits(&self.layout, &self.roots)),
+                .and_then(|()| observe_json_commits(&self.roots)),
         )
     }
 }
@@ -937,6 +1414,7 @@ impl JsonMutationSession {
         prior: CapturedAnswers,
         spec: CaptureSpec,
     ) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        self.storage.selection_observation(true)?;
         revalidate_layout_capabilities(&self.layout, &self.roots)?;
         let image =
             capture_capability_image(&self.layout, &self.roots, &self.storage, spec, prior)?;
@@ -1114,7 +1592,7 @@ impl MemoryMutationSession {
             .commit_record(&record)
             .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))?;
         MemoryRedoApplier::new(SessionRedoInterruptions::new(interruptions))
-            .apply(&self.storage, &record)
+            .apply_for_layout(&self.storage, &record, &self.layout)
             .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
     }
 }
@@ -1232,7 +1710,7 @@ pub fn ensure_write_set_unchanged(
         captured,
         record,
         &|path| inspect_capability_entry(captured.layout(), roots, path, ReadMode::Whole),
-        &|| live_event_log_tail(captured.layout(), roots),
+        &|| live_event_log_tail(roots),
     )
 }
 
@@ -1366,8 +1844,14 @@ fn redo_record_for<'a>(
             _ => None,
         })
         .collect();
-    RedoRecord::new(make_directories, puts, deletes, event_append)
-        .map_err(|source| RepositoryStateStoreError::Other(source.into()))
+    RedoRecord::for_layout(
+        captured.layout(),
+        make_directories,
+        puts,
+        deletes,
+        event_append,
+    )
+    .map_err(|source| RepositoryStateStoreError::Other(source.into()))
 }
 
 /// The redo record publishing `delta` over a present data root, refused
@@ -1417,11 +1901,10 @@ fn retryable_conflict(path: &VirtualPath) -> RepositoryStateStoreError {
 
 /// Read the live log's length and tail, or `None` when no ordinary file is there.
 fn live_event_log_tail(
-    layout: &RepositoryLayout,
     roots: &CapabilityRoots,
 ) -> Result<Option<EventLogTail>, RepositoryStateStoreError> {
     Ok(
-        match inspect_capability_entry(layout, roots, &VirtualPath::EVENTS, ReadMode::Tail)? {
+        match inspect_capability_path(roots, &VirtualPath::EVENTS, ReadMode::Tail)? {
             RepositoryEntry::FileTail { tail, .. } => Some(tail),
             _ => None,
         },
@@ -1760,6 +2243,14 @@ fn inspect_capability_entry(
     mode: ReadMode,
 ) -> Result<RepositoryEntry, RepositoryStateStoreError> {
     layout.ensure_canonical(path)?;
+    inspect_capability_path(roots, path, mode)
+}
+
+fn inspect_capability_path(
+    roots: &CapabilityRoots,
+    path: &VirtualPath,
+    mode: ReadMode,
+) -> Result<RepositoryEntry, RepositoryStateStoreError> {
     let Some(root) = roots.root(path.root_class()) else {
         return Ok(RepositoryEntry::Absent);
     };
@@ -1817,7 +2308,7 @@ fn inspect_capability_leaf(
         Err(error) => return Err(error.into()),
     };
     if metadata.is_symlink() {
-        let target = parent.read_link(leaf)?;
+        let target = parent.read_link_contents(leaf)?;
         let bytes = target.as_os_str().as_encoded_bytes().to_vec();
         return Ok(RepositoryEntry::Symlink {
             target: CapturedBytes::new(capability_metadata_identity(&metadata)?, bytes)?,
@@ -1833,10 +2324,7 @@ fn inspect_capability_leaf(
         });
     }
     if metadata.is_file() {
-        let mut options = OpenOptions::new();
-        options.read(true);
-        options._cap_fs_ext_follow(FollowSymlinks::No);
-        let mut file = parent.open_with(leaf, &options)?;
+        let mut file = open_regular_file_nofollow(parent, leaf)?;
         if read == ReadMode::Tail {
             let length = file.metadata()?.len();
             let tail = EventLogTail::read_tail(length, |start, len| {
@@ -1973,7 +2461,7 @@ fn discover_root_evidence(
     }
 }
 
-fn ensure_symlink_free_ancestry(
+pub(crate) fn ensure_symlink_free_ancestry(
     path: &Path,
     allow_absent_leaf: bool,
 ) -> Result<(), RepositoryStateStoreError> {

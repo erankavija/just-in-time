@@ -228,11 +228,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                     .labels
                     .retain(|label| label != &label_utils::type_label(&old_type));
                 issue.labels.push(label_utils::type_label(&new_type));
-                if !dry_run {
-                    fixes
-                        .messages
-                        .extend(self.exec.refuse_foreign_lease(&issue_id)?);
-                }
                 fixes.messages.push(format!(
                     "{} type '{old_type}' with '{new_type}' for issue {issue_id}",
                     if dry_run { "Would replace" } else { "Replaced" }
@@ -1208,7 +1203,7 @@ impl<S: IssueStore> ValidationOps<'_, S> {
         let checkout = self
             .exec
             .require_worktree_paths()?
-            .write_checkout()
+            .code_checkout()
             .context("branch drift validation requires a git repository")?;
         match checkout.compare_with_base("origin/main")? {
             BaseComparison::BaseUnresolved => {
@@ -1367,6 +1362,27 @@ fn recorded_worktree_ids(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_validate_branch_drift_uses_selected_code_checkout() {
+        use crate::test_harness::git::GitRepository;
+        let outer = tempfile::tempdir().unwrap();
+        let data = GitRepository::init(outer.path().join("data"));
+        let code = GitRepository::init(outer.path().join("code"));
+        data.write("data", "data")
+            .commit("data history without origin/main");
+        code.write("code", "code").commit("code history");
+        code.git(&["update-ref", "refs/remotes/origin/main", "HEAD"]);
+        let paths = crate::storage::WorktreePaths::detect_for_data_root(
+            &data.root().join(".jit"),
+            data.root(),
+        )
+        .unwrap()
+        .with_worktree_root(code.root())
+        .unwrap();
+        let executor = crate::commands::test_helpers::setup().with_worktree_paths(paths);
+        assert!(executor.validation().validate_branch_drift().is_ok());
+    }
+
     use super::*;
     use crate::commands::test_helpers::{seed_issue, MemoryDeclarations};
     use crate::repository_state::VirtualPath;
@@ -2010,6 +2026,37 @@ mod tests {
 
         let (second, _, _, _) = executor.validation().validate_with_fix(false).unwrap();
         assert_eq!(second, 0, "a captured type repair must not repeat");
+    }
+
+    #[test]
+    fn test_validate_type_fix_repairs_another_agents_leased_issue_in_strict_mode() {
+        use crate::commands::test_helpers::{
+            plant_foreign_lease, seed_issue, seed_repo_file, setup_coordinated_with_enforcement,
+        };
+        use crate::storage::IssueStore;
+
+        let executor = setup_coordinated_with_enforcement("strict");
+        seed_repo_file(
+            executor.storage(),
+            ".jit/config.toml",
+            "[worktree]\nenforce_leases = \"strict\"\n\
+             [type_hierarchy.types]\ntask = 4\n\
+             [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        );
+        let mut issue =
+            crate::test_utils::fixture_issue("Type fix lease".to_string(), String::new());
+        issue.labels.push("type:taks".to_string());
+        let issue_id = issue.id.clone();
+        seed_issue(executor.storage(), issue);
+        plant_foreign_lease(&executor, &issue_id);
+
+        let (count, messages, _, _) = executor.validation().validate_with_fix(false).unwrap();
+
+        assert!(count > 0, "{messages:?}");
+        let repaired = executor.storage().load_issue(&issue_id).unwrap();
+        assert!(repaired.labels.iter().any(|label| label == "type:task"));
+        assert!(!repaired.labels.iter().any(|label| label == "type:taks"));
+        assert!(messages.iter().all(|message| !message.contains("lease")));
     }
 
     #[test]

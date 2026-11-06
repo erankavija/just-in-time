@@ -34,8 +34,14 @@ fn set<S: HandlerStore>(
 /// An invalid configuration source is a registered validation failure; its
 /// report carries the errors under `--json` and the summary is the message.
 fn validate<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<ConfigValidateResponse> {
-    let response = ConfigValidateResponse(ctx.executor.config().validate()?);
-    Ok(if response.0.valid {
+    Ok(validation_outcome(ctx.executor.config().validate()?))
+}
+
+fn validation_outcome(
+    report: crate::commands::ConfigValidationReport,
+) -> Outcome<ConfigValidateResponse> {
+    let response = ConfigValidateResponse(report);
+    if response.0.valid {
         Outcome::success_with(response, "Configuration is valid")
     } else {
         Outcome::findings(
@@ -46,7 +52,22 @@ fn validate<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<ConfigV
             ),
             response,
         )
-    })
+    }
+}
+
+pub(super) fn dispatch_validation(
+    report: crate::commands::ConfigValidationReport,
+    mode: crate::output::OutputMode,
+    out: &mut dyn std::io::Write,
+    err: &mut dyn std::io::Write,
+) -> anyhow::Result<crate::output::RunStatus> {
+    let leaf = GROUP
+        .leaves
+        .iter()
+        .find(|leaf| leaf.path == "config_validate")
+        .ok_or_else(|| anyhow::anyhow!("config_validate leaf is not registered"))?;
+    let outcome = leaf.admit(validation_outcome(report))?;
+    crate::output::emit_outcome(&outcome, mode, out, err)
 }
 
 fn show_hierarchy<S: IssueStore>(

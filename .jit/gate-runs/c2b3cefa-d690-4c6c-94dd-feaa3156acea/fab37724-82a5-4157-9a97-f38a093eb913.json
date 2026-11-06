@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6672a5e013852ff57e22def6a5e567bec7bf5a1e",
+  "completed_at": "2026-11-06T00:07:03.780875857Z",
+  "duration_ms": 234232,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/gate_check.rs",
+        "id": "F1",
+        "line": 799,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c2b3cefa/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "Inputs-session foreign-lease warnings are discarded, so warn-mode findings can be lost before gate-run recording."
+      }
+    ],
+    "summary": "Automated gate evaluation drops warn-mode lease findings from its inputs session.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c2b3cefa-d690-4c6c-94dd-feaa3156acea",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fab37724-82a5-4157-9a97-f38a093eb913",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T00:03:09.547892802Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4923 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1ae2a-991a-7c83-a06c-f145c9243ec2\n--------\nuser\n--- 4910 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: df59347fb5cca9eb8b1972cf45f1934cb7d0c512 (`jit:c2b3cefa`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c2b3cefa/requirement/REQ-01, @/issue/b697a3f7/requirement/REQ-04; @/charter/D-4,D-17,D-20; @/invariant/atomic-writes,derived-state-coherence,semantic-types,architecture-dependency-direction,orthogonal-tests,essential-code-prose; @/gate/cargo-ci\nGate evidence: cargo-ci passed (exit 0, 2026-11-06T00:01:23Z); run 6672a5e contains df59347f\nTruncation recovery: reread bounded current-source ranges for gate evaluation, gate mutation, template application, bootstrap, and CLI classification after broad output truncated\n\n1. Blocking — issue-impact. `crates/jit/src/commands/gate_check.rs:799` discards the warnings returned by the new inputs-session lease check. The later recording session independently rechecks leases, so an initial warn-mode foreign lease disappears from the outcome if it expires/releases during checker execution, or if the checker fails before recording. This violates the hard requirement that every warn-mode finding retain its text. Preserve and return/merge the inputs-session warnings.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Automated gate evaluation drops warn-mode lease findings from its inputs session.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Inputs-session foreign-lease warnings are discarded, so warn-mode findings can be lost before gate-run recording.\",\"file\":\"crates/jit/src/commands/gate_check.rs\",\"line\":799,\"references\":[\"@/issue/c2b3cefa/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

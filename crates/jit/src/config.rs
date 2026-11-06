@@ -5,9 +5,11 @@
 
 use crate::domain::item::KindScope;
 use crate::domain::vocabulary::wire_vocabulary;
-use crate::repository_state::{RepositoryLayout, VirtualPath};
+use crate::repository_state::RepositoryLayout;
+#[cfg(test)]
+use crate::repository_state::VirtualPath;
 use crate::runtime_defaults::{MAX_INDEFINITE_LEASES_PER_AGENT, MAX_INDEFINITE_LEASES_PER_REPO};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -1055,6 +1057,8 @@ pub enum EnforcementModeError {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorktreeConfig {
+    /// Code root, absolute or relative to the selected data root.
+    pub root: Option<std::path::PathBuf>,
     /// Lease enforcement mode; resolved by [`JitConfig::enforcement_mode`].
     pub enforce_leases: Option<EnforcementMode>,
     /// Write-policy stance for state-mutating commands run inside a linked
@@ -1221,24 +1225,12 @@ impl JitConfig {
     /// Load the configuration from the data root's declaration files through
     /// [`assemble_configuration`](crate::declarations::assemble_configuration).
     pub fn load(layout: &RepositoryLayout) -> Result<Self> {
-        let read = |path: &VirtualPath| -> Result<Option<Vec<u8>>> {
-            let resolved = layout.resolve(path)?;
-            match std::fs::read(&resolved) {
-                Ok(bytes) => Ok(Some(bytes)),
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-                Err(error) => {
-                    Err(error).with_context(|| format!("Failed to read {}", resolved.display()))
-                }
-            }
-        };
-        let config = read(&VirtualPath::CONFIG)?;
-        let templates = read(&VirtualPath::TEMPLATES)?;
-        let invariants = read(&VirtualPath::INVARIANTS)?;
-        Ok(crate::declarations::assemble_configuration(
-            config.as_deref(),
-            templates.as_deref(),
-            invariants.as_deref(),
-        )?)
+        Ok(
+            crate::storage::repository_state_store::ConfigurationObservation::capture(
+                layout.data_root(),
+            )?
+            .assemble()?,
+        )
     }
 
     /// Validate every explicitly-declared `[item_kinds.X]` table, requiring all

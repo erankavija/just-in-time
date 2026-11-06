@@ -1172,9 +1172,6 @@ fn ensure_committed_write_targets(
     layout: &RepositoryLayout,
     paths: &WorktreePaths,
 ) -> Result<()> {
-    let Some(checkout) = paths.write_checkout() else {
-        return Ok(());
-    };
     let written = plan
         .delta()
         .file_writes()
@@ -1196,12 +1193,24 @@ fn ensure_committed_write_targets(
             .join(path.relative().as_path())
         })
         .collect::<BTreeSet<_>>();
-    let uncommitted = checkout
-        .dirty_paths()?
-        .into_iter()
-        .filter(|dirty| written.contains(&checkout.worktree_root().join(dirty)))
-        .map(|dirty| dirty.display().to_string())
-        .collect::<BTreeSet<_>>();
+    let mut uncommitted = BTreeSet::new();
+    let mut checked = BTreeSet::new();
+    let checkouts = [
+        paths
+            .write_checkout()
+            .map(|checkout| (checkout, paths.checkout_top_level())),
+        paths.code_checkout().zip(paths.code_checkout_top_level()),
+    ];
+    for (checkout, top) in checkouts.into_iter().flatten() {
+        if !checked.insert(top.to_path_buf()) {
+            continue;
+        }
+        for dirty in checkout.dirty_paths()? {
+            if written.contains(&top.join(&dirty)) {
+                uncommitted.insert(dirty.display().to_string());
+            }
+        }
+    }
     if uncommitted.is_empty() {
         return Ok(());
     }
@@ -2220,6 +2229,61 @@ mod tests {
         apply_package(&executor, &package).unwrap();
 
         assert_eq!(fs::read_to_string(outside_target).unwrap(), "rendered\n");
+    }
+
+    #[test]
+    fn test_apply_profiles_refuses_dirty_target_in_selected_code_subdirectory() {
+        let temp = TempDir::new().unwrap();
+        let data = crate::test_harness::git::GitRepository::init(temp.path().join("data"));
+        let code = crate::test_harness::git::GitRepository::init(temp.path().join("code"));
+        let sub = code.root().join("sub");
+        fs::create_dir(&sub).unwrap();
+        let storage = JsonFileStorage::new(data.root().join("state"));
+        let paths =
+            crate::storage::WorktreePaths::detect_for_data_root(storage.root(), data.root())
+                .unwrap()
+                .with_worktree_root(&sub)
+                .unwrap();
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(&sub, storage.root()).unwrap())
+            .unwrap()
+            .with_worktree_paths(paths);
+        executor
+            .profiles()
+            .initialize_fresh_repository(&sub, None)
+            .unwrap();
+        data.commit("track data");
+        fs::create_dir(sub.join("docs")).unwrap();
+        fs::write(
+            sub.join("docs/first.txt"),
+            "tracked
+",
+        )
+        .unwrap();
+        code.commit("track target");
+        fs::write(
+            sub.join("docs/first.txt"),
+            "local edit
+",
+        )
+        .unwrap();
+        let package = authored_package(
+            &temp,
+            "code/sub/packages/first",
+            "first",
+            "docs/first.txt",
+            "rendered
+",
+            "",
+        );
+        let error = apply_package(&executor, &package).unwrap_err();
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileApplyError>(),
+                Some(ProfileApplyError::UncommittedTargets { .. })
+            ),
+            "{error:#}"
+        );
     }
 
     #[test]

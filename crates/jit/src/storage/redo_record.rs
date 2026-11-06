@@ -9,7 +9,10 @@
 //! operation's path lies beneath (OD-7).
 
 use crate::domain::relative_path::RootRelativePath;
-use crate::repository_state::{FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath};
+use crate::repository_state::{
+    FileMode, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, RepositoryRootEvidence,
+    VirtualPath,
+};
 use serde::{Deserialize, Serialize};
 
 pub use crate::repository_state::RECORD_SCRATCH_DIR;
@@ -22,7 +25,7 @@ pub use crate::repository_state::RECORD_SCRATCH_DIR;
 /// apply.
 pub const RECORD_FILE_NAME: &str = "redo.record";
 
-const FORMAT_VERSION: u64 = 1;
+const FORMAT_VERSION: u64 = 2;
 
 /// A file published whole: its complete new bytes and the mode it carries.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,6 +43,33 @@ pub struct EventAppend {
     pub bytes: Vec<u8>,
 }
 
+/// Original worktree authority carried by a local durable commit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorktreeRootBinding(RepositoryRootEvidence);
+
+impl WorktreeRootBinding {
+    pub fn from_layout(layout: &RepositoryLayout) -> Self {
+        Self(RepositoryRootEvidence::new(
+            layout.worktree_root(),
+            layout.worktree_identity(),
+            true,
+        ))
+    }
+
+    pub fn path(&self) -> &std::path::Path {
+        self.0.path()
+    }
+    pub fn identity(&self) -> &str {
+        self.0.identity()
+    }
+
+    fn parse(path: std::path::PathBuf, identity: String) -> Result<Self, RedoRecordError> {
+        let evidence = RepositoryRootEvidence::new(path, identity, true);
+        evidence.validate()?;
+        Ok(Self(evidence))
+    }
+}
+
 /// One mutation's file changes, in application order: ordered directories to
 /// make, ordered puts, ordered deletes, one event append.
 ///
@@ -54,6 +84,7 @@ pub struct EventAppend {
 /// one has had it checked.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RedoRecord {
+    worktree: Option<WorktreeRootBinding>,
     make_directories: Vec<VirtualPath>,
     puts: Vec<PutFile>,
     deletes: Vec<VirtualPath>,
@@ -61,7 +92,7 @@ pub struct RedoRecord {
 }
 
 impl RedoRecord {
-    /// Construct a record from its operation set, rejecting one whose paths
+    /// Construct a data-only record, rejecting one whose paths
     /// overlap: no operation's path may be an ancestor of another's, and no
     /// two operations may name the same path. The event append's implicit
     /// target, [`VirtualPath::EVENTS`], participates alongside every
@@ -80,6 +111,33 @@ impl RedoRecord {
         deletes: Vec<VirtualPath>,
         event_append: Option<EventAppend>,
     ) -> Result<Self, RedoRecordError> {
+        Self::with_binding(None, make_directories, puts, deletes, event_append)
+    }
+
+    /// Bind worktree operations to the layout that produced them; data-only records remain unbound.
+    pub fn for_layout(
+        layout: &RepositoryLayout,
+        make_directories: Vec<VirtualPath>,
+        puts: Vec<PutFile>,
+        deletes: Vec<VirtualPath>,
+        event_append: Option<EventAppend>,
+    ) -> Result<Self, RedoRecordError> {
+        let worktree = make_directories
+            .iter()
+            .chain(puts.iter().map(|put| &put.path))
+            .chain(deletes.iter())
+            .any(|path| path.root_class() == RepositoryRootClass::Worktree)
+            .then(|| WorktreeRootBinding::from_layout(layout));
+        Self::with_binding(worktree, make_directories, puts, deletes, event_append)
+    }
+
+    fn with_binding(
+        worktree: Option<WorktreeRootBinding>,
+        make_directories: Vec<VirtualPath>,
+        puts: Vec<PutFile>,
+        deletes: Vec<VirtualPath>,
+        event_append: Option<EventAppend>,
+    ) -> Result<Self, RedoRecordError> {
         if puts
             .iter()
             .map(|put| &put.path)
@@ -89,13 +147,27 @@ impl RedoRecord {
             return Err(RedoRecordError::EventLogRewrite);
         }
         let record = Self {
+            worktree,
             make_directories,
             puts,
             deletes,
             event_append,
         };
         record.ensure_disjoint_paths()?;
+        let has_worktree = record
+            .make_directories
+            .iter()
+            .chain(record.puts.iter().map(|put| &put.path))
+            .chain(record.deletes.iter())
+            .any(|path| path.root_class() == RepositoryRootClass::Worktree);
+        if has_worktree != record.worktree.is_some() {
+            return Err(RedoRecordError::WorktreeBindingPresence);
+        }
         Ok(record)
+    }
+
+    pub fn worktree_binding(&self) -> Option<&WorktreeRootBinding> {
+        self.worktree.as_ref()
     }
 
     /// Every directory the record makes, in application order.
@@ -143,9 +215,8 @@ impl RedoRecord {
     /// The header is compact JSON, so it holds no raw newline and the first
     /// newline ends it. Content stays raw rather than encoded, because a put
     /// carries whole files, among them the non-UTF-8 assets a profile
-    /// publishes. Equal records
-    /// serialize to equal bytes and nothing process-local is written, so the
-    /// record one process wrote is the record another parses.
+    /// publishes. Local recovery authority binds worktree writes to their
+    /// original path and identity; equal records serialize to equal bytes.
     ///
     /// # Errors
     ///
@@ -153,6 +224,10 @@ impl RedoRecord {
     pub fn serialize(&self) -> Result<Vec<u8>, RedoRecordError> {
         let header = RecordHeader {
             version: FORMAT_VERSION,
+            worktree: self.worktree.as_ref().map(|binding| WorktreeHeader {
+                path: binding.path().to_path_buf(),
+                identity: binding.identity().to_owned(),
+            }),
             make_directories: self
                 .make_directories
                 .iter()
@@ -248,7 +323,16 @@ impl RedoRecord {
             })
             .transpose()?;
         match content.len() - read {
-            0 => Self::new(make_directories, puts, deletes, event_append),
+            0 => Self::with_binding(
+                header
+                    .worktree
+                    .map(|binding| WorktreeRootBinding::parse(binding.path, binding.identity))
+                    .transpose()?,
+                make_directories,
+                puts,
+                deletes,
+                event_append,
+            ),
             trailing => Err(RedoRecordError::TrailingBytes(trailing)),
         }
     }
@@ -258,6 +342,8 @@ impl RedoRecord {
 /// self-contradictory operation set, whether built in process or parsed.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum RedoRecordError {
+    #[error("redo record requires an original worktree binding exactly when it addresses worktree targets")]
+    WorktreeBindingPresence,
     #[error("redo record carries no header line")]
     MissingHeader,
     #[error("redo record header is not readable: {0}")]
@@ -284,10 +370,19 @@ pub enum RedoRecordError {
 #[serde(deny_unknown_fields)]
 struct RecordHeader {
     version: u64,
+    #[serde(default)]
+    worktree: Option<WorktreeHeader>,
     make_directories: Vec<PathHeader>,
     puts: Vec<PutHeader>,
     deletes: Vec<PathHeader>,
     event_append: Option<AppendHeader>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WorktreeHeader {
+    path: std::path::PathBuf,
+    identity: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -384,8 +479,13 @@ mod tests {
     /// A record covering both roots, both modes, non-UTF-8 content, a made
     /// directory, a delete and an append — every operation the vocabulary
     /// carries.
+    fn sample_layout() -> RepositoryLayout {
+        crate::storage::InMemoryStorage::new().repository_layout()
+    }
+
     fn sample_record() -> RedoRecord {
         RedoRecord {
+            worktree: Some(WorktreeRootBinding::from_layout(&sample_layout())),
             make_directories: vec![VirtualPath::data("templates").unwrap()],
             puts: vec![
                 PutFile {
@@ -405,6 +505,80 @@ mod tests {
                 bytes: b"{\"tag\":\"issue_created\"}\n".to_vec(),
             }),
         }
+    }
+
+    #[test]
+    fn test_new_rejects_worktree_operations_without_original_root_binding() {
+        for (directories, puts, deletes) in [
+            (
+                vec![VirtualPath::worktree("notes").unwrap()],
+                vec![],
+                vec![],
+            ),
+            (
+                vec![],
+                vec![put(VirtualPath::worktree("notes.md").unwrap())],
+                vec![],
+            ),
+            (
+                vec![],
+                vec![],
+                vec![VirtualPath::worktree("notes.md").unwrap()],
+            ),
+        ] {
+            assert!(
+                RedoRecord::new(directories, puts, deletes, None).is_err(),
+                "worktree writes require their original root binding"
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_rejects_unbound_pre_cutover_format() {
+        let bytes = b"{\"version\":1,\"make_directories\":[],\"puts\":[],\"deletes\":[],\"event_append\":null}\n";
+        assert!(matches!(
+            RedoRecord::parse(bytes),
+            Err(RedoRecordError::UnsupportedVersion(1))
+        ));
+    }
+
+    #[test]
+    fn test_parse_validates_binding_presence_and_original_root_structure() {
+        let encoded = sample_record().serialize().unwrap();
+        let end = encoded.iter().position(|byte| *byte == b'\n').unwrap();
+        let original: serde_json::Value = serde_json::from_slice(&encoded[..end]).unwrap();
+        for (field, invalid) in [
+            ("path", serde_json::json!("relative")),
+            ("identity", serde_json::json!("")),
+        ] {
+            let mut header = original.clone();
+            header["worktree"][field] = invalid;
+            let bytes = [
+                serde_json::to_vec(&header).unwrap(),
+                encoded[end..].to_vec(),
+            ]
+            .concat();
+            assert!(matches!(
+                RedoRecord::parse(&bytes),
+                Err(RedoRecordError::Path(_))
+            ));
+        }
+        let mut data_only: serde_json::Value = serde_json::from_slice(
+            RedoRecord::default()
+                .serialize()
+                .unwrap()
+                .split(|byte| *byte == b'\n')
+                .next()
+                .unwrap(),
+        )
+        .unwrap();
+        data_only["worktree"] = original["worktree"].clone();
+        let mut bytes = serde_json::to_vec(&data_only).unwrap();
+        bytes.push(b'\n');
+        assert!(matches!(
+            RedoRecord::parse(&bytes),
+            Err(RedoRecordError::WorktreeBindingPresence)
+        ));
     }
 
     #[test]
@@ -584,6 +758,7 @@ mod tests {
         ] {
             // Bypass construction to represent corrupt serialized input.
             let bytes = RedoRecord {
+                worktree: None,
                 make_directories: Vec::new(),
                 puts: puts.clone(),
                 deletes: deletes.clone(),
@@ -601,7 +776,8 @@ mod tests {
 
     #[test]
     fn test_new_accepts_paths_that_share_a_spelling_prefix_without_containment() {
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &sample_layout(),
             Vec::new(),
             vec![
                 put(VirtualPath::data("records/ab.json").unwrap()),

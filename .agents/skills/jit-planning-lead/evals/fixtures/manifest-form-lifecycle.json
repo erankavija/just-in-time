@@ -1,0 +1,23 @@
+[
+  {
+    "key": "replace-config-loader",
+    "title": "Replace the configuration loader",
+    "description": "Add the storage configuration loader, move its callers, and delete the old loader.\n\n## Success Criteria\n\n- Only the storage loader reads configuration.",
+    "type": "task",
+    "priority": "high",
+    "labels": ["component:planning"],
+    "gates": ["cargo-ci"],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Add the storage loader, move its callers, and delete the old loader",
+      "contract_refs": [],
+      "source_refs": ["REQ-14"],
+      "terminal": {
+        "consumer_family": "configuration loading",
+        "test_boundary": "loader unit tests",
+        "worker_sized_reason": "One loader replacement within the configuration module.",
+        "footprint": {"touches": ["config.rs"]}
+      }
+    }
+  }
+]

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:b697a3f7-lead",
+  "claimed_at": "2026-11-06T00:32:28.285618799Z",
   "context": {},
   "created_at": "2026-10-24T21:22:37.717854234Z",
   "dependencies": [
@@ -7,12 +8,26 @@
   ],
   "description": "Make redo apply open each distinct parent directory once per record, through a handle map built before the first live write, and use that per-record parent set to decide the directory-sync policy: add the conformance test that shows whether replaying a committed record from any persisted subset of its operations converges, and if it does, sync each distinct parent once per application; otherwise keep per-operation syncs and say why in the module rustdoc.\n\n## Background\n\n- `RedoApplier::apply_operations` (`crates/jit/src/storage/redo_apply.rs:130-179`) first resolves every path through `resolve` (`:196-206`), which walks the parent chain with `open_capability_parent` and discards the handle. Each operation then calls `resolve` again and walks a third time: `make_directory` and `put_file` through `open_or_create_capability_parent` (`:213-226`, `:233-240`), `delete_file` and `append_events` through `open_capability_parent` (`:290-300`, `:308-321`).\n- Each walk lstats a component and then `open_child_dir_nofollow` lstats it again before the open (the walks and the open live in `crates/jit/src/storage/capability_fs.rs` once the primitives move there; today `crates/jit/src/storage/repository_state_store.rs:1552-1641`).\n- The pre-pass guarantees that a symlinked or out-of-root ancestor is refused before any live write; `test_redo_applier_apply_refuses_a_path_outside_the_roots_before_any_live_write` (`redo_apply.rs:1036-1064`) owns that property.\n- Directory-entry durability needs the directory fsynced. Redo apply syncs the parent after every make-directory, put and delete (`crates/jit/src/storage/redo_apply.rs:217,239,296`) and after each ancestor `open_or_create_capability_parent` creates (in `crates/jit/src/storage/capability_fs.rs` once the primitives move there; today `crates/jit/src/storage/repository_state_store.rs:1599-1602`). A record whose targets share one parent pays one directory fsync per operation. Coalescing those syncs is safe only if a crash that keeps an arbitrary subset of the unsynced entries still leaves a state the record replays to completion (`@/inv/atomic-writes`).\n- The existing matrix (`crates/jit/src/storage/redo_conformance.rs`, `test_the_matrix_drives_an_interruption_at_every_point_on_both_backends` at `:338` and `prop_re_application_after_an_interruption_at_any_point_reaches_and_holds_the_new_state` at `:461`) interrupts in-process, so it reaches only prefixes of the operation sequence: a completed rename stays visible in the page cache. It cannot show convergence from an arbitrary subset.\n- Record operations are pairwise path-disjoint (`ensure_disjoint_paths`, `crates/jit/src/storage/redo_record.rs:116-129`, run by `RedoRecord::new` at `:90` and `parse` at `:277`) and each is idempotent (make-directory tolerates a directory, put overwrites through a stage and rename, delete tolerates absence, the append seeks and truncates to offset plus length; `redo_apply.rs:213-321`). That is the argument the test checks.\n- The suite's fixtures are `arbitrary_record`, `seed_repository` and `snapshot` from `redo_apply.rs`'s `test_fixtures` (`:379-640`) and the memory fixtures in `crates/jit/src/storage/memory.rs`; `snapshot` sees `.redo.*.tmp` stages that a lost rename leaves, which the orphan sweep owns (`redo_apply.rs:918`).\n- The staged file's `sync_all` (`redo_apply.rs:268`) and the event log's `sync_all` (`:320`) are file-data syncs: a rename that persists must name synced bytes, so they stay per operation.\n- `RedoApplier::apply` removes the record after `RedoPoint::BeforeRecordRemoval` (`redo_apply.rs:117-127`); `remove_record` syncs the scratch directory (`:325-338`).\n- The init publisher (`crates/jit/src/storage/init_publish.rs:51-87`) stages a whole tree, creating ancestors through the syncing walk (`:62`, `:69`), and then runs `sync_tree` (`:134-143`), which syncs every directory again.\n- The module rustdoc (`redo_apply.rs:1-8`), `put_file`'s rustdoc (`:228-232`) and `dev/architecture/repository-state-materialization.md:367-368` describe per-put parent syncs.\n- Crash model: file data is durable after `sync_all`. A directory entry is durable once its directory's fsync returns; any subset of entries not yet synced may persist. The record is durable before the first live write and removed only after the pass.\n\n## Success Criteria\n\n- [hard] REQ-01: Redo apply builds one map from (root class, parent directory) to an open handle in its pre-pass, opening each existing ancestor directory once; every operation takes its parent from the map, and an operation that creates a missing ancestor adds it to the map. A unit test applying a record whose targets share ancestors asserts, through the map's per-instance open count, that the count equals the number of distinct ancestor directories; today's applier opens shared ancestors once per walk, so the assertion fails before the change.\n- [hard] REQ-02: The pre-pass still refuses a symlinked or out-of-root ancestor before any live write, and the redo conformance matrix passes on both backends.\n- [hard] REQ-03: `prop_replay_converges_from_any_subset_of_persisted_operations` in `redo_conformance.rs` runs on both backends: for a generated record of at most seven operations and each subset of them, it seeds the initial state, applies the sub-record of that subset uninterrupted, may create the ancestors of puts outside the subset and may seed event-log residue, then commits and applies the full record and asserts the published state equals a clean application of the full record. The comparison ignores `.redo.*.tmp` stage names, and the test's rustdoc states the crash model it assumes.\n- [hard] REQ-04: If the property holds on both backends, it lands in the default suite as the convergence verdict, and redo apply syncs each distinct parent directory in the map that it changed exactly once, after its last operation and before `BeforeRecordRemoval`; staged-file and event-log data syncs stay per operation, and the init publisher creates staged ancestors without per-ancestor syncs and relies on its tree sync. A unit test counting directory syncs per application shows one sync per distinct parent for a record whose puts share a parent; today's applier syncs once per operation, so the assertion fails before the change.\n- [hard] REQ-05: If the property fails, it does not land; instead a deterministic test in the same suite applies the shrunk failing record and subset and asserts that replay diverges from clean application, the subset is recorded in the completion evidence, per-operation directory syncs remain, and the module rustdoc states the crash case that requires them. No ignored or failing test lands (`@/inv/no-ignored-tests`).\n- [hard] REQ-06: The module rustdoc, `put_file`'s rustdoc and the architecture note describe the open and sync policy that ships.\n\n## Notes\n\n- Behaviour change: fewer directory opens per mutation; when coalesced, fewer directory fsyncs. Durability at the commit point and replay after a crash are unchanged. When the verdict is divergence, the sync policy is unchanged.\n- The session's write-set check before commit (`ensure_write_set_unchanged`, `repository_state_store.rs:891-902`) reads targets through capture, not redo apply, and is outside this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-06T01:25:50.170504064Z",
   "first_ready_at": "2026-11-04T16:02:10.637083086Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "18f8b1eb-bb82-45ee-b514-79de73e6d44e",
+      "status": "passed",
+      "updated_at": "2026-11-06T01:20:59.306971646Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "7116ed3a-50cb-4693-a987-c4f25884ba3d",
+      "status": "passed",
+      "updated_at": "2026-11-06T01:25:40.309563581Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4d834432-bb39-4ffc-9683-7dba55c3d06e",
   "labels": [
     "type:task",
@@ -26,7 +41,7 @@
     "story:storage-primitives"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Redo apply opens and syncs each parent once per record",
-  "updated_at": "2026-11-04T16:02:10.637083086Z"
+  "updated_at": "2026-11-06T01:25:50.170504064Z"
 }

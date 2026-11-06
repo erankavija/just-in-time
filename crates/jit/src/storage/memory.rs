@@ -18,8 +18,8 @@ use crate::repository_state::{
 use crate::storage::capability_fs::CapabilityFsError;
 use crate::storage::redo_apply::{check_interruption, occupied_directory};
 use crate::storage::{
-    EventAppend, IssueNotFoundError, IssueStore, PresetNotFoundError, PutFile, RedoApplyError,
-    RedoInterruptionInjector, RedoPoint, RedoRecord, RepoWriteGuard, RepoWriteLock,
+    EventAppend, IssueNotFoundError, IssueStore, PutFile, RedoApplyError, RedoInterruptionInjector,
+    RedoPoint, RedoRecord, RepoWriteGuard, RepoWriteLock,
 };
 use anyhow::{anyhow, Context, Result};
 use std::collections::BTreeMap;
@@ -251,44 +251,6 @@ impl InMemoryStorage {
         &self,
     ) -> Arc<crate::storage::repository_state_store::ActiveLayoutTracker> {
         Arc::clone(&self.active_mutation_layout)
-    }
-
-    fn gate_presets_from_repository_state(
-        &self,
-    ) -> Result<std::collections::HashMap<String, crate::gate_presets::GatePresetDefinition>> {
-        let presets_prefix = format!(
-            "{}/",
-            crate::repository_state::VirtualPath::GATE_PRESETS
-                .relative()
-                .as_str()
-        );
-        let files = self
-            .read_repository_state()?
-            .entries
-            .iter()
-            .filter_map(|(path, entry)| {
-                if path.root_class() != RepositoryRootClass::Data {
-                    return None;
-                }
-                let filename = path
-                    .relative()
-                    .as_str()
-                    .strip_prefix(presets_prefix.as_str())?;
-                if filename.contains('/') || !filename.ends_with(".json") {
-                    return None;
-                }
-                Some(match entry {
-                    RepositoryEntry::File { content, .. } => {
-                        Ok((filename.to_string(), content.bytes().to_vec()))
-                    }
-                    _ => Err(crate::errors::InvalidArgumentError::new(format!(
-                        "Custom preset file '{filename}' must be an ordinary file"
-                    ))
-                    .into()),
-                })
-            })
-            .collect::<Result<Vec<_>>>()?;
-        crate::gate_presets::load_presets_from_custom_files(files)
     }
 
     /// Classify an `IssueStore` repository-relative input through the canonical
@@ -578,6 +540,23 @@ impl MemoryRedoApplier {
         storage: &InMemoryStorage,
         record: &RedoRecord,
     ) -> Result<(), RedoApplyError> {
+        self.apply_for_layout(storage, record, &storage.repository_layout())
+    }
+
+    pub(in crate::storage) fn apply_for_layout(
+        &self,
+        storage: &InMemoryStorage,
+        record: &RedoRecord,
+        layout: &crate::repository_state::RepositoryLayout,
+    ) -> Result<(), RedoApplyError> {
+        if let Some(binding) = record.worktree_binding() {
+            if *binding != crate::storage::redo_record::WorktreeRootBinding::from_layout(layout) {
+                return Err(RedoApplyError::OriginalWorktree {
+                    path: binding.path().to_path_buf(),
+                    source: anyhow::anyhow!("memory worktree differs from the committed binding"),
+                });
+            }
+        }
         let injector = &*self.injector;
         let mut state = storage.repository_state();
         let event_log = VirtualPath::EVENTS;
@@ -661,11 +640,10 @@ fn memory_directory_entry(relative: &std::path::Path) -> RepositoryEntry {
 
 /// Refuse a path this backend's tree cannot address.
 ///
-/// The counterpart of the file backend's path resolution, which runs once over
-/// the whole record before the first live write and again inside each
-/// operation: a data path while the data root is absent has no root to land in,
-/// and an ancestor that is not a directory is the no-follow parent walk's
-/// refusal, reported by the same component the walk stopped at. An absent
+/// The counterpart of the file backend's path resolution, which runs over the
+/// whole record before the first live write: a data path while the data root is
+/// absent has no root to land in, and an ancestor that is not a directory is the
+/// no-follow parent walk's refusal, reported by the same component the walk stopped at. An absent
 /// ancestor is admitted, because an operation creates the directories its path
 /// needs.
 fn resolve(state: &MemoryRepositoryState, path: &VirtualPath) -> Result<(), RedoApplyError> {
@@ -971,27 +949,6 @@ impl IssueStore for InMemoryStorage {
         super::gate_run_reader::list_gate_runs_for_issue(self, issue_id)
     }
 
-    fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
-        let mut presets = self
-            .gate_presets_from_repository_state()?
-            .values()
-            .map(|preset| crate::gate_presets::PresetInfo {
-                name: preset.name.clone(),
-                description: preset.description.clone(),
-                gate_count: preset.gates.len(),
-            })
-            .collect::<Vec<_>>();
-        presets.sort_by(|left, right| left.name.cmp(&right.name));
-        Ok(presets)
-    }
-
-    fn get_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition> {
-        self.gate_presets_from_repository_state()?
-            .get(name)
-            .cloned()
-            .ok_or_else(|| PresetNotFoundError::new(name).into())
-    }
-
     fn read_repo_file(
         &self,
         rel_path: &str,
@@ -1067,7 +1024,6 @@ mod tests {
                 reader.resolve_issue_id(&prefix).unwrap_err(),
                 reader.load_gate_registry().unwrap_err(),
                 reader.read_events().unwrap_err(),
-                reader.list_gate_presets().unwrap_err(),
             ];
             tx.send(errors).unwrap();
         });
@@ -1276,7 +1232,8 @@ mod record_tests {
     fn test_commit_record_installs_the_record_before_any_entry_changes() {
         let storage = seeded(&[VirtualPath::INDEX, worktree("stale.md")], false);
         let before = semantic_state(&storage).0;
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &storage.repository_layout(),
             Vec::new(),
             vec![put(VirtualPath::INDEX, b"published")],
             vec![worktree("stale.md")],
@@ -1304,7 +1261,8 @@ mod record_tests {
     #[test]
     fn test_commit_record_refuses_a_record_a_previous_mutation_left_behind() {
         let storage = seeded(&[], false);
-        let leftover = RedoRecord::new(
+        let leftover = RedoRecord::for_layout(
+            &storage.repository_layout(),
             Vec::new(),
             vec![put(VirtualPath::INDEX, b"leftover")],
             Vec::new(),
@@ -1314,7 +1272,14 @@ mod record_tests {
         storage.commit_record(&leftover).unwrap();
 
         let outcome = storage.commit_record(
-            &RedoRecord::new(Vec::new(), Vec::new(), vec![VirtualPath::INDEX], None).unwrap(),
+            &RedoRecord::for_layout(
+                &storage.repository_layout(),
+                Vec::new(),
+                Vec::new(),
+                vec![VirtualPath::INDEX],
+                None,
+            )
+            .unwrap(),
         );
 
         assert!(
@@ -1328,7 +1293,8 @@ mod record_tests {
     fn test_memory_redo_applier_apply_publishes_every_operation_the_record_names() {
         let storage = seeded(&[VirtualPath::INDEX, worktree("stale.md")], false);
         let appended = b"{\"tag\":\"issue_claimed\"}\n";
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &storage.repository_layout(),
             Vec::new(),
             vec![put(VirtualPath::INDEX, b"published")],
             vec![worktree("stale.md")],
@@ -1361,7 +1327,8 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_removes_the_record_it_applied() {
         let storage = seeded(&[], false);
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &storage.repository_layout(),
             Vec::new(),
             vec![put(VirtualPath::INDEX, b"published")],
             Vec::new(),
@@ -1383,7 +1350,8 @@ mod record_tests {
     fn test_memory_redo_applier_apply_creates_the_directories_a_put_needs() {
         let storage = seeded(&[], false);
         let nested = issue_data("2026/a.json");
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &storage.repository_layout(),
             Vec::new(),
             vec![put(nested.clone(), b"published")],
             Vec::new(),
@@ -1410,7 +1378,8 @@ mod record_tests {
     fn test_memory_redo_applier_apply_gives_each_put_the_mode_it_carries() {
         let storage = seeded(&[], false);
         let path = worktree("scripts/publish.sh");
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &storage.repository_layout(),
             Vec::new(),
             vec![PutFile {
                 path: path.clone(),
@@ -1442,7 +1411,8 @@ mod record_tests {
         // truncates would leave its residue behind the appended bytes.
         let storage = seeded(&[], true);
         let appended = b"{\"tag\":\"issue_claimed\"}\n";
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &storage.repository_layout(),
             Vec::new(),
             Vec::new(),
             Vec::new(),
@@ -1464,7 +1434,8 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_checks_every_interruption_point_in_order() {
         let storage = seeded(&[], false);
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &storage.repository_layout(),
             vec![data("templates")],
             vec![
                 put(VirtualPath::INDEX, b"published"),
@@ -1502,15 +1473,22 @@ mod record_tests {
     fn test_memory_redo_applier_apply_checks_every_application_through_the_held_injector() {
         let storage = seeded(&[], false);
         let (recorded, applier) = recording_applier();
-        let published = RedoRecord::new(
+        let published = RedoRecord::for_layout(
+            &storage.repository_layout(),
             Vec::new(),
             vec![put(VirtualPath::INDEX, b"published")],
             Vec::new(),
             None,
         )
         .unwrap();
-        let removed =
-            RedoRecord::new(Vec::new(), Vec::new(), vec![VirtualPath::INDEX], None).unwrap();
+        let removed = RedoRecord::for_layout(
+            &storage.repository_layout(),
+            Vec::new(),
+            Vec::new(),
+            vec![VirtualPath::INDEX],
+            None,
+        )
+        .unwrap();
 
         applier.apply(&storage, &published).unwrap();
         let after_first = recorded.points();
@@ -1536,7 +1514,8 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_refuses_a_data_path_while_the_data_root_is_absent() {
         let storage = InMemoryStorage::new();
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &storage.repository_layout(),
             Vec::new(),
             vec![
                 put(worktree("notes.md"), b"published"),
@@ -1566,7 +1545,8 @@ mod record_tests {
             VirtualPath::ISSUES.relative().as_str(),
             "an ordinary file where a directory is needed",
         );
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &storage.repository_layout(),
             Vec::new(),
             vec![put(issue_data("a.json"), b"published")],
             Vec::new(),
@@ -1611,7 +1591,8 @@ mod record_tests {
     fn test_memory_redo_applier_apply_refuses_a_put_over_a_pre_existing_directory() {
         let storage = seeded(&[], false);
         storage.add_data_file(issue_data("existing.json").relative().as_path(), "residual");
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &storage.repository_layout(),
             Vec::new(),
             vec![put(VirtualPath::ISSUES, b"occupier")],
             Vec::new(),
@@ -1656,7 +1637,8 @@ mod record_tests {
     fn test_memory_redo_applier_apply_leaves_an_earlier_put_applied_after_a_later_one_is_refused() {
         let storage = seeded(&[], false);
         storage.add_data_file(issue_data("existing.json").relative().as_path(), "residual");
-        let record = RedoRecord::new(
+        let record = RedoRecord::for_layout(
+            &storage.repository_layout(),
             Vec::new(),
             vec![
                 put(VirtualPath::INDEX, b"published"),
@@ -1693,8 +1675,14 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_refuses_a_delete_of_a_directory() {
         let storage = seeded(&[issue_data("2026/a.json")], false);
-        let record =
-            RedoRecord::new(Vec::new(), Vec::new(), vec![issue_data("2026")], None).unwrap();
+        let record = RedoRecord::for_layout(
+            &storage.repository_layout(),
+            Vec::new(),
+            Vec::new(),
+            vec![issue_data("2026")],
+            None,
+        )
+        .unwrap();
         storage.commit_record(&record).unwrap();
 
         let outcome = uninterrupted().apply(&storage, &record);

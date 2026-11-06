@@ -15,7 +15,7 @@
 //! emitter renders (human) or lists (`--json`). Handlers resolve issue-id arguments with
 //! [`resolve_issue`].
 
-use crate::cli::{Cli, Commands, IssueCommands, ProfileCommands};
+use crate::cli::{Cli, Commands, ConfigCommands, IssueCommands, ProfileCommands, WorktreeCommands};
 use crate::commands::{open_repository, CommandExecutor, OpenedRepository, RepositoryInvocation};
 use crate::config_manager::ConfigManager;
 use crate::domain::identity::{IssueId, IssueIdPrefix};
@@ -119,21 +119,29 @@ fn count_message(count: usize, prefix: &str, suffix: &str) -> String {
     format!("{prefix}{count}{suffix}")
 }
 
+/// Repository authority or the result of a diagnostic that needs only data.
+pub enum BootstrapResult {
+    Repository(Box<OpenedRepository>),
+    ConfigValidation(crate::commands::ConfigValidationReport),
+    WorktreeExec(crate::commands::worktree::WorktreeExec),
+}
+
 /// Open the repository `cli`'s command runs over; `--schema`, a missing
 /// command, `version` and `init` run without one.
 ///
 /// # Errors
 ///
 /// An unusable linked-checkout write token, or [`open_repository`]'s failure.
-pub fn bootstrap(cli: &Cli) -> anyhow::Result<Option<OpenedRepository>> {
+pub fn bootstrap(cli: &Cli) -> anyhow::Result<Option<BootstrapResult>> {
     let command = match &cli.command {
         Some(Commands::Version | Commands::Init(_)) | None => return Ok(None),
         Some(_) if cli.schema => return Ok(None),
         Some(command) => command,
     };
-    open_repository(RepositoryInvocation {
+    let invocation = RepositoryInvocation {
         current_dir: std::env::current_dir()?,
         data_dir_override: std::env::var("JIT_DATA_DIR").ok().map(PathBuf::from),
+        worktree_root_override: std::env::var_os("JIT_WORKTREE_ROOT").map(PathBuf::from),
         is_init: false,
         opens_mutation_session: command.requires_recovery_dispatch(),
         coordinates_claims_first: command.coordinates_claims_first(),
@@ -142,8 +150,31 @@ pub fn bootstrap(cli: &Cli) -> anyhow::Result<Option<OpenedRepository>> {
         // Read before any repository work, so an unusable token fails the
         // invocation even for a command that never writes.
         write_override: ConfigManager::invocation_write_override()?,
-    })
-    .map(Some)
+    };
+    if matches!(command, Commands::Config(ConfigCommands::Validate)) {
+        return crate::commands::ConfigValidationReport::for_invocation(&invocation)
+            .map(BootstrapResult::ConfigValidation)
+            .map(Some);
+    }
+    if matches!(command, Commands::Worktree(WorktreeCommands::Exec { .. })) {
+        return Ok(Some(BootstrapResult::WorktreeExec(
+            crate::commands::worktree::WorktreeExec::for_invocation(&invocation),
+        )));
+    }
+    open_repository(invocation)
+        .map_err(|error| adapt_configuration_error(command, error))
+        .map(|repository| Some(BootstrapResult::Repository(Box::new(repository))))
+}
+
+fn adapt_configuration_error(command: &Commands, error: anyhow::Error) -> anyhow::Error {
+    match error.downcast::<crate::declarations::ConfigurationAssemblyError>() {
+        Ok(error) => match command {
+            Commands::Item(_) => crate::commands::configuration_argument_error(error).into(),
+            Commands::Recover => crate::errors::RecoveryFailedError(error.into()).into(),
+            _ => error.into(),
+        },
+        Err(error) => error,
+    }
 }
 
 /// Run `cli`'s command over the `repository` [`bootstrap`] opened for it and
@@ -154,7 +185,7 @@ pub fn bootstrap(cli: &Cli) -> anyhow::Result<Option<OpenedRepository>> {
 /// The handler's failure, for the caller to render.
 pub fn dispatch(
     cli: Cli,
-    mut repository: Option<OpenedRepository>,
+    repository: Option<BootstrapResult>,
     mode: OutputMode,
     out: &mut dyn Write,
     err: &mut dyn Write,
@@ -169,6 +200,23 @@ pub fn dispatch(
     let command = cli
         .command
         .ok_or_else(|| anyhow!("No command provided. Use --help for usage."))?;
+    let mut repository = match repository {
+        Some(BootstrapResult::WorktreeExec(operation)) => {
+            let Commands::Worktree(WorktreeCommands::Exec { command }) = command else {
+                anyhow::bail!("worktree exec context provided for another command");
+            };
+            return worktree::dispatch_exec(operation, command, mode, out, err);
+        }
+        Some(BootstrapResult::ConfigValidation(report)) => {
+            anyhow::ensure!(
+                matches!(command, Commands::Config(ConfigCommands::Validate)),
+                "config diagnostic provided for another command"
+            );
+            return config::dispatch_validation(report, mode, out, err);
+        }
+        Some(BootstrapResult::Repository(repository)) => Some(repository),
+        None => None,
+    };
     // The server child runs its own startup recovery, so holding this session
     // across the wait deadlocks the child against the parent.
     if let Some(guard) = repository
@@ -562,6 +610,61 @@ pub mod worktree;
 mod tests {
     use super::{count_message, REGISTERED_GROUPS};
     use crate::output::ErrorCode;
+
+    #[test]
+    fn test_bootstrap_configuration_error_preserves_the_item_full_view_adapter() {
+        use clap::Parser;
+        for args in [
+            vec!["jit", "item", "list"],
+            vec!["jit", "item", "search", "term"],
+        ] {
+            let command = super::Cli::try_parse_from(args).unwrap().command.unwrap();
+            let document =
+                crate::declarations::ConfigurationDocument::parse(Some(b"not = valid = toml"));
+            let expected = crate::commands::configuration_argument_error(
+                document.assemble(None, None).unwrap_err(),
+            );
+            let adapted = super::adapt_configuration_error(
+                &command,
+                document.worktree(true, false).unwrap_err().into(),
+            );
+            let actual = adapted
+                .downcast_ref::<crate::errors::InvalidArgumentError>()
+                .unwrap();
+            assert_eq!(actual.to_string(), expected.to_string());
+        }
+    }
+
+    #[test]
+    fn test_bootstrap_configuration_error_adapts_recovery_and_preserves_other_typed_failures() {
+        use clap::Parser;
+        for args in [
+            vec!["jit", "recover"],
+            vec!["jit", "item", "list"],
+            vec!["jit", "config", "show"],
+        ] {
+            let command = super::Cli::try_parse_from(args).unwrap().command.unwrap();
+            let failure =
+                crate::declarations::ConfigurationDocument::parse(Some(b"not = valid = toml"))
+                    .worktree(true, false)
+                    .unwrap_err();
+            let adapted = super::adapt_configuration_error(&command, failure.into());
+            match command {
+                super::Commands::Recover => {
+                    assert!(adapted.is::<crate::errors::RecoveryFailedError>())
+                }
+                super::Commands::Item(_) => {
+                    assert!(adapted.is::<crate::errors::InvalidArgumentError>())
+                }
+                _ => assert!(adapted.is::<crate::declarations::ConfigurationAssemblyError>()),
+            }
+            let storage = crate::storage::RepositoryStateStoreError::RetryableConflict {
+                path: "selected data".into(),
+            };
+            let adapted = super::adapt_configuration_error(&command, storage.into());
+            assert!(adapted.is::<crate::storage::RepositoryStateStoreError>());
+        }
+    }
 
     /// The codes the universal `*` exit-code rows describe.
     const UNIVERSAL: &[ErrorCode] = &[

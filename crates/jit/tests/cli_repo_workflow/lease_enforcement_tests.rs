@@ -33,7 +33,8 @@ const REFUSES: &[(&str, &str)] = &[
     ("gate add", "gate add {x} unused"),
     ("gate evaluate", "gate evaluate {x} auto"),
     ("gate evaluate-all", "gate evaluate-all {x}"),
-    ("gate evaluate-many", "gate evaluate-many auto {x}"),
+    // A refused entry reports its reason in the JSON findings.
+    ("gate evaluate-many", "gate evaluate-many auto {x} --json"),
     ("gate fail", "gate fail {w} manual --by agent:other"),
     ("gate preset apply", "gate preset apply seeded {x}"),
     ("issue assign", "issue assign {x} agent:other"),
@@ -434,6 +435,15 @@ fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
 
+/// What a refusal reports, on stderr or as JSON findings on stdout.
+fn diagnostics(output: &Output) -> String {
+    format!(
+        "{}{}",
+        stderr(output),
+        String::from_utf8_lossy(&output.stdout)
+    )
+}
+
 fn assert_ok(output: &Output) {
     assert!(
         output.status.success(),
@@ -612,18 +622,18 @@ fn test_strict_lease_every_cli_leaf_is_classified_and_only_anothers_lease_refuse
                     "{leaf} must refuse another agent"
                 );
                 assert!(
-                    stderr(&refused).contains(OWNER),
+                    diagnostics(&refused).contains(OWNER),
                     "{leaf} refused another agent for another reason: {}",
-                    stderr(&refused)
+                    diagnostics(&refused)
                 );
                 assert!(
                     !anonymous.status.success(),
                     "{leaf} must refuse no identity"
                 );
                 assert!(
-                    stderr(&anonymous).contains("JIT_AGENT_ID"),
+                    diagnostics(&anonymous).contains("JIT_AGENT_ID"),
                     "{leaf} refused no identity for another reason: {}",
-                    stderr(&anonymous)
+                    diagnostics(&anonymous)
                 );
                 assert_eq!(repo.snapshot(), before, "{leaf} changed something");
 
@@ -819,9 +829,10 @@ fn test_warn_mode_dependency_writes_warn_only_in_human_non_quiet_mode() {
 }
 
 #[test]
-fn test_validate_fix_type_fix_refuses_another_agents_lease() {
+fn test_validate_fix_type_fix_repairs_another_agents_leased_issue() {
     let repo = Repo::new();
     repo.owner(&["dep", "add", &repo.y, &repo.z]);
+    repo.owner(&["dep", "add", &repo.w, &repo.z]);
     repo.append_config(
         "\n[type_hierarchy.types]\ntask = 4\n\
          \n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
@@ -829,13 +840,17 @@ fn test_validate_fix_type_fix_refuses_another_agents_lease() {
     let mut record = repo.record(&repo.x);
     record["labels"] = serde_json::json!(["type:taks"]);
     repo.write_record(&repo.x, &record);
-    let before = repo.raw_record(&repo.x);
-
     let output = repo.other(&["validate", "--fix"]);
 
-    assert!(!output.status.success(), "{}", stderr(&output));
-    assert!(stderr(&output).contains(OWNER), "{}", stderr(&output));
-    assert_eq!(repo.raw_record(&repo.x), before);
+    assert_ok(&output);
+    let labels = repo.record(&repo.x)["labels"].as_array().unwrap().clone();
+    assert!(labels.iter().any(|label| label == "type:task"));
+    assert!(!labels.iter().any(|label| label == "type:taks"));
+    assert!(
+        !diagnostics(&output).contains(OWNER),
+        "{}",
+        diagnostics(&output)
+    );
 }
 
 #[test]

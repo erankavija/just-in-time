@@ -91,7 +91,8 @@ fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
     cli.commit("Initial commit").unwrap();
     cli.run(["init"]).unwrap();
     let published = cli.root().join("applied-by-recovery.md");
-    let record = RedoRecord::new(
+    let record = RedoRecord::for_layout(
+        &jit::storage::discover_repository_layout(cli.root(), cli.root().join(".jit")).unwrap(),
         Vec::new(),
         vec![PutFile {
             path: jit::repository_state::VirtualPath::worktree("applied-by-recovery.md").unwrap(),
@@ -104,14 +105,17 @@ fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
     .unwrap();
     commit_redo_record(&DataRoot::open(&cli.root().join(".jit")).unwrap(), &record).unwrap();
 
+    let next_code = tempfile::tempdir().unwrap();
     let output = cli
         .command(["recover", "--json"])
+        .env("JIT_WORKTREE_ROOT", next_code.path())
         .assert()
         .success()
         .get_output()
         .stdout
         .clone();
 
+    assert!(!next_code.path().join("applied-by-recovery.md").exists());
     let value: Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(
         value["redo_records_applied"], 1,

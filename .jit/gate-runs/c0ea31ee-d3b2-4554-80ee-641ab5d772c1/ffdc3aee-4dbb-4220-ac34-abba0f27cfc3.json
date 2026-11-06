@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-c0ea31ee",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "4b5f2c13dc43280af8a1d356f957ae3be290fe02",
+  "completed_at": "2026-11-05T04:40:18.279172565Z",
+  "duration_ms": 73672,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "e6f2df85b64c2283119d16c621b4c72ff8616342408d0b330ffabaed466ca04f",
+  "issue_id": "c0ea31ee-d3b2-4554-80ee-641ab5d772c1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ffdc3aee-4dbb-4220-ac34-abba0f27cfc3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-05T04:39:04.606264945Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- clippy diagnostics ---\nwarning: jit-server@1.0.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.\nerror[E0460]: found possibly newer version of crate `serde_core` which `serde_path_to_error` depends on\nerror: could not compile `axum` (lib) due to 1 previous error\nwarning: build failed, waiting for other jobs to finish...\n  ✓ fmt: ok (1614 ms)\n  ✗ clippy: FAILED (exit 101) (12143 ms)\n  ✓ suite-build: built in 44582 ms, warmed 11 executables (911949088 bytes) in 40 ms (44627 ms)\n  ✓ test: 5056 passed, 0 failed, 0 skipped (12274 ms)\n  ✓ doctest: 25 passed, 0 failed, 0 ignored (2703 ms)\n  ✓ suite-clock: 14997 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✓ budget: integration-targets=3/3 active-executables=7 bytes=635256192/740294656 profile=line-tables-only dep-features=pruned suite-duration=14997ms main-rs-lines=37/40 (131 ms)\n\ncargo-ci: verdict (exit 1): step 'clippy' failed on repository content\n"
+}

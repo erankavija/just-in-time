@@ -18,17 +18,15 @@
 //! [`RepositoryStateStore`]: super::RepositoryStateStore
 //! [`classify_repository_export`]: crate::repository_state::classify_repository_export
 
-use super::atomic_write::rename_noreplace_cap;
+use super::atomic_write::{
+    publish_file, rename_noreplace_cap, unique_stage_name, write_staged_file, Durability,
+};
+use crate::repository_state::FileMode;
 use anyhow::{Context, Result};
-use cap_primitives::fs::FollowSymlinks;
-use cap_std::fs::{Dir, OpenOptions};
+use cap_std::fs::Dir;
 use std::ffi::OsStr;
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-
-static COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// The filesystem refused an operation this publication's durability needs.
 #[derive(Debug, thiserror::Error)]
@@ -65,28 +63,14 @@ pub(crate) fn write_external_export_atomic(
         Err(error) => return Err(error.into()),
     }
 
-    let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let file_name = leaf.to_string_lossy();
-    let tmp_name = format!(".{file_name}.{}.{seq}.tmp", std::process::id());
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    options._cap_fs_ext_follow(FollowSymlinks::No);
-    let mut temp = parent
-        .open_with(&tmp_name, &options)
-        .with_context(|| format!("creating external export temporary file {tmp_name}"))?;
-    let publish = (|| -> Result<()> {
-        temp.write_all(content)?;
-        temp.sync_all()?;
-        drop(temp);
-        revalidate_external_parent(parent_path, &parent)?;
-        parent.rename(&tmp_name, &parent, leaf)?;
-        parent.try_clone()?.into_std_file().sync_all()?;
-        Ok(())
-    })();
-    if publish.is_err() {
-        let _ = parent.remove_file(&tmp_name);
-    }
-    publish
+    publish_file(
+        &parent,
+        leaf,
+        content,
+        FileMode::Regular,
+        Durability::Full,
+        || revalidate_external_parent(parent_path, &parent),
+    )
 }
 
 fn revalidate_external_parent(path: &Path, held: &Dir) -> Result<()> {
@@ -117,19 +101,11 @@ pub(crate) fn publish_external_file_noreplace(
 ) -> Result<ExternalExportOutcome> {
     let target = path.as_path();
     let (parent_path, leaf, parent) = external_file_noreplace_target(path)?;
-    let tmp_name = external_temp_name(leaf);
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    options._cap_fs_ext_follow(FollowSymlinks::No);
-    let mut temp = parent.open_with(&tmp_name, &options)?;
-    let prepare = (|| -> Result<()> {
-        let mut input = fs::File::open(source)?;
-        std::io::copy(&mut input, &mut temp)?;
-        temp.sync_all()?;
-        drop(temp);
-        revalidate_external_parent(parent_path, &parent)?;
-        Ok(())
-    })();
+    let tmp_name = unique_stage_name();
+    let prepare = fs::File::open(source)
+        .and_then(|input| write_staged_file(&parent, &tmp_name, input, FileMode::Regular))
+        .map_err(anyhow::Error::from)
+        .and_then(|()| revalidate_external_parent(parent_path, &parent));
     if let Err(error) = prepare {
         let _ = parent.remove_file(&tmp_name);
         return Err(error);
@@ -183,7 +159,7 @@ pub(crate) fn publish_external_directory_noreplace(
 ) -> Result<ExternalExportOutcome> {
     let target = path.as_path();
     let (parent_path, leaf, parent) = external_parent(target)?;
-    let stage_name = external_temp_name(leaf);
+    let stage_name = unique_stage_name();
     parent.create_dir(&stage_name)?;
     let stage = super::capability_fs::open_child_dir_nofollow(&parent, &stage_name)?;
     let prepare = (|| -> Result<()> {
@@ -192,13 +168,8 @@ pub(crate) fn publish_external_directory_noreplace(
         }
         for relative in files {
             let (target_parent, target_leaf) = create_external_stage_parent(&stage, relative)?;
-            let mut options = OpenOptions::new();
-            options.write(true).create_new(true);
-            options._cap_fs_ext_follow(FollowSymlinks::No);
-            let mut output = target_parent.open_with(&target_leaf, &options)?;
-            let mut input = fs::File::open(source.join(relative))?;
-            std::io::copy(&mut input, &mut output)?;
-            output.sync_all()?;
+            let input = fs::File::open(source.join(relative))?;
+            write_staged_file(&target_parent, &target_leaf, input, FileMode::Regular)?;
             target_parent.try_clone()?.into_std_file().sync_all()?;
         }
         for relative in directories.iter().rev() {
@@ -275,15 +246,6 @@ fn external_file_noreplace_target(
     }
 }
 
-fn external_temp_name(leaf: &OsStr) -> String {
-    let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!(
-        ".{}.{}.{seq}.tmp",
-        leaf.to_string_lossy(),
-        std::process::id()
-    )
-}
-
 fn create_external_stage_directory(root: &Dir, relative: &Path) -> Result<()> {
     let mut current = root.try_clone()?;
     for component in relative.components() {
@@ -345,6 +307,24 @@ mod tests {
             RepositoryExportDestination::External(path) => path,
             RepositoryExportDestination::Repository(_) => panic!("expected external target"),
         }
+    }
+
+    #[test]
+    fn test_write_external_export_atomic_leaves_no_stage_beside_its_destination() {
+        let root = tempfile::tempdir().unwrap();
+        let target = external_target(root.path(), "graph.json");
+        std::fs::write(target.as_path(), b"previous").unwrap();
+
+        write_external_export_atomic(&target, b"exported").unwrap();
+
+        assert_eq!(std::fs::read(target.as_path()).unwrap(), b"exported");
+        assert_eq!(
+            std::fs::read_dir(root.path().join("output"))
+                .unwrap()
+                .count(),
+            1,
+            "the export left its stage beside the destination"
+        );
     }
 
     #[test]

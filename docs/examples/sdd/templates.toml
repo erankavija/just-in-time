@@ -3,8 +3,10 @@
 # The mechanism is generic and domain-agnostic: nothing here is hardcoded in engine
 # logic — the strings (types, roles, gates, docs) come from THIS file. Validated at
 # every `jit` config load by the templates loader (templates.rs): roles unique;
-# depends_on/anchor_edges/transforms reference declared roles/anchors; node `type`s
-# exist in [type_hierarchy]; internal edges acyclic.
+# depends_on/anchor_edges/transforms reference declared roles/anchors; applies_to
+# types exist in [type_hierarchy]; internal edges acyclic. `jit apply` checks the
+# declarations the template requires (node types, label namespaces, gates, doc
+# areas) and names every unmet one at once.
 #
 # This file declares the SDD planning bracket: a plan-before-fan-out bracket of a
 # planning node P and a breakdown node B over the SDD container type `epic`. Copy
@@ -20,7 +22,7 @@ applies_to  = ["epic"]           # container types this template may be applied 
 
   [[template.nodes]]
   role        = "planning"
-  type        = "planning"       # must exist in [type_hierarchy]
+  type        = "planning"       # must exist in [type_hierarchy] at apply
   gates       = ["plan-review"]  # gate names: a project preset, or a registry key
   doc_area    = "dev/active"     # issue-scoped area {container.dir} resolves in
   doc         = "{container.dir}/plan.md"

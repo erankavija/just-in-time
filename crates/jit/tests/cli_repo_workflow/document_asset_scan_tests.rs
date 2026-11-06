@@ -99,3 +99,33 @@ fn test_doc_add_still_refuses_an_escaping_relative_path_beside_the_symbol() {
     let assets: serde_json::Value = serde_json::from_slice(&assets.stdout).unwrap();
     assert!(assets["assets"].as_array().unwrap().is_empty());
 }
+
+#[test]
+fn test_check_links_finds_missing_worktree_asset_in_selected_code_subdirectory_history() {
+    use assert_cmd::prelude::*;
+    use jit::test_harness::git::GitRepository;
+
+    let data = JitCli::initialised().unwrap();
+    data.init_git().unwrap();
+    data.commit("data history").unwrap();
+    let code_dir = tempfile::tempdir().unwrap();
+    let code = GitRepository::init(code_dir.path());
+    code.write(
+        "sub/document.md",
+        "![asset](asset.png)
+",
+    )
+    .write("sub/asset.png", b"image")
+    .commit("code asset");
+    let selected = code.root().join("sub");
+    let issue = data.create_issue(["--title", "Code asset"]).unwrap();
+    data.command(["doc", "add", &issue, "document.md"])
+        .env("JIT_WORKTREE_ROOT", &selected)
+        .assert()
+        .success();
+    fs::remove_file(selected.join("asset.png")).unwrap();
+    data.command(["doc", "check-links", "--scope", "all", "--json"])
+        .env("JIT_WORKTREE_ROOT", &selected)
+        .assert()
+        .success();
+}
