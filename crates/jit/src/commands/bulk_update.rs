@@ -34,11 +34,11 @@ pub struct UpdateOperations {
 pub struct BulkUpdateResult {
     /// IDs that matched the filter
     pub matched: Vec<IssueId>,
-    /// IDs successfully updated
+    /// IDs whose change published, including a `Done` request diverted to `Gated`
     pub modified: Vec<IssueId>,
     /// IDs skipped with reasons (id, reason)
     pub skipped: Vec<(IssueId, String)>,
-    /// IDs that failed with errors (id, error)
+    /// IDs whose change failed or was diverted to `Gated`, with the error (id, error)
     pub errors: Vec<(IssueId, String)>,
     /// Per-issue non-enforcing graph-rule warnings (id, message).
     /// Warnings never block the transition; they are informational findings
@@ -113,6 +113,8 @@ enum BulkAttempt {
 struct MatchedChange {
     intents: Vec<MutationIntent>,
     changed: bool,
+    /// A `Done` request the change publishes as `Gated`, reporting `error`.
+    diverted: bool,
     warnings: Vec<String>,
     error: Option<String>,
 }
@@ -151,7 +153,12 @@ impl BulkProjection {
             });
         self.intents.extend(change.intents);
         match (change.error, change.changed) {
-            (Some(error), _) => self.result.errors.push((id.clone(), error)),
+            (Some(error), _) => {
+                if change.diverted {
+                    self.result.modified.push(id.clone());
+                }
+                self.result.errors.push((id.clone(), error));
+            }
             (None, changed) => {
                 self.result.warnings.extend(
                     change
@@ -239,6 +246,7 @@ impl BulkDerivation<'_> {
                 error: Some(refusal.to_string()),
                 intents: recorded.recording_on(issue),
                 changed: false,
+                diverted: false,
                 warnings: Vec::new(),
             });
         }
@@ -249,12 +257,18 @@ impl BulkDerivation<'_> {
         match derive_prechecked_field_update(issue.clone(), projected, recorded, &request, evidence)
         {
             Ok(derived) => {
+                let diverted = derived.changed
+                    && derived
+                        .error_after_apply
+                        .as_ref()
+                        .is_some_and(|error| error.actual_state() == State::Gated);
                 let error = derived
                     .error_after_apply
                     .map(|error| error.with_warnings(derived.warnings.clone()).to_string());
                 Ok(MatchedChange {
                     intents: derived.intents,
                     changed: derived.changed,
+                    diverted,
                     warnings: derived.warnings,
                     error,
                 })
@@ -264,6 +278,7 @@ impl BulkDerivation<'_> {
             Err(error) => Ok(MatchedChange {
                 intents: record()?.recording_on(issue),
                 changed: false,
+                diverted: false,
                 warnings: Vec::new(),
                 error: Some(error.to_string()),
             }),
@@ -294,10 +309,11 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// issues, and derives each matched issue's change against the issues as
     /// the changes before it in match order leave them. Every change that is
     /// not rejected publishes, with its readiness corrections, in one redo
-    /// record; a rejected change, and a `Done` request diverted to `Gated`,
-    /// which still publishes, are reported in `errors`. When a change moves
-    /// a `Ready` issue with precheck gates to `InProgress`, a preflight session
-    /// reads the prechecks first, because they run outside the repository lock.
+    /// record; a rejected change is reported in `errors`, and a `Done` request
+    /// diverted to `Gated`, which publishes, in `modified` and `errors`. When a
+    /// change moves a `Ready` issue with precheck gates to `InProgress`, a
+    /// preflight session reads the prechecks first, because they run outside
+    /// the repository lock.
     pub fn apply_bulk_update(
         &mut self,
         filter: &QueryFilter,
@@ -1537,6 +1553,11 @@ mod tests {
         assert_eq!(
             result.errors,
             vec![(gated_id.clone(), single_error.to_string())]
+        );
+        assert_eq!(
+            result.modified,
+            std::slice::from_ref(&gated_id),
+            "a diversion to Gated is reported as modified and failed"
         );
         assert_eq!(bulk_state, State::Gated);
         assert_eq!(bulk_state, single_state);
