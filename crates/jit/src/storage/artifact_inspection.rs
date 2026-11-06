@@ -12,7 +12,7 @@ use crate::storage::capability_fs::{
 use crate::storage::repository_state_store::{
     is_advisory_permission_denied, RepositoryStateStoreError,
 };
-use crate::storage::{validate_repo_relative_path, IssueStore, PathReadError};
+use crate::storage::{IssueStore, PathReadError};
 use anyhow::anyhow;
 use cap_std::fs::Dir;
 use std::collections::BTreeSet;
@@ -138,31 +138,22 @@ fn inspect_artifact_evidence_with_policy<S: IssueStore>(
     listing_scope: ArtifactListingScope,
     permission_denied: PermissionDeniedPolicy,
 ) -> Result<ArtifactEvidence, PathReadError> {
-    if matches!(
-        validate_repo_relative_path(path),
-        Err(PathReadError::InvalidPath(_) | PathReadError::OutsideRepoRoot(_))
-    ) {
-        return Ok(ArtifactEvidence::InvalidPath);
-    }
-    validate_repo_relative_path(path)?;
-    // A link can spell a target the layout cannot represent, such as one
-    // holding `:`; that is evidence about the link, not a read failure.
-    if RootRelativePath::parse(path).is_err() {
-        return Ok(ArtifactEvidence::InvalidPath);
-    }
+    let relative = match RootRelativePath::parse(path) {
+        Ok(relative) if !relative.is_root() => relative,
+        _ => return Ok(ArtifactEvidence::InvalidPath),
+    };
     let layout = storage.repository_layout().map_err(PathReadError::Other)?;
     let root = open_absolute_dir_nofollow(layout.worktree_root()).map_err(other)?;
-    inspect_artifact_from_root(&root, path, listing_scope, permission_denied)
+    inspect_artifact_from_root(&root, path, &relative, listing_scope, permission_denied)
 }
 
 fn inspect_artifact_from_root(
     root: &Dir,
     path: &str,
+    relative: &RootRelativePath,
     listing_scope: ArtifactListingScope,
     permission_denied: PermissionDeniedPolicy,
 ) -> Result<ArtifactEvidence, PathReadError> {
-    let relative = RootRelativePath::parse(path)
-        .map_err(|error| PathReadError::InvalidPath(error.to_string()))?;
     let components = relative
         .as_path()
         .components()

@@ -1041,12 +1041,12 @@ mod tests {
             },
         );
         let err = exec.items().show_item("@/glossary/GLOSS-01").unwrap_err();
-        // The typed InvalidPath cause is in the error chain (alternate Display
-        // renders the full anyhow context chain).
-        let msg = format!("{err:#}");
+        let invalid_path = err
+            .downcast_ref::<crate::storage::PathReadError>()
+            .is_some_and(|error| matches!(error, crate::storage::PathReadError::InvalidPath(_)));
         assert!(
-            msg.contains("'..' segment not permitted"),
-            "expected traversal rejection, got: {msg}"
+            invalid_path,
+            "expected a typed invalid-path rejection, got: {err:#}"
         );
     }
 
@@ -1070,10 +1070,12 @@ mod tests {
             },
         );
         let err = exec.items().show_item("@/glossary/GLOSS-01").unwrap_err();
-        let msg = format!("{err:#}");
+        let invalid_path = err
+            .downcast_ref::<crate::storage::PathReadError>()
+            .is_some_and(|error| matches!(error, crate::storage::PathReadError::InvalidPath(_)));
         assert!(
-            msg.contains("absolute paths are not permitted"),
-            "expected absolute-path rejection, got: {msg}"
+            invalid_path,
+            "expected a typed invalid-path rejection, got: {err:#}"
         );
     }
 

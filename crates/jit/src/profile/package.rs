@@ -1,7 +1,7 @@
 use super::manifest::{ProfilePackageModel, MANIFEST_FILE_NAME};
 use super::variables::{validate_body_references, validate_model_references, VariableError};
 use super::wire::ManifestWireError;
-use crate::domain::repository_inputs::is_safe_relative_path;
+use crate::domain::relative_path::RootRelativePath;
 use crate::repository_state::{Contribution, MapEntryTarget, ScalarTarget};
 use crate::storage::capability_fs::{
     classify_open_failure, is_executable, open_entry_nofollow, LeafKind, OpenRefusal,
@@ -764,7 +764,10 @@ fn validate_contribution(
 }
 
 fn validate_relative_path(field: &'static str, path: &str) -> Result<(), ProfilePackageError> {
-    if is_safe_relative_path(path) {
+    if matches!(
+        RootRelativePath::parse(path),
+        Ok(RootRelativePath::Descendant(_))
+    ) {
         Ok(())
     } else {
         Err(ProfilePackageError::UnsafePath {
