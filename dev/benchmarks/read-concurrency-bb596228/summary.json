@@ -1,0 +1,430 @@
+{
+  "artifact": "dev/benchmarks/read-concurrency-bb596228/summary.json",
+  "issue": "bb596228-fad0-4415-a131-54db05df0ddd",
+  "binaries": {
+    "base": {
+      "commit": "369d35a42f0ecc5067d930415c44908defdc0e36",
+      "sha256": "b5ba9298e54fda902b68858b8e7a930e6b29669df5e2fb11bb5f4420d126da4a",
+      "version": "jit 1.0.0 (profile release)"
+    },
+    "tip": {
+      "commit": "8070b5bb416484b75417e4b8fd960aa6f5cfc629",
+      "sha256": "36764622df86307fff42d85fa13b965417992b0454ad5444dca904d3908c14f7",
+      "version": "jit 1.0.0 (profile release)"
+    }
+  },
+  "raw_sha256": {
+    "raw/arms/00-r0-base-n0.json": "76375d906082697039d197ca9e19fc6765da371407263c6dac02bd654a648d04",
+    "raw/arms/01-r0-tip-n0.json": "709bfb321ffa6bfbffca217d60abb69352fa86da9ed86f7a65415b52d84b8826",
+    "raw/arms/02-r0-base-n1.json": "7e4fecc20c139f7ec74346ff13a7e299f27b6d01f08c8974ae7ddd48725c3af3",
+    "raw/arms/03-r0-tip-n1.json": "2cdf1b4f43cdfd8a1464ceee8f6fddc9cbf654df248b21da2184d045e408e68e",
+    "raw/arms/04-r0-base-n8.json": "52469cf449081deae76e50a8ace320ece91ef22d3133d97e322f97bc27ee29c8",
+    "raw/arms/05-r0-tip-n8.json": "abc59acc73f25666fe9fc98914a54ed2205b57b153a794541207df6cf111d70d",
+    "raw/arms/06-r1-tip-n0.json": "35dcc69c28af7d331345bdb00749fd3b374abccc19fa44ad4393ec2673b33a4b",
+    "raw/arms/07-r1-base-n0.json": "76d17b2c2bb925785a6d6ac0ea705441b12c2c2d08b3184b5a2cf40eb42206ff",
+    "raw/arms/08-r1-tip-n1.json": "acbc34b090ccc32ab1a394830a1c3cf96b990db46471e08e10c5ea41a42efe43",
+    "raw/arms/09-r1-base-n1.json": "7a8c84f2356e6e847b1481db6cf329eacfb244b0a0d647c9423952a39de80210",
+    "raw/arms/10-r1-tip-n8.json": "c97aee1cd26e5c9b09f38954d067701c696c8df3c4af7c5fa2547d443125b791",
+    "raw/arms/11-r1-base-n8.json": "3b947ee15415a293fab89e6de7f514bb77348d0b8baa6c4f52fcfb09674f7012",
+    "raw/arms/12-r2-base-n0.json": "dd0df530375eef305b98b1e7e283634b0ed66439e88d96a01d273fc390a73096",
+    "raw/arms/13-r2-tip-n0.json": "05bc48d17ba2300c407608a060a01f3f4d5214a013f38d82d45af767c28879b4",
+    "raw/arms/14-r2-base-n1.json": "c705b452558e32125cc96bfb1172d29ebe287945194843589e5b5b96c819603f",
+    "raw/arms/15-r2-tip-n1.json": "0bc3c8d0ec17c7e2fae1e589ba95bb2d9ebd3412ef1d0ad15091ee4b84f58300",
+    "raw/arms/16-r2-base-n8.json": "e25963684f9a765e6627bb316b889796afba34d7675fca95de03806f6163f91b",
+    "raw/arms/17-r2-tip-n8.json": "1df11b57af7d7f5f37202980f157bc494af5eadf54682279c8f917ef2836853b",
+    "raw/arms/18-r3-tip-n0.json": "10b96c2cbf32af506e32804bfa6acdf60d77e8395918d3ef0b20b27ba254894f",
+    "raw/arms/19-r3-base-n0.json": "56965e678f0466ed40aa006c3ad6cb627051eafdf52179316fa5f2251ca16b0d",
+    "raw/arms/20-r3-tip-n1.json": "1e231f461bd1f30f6c9b231420be664dc8cdb0e4402c598ff009493071ba300f",
+    "raw/arms/21-r3-base-n1.json": "cecb30e9d5e77cc99d61163693ea3f8270aeb1abad558e8377662e562827645c",
+    "raw/arms/22-r3-tip-n8.json": "4497c910c9670c6dd62cc7ae4231678f0af493a50b5060856b207d43bf100b95",
+    "raw/arms/23-r3-base-n8.json": "d860a9b9ef0a2df6775bc6442f61031bfa8173067fe72f7f425f9d14efb5d089",
+    "raw/arms/24-r4-base-n0.json": "88d6a0bb04c55252c5f55b4c45845185964b12944b60d6eedf003e1cb1919e2e",
+    "raw/arms/25-r4-tip-n0.json": "8c03302ceccf5b4f6d289565f830c7ca1575f2bda88db2312cbdd53a48e4965a",
+    "raw/arms/26-r4-base-n1.json": "9064406caf80379144c0faa8f5122c859c448de842a351e76cc7c207809c70af",
+    "raw/arms/27-r4-tip-n1.json": "629e8fcf9df3d88c3b4a34a2def37ef2c14668f4274fc98811385b5ff24dfce6",
+    "raw/arms/28-r4-base-n8.json": "c613f9ec8157b534fd15715451f53ce934f1e12d7a4ce87beb493c91b57b1805",
+    "raw/arms/29-r4-tip-n8.json": "ec1b122bce32792adee7ac03458513918fcf391f283ab69534f87f6f1153969a",
+    "raw/host.json": "5f201aeac91c5f3e3aae6b9181659b81f7bfa88a660b5d0405f0fe7bafc36116"
+  },
+  "thresholds": {
+    "tip_reader_scaling_min": 4.0,
+    "tip_writer_retention_min": 0.8,
+    "min_logical_cpus": 16
+  },
+  "logical_cpus": 24,
+  "arms": [
+    {
+      "round": 0,
+      "binary": "base",
+      "readers": 0,
+      "reader_per_s": 0.0,
+      "writer_per_s": 21.066667,
+      "reader_p95_ms": null,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 0,
+      "binary": "tip",
+      "readers": 0,
+      "reader_per_s": 0.0,
+      "writer_per_s": 20.066667,
+      "reader_p95_ms": null,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 0,
+      "binary": "base",
+      "readers": 1,
+      "reader_per_s": 10.6,
+      "writer_per_s": 20.466667,
+      "reader_p95_ms": 144.641,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 0,
+      "binary": "tip",
+      "readers": 1,
+      "reader_per_s": 74.066667,
+      "writer_per_s": 22.533333,
+      "reader_p95_ms": 28.918,
+      "reader_failures": 36,
+      "writer_failures": 0
+    },
+    {
+      "round": 0,
+      "binary": "base",
+      "readers": 8,
+      "reader_per_s": 133.6,
+      "writer_per_s": 13.8,
+      "reader_p95_ms": 193.556,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 0,
+      "binary": "tip",
+      "readers": 8,
+      "reader_per_s": 464.266667,
+      "writer_per_s": 17.4,
+      "reader_p95_ms": 36.084,
+      "reader_failures": 196,
+      "writer_failures": 0
+    },
+    {
+      "round": 1,
+      "binary": "tip",
+      "readers": 0,
+      "reader_per_s": 0.0,
+      "writer_per_s": 21.933333,
+      "reader_p95_ms": null,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 1,
+      "binary": "base",
+      "readers": 0,
+      "reader_per_s": 0.0,
+      "writer_per_s": 21.6,
+      "reader_p95_ms": null,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 1,
+      "binary": "tip",
+      "readers": 1,
+      "reader_per_s": 73.0,
+      "writer_per_s": 22.866667,
+      "reader_p95_ms": 29.166,
+      "reader_failures": 36,
+      "writer_failures": 0
+    },
+    {
+      "round": 1,
+      "binary": "base",
+      "readers": 1,
+      "reader_per_s": 10.133333,
+      "writer_per_s": 20.066667,
+      "reader_p95_ms": 192.999,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 1,
+      "binary": "tip",
+      "readers": 8,
+      "reader_per_s": 619.733333,
+      "writer_per_s": 22.066667,
+      "reader_p95_ms": 28.805,
+      "reader_failures": 234,
+      "writer_failures": 0
+    },
+    {
+      "round": 1,
+      "binary": "base",
+      "readers": 8,
+      "reader_per_s": 81.2,
+      "writer_per_s": 9.4,
+      "reader_p95_ms": 233.372,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 2,
+      "binary": "base",
+      "readers": 0,
+      "reader_per_s": 0.0,
+      "writer_per_s": 9.8,
+      "reader_p95_ms": null,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 2,
+      "binary": "tip",
+      "readers": 0,
+      "reader_per_s": 0.0,
+      "writer_per_s": 11.266667,
+      "reader_p95_ms": null,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 2,
+      "binary": "base",
+      "readers": 1,
+      "reader_per_s": 4.133333,
+      "writer_per_s": 8.666667,
+      "reader_p95_ms": 524.484,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 2,
+      "binary": "tip",
+      "readers": 1,
+      "reader_per_s": 36.266667,
+      "writer_per_s": 8.0,
+      "reader_p95_ms": 25.38,
+      "reader_failures": 126,
+      "writer_failures": 0
+    },
+    {
+      "round": 2,
+      "binary": "base",
+      "readers": 8,
+      "reader_per_s": 68.6,
+      "writer_per_s": 7.2,
+      "reader_p95_ms": 391.727,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 2,
+      "binary": "tip",
+      "readers": 8,
+      "reader_per_s": 517.933333,
+      "writer_per_s": 16.933333,
+      "reader_p95_ms": 39.528,
+      "reader_failures": 305,
+      "writer_failures": 0
+    },
+    {
+      "round": 3,
+      "binary": "tip",
+      "readers": 0,
+      "reader_per_s": 0.0,
+      "writer_per_s": 18.133333,
+      "reader_p95_ms": null,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 3,
+      "binary": "base",
+      "readers": 0,
+      "reader_per_s": 0.0,
+      "writer_per_s": 16.4,
+      "reader_p95_ms": null,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 3,
+      "binary": "tip",
+      "readers": 1,
+      "reader_per_s": 59.666667,
+      "writer_per_s": 16.2,
+      "reader_p95_ms": 41.423,
+      "reader_failures": 20,
+      "writer_failures": 0
+    },
+    {
+      "round": 3,
+      "binary": "base",
+      "readers": 1,
+      "reader_per_s": 5.666667,
+      "writer_per_s": 13.266667,
+      "reader_p95_ms": 439.257,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 3,
+      "binary": "tip",
+      "readers": 8,
+      "reader_per_s": 531.333333,
+      "writer_per_s": 17.133333,
+      "reader_p95_ms": 35.544,
+      "reader_failures": 323,
+      "writer_failures": 0
+    },
+    {
+      "round": 3,
+      "binary": "base",
+      "readers": 8,
+      "reader_per_s": 97.4,
+      "writer_per_s": 12.466667,
+      "reader_p95_ms": 274.184,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 4,
+      "binary": "base",
+      "readers": 0,
+      "reader_per_s": 0.0,
+      "writer_per_s": 16.666667,
+      "reader_p95_ms": null,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 4,
+      "binary": "tip",
+      "readers": 0,
+      "reader_per_s": 0.0,
+      "writer_per_s": 17.4,
+      "reader_p95_ms": null,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 4,
+      "binary": "base",
+      "readers": 1,
+      "reader_per_s": 4.933333,
+      "writer_per_s": 16.6,
+      "reader_p95_ms": 476.246,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 4,
+      "binary": "tip",
+      "readers": 1,
+      "reader_per_s": 54.666667,
+      "writer_per_s": 14.6,
+      "reader_p95_ms": 42.469,
+      "reader_failures": 23,
+      "writer_failures": 0
+    },
+    {
+      "round": 4,
+      "binary": "base",
+      "readers": 8,
+      "reader_per_s": 91.8,
+      "writer_per_s": 12.0,
+      "reader_p95_ms": 295.712,
+      "reader_failures": 0,
+      "writer_failures": 0
+    },
+    {
+      "round": 4,
+      "binary": "tip",
+      "readers": 8,
+      "reader_per_s": 551.733333,
+      "writer_per_s": 17.733333,
+      "reader_p95_ms": 34.955,
+      "reader_failures": 294,
+      "writer_failures": 0
+    }
+  ],
+  "per_round": [
+    {
+      "round": 0,
+      "binary": "base",
+      "reader_scaling": 12.603774,
+      "writer_retention": 0.655063
+    },
+    {
+      "round": 0,
+      "binary": "tip",
+      "reader_scaling": 6.268227,
+      "writer_retention": 0.86711
+    },
+    {
+      "round": 1,
+      "binary": "base",
+      "reader_scaling": 8.013158,
+      "writer_retention": 0.435185
+    },
+    {
+      "round": 1,
+      "binary": "tip",
+      "reader_scaling": 8.489498,
+      "writer_retention": 1.006079
+    },
+    {
+      "round": 2,
+      "binary": "base",
+      "reader_scaling": 16.596776,
+      "writer_retention": 0.734694
+    },
+    {
+      "round": 2,
+      "binary": "tip",
+      "reader_scaling": 14.28125,
+      "writer_retention": 1.502959
+    },
+    {
+      "round": 3,
+      "binary": "base",
+      "reader_scaling": 17.188234,
+      "writer_retention": 0.760163
+    },
+    {
+      "round": 3,
+      "binary": "tip",
+      "reader_scaling": 8.905028,
+      "writer_retention": 0.944853
+    },
+    {
+      "round": 4,
+      "binary": "base",
+      "reader_scaling": 18.608109,
+      "writer_retention": 0.72
+    },
+    {
+      "round": 4,
+      "binary": "tip",
+      "reader_scaling": 10.092683,
+      "writer_retention": 1.019157
+    }
+  ],
+  "medians": {
+    "base": {
+      "reader_scaling": 16.596776,
+      "writer_retention": 0.72
+    },
+    "tip": {
+      "reader_scaling": 8.905028,
+      "writer_retention": 1.006079
+    }
+  },
+  "verdict": "pass"
+}
