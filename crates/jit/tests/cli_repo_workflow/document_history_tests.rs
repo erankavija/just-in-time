@@ -398,6 +398,60 @@ fn test_doc_diff_from_old_to_head() {
     assert!(stdout.contains("v2") || stdout.contains("More details"));
 }
 
+#[cfg(unix)]
+#[test]
+fn test_doc_diff_uses_one_cat_file_process_for_both_versions() {
+    use jit::test_harness::git::GitStandIn;
+
+    let cli = JitCli::initialised().unwrap();
+    cli.init_git().unwrap();
+
+    write_file(&cli, "docs/spec.md", "first version\n");
+    cli.commit("Add document").unwrap();
+    let from = cli.git(["rev-parse", "HEAD"]).unwrap();
+    let from = from.trim();
+
+    write_file(&cli, "docs/spec.md", "second version\n");
+    cli.commit("Update document").unwrap();
+    let to = cli.git(["rev-parse", "HEAD"]).unwrap();
+    let to = to.trim();
+
+    let issue_id = cli.create_issue(["--title", "Test"]).unwrap();
+    cli.run(["doc", "add", issue_id.as_str(), "docs/spec.md"])
+        .unwrap();
+
+    let stand_in = GitStandIn::new();
+    let output = cli
+        .command_with_env(
+            [
+                "doc",
+                "diff",
+                issue_id.as_str(),
+                "docs/spec.md",
+                "--from",
+                from,
+                "--to",
+                to,
+            ],
+            [("PATH", stand_in.search_path())],
+        )
+        .output()
+        .unwrap();
+    let cat_file_reads = stand_in
+        .invocations()
+        .iter()
+        .filter(|invocation| invocation.args() == ["cat-file", "--batch", "-Z"])
+        .count();
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        cat_file_reads,
+        1,
+        "git invocations: {:#?}",
+        stand_in.invocations()
+    );
+}
+
 #[test]
 fn test_doc_history_json_output() {
     let cli = JitCli::initialised().unwrap();

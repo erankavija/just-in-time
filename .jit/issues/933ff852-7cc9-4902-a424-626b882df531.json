@@ -10,12 +10,26 @@
   ],
   "description": "Make the CLI and server document diff read both versions through one git module object reader, removing the last libgit2 blob reader in the document commands.\n\n## Background\n\n- `document_diff` (`crates/jit/src/commands/document.rs:581-632`) and `get_document_diff` (`crates/jit/src/commands/document.rs:764-814`) each open libgit2 and call `read_file_from_git` (`crates/jit/src/commands/document.rs:848-862`) twice, then render a unified diff with the `similar` crate.\n- Outside git the CLI variant fails with \"Not a git repository\", and the server variant returns `PathReadError::Other(\"Document diff not available (requires git repository with history)\")`.\n- Tests: `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:263`, `:305`, and the server's `crates/server/tests/server_integration/document_api_tests.rs`.\n- Kept as one change for a build reason: `read_file_from_git` is private, and an uncalled private method fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: Both variants read the two versions through one object reader on the executor's selected code checkout (`code_checkout()`). `read_file_from_git` no longer exists, and neither variant uses git2.\n- [hard] REQ-02: Diff output is byte-identical, so the CLI and server diff tests pass unchanged; outside git each variant fails as today.\n- [hard] REQ-03: A CLI test with the counting stand-in first on `PATH` asserts one `cat-file` invocation for `jit doc diff`; today the diff runs in libgit2 and records none, so it fails.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-06T04:24:43.216641719Z",
   "first_ready_at": "2026-11-06T03:24:05.568345089Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "65ed50ea-4b88-4023-b267-35e1e5612543",
+      "status": "passed",
+      "updated_at": "2026-11-06T04:24:32.487454830Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e048f32a-4194-4ff2-9fdd-24490f178c0f",
+      "status": "passed",
+      "updated_at": "2026-11-06T04:12:28.152415556Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "933ff852-7cc9-4902-a424-626b882df531",
   "labels": [
     "type:task",
@@ -29,7 +43,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Document diff reads both versions through one git process",
-  "updated_at": "2026-11-06T03:25:36.666723407Z"
+  "updated_at": "2026-11-06T04:24:43.216641719Z"
 }

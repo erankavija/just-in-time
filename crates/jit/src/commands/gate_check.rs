@@ -1569,7 +1569,7 @@ mod tests {
         IssueIdPrefix,
     };
     use crate::commands::test_helpers::gate_reuse::{seed_gate_issue, ReuseFixture};
-    use crate::commands::test_helpers::{seed_gate_registry, seed_issue, seed_repo_file, setup};
+    use crate::commands::test_helpers::{seed_gate_registry, seed_issue, setup};
     use crate::commands::IssueShowResponse;
     use crate::commands::{CommandExecutor, GateUpdate};
     use crate::declarations::{GateChecker, GateMode, GateStage};
@@ -1579,6 +1579,7 @@ mod tests {
     use crate::gate_execution::GateRunSubject;
     use crate::repository_state::VirtualPath;
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage, MutationPoint, RedoPoint};
+    use crate::test_harness::seed_memory_repository_file;
     use crate::test_utils::add_reducing_edge;
     use crate::test_utils::document_reference;
     use chrono::{TimeZone, Utc};
@@ -1708,7 +1709,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             rule_validation_test_rules(),
         )
         .unwrap();
-        seed_repo_file(
+        seed_memory_repository_file(
             &executor.storage,
             ".jit/rules.toml",
             &rule_validation_test_rules(),
@@ -3458,7 +3459,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .resolve(&crate::repository_state::VirtualPath::CONFIG)
             .unwrap();
         std::fs::write(config_path, &config).unwrap();
-        seed_repo_file(&executor.storage, ".jit/config.toml", &config);
+        seed_memory_repository_file(&executor.storage, ".jit/config.toml", &config);
         seed_rule_validation_rules(&executor);
 
         let mut container = crate::test_utils::fixture_issue(
@@ -5264,7 +5265,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
 
         // Write a prompt file relative to repo root
-        seed_repo_file(
+        seed_memory_repository_file(
             executor.storage(),
             "contrib/gates/code-review-prompt.md",
             "You are a senior engineer. Review for security issues.",
@@ -6114,7 +6115,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .map(|_| "x".repeat(100))
             .collect::<Vec<_>>()
             .join("\n"); // 1100 lines of 100 chars = ~110KB
-        seed_repo_file(executor.storage(), "huge-prompt.md", &big_content);
+        seed_memory_repository_file(executor.storage(), "huge-prompt.md", &big_content);
 
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(

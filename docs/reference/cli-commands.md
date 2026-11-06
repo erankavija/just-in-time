@@ -225,7 +225,9 @@ jit archive document dev/active/design.md --execute
 jit archive container 2f84c930 --execute --json
 ```
 
-Both target forms use the same planner. Without `--execute`, they are read-only.
+Both target forms, with or without `--execute`, use the same planner. Without
+`--execute`, they are read-only: the preview reads one repository snapshot
+without taking the write lock and reports the plan execution would apply to it.
 A document target
 includes its recursively supported local bundle. A container target includes
 documents attached to the container and its resolved-hierarchy descendants,

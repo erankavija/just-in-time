@@ -1068,13 +1068,6 @@ impl IssueStore for FailingMutationStorage {
         self.inner.read_events()
     }
 
-    fn read_archive_evidence_record(
-        &self,
-        target: &jit::domain::artifact_plan::PlanTarget,
-    ) -> anyhow::Result<Option<jit::domain::artifact_execution::ArchiveEvidenceRecord>> {
-        self.inner.read_archive_evidence_record(target)
-    }
-
     fn load_gate_run_result(
         &self,
         issue_id: &jit::domain::identity::IssueId,

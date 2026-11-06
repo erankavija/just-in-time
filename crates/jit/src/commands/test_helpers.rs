@@ -34,22 +34,6 @@ impl<S: IssueStore> ExecutorTestAccess<S> for CommandExecutor<S> {
     }
 }
 
-/// Seed one exact repository-file precondition in the aggregate memory image.
-pub(crate) fn seed_repo_file(storage: &InMemoryStorage, path: &str, content: &str) {
-    let layout = storage.repository_layout();
-    let path = layout
-        .classify_repository_relative(path)
-        .expect("fixture path is canonical");
-    match path.root_class() {
-        crate::repository_state::RepositoryRootClass::Data => {
-            storage.add_data_file(path.relative().as_path(), content)
-        }
-        crate::repository_state::RepositoryRootClass::Worktree => {
-            storage.add_worktree_file(path.relative().as_path(), content)
-        }
-    }
-}
-
 /// A session whose every capture is held to `max_bytes`, keeping each request's
 /// read mode, so a test proves a capture fits a small budget without a large
 /// fixture.
@@ -183,7 +167,7 @@ pub(crate) fn seed_issue(storage: &InMemoryStorage, issue: Issue) {
 pub(crate) fn seed_gate_registry(storage: &InMemoryStorage, registry: &GateRegistry) {
     let bytes = crate::declarations::serialize_gate_registry(registry)
         .expect("fixture gate registry serializes");
-    seed_repo_file(
+    crate::test_harness::seed_memory_repository_file(
         storage,
         ".jit/gates.toml",
         std::str::from_utf8(&bytes).expect("gate registry TOML is UTF-8"),
@@ -269,7 +253,7 @@ impl crate::storage::MutationInterruptionInjector for SessionRace {
             match self.action.lock().unwrap().take().unwrap() {
                 SessionRaceAction::Save(issue) => seed_issue(&storage, *issue),
                 SessionRaceAction::WriteRepoFile { path, content } => {
-                    seed_repo_file(&storage, &path, &content);
+                    crate::test_harness::seed_memory_repository_file(&storage, &path, &content);
                 }
                 SessionRaceAction::Run(operation) => operation(&storage),
             }
@@ -346,7 +330,13 @@ impl MemoryDeclarations<'_> {
         ]
         .into_iter()
         .filter_map(|(path, body)| body.map(|body| (path, body)))
-        .for_each(|(path, body)| seed_repo_file(storage, &path.repository_relative(), body));
+        .for_each(|(path, body)| {
+            crate::test_harness::seed_memory_repository_file(
+                storage,
+                &path.repository_relative(),
+                body,
+            )
+        });
     }
 
     fn remove_absent(&self, storage: &InMemoryStorage) {
@@ -788,7 +778,11 @@ mod tests {
         let storage = InMemoryStorage::rooted_at(reference.root());
         for path in held {
             let initialized = reference.read_repo_file(path).unwrap().unwrap();
-            seed_repo_file(&storage, path, &format!("{initialized}\n"));
+            crate::test_harness::seed_memory_repository_file(
+                &storage,
+                path,
+                &format!("{initialized}\n"),
+            );
         }
 
         let image = |store: &InMemoryStorage| store.repository_state().entries.clone();
