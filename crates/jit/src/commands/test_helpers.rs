@@ -214,6 +214,29 @@ impl crate::storage::MutationInterruptionInjector for SessionOpenCounter {
     }
 }
 
+/// Count redo-record publications via the moment each record's application
+/// crosses once, without coupling a test to preparatory capture sessions.
+pub(crate) struct PublicationCounter(AtomicUsize);
+
+impl PublicationCounter {
+    pub(crate) fn new() -> Arc<Self> {
+        Arc::new(Self(AtomicUsize::new(0)))
+    }
+
+    pub(crate) fn count(&self) -> usize {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+impl crate::storage::MutationInterruptionInjector for PublicationCounter {
+    fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+        if point == &MutationPoint::Redo(crate::storage::RedoPoint::BeforeApply) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+        Ok(())
+    }
+}
+
 pub(crate) enum SessionRaceAction {
     Save(Box<crate::domain::Issue>),
     WriteRepoFile {
