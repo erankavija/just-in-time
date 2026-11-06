@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5b7981ba-7759-48a3-985c-88d4753f4f8f",
+      "status": "passed",
+      "updated_at": "2026-11-06T00:19:22.378257875Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f6477007-09ab-4d53-8fec-ca4741c3cf78",
   "labels": [
     "type:task",
@@ -29,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Process liveness and signalling go through one PID guard",
-  "updated_at": "2026-11-05T23:20:21.875314243Z"
+  "updated_at": "2026-11-06T00:19:22.378257875Z"
 }
