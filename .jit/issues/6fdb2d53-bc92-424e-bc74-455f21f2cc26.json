@@ -32,9 +32,9 @@
       "updated_by": "auto:executor"
     },
     "dependency-audit": {
-      "run_id": "86db6f60-9835-47cb-bc8b-f982f44e050c",
-      "status": "failed",
-      "updated_at": "2026-11-06T04:48:33.874302854Z",
+      "run_id": "db41f686-e5d1-4ea4-9540-78763c10ffa8",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:16:20.463238336Z",
       "updated_by": "auto:executor"
     }
   },
@@ -56,5 +56,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remove the libgit2 binding from the workspace",
-  "updated_at": "2026-11-06T05:13:32.838829820Z"
+  "updated_at": "2026-11-06T05:16:20.463238336Z"
 }
