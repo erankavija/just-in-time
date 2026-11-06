@@ -96,7 +96,7 @@ impl Default for BulkUpdateResult {
 
 /// One matched issue's precheck execution, retained across publication retries.
 struct BulkPrecheck {
-    plan: CapturedPrecheckPlan,
+    captured: super::gate_check::CapturedGateEvidence,
     cached: CachedPrecheckExecution,
     /// The run records and prompt files the publishing base must read.
     capture_paths: Vec<crate::repository_state::VirtualPath>,
@@ -231,7 +231,7 @@ impl BulkDerivation<'_> {
         let record = || {
             record_captured_prechecks(
                 precheck.map(|precheck| &precheck.cached),
-                precheck.map(|precheck| &precheck.plan),
+                precheck.map(|precheck| &precheck.captured),
                 self.image,
                 &planned,
                 registry,
@@ -381,7 +381,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
                     )
                     .collect();
                 Ok(BulkPrecheck {
-                    plan: preflight.plan,
+                    captured: preflight.captured,
                     cached: cached
                         .ok_or_else(|| anyhow!("precheck execution for {target} was not kept"))?,
                     capture_paths,

@@ -16,6 +16,7 @@
       "path": "dev/active/693a2fdd/criteria-ruling.md"
     }
   ],
+  "done_at": "2026-11-06T03:25:45.985710953Z",
   "first_ready_at": "2026-11-06T02:30:00.611282062Z",
   "gates_required": [
     "cargo-ci",
@@ -29,9 +30,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "3fe7575a-cef3-463d-a1d7-0193f31a7ae7",
-      "status": "failed",
-      "updated_at": "2026-11-06T03:09:11.919819131Z",
+      "run_id": "c5ba2a3a-82ae-48ed-b085-79ec23ab2de7",
+      "status": "passed",
+      "updated_at": "2026-11-06T03:25:38.427782331Z",
       "updated_by": "auto:executor"
     }
   },
@@ -48,7 +49,7 @@
     "satisfies:b697a3f7/REQ-05"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Bulk update applies its matches in one session with no preview",
-  "updated_at": "2026-11-06T03:21:11.877822882Z"
+  "updated_at": "2026-11-06T03:25:45.985710953Z"
 }

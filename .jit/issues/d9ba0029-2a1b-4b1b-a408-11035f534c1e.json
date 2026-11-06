@@ -11,12 +11,26 @@
   ],
   "description": "Make the archive planner resolve every pinned document through one module object reader on the invocation's selected code checkout, instead of three processes per document through the revision resolver bridge.\n\n## Background\n\n- `plan_archive_target` (`crates/jit/src/commands/archive.rs:184-309`) builds `GitRevisionResolver::new(repo_root)` (`crates/jit/src/commands/archive.rs:190`), a bridge onto the git module with the default executable that ignores the invocation's checkout.\n- `inventory_issues_pinned_evidence` (`crates/jit/src/commands/archive.rs:90-105`), called once at `crates/jit/src/commands/archive.rs:248`, calls `read_pinned_path` for each pinned request, three git processes each (resolve, blob id, blob), and keeps only the resolved version: `Resolved(version)` on success, `Unavailable` otherwise.\n- The in-process test fixture `executor` (`crates/jit/src/commands/archive.rs:892-896`) builds executors without paths.\n- Archive preview CLI tests: `crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs:339` onwards.\n\n## Success Criteria\n\n- [hard] REQ-01: The planner takes the selected code checkout from the executor's paths (`code_checkout()`), and its in-process test fixture supplies detected paths. It resolves each unchanged original revision expression through the shared reader commit-resolution operation, peels only its canonical object ID when necessary, and requests `<canonical-commit>:<path>` in the same child. No consumer-local resolver is introduced.\n- [hard] REQ-02: Evidence is `Resolved(version)` exactly when the path names a file at the resolved commit, and `Unavailable` otherwise, including without a git checkout; `commands/archive.rs` no longer names `GitRevisionResolver`.\n- [hard] REQ-03: A CLI test previews archives over one and over several pinned documents with the counting stand-in first on `PATH`, and asserts that both record the same number of git invocations; today's planner adds three per pinned document, so it fails.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-06T03:51:07.187492475Z",
   "first_ready_at": "2026-11-05T03:02:23.946863524Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "69adc717-1a70-409e-a438-0136ff0b6cb1",
+      "status": "passed",
+      "updated_at": "2026-11-06T03:50:59.081271896Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a5c424fe-40af-4424-a521-b5ada6d6a1f2",
+      "status": "passed",
+      "updated_at": "2026-11-06T03:47:40.195796959Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d9ba0029-2a1b-4b1b-a408-11035f534c1e",
   "labels": [
     "type:task",
@@ -29,7 +43,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Archive planning reads pinned evidence through one git process",
-  "updated_at": "2026-11-06T03:25:36.243060194Z"
+  "updated_at": "2026-11-06T03:51:07.187492475Z"
 }

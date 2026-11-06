@@ -387,8 +387,9 @@
           "short_id": "d9ba0029",
           "title": "Archive planning reads pinned evidence through one git process",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "done",
+          "external_blockers": [],
+          "worker_status": "landed_f7879709a"
         },
         {
           "id": "dcf88b6f-b6d8-4e3d-b4c9-8cb718487b04",
@@ -440,8 +441,9 @@
           "short_id": "7cd27db8",
           "title": "Snapshot export reads committed files through one git process",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatched_2026-11-06"
         },
         {
           "id": "e6ec58f3-94d4-4886-85ef-fae12decaeba",
@@ -461,8 +463,9 @@
           "short_id": "933ff852",
           "title": "Document diff reads both versions through one git process",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatched_2026-11-06"
         },
         {
           "id": "cd603c8e-c2a8-43b8-afd5-7419d8d667f3",
@@ -576,7 +579,8 @@
     "47d62472": 1,
     "9ecde705": 1,
     "fb5e8e8d": 1,
-    "5046408a": 4
+    "5046408a": 4,
+    "933ff852": 1
   },
   "surfaced_pitfalls": [
     {
@@ -894,6 +898,30 @@
       "model": "gpt-6-luna",
       "effort": "xhigh",
       "reason": "One-file docs correction with exact criteria; out of wave order per steward."
+    },
+    {
+      "issue": "d9ba0029",
+      "vendor": "openai",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Archive planner resolution semantics on shared reader; counting test.",
+      "base": "28d98ee40"
+    },
+    {
+      "issue": "7cd27db8",
+      "vendor": "openai",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Bounded snapshot reader migration with exact criteria.",
+      "base": "28d98ee40"
+    },
+    {
+      "issue": "933ff852",
+      "vendor": "openai",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "Bounded document diff reader migration with exact criteria.",
+      "base": "28d98ee40"
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -1651,6 +1679,10 @@
         {
           "issue": "cd603c8e",
           "note": "explicitly approved (option 1) before the rule; docs/reference/cli-commands.md only; lands after c140921c"
+        },
+        {
+          "issue": "933ff852",
+          "note": "wave 8 dispatched alongside wave 6/7 d9ba0029 and 7cd27db8: DAG-ready, footprint document.rs/history tests disjoint from archive.rs and snapshot.rs; no earlier-wave issue changes doc diff"
         }
       ]
     }
