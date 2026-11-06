@@ -14,7 +14,20 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "run_id": "d4e3ceb6-2e3f-41a7-8f2e-7210a74654b2",
+      "status": "passed",
+      "updated_at": "2026-11-06T03:05:05.500971525Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "9edf7de5-4e58-4600-8822-5de1e12fc6ba",
+      "status": "passed",
+      "updated_at": "2026-11-06T03:03:40.522717240Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cd603c8e-c2a8-43b8-afd5-7419d8d667f3",
   "labels": [
     "type:task",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Document command reference states the show and history semantics",
-  "updated_at": "2026-11-06T02:58:36.705150596Z"
+  "updated_at": "2026-11-06T03:05:05.500971525Z"
 }

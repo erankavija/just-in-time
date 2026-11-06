@@ -2807,8 +2807,9 @@ the working tree, including uncommitted edits and derived files.
 
 ### `jit doc history`
 
-List the commits that touched one of an issue's documents, explicit or derived.
-It reads Git history, so an uncommitted file has none.
+List Git's history for the document path, newest first, including a commit that
+deletes it. Git's default history simplification can omit a merge when the
+document matches a parent; uncommitted changes do not appear.
 
 ```bash
 jit doc history <ID> <PATH>
