@@ -10,9 +10,7 @@
 
 use crate::repository_state::RepositoryAction;
 use crate::storage::atomic_write::{rename_noreplace_cap, sync_capability_directory};
-use crate::storage::capability_fs::{
-    open_child_dir_nofollow, open_or_create_capability_parent, DataRoot,
-};
+use crate::storage::capability_fs::{open_child_dir_nofollow, DataRoot, DirectoryHandles};
 use crate::storage::redo_apply::write_staged_file;
 use crate::storage::repository_state_store::RepositoryStateStoreError;
 use cap_std::fs::Dir;
@@ -57,17 +55,18 @@ pub(in crate::storage) fn stage_new_data_root<'a>(
     remove_stage(data_parent, &stage)?;
     data_parent.create_dir(&stage)?;
     let root = open_child_dir_nofollow(data_parent, &stage)?;
+    let mut handles = DirectoryHandles::new(&root);
     actions.into_iter().try_for_each(|action| {
         let relative = action.path().relative();
-        let stage_file = |bytes: &[u8], mode| {
-            let (parent, leaf) = open_or_create_capability_parent(&root, relative.as_path())?;
-            write_staged_file(&parent, &leaf, bytes, mode)
+        let mut stage_file = |bytes: &[u8], mode| {
+            let (parent, leaf) = handles.open_or_create_parent(relative.as_path())?;
+            write_staged_file(parent, &leaf, bytes, mode)
                 .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
         };
         match action {
             RepositoryAction::CreateDirectory { .. } if relative.is_root() => Ok(()),
             RepositoryAction::CreateDirectory { .. } => {
-                let (parent, leaf) = open_or_create_capability_parent(&root, relative.as_path())?;
+                let (parent, leaf) = handles.open_or_create_parent(relative.as_path())?;
                 match parent.create_dir(&leaf) {
                     Err(error) if error.kind() == ErrorKind::AlreadyExists => Ok(()),
                     outcome => outcome.map_err(Into::into),
@@ -130,9 +129,10 @@ fn remove_stage(data_parent: &Dir, stage: &str) -> Result<(), RepositoryStateSto
     }
 }
 
-/// Fsync `directory` and every directory below it, so the scaffold's entries
-/// are on the device before the rename publishes them. A staged file's own
-/// bytes are synced as it is written.
+/// Fsync `directory` and every directory below it, so the scaffold's entries,
+/// the ancestors staging created unsynced among them, are on the device before
+/// the rename publishes them. A staged file's own bytes are synced as it is
+/// written.
 fn sync_tree(directory: &Dir) -> Result<(), RepositoryStateStoreError> {
     directory.entries()?.try_for_each(|entry| {
         let entry = entry?;
