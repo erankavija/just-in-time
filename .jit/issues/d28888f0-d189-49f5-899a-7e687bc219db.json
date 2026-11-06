@@ -9,6 +9,7 @@
   ],
   "description": "Route every branch, commit, worktree listing, base comparison and identity lookup through one operation each in the git module, run against the selected worktree, with claims failing typed when git is missing.\n\n## Success Criteria\n\n- [hard] REQ-01: One head lookup serves claims, worktree commands, init, gate evidence and snapshots.\n- [hard] REQ-02: Worktree listing, base comparison and the release actor's `user.name` each have one module operation, and lease validation lists worktrees once per run.\n- [hard] REQ-03: Claim commands fail with the typed git-requirement error outside git and with no git executable, and tests cover both conditions.\n- [hard] REQ-04: Among production sources only the git module starts git, and it exposes only operations production code calls.\n",
   "documents": [],
+  "done_at": "2026-11-06T05:55:56.741147693Z",
   "first_ready_at": "2026-11-06T05:51:21.911467596Z",
   "gates_required": [
     "cargo-ci",
@@ -19,6 +20,12 @@
       "run_id": "e84333e5-20f2-4c64-8928-84cee1e23ff3",
       "status": "passed",
       "updated_at": "2026-11-06T05:52:29.928416447Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "run_id": "adb95e2a-d73b-4acd-aa23-31aead756a03",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:55:27.461944335Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,7 +42,7 @@
     "per:@/charter/D-21"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Branch, worktree and base facts come from one module",
-  "updated_at": "2026-11-06T05:52:29.928416447Z"
+  "updated_at": "2026-11-06T05:55:56.741147693Z"
 }

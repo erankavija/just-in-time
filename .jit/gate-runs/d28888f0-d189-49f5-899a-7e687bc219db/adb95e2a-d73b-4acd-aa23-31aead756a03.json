@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f372c5fc64fe0e0b5d8af06cfbe2dde734734440",
+  "completed_at": "2026-11-06T05:55:27.460285515Z",
+  "duration_ms": 177408,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are substantiated by the git module, production callers, focused tests, and the passing cargo-ci record for f372c5fc.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "d28888f0-d189-49f5-899a-7e687bc219db",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "adb95e2a-d73b-4acd-aa23-31aead756a03",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T05:52:30.051593068Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are substantiated by the git module, production callers, focused tests, and the passing cargo-ci record for f372c5fc.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
