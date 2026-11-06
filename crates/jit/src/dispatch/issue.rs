@@ -620,7 +620,7 @@ command_group! {
             raises [DeletionNotConfirmed] -> IssueDeleteResponse,
         "issue_assign" => IssueCommands::Assign { id, assignee } => assign(id, assignee) -> IssueLifecycleResponse,
         "issue_claim" => IssueCommands::Claim { id, assignee, assign_only } => claim(id, assignee, assign_only)
-            raises [Blocked, ValidationFailed] -> IssueLifecycleResponse,
+            raises [Blocked, ValidationFailed, RetryableConflict] -> IssueLifecycleResponse,
         "issue_unassign" => IssueCommands::Unassign { id } => unassign(id) -> IssueLifecycleResponse,
         "issue_reject" => IssueCommands::Reject { id, reason } => reject(id, reason) -> IssueLifecycleResponse,
         "issue_release" => IssueCommands::Release { id, reason } => release(id, reason) -> IssueLifecycleResponse,

@@ -2545,6 +2545,8 @@ pub(crate) fn configuration_argument_error(
 pub struct CommandExecutor<S: IssueStore> {
     storage: S,
     config_manager: ConfigManager,
+    // `rules`, `effective_rules` and `namespaces` are test-only remnants, removed
+    // by 42046050 (executor-config-caches-removal).
     /// Lazily-parsed `.jit/rules.toml`, cached for the lifetime of the
     /// executor so the validation ruleset is read at most once per process
     /// rather than re-parsed on every write. The cached value retains any

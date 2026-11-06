@@ -497,6 +497,48 @@ fn invoke_gate_evaluate_many_mutation_lock_timeout(json: bool) -> Vec<Output> {
     vec![output]
 }
 
+/// `gate evaluate-many` whose document read meets a redo record that appeared
+/// after the gate's input capture: the declared input is a FIFO, held open until
+/// the record is written.
+#[cfg(unix)]
+fn invoke_gate_evaluate_many_retryable_read(json: bool) -> Vec<Output> {
+    use std::io::Write;
+    use std::time::Duration;
+
+    let cli = JitCli::initialised().unwrap();
+    let id = setup_auto_gate_issue(&cli, "true");
+    let registry = cli.root().join(".jit/gates.toml");
+    let mut gates = fs::read_to_string(&registry).unwrap();
+    gates.push_str("\n[gates.inputs]\nroots = [\"probe.fifo\"]\n");
+    fs::write(&registry, gates).unwrap();
+    let fifo = cli.root().join("probe.fifo");
+    nix::unistd::mkfifo(
+        &fifo,
+        nix::sys::stat::Mode::S_IRUSR | nix::sys::stat::Mode::S_IWUSR,
+    )
+    .unwrap();
+    let mut command = cli.command(["gate", "evaluate-many", "projection-gate", &id, "--force"]);
+    if json {
+        command.arg("--json");
+    }
+    let child = std::thread::spawn(move || {
+        assert_cmd::Command::from_std(command)
+            .timeout(Duration::from_secs(10))
+            .output()
+            .unwrap()
+    });
+    // Opening for write returns once the gate's input digest opens the FIFO.
+    let mut pipe = fs::OpenOptions::new().write(true).open(&fifo).unwrap();
+    let scratch = cli.root().join(".jit/tmp");
+    fs::create_dir_all(&scratch).unwrap();
+    fs::write(scratch.join("redo.record"), b"pending").unwrap();
+    pipe.write_all(b"input").unwrap();
+    drop(pipe);
+    let output = child.join().unwrap();
+    assert_batch_report(&output, json);
+    vec![output]
+}
+
 /// `gate evaluate-many` over a target whose checker ran and failed.
 fn invoke_gate_evaluate_many_failure(json: bool) -> Vec<Output> {
     vec![evaluate_many_output("false", None, json)]
@@ -1025,7 +1067,7 @@ fn invoke_retryable_reads(json: bool) -> Vec<Output> {
 
 row_bindings! {
     test_command_exit_codes_success_emits_0: ("*", 0, false) => invoke_success;
-    test_command_exit_codes_retryable_reads_emit_12: ("archive candidates, archive document, archive container, config show-hierarchy, doc list, doc show, doc dir, doc conformance, doc history, doc diff, doc check-links, graph deps, graph rdeps, graph roots, graph tree, graph export, rdeps, invariant check, profile diff, profile apply, profile pack, profile add, query all, query available, query blocked, query strategic, query closed, query count, query divergence, query, status, issue show, issue list, issue search, issue batch-create, issue update, issue claim-next, snapshot export, item list, item search, item show, item resolve, label namespaces, label values, validate", 12, false) => invoke_retryable_reads;
+    test_command_exit_codes_retryable_reads_emit_12: ("archive candidates, archive document, archive container, config show-hierarchy, doc list, doc show, doc dir, doc conformance, doc history, doc diff, doc check-links, gate evaluate, gate evaluate-all, graph deps, graph rdeps, graph roots, graph tree, graph export, rdeps, invariant check, profile diff, profile apply, profile pack, profile add, query all, query available, query blocked, query strategic, query closed, query count, query divergence, query, status, issue show, issue list, issue search, issue batch-create, issue update, issue claim, issue claim-next, snapshot export, item list, item search, item show, item resolve, label namespaces, label values, validate", 12, false) => invoke_retryable_reads;
     test_command_exit_codes_malformed_stored_record_emits_1: ("*", 1, false) => invoke_malformed_stored_record;
     test_command_exit_codes_invalid_argument_emits_2: ("*", 2, false) => invoke_invalid_argument;
     test_command_exit_codes_not_found_emits_3: ("*", 3, false) => invoke_not_found;
@@ -1047,6 +1089,8 @@ row_bindings! {
     test_command_exit_codes_gate_evaluate_many_permission_denied_emits_5: ("gate evaluate-many", 5, true) => invoke_gate_evaluate_many_permission_denied;
     #[cfg(unix)]
     test_command_exit_codes_gate_evaluate_many_mutation_lock_timeout_emits_11: ("gate evaluate-many", 11, true) => invoke_gate_evaluate_many_mutation_lock_timeout;
+    #[cfg(unix)]
+    test_command_exit_codes_gate_evaluate_many_retryable_read_emits_12: ("gate evaluate-many", 12, true) => invoke_gate_evaluate_many_retryable_read;
     test_command_exit_codes_gate_evaluate_many_failure_emits_4: ("gate evaluate-many", 4, true) => invoke_gate_evaluate_many_failure;
     test_command_exit_codes_gate_evaluate_many_runner_error_emits_10: ("gate evaluate-many", 10, true) => invoke_gate_evaluate_many_runner_error;
     test_command_exit_codes_gate_evaluate_many_missing_target_emits_3: ("gate evaluate-many", 3, true) => invoke_gate_evaluate_many_missing_target;
