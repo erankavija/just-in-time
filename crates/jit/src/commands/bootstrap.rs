@@ -748,13 +748,15 @@ mod linked_checkout_write_decision_tests {
     }
 
     fn declared_policy(data: &std::path::Path) -> LinkedCheckoutWriteStance {
-        crate::config::JitConfig::load(&repository_layout_for_data_root(data))
-            .unwrap()
-            .worktree
-            .as_ref()
-            .map_or(LinkedCheckoutWriteStance::DEFAULT, |config| {
-                config.write_policy()
-            })
+        crate::storage::configuration_store::load_configuration(&repository_layout_for_data_root(
+            data,
+        ))
+        .unwrap()
+        .worktree
+        .as_ref()
+        .map_or(LinkedCheckoutWriteStance::DEFAULT, |config| {
+            config.write_policy()
+        })
     }
 
     /// Paths describing either a linked non-primary checkout or the primary one.

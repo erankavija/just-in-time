@@ -5,7 +5,7 @@
 //! config load through CLI query:
 //!
 //! - REQ-01: an `.jit/invariants.toml` entry with `statement`, `kind`, and
-//!   optional `enforced-by` loads at config time via `JitConfig::load`.
+//!   optional `enforced-by` loads at config time via `load_configuration`.
 //! - REQ-02: invariants load on BOTH config-load return paths (with AND without
 //!   a sibling `config.toml`).
 //! - REQ-03: `jit item list --kind invariant` returns the invariant as `@/<kind>/<self-id>`.
@@ -15,8 +15,8 @@
 //!   DESCRIPTION does NOT produce an invariant item; only `.jit/invariants.toml`
 //!   entries do.
 
-use jit::config::JitConfig;
 use jit::declarations::invariants::{InvariantConfigError, InvariantKind};
+use jit::storage::configuration_store::load_configuration;
 use jit::test_cli::JitCli;
 use jit::test_utils::{declaration_dir, profiled_repository_fixture};
 use serde_json::Value;
@@ -52,7 +52,7 @@ fn seed_invariants(cli: &JitCli) {
 
 #[test]
 fn req01_invariant_entry_loads_at_config_time_config_present() {
-    // REQ-01, config-present path: `JitConfig::load` populates `config.invariants`
+    // REQ-01, config-present path: `load_configuration` populates `config.invariants`
     // with the parsed entries, including the full `enforced-by` binding.
     let temp = declaration_dir(&[
         (".jit/config.toml", TYPE_HIERARCHY_CONFIG),
@@ -61,7 +61,7 @@ fn req01_invariant_entry_loads_at_config_time_config_present() {
     .unwrap();
     let jit_root = temp.path().join(".jit");
 
-    let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(&jit_root))
+    let config = load_configuration(&jit::test_utils::repository_layout_for_data_root(&jit_root))
         .expect("config load must succeed");
 
     let invs = &config.invariants.invariants;
@@ -94,11 +94,11 @@ fn req01_invariant_entry_loads_at_config_time_config_present() {
 #[test]
 fn req02_invariants_load_without_config_toml() {
     // REQ-02, config-absent path: even when there is NO `config.toml`,
-    // `JitConfig::load` still reads `invariants.toml` and populates the registry.
+    // `load_configuration` still reads `invariants.toml` and populates the registry.
     let temp = declaration_dir(&[(".jit/invariants.toml", INVARIANTS_TOML)]).unwrap();
     let jit_root = temp.path().join(".jit");
 
-    let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(&jit_root))
+    let config = load_configuration(&jit::test_utils::repository_layout_for_data_root(&jit_root))
         .expect("config load must succeed without config.toml");
 
     // Sanity: config-absent path must have returned an empty type-hierarchy.
@@ -135,7 +135,7 @@ fn req02_invariants_load_with_config_toml() {
     .unwrap();
     let jit_root = temp.path().join(".jit");
 
-    let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(&jit_root))
+    let config = load_configuration(&jit::test_utils::repository_layout_for_data_root(&jit_root))
         .expect("config load must succeed with config.toml");
 
     // Sanity: config-present path must have a type hierarchy.
@@ -169,8 +169,9 @@ fn req02_absent_invariants_toml_is_empty_on_both_paths() {
         };
         let temp = declaration_dir(files).unwrap();
         let jit_dir = temp.path().join(".jit");
-        let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(&jit_dir))
-            .unwrap_or_else(|e| panic!("load must succeed (with_config={with_config}): {e}"));
+        let config =
+            load_configuration(&jit::test_utils::repository_layout_for_data_root(&jit_dir))
+                .unwrap_or_else(|e| panic!("load must succeed (with_config={with_config}): {e}"));
         assert!(
             config.invariants.invariants.is_empty(),
             "absent invariants.toml must yield an empty registry (with_config={with_config})"
@@ -280,7 +281,7 @@ fn req03_item_show_at_qualified_id_resolves_invariant() {
 
 #[test]
 fn req04_missing_statement_fails_with_typed_error() {
-    // REQ-04: an invariant entry without `statement` makes `JitConfig::load` fail
+    // REQ-04: an invariant entry without `statement` makes `load_configuration` fail
     // with a typed error that names both the file and the missing field.
     for with_config in [false, true] {
         // Valid id and kind but no statement.
@@ -296,7 +297,7 @@ fn req04_missing_statement_fails_with_typed_error() {
         let temp = declaration_dir(files).unwrap();
         let jit_dir = temp.path().join(".jit");
 
-        let err = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(&jit_dir))
+        let err = load_configuration(&jit::test_utils::repository_layout_for_data_root(&jit_dir))
             .expect_err("missing statement must fail config load");
 
         // The assembly error names the file; the full chain (via `{err:#}`) also
@@ -324,7 +325,7 @@ fn req04_invalid_kind_token_fails_with_descriptive_error() {
     .unwrap();
     let jit_dir = temp.path().join(".jit");
 
-    let err = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(&jit_dir))
+    let err = load_configuration(&jit::test_utils::repository_layout_for_data_root(&jit_dir))
         .expect_err("invalid kind token must fail config load");
 
     // See req04_missing_statement_fails_with_typed_error for why we use `{err:#}`.

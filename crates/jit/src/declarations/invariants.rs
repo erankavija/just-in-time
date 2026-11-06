@@ -1,46 +1,13 @@
-//! Declarative project-invariant registry (driven by `.jit/invariants.toml`).
-//!
-//! An invariant is a project-scoped (`@`) statement of a property the project
-//! intends to hold, optionally bound to the rule or gate that enforces it. This
-//! module is the registry-first SOURCE for those entries: it owns only the pure
-//! parse/load step (read the file if present, parse with serde + toml, return a
-//! typed error on malformed/invalid content). Wiring the registry into the
-//! configuration is the job of
-//! [`assemble_configuration`](crate::declarations::assemble_configuration), and
-//! indexing/querying invariants as addressable items (`@/invariant/<self-id>`)
-//! is built on top of this registry by a later layer.
-//!
-//! The loader mirrors the production rules filesystem boundary:
-//! an absent file is graceful (an empty registry, NOT an error), and each entry
-//! is keyed by its `id` field — the entry's SELF-ID, from which the project-scoped
-//! qualified id `@/invariant/<self-id>` is derived.
+//! Pure parsing and serialization of the project-invariant registry.
+//! Configuration assembly wires entries into addressable project knowledge.
 
-use crate::repository_state::{RepositoryLayout, RepositoryLayoutError, VirtualPath};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::path::PathBuf;
 use thiserror::Error;
 
-/// Errors that can occur while loading and parsing `.jit/invariants.toml`.
-///
-/// Every variant carries enough context (path, entry id, or the underlying
-/// parse error) to point an author at the offending entry. Mirrors
-/// [`RuleConfigError`](crate::declarations::rules::RuleConfigError).
+/// Invalid invariant declarations or serialization failures.
 #[derive(Debug, Error)]
 pub enum InvariantConfigError {
-    /// The repository layout could not resolve the invariants path.
-    #[error(transparent)]
-    Layout(#[from] RepositoryLayoutError),
-
-    /// The invariants file could not be read from disk.
-    #[error("failed to read invariants file '{path}': {source}")]
-    Io {
-        /// Path that failed to read.
-        path: PathBuf,
-        /// Underlying I/O error.
-        source: std::io::Error,
-    },
-
     /// The invariants file is not valid TOML or does not match the schema. This
     /// covers a missing required field (`statement`, `id`, `kind`) and an
     /// unrecognized `kind` token, both of which surface as descriptive serde
@@ -140,24 +107,6 @@ impl InvariantRegistry {
     /// An empty registry (used when no `invariants.toml` exists).
     pub fn empty() -> Self {
         Self::default()
-    }
-
-    /// Load and parse `.jit/invariants.toml` relative to the given `.jit` root.
-    ///
-    /// Returns an empty [`InvariantRegistry`] when the file does not exist
-    /// (graceful, NOT an error), mirroring
-    /// the production rules filesystem boundary.
-    pub fn load(layout: &RepositoryLayout) -> Result<Self, InvariantConfigError> {
-        let path = layout.resolve(&VirtualPath::INVARIANTS)?;
-        if !path.exists() {
-            return Ok(Self::empty());
-        }
-        let content =
-            std::fs::read_to_string(&path).map_err(|source| InvariantConfigError::Io {
-                path: path.clone(),
-                source,
-            })?;
-        Self::from_toml_str(&content)
     }
 
     /// Parse an `invariants.toml` string into a registry.
@@ -313,40 +262,8 @@ kind = "advisory"
     }
 
     #[test]
-    fn test_load_absent_file_is_empty_registry() {
-        let dir = tempfile::tempdir().unwrap();
-        let reg = InvariantRegistry::load(&crate::test_utils::repository_layout_for_data_root(
-            dir.path(),
-        ))
-        .unwrap();
-        assert!(reg.invariants.is_empty());
-    }
-
-    #[test]
-    fn test_load_reads_present_file() {
-        let dir = tempfile::tempdir().unwrap();
-        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
-        std::fs::write(
-            layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
-            "[[invariants]]\nid = \"ninth-invariant\"\nstatement = \"s\"\nkind = \"enforced\"\n",
-        )
-        .unwrap();
-        let reg = InvariantRegistry::load(&layout).unwrap();
-        assert_eq!(reg.invariants.len(), 1);
-        assert_eq!(reg.invariants[0].id, "ninth-invariant");
-        assert_eq!(reg.invariants[0].kind, InvariantKind::Enforced);
-    }
-
-    #[test]
-    fn test_load_malformed_file_is_typed_error() {
-        let dir = tempfile::tempdir().unwrap();
-        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
-        std::fs::write(
-            layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
-            "not = valid = toml",
-        )
-        .unwrap();
-        let err = InvariantRegistry::load(&layout).unwrap_err();
+    fn test_from_toml_str_malformed_syntax_is_typed_error() {
+        let err = InvariantRegistry::from_toml_str("not = valid = toml").unwrap_err();
         assert!(matches!(err, InvariantConfigError::Toml(_)));
     }
 }

@@ -3,7 +3,6 @@
 //! Provides CLI interface to the lease-based claim coordination system.
 
 use super::CommandExecutor;
-use crate::config::JitConfig;
 use crate::domain::identity::{IssueId, IssueIdPrefix, LeaseId};
 use crate::errors::{GitRequirementGap, RequiresGitError};
 use crate::storage::claim_coordinator::{read_leases, LeaseChange};
@@ -89,7 +88,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
         let agent = resolve_agent_id(agent_id.map(|s| s.to_string()))?;
 
         // Load config for policy limits
-        let coord_config = JitConfig::load(&storage.repository_layout()?)?.coordination();
+        let coord_config =
+            crate::storage::configuration_store::load_configuration(&storage.repository_layout()?)?
+                .coordination();
 
         // Create file locker with the default lock-acquisition timeout
         let locker = FileLocker::with_configured_timeout();
