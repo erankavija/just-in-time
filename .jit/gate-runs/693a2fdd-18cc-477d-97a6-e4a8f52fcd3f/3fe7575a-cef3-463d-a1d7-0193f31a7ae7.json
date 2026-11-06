@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8649dd5d1518e35d5867b19eb2d7a30b1e18d350",
+  "completed_at": "2026-11-06T03:09:11.918126501Z",
+  "duration_ms": 244512,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/bulk_update.rs",
+        "id": "F1",
+        "line": 154,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/693a2fdd/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "A Done-to-Gated diversion is recorded only as an error, not as a modification."
+      }
+    ],
+    "summary": "Gated diversions publish state changes but are not reported as modified.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "693a2fdd-18cc-477d-97a6-e4a8f52fcd3f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3fe7575a-cef3-463d-a1d7-0193f31a7ae7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T03:05:07.405922992Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10119 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1aed1-30fe-7852-ae3b-945b336cadf3\n--------\nuser\n--- 10106 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 2252c76fd (`jit:693a2fdd`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/693a2fdd/requirement/REQ-03 (.jit issue description); @/charter/D-20 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/derived-state-coherence, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-11-06T03:03:25Z); run commit 8649dd5 contains 2252c76fd\nTruncation recovery: initial aggregate diff truncation recovered through bounded per-file diffs and affected source, test, and documentation ranges\n\n1. F1 — blocking, issue-impact: [`BulkProjection::record`](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/bulk_update.rs:153>) puts every `error_after_apply` outcome only in `errors`, even when its intents publish a state change. A `done` request diverted to `Gated` therefore changes and publishes the issue but is absent from `modified`; the dedicated test verifies only the error and final state. This misses REQ-03’s requirement that a Gated diversion be reported as both modified and failed. References: @/issue/693a2fdd/requirement/REQ-03.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Gated diversions publish state changes but are not reported as modified.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A Done-to-Gated diversion is recorded only as an error, not as a modification.\",\"file\":\"crates/jit/src/commands/bulk_update.rs\",\"line\":154,\"references\":[\"@/issue/693a2fdd/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
