@@ -782,7 +782,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         let layout = self.exec.require_layout()?;
         let mutation = super::production_mutation_context();
         let run_id = mutation.gate_run_id_at(0);
-        let run_paths = super::gate_run_record_paths(&mutation, issue_id, 1);
+        let run_paths = super::gate_run_record_paths(&mutation, issue_id, 0..1);
         let (target_id, image, issue, issues, registry, runs, captured, input_warnings) =
             with_mutation_attempts("gate evaluation inputs", || {
                 let claims_guard =
@@ -1390,13 +1390,15 @@ impl<S: IssueStore> GateOps<'_, S> {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    /// Execute prechecks from one closed repository image without publishing.
+    /// Execute prechecks from one closed repository image without publishing,
+    /// deriving run ids from index `first_run` of `mutation`.
     pub(super) fn execute_captured_prechecks(
         &self,
         image: &crate::repository_state::RepositoryImage,
         issue: &Issue,
         registry: &crate::declarations::GateRegistry,
         captured_prompts: &HashMap<GateKey, String>,
+        first_run: u64,
         mutation: &crate::repository_state::MutationContext,
     ) -> Result<PrecheckExecution>
     where
@@ -1435,7 +1437,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .as_ref()
                         .filter(|checker| super::checker_consumes_run_history(checker))
                         .map_or(&[][..], |_| history.as_slice());
-                    let run_id = mutation.gate_run_id_at(runs.len() as u64);
+                    let run_id = mutation.gate_run_id_at(first_run + runs.len() as u64);
                     let result = match self.execute_captured_gate(CapturedGateExecution {
                         run_id: &run_id,
                         image,

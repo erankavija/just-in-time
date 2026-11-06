@@ -38,12 +38,26 @@
       "path": "dev/active/c140921c/revision-producer-plan.md"
     }
   ],
+  "done_at": "2026-11-06T03:24:05.568345089Z",
   "first_ready_at": "2026-11-05T03:02:23.946863524Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "27133717-409f-4960-a3a9-b87aceed7d39",
+      "status": "passed",
+      "updated_at": "2026-11-06T03:23:55.704230903Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "5cff90c1-58ea-4bff-9c99-2e1b2037b557",
+      "status": "passed",
+      "updated_at": "2026-11-06T03:19:34.807890812Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c140921c-0730-4983-8e77-c6a46bbdca5a",
   "labels": [
     "type:task",
@@ -56,7 +70,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Snapshot source and repository facts come from the module",
-  "updated_at": "2026-11-05T05:44:13.346974595Z"
+  "updated_at": "2026-11-06T03:24:05.568345089Z"
 }

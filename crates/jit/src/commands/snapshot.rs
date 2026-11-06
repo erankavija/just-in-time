@@ -7,6 +7,7 @@ use crate::snapshot::{
     compute_sha256, AssetSnapshot, DocumentSnapshot, IssuesInfo, MetadataInfo, RepoInfo,
     SnapshotFormat, SnapshotManifest, SnapshotScope, SourceInfo, SourceMode, VerificationInfo,
 };
+use crate::storage::git::GitCheckout;
 use crate::storage::{IssueStore, RepositoryStateStore};
 use anyhow::{anyhow, Context, Result};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -16,20 +17,9 @@ type SnapshotDirectories = BTreeSet<crate::domain::relative_path::RootRelativePa
 type SnapshotFiles = BTreeMap<crate::domain::relative_path::RootRelativePath, Vec<u8>>;
 const MAX_REPOSITORY_SNAPSHOT_BYTES: u64 = 128 * 1024 * 1024;
 
-fn origin_remote_url(repo: &git2::Repository) -> Option<String> {
-    repo.find_remote("origin")
-        .ok()
-        .and_then(|remote| remote.url().ok().map(str::to_owned))
-}
-
-fn current_branch_name(repo: &git2::Repository) -> Option<String> {
-    repo.head()
-        .ok()
-        .and_then(|head| head.shorthand().ok().map(str::to_owned))
-}
-
 struct SnapshotExporter<'a, S: IssueStore> {
     storage: &'a S,
+    checkout: Option<GitCheckout>,
     worktree_root: PathBuf,
     data_root: PathBuf,
     created_at: chrono::DateTime<chrono::Utc>,
@@ -50,19 +40,12 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
         working_tree: bool,
         committed_only: bool,
     ) -> Result<SourceMode> {
-        let layout = self.exec.require_layout()?;
-        let open_repo = || {
-            git2::Repository::open(layout.worktree_root())
-                .map_err(|_| anyhow!("snapshot source requires git repository"))
-        };
+        let checkout = self.exec.require_worktree_paths()?.code_checkout();
         let resolve = |reference: &str| -> Result<String> {
-            let repo = open_repo()?;
-            let oid = repo
-                .revparse_single(reference)?
-                .peel_to_commit()?
-                .id()
-                .to_string();
-            Ok(oid)
+            let checkout = checkout
+                .as_ref()
+                .ok_or_else(|| anyhow!("snapshot source requires git repository"))?;
+            Ok(checkout.resolve_commit(reference)?.as_str().to_owned())
         };
         match (at_commit, working_tree, committed_only) {
             (Some(_), true, _) => Err(anyhow!("Cannot use both --at and --working-tree")),
@@ -83,12 +66,14 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
 impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
     fn new(
         storage: &'a S,
+        checkout: Option<GitCheckout>,
         worktree_root: PathBuf,
         data_root: PathBuf,
         created_at: chrono::DateTime<chrono::Utc>,
     ) -> Self {
         Self {
             storage,
+            checkout,
             worktree_root,
             data_root,
             created_at,
@@ -361,17 +346,13 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
 
         match mode {
             SourceMode::Git { commit } => {
-                let repo = git2::Repository::open(&self.worktree_root)?;
-
-                // Get remote URL
-                let remote = origin_remote_url(&repo);
-
-                // Get branch name
-                let branch = current_branch_name(&repo);
-
-                // Check if working tree is dirty
-                let statuses = repo.statuses(None)?;
-                let dirty = !statuses.is_empty();
+                let checkout = self
+                    .checkout
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("snapshot source requires git repository"))?;
+                let remote = checkout.origin_url()?;
+                let branch = checkout.head()?.map(|head| head.branch_label().to_owned());
+                let dirty = !checkout.dirty_paths()?.is_empty();
 
                 Ok(RepoInfo {
                     path,
@@ -686,6 +667,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
         let layout = self.exec.require_layout()?;
         let exporter = SnapshotExporter::new(
             &self.exec.storage,
+            self.exec.require_worktree_paths()?.code_checkout(),
             layout.worktree_root().to_path_buf(),
             layout.data_root().to_path_buf(),
             chrono::Utc::now(),
@@ -784,6 +766,7 @@ mod tests {
     fn exporter(storage: &InMemoryStorage) -> SnapshotExporter<'_, InMemoryStorage> {
         SnapshotExporter::new(
             storage,
+            None,
             PathBuf::from("."),
             PathBuf::from(".jit"),
             chrono::Utc::now(),
@@ -1067,30 +1050,145 @@ mod tests {
     }
 
     #[test]
-    fn test_git_metadata_extracts_remote_and_branch_with_fallible_text_accessors() {
+    fn test_determine_snapshot_source_mode_resolves_requested_commit_and_defaults_to_head() {
         let temp = tempfile::tempdir().unwrap();
-        let repo = git2::Repository::init(temp.path()).unwrap();
-        repo.remote("origin", "https://example.com/repository.git")
+        let repository = crate::test_harness::git::GitRepository::init(temp.path().join("code"));
+        repository.write("tracked", "initial");
+        let initial = repository.commit("unique needle");
+        repository.write("tracked", "updated");
+        let head = repository.commit("updated");
+        let data = crate::test_harness::git::GitRepository::init(temp.path().join("data"));
+        data.write("tracked", "unrelated")
+            .commit("unrelated data history");
+        let storage = InMemoryStorage::rooted_at(repository.root());
+        let layout = storage.repository_layout();
+        let executor = crate::commands::CommandExecutor::new(storage)
+            .with_layout(layout)
+            .unwrap()
+            .with_worktree_paths(
+                crate::storage::WorktreePaths::detect_from(data.root())
+                    .unwrap()
+                    .with_worktree_root(repository.root())
+                    .unwrap(),
+            );
+
+        for (at, committed_only, expected) in [
+            (Some(initial.as_str()), false, &initial),
+            (Some(":/unique needle"), false, &initial),
+            (None, true, &head),
+            (None, false, &head),
+        ] {
+            let mode = executor
+                .archive()
+                .determine_snapshot_source_mode(at, false, committed_only)
+                .unwrap();
+            assert!(matches!(mode, SourceMode::Git { commit } if &commit == expected));
+        }
+        assert!(matches!(
+            executor
+                .archive()
+                .determine_snapshot_source_mode(None, true, false)
+                .unwrap(),
+            SourceMode::WorkingTree
+        ));
+        assert!(executor
+            .archive()
+            .determine_snapshot_source_mode(Some(&initial), true, false)
+            .is_err());
+    }
+
+    #[test]
+    fn test_determine_snapshot_source_mode_without_checkout_uses_working_tree_and_rejects_git_options(
+    ) {
+        let temp = tempfile::tempdir().unwrap();
+        let repository = crate::test_harness::git::GitRepository::init(temp.path());
+        repository.write("tracked", "initial");
+        repository.commit("initial");
+        let storage = InMemoryStorage::rooted_at(repository.root());
+        let layout = storage.repository_layout();
+        let executor = crate::commands::CommandExecutor::new(storage)
+            .with_layout(layout)
             .unwrap();
-        repo.set_head("refs/heads/main").unwrap();
 
-        let tree_id = repo.index().unwrap().write_tree().unwrap();
-        let tree = repo.find_tree(tree_id).unwrap();
-        let signature = git2::Signature::now("JIT Test", "jit@example.com").unwrap();
-        repo.commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            "initial commit",
-            &tree,
-            &[],
-        )
-        .unwrap();
+        assert!(matches!(
+            executor
+                .archive()
+                .determine_snapshot_source_mode(None, false, false)
+                .unwrap(),
+            SourceMode::WorkingTree
+        ));
+        for (at, committed_only) in [(Some("HEAD"), false), (None, true)] {
+            assert!(executor
+                .archive()
+                .determine_snapshot_source_mode(at, false, committed_only)
+                .is_err());
+        }
+    }
 
+    #[test]
+    fn test_get_repo_info_ignored_file_exports_clean() {
+        let temp = tempfile::tempdir().unwrap();
+        let repository = crate::test_harness::git::GitRepository::init(temp.path());
+        repository.write(".gitignore", "ignored\n");
+        let commit = repository.commit("initial");
+        repository.write("ignored", "local cache");
+        let storage = InMemoryStorage::new();
+        let exporter = SnapshotExporter::new(
+            &storage,
+            crate::storage::WorktreePaths::detect_from(repository.root())
+                .unwrap()
+                .git(),
+            repository.root().to_path_buf(),
+            repository.root().join(".jit"),
+            chrono::Utc::now(),
+        );
+
+        let info = exporter.get_repo_info(&SourceMode::Git { commit }).unwrap();
+
+        assert!(
+            !info.dirty,
+            "ignored files must not make the snapshot dirty"
+        );
+    }
+
+    #[test]
+    fn test_get_repo_info_extracts_remote_and_head_branch_label() {
+        let temp = tempfile::tempdir().unwrap();
+        let repository = crate::test_harness::git::GitRepository::init(temp.path());
+        repository.git(&[
+            "remote",
+            "add",
+            "origin",
+            "https://example.com/repository.git",
+        ]);
+        repository.git(&["branch", "--move", "main"]);
+        let storage = InMemoryStorage::new();
+        let exporter = SnapshotExporter::new(
+            &storage,
+            crate::storage::WorktreePaths::detect_from(repository.root())
+                .unwrap()
+                .git(),
+            repository.root().to_path_buf(),
+            repository.root().join(".jit"),
+            chrono::Utc::now(),
+        );
+
+        repository.write("tracked", "content");
+        let commit = repository.commit("initial");
+        let mode = SourceMode::Git { commit };
+        let info = exporter.get_repo_info(&mode).unwrap();
         assert_eq!(
-            origin_remote_url(&repo).as_deref(),
+            info.remote.as_deref(),
             Some("https://example.com/repository.git")
         );
-        assert_eq!(current_branch_name(&repo).as_deref(), Some("main"));
+        assert_eq!(info.branch.as_deref(), Some("main"));
+
+        repository.git(&["checkout", "--quiet", "--detach", "HEAD"]);
+        let detached = exporter.get_repo_info(&mode).unwrap();
+        assert_eq!(detached.branch.as_deref(), Some("HEAD"));
+
+        repository.git(&["symbolic-ref", "HEAD", "refs/heads/unborn"]);
+        let unborn = exporter.get_repo_info(&mode).unwrap();
+        assert!(unborn.branch.is_none());
     }
 }

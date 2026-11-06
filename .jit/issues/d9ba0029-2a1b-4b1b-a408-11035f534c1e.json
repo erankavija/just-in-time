@@ -28,7 +28,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Archive planning reads pinned evidence through one git process",
-  "updated_at": "2026-11-05T05:44:13.449517799Z"
+  "updated_at": "2026-11-06T03:24:05.568345089Z"
 }

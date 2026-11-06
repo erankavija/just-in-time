@@ -21,11 +21,9 @@ set -euo pipefail
 #       single mutation jit issue update <id> --priority <p> --json
 #       bulk mutation   jit issue update --filter <label> --priority <p> --json
 #     The bulk-mutation scenario targets a fixed-size labeled group (K matched
-#     issues, of which J already hold the target priority and are confirmed
-#     no-ops by the eligibility prefilter's shared verification session while
-#     the remaining K-J genuinely change), so its numbers measure the
-#     post-prefilter bounded-session behavior (jit:412925b9) rather than the
-#     earlier O(matched) session cost.
+#     issues, of which K-J already hold the target priority and are skipped
+#     while the remaining J genuinely change), all derived and published in
+#     one session.
 #   - Reset protocol for the mutable scenarios (single and bulk mutation): a
 #     fresh fixture is materialized (copied from the pristine template) before
 #     EVERY measured sample, so no sample observes a prior sample's mutation.
@@ -224,8 +222,7 @@ MEASUREMENT_FS=$(df --output=fstype "$WORK_BASE" 2>/dev/null | tail -1 | tr -d '
 # K issues (BULK_MATCH_COUNT) carry BULK_LABEL and are matched by the bulk
 # scenario's --filter. Of those, J (BULK_CHANGE_COUNT) are created at priority
 # "normal" and genuinely change to "high" when the scenario runs; the
-# remaining K-J are created already at "high" and are confirmed no-ops by the
-# eligibility prefilter's shared verification session (jit:412925b9), so the
+# remaining K-J are created already at "high" and are skipped, so the
 # scenario exercises both the skip path and the change path. Clamped to fit
 # ISSUE_COUNT since issue 1 is reserved for TARGET_ID.
 BULK_LABEL="component:bulk-target"
@@ -499,7 +496,7 @@ CMD_LIST=$(with_stat issue_list '["jit","issue","list","--json"]' pure_read_all 
 CMD_UPDATE=$(with_stat issue_update_mutation '["jit","issue","update","<id>","--priority","high","--json"]' mutation "$UPDATE_STATS" "$UPDATE_LOCKS" "fresh fixture materialized before every measured sample so no sample observes a prior mutation")
 BULK_NAME="issue_update_bulk_mutation_k${BULK_MATCH_COUNT}_j${BULK_CHANGE_COUNT}"
 BULK_ARGV_JSON=$(argv_to_json jit issue update --filter "$BULK_FILTER" --priority high --json)
-BULK_NOTE="fresh fixture materialized before every measured sample so no sample observes a prior mutation (same reset protocol as issue_update_mutation); $BULK_MATCH_COUNT issues match --filter \"$BULK_FILTER\" (K), of which $BULK_NOOP_COUNT already hold the target priority and are confirmed no-ops by the eligibility prefilter's shared verification session, and $BULK_CHANGE_COUNT (J) genuinely change and each open their own preflight+publication session"
+BULK_NOTE="fresh fixture materialized before every measured sample so no sample observes a prior mutation (same reset protocol as issue_update_mutation); $BULK_MATCH_COUNT issues match --filter \"$BULK_FILTER\" (K), of which $BULK_NOOP_COUNT already hold the target priority and are skipped, and $BULK_CHANGE_COUNT (J) genuinely change, all published in one session"
 CMD_BULK=$(with_stat "$BULK_NAME" "$BULK_ARGV_JSON" mutation "$BULK_STATS" "$BULK_LOCKS" "$BULK_NOTE")
 
 ARTIFACT_TMP=$(mktemp "$OUT_DIR/.session-cost.json.XXXXXX")

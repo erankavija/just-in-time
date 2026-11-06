@@ -8,6 +8,7 @@
   ],
   "description": "Make a git-mode snapshot export read every captured file through one git module object reader, instead of opening libgit2 once per file.\n\n## Background\n\n- In git mode, capture reads each file through `read_content` (`crates/jit/src/commands/snapshot.rs:196-204`), which opens a libgit2 repository per file and calls `read_from_git` (`crates/jit/src/commands/snapshot.rs:138-172`). That function returns the blob bytes with the commit and the blob id as `blob_sha`, and fails with `NotFoundError` \"Path '<path>' not found in commit <ref>\" (exit 3).\n- Asset paths come from scanning documents read in the same export, so reads arrive after earlier answers.\n- Tests: `crates/jit/tests/cli_issue/snapshot_export_tests.rs`.\n- Kept as one change for a build reason: `read_from_git` is private, and an uncalled private method fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: A git-mode export reads every file it captures through one object reader on the executor's git checkout, recording each file's blob id as `blob_sha` and the commit as today. `read_from_git` and the per-file repository open no longer exist, and `commands/snapshot.rs` uses no git2.\n- [hard] REQ-02: A missing path fails with today's not-found error and exit 3, working-tree exports are unchanged, and the snapshot export tests pass.\n- [hard] REQ-03: A CLI test with the counting stand-in first on `PATH` exports `--at HEAD` over several documents and assets and asserts one `cat-file` invocation; today export runs in libgit2 and records none, so it fails.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "first_ready_at": "2026-11-06T03:24:05.568345089Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "satisfies:f4d9502a/REQ-10"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Snapshot export reads committed files through one git process",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-11-06T03:24:05.568345089Z"
 }
