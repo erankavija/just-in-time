@@ -1677,7 +1677,7 @@ fn test_json_capture_reads_no_blob_for_a_kind_only_pinned_request() {
         stand_in
             .invocations()
             .iter()
-            .filter(|invocation| invocation.args() == ["cat-file", "--batch"])
+            .filter(|invocation| invocation.args() == ["cat-file", "--batch", "-Z"])
             .count()
     };
     let mut kind = CaptureSpec::new([], budget()).unwrap();
@@ -1770,7 +1770,7 @@ fn test_json_capture_reuses_pinned_target_cache_for_unchanged_commit() {
     assert_eq!(
         all_processes
             .iter()
-            .filter(|invocation| invocation.args() == ["cat-file", "--batch"])
+            .filter(|invocation| invocation.args() == ["cat-file", "--batch", "-Z"])
             .count(),
         1
     );

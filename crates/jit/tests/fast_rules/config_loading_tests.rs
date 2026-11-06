@@ -1,4 +1,5 @@
 use jit::config::JitConfig;
+use jit::storage::configuration_store::load_configuration;
 use jit::storage::{IssueStore, JsonFileStorage};
 use jit::CommandExecutor;
 use tempfile::TempDir;
@@ -47,7 +48,7 @@ fn test_handle_missing_config_file() {
     let storage = JsonFileStorage::new(temp_dir.path());
 
     // Config file doesn't exist - should fall back to defaults
-    let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+    let config = load_configuration(&jit::test_utils::repository_layout_for_data_root(
         storage.root(),
     ))
     .unwrap();
@@ -74,7 +75,7 @@ feature = "epic"
     std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
 
     // Load config
-    let config = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+    let config = load_configuration(&jit::test_utils::repository_layout_for_data_root(
         storage.root(),
     ))
     .unwrap();
@@ -137,7 +138,7 @@ types = { broken syntax
     std::fs::write(storage.root().join("config.toml"), bad_toml).unwrap();
 
     // Should return error
-    let result = JitConfig::load(&jit::test_utils::repository_layout_for_data_root(
+    let result = load_configuration(&jit::test_utils::repository_layout_for_data_root(
         storage.root(),
     ));
     assert!(result.is_err());

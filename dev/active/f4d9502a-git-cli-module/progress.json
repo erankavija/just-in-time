@@ -368,9 +368,9 @@
           "short_id": "a273667c",
           "title": "Path reads at a commit go through the git module",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "reviewed_awaiting_user_floor_decision"
+          "worker_status": "landed_8ae117d30"
         },
         {
           "id": "c140921c-0730-4983-8e77-c6a46bbdca5a",
@@ -379,7 +379,7 @@
           "classification": "implementation",
           "status": "in_progress",
           "external_blockers": [],
-          "worker_status": "conditional_design_complete_waiting_a273",
+          "worker_status": "dispatched_2026-11-06",
           "worker": "agent:f4d9502a-lead"
         },
         {
@@ -421,15 +421,16 @@
           "short_id": "1acfa592",
           "title": "Document show reads through storage at the version it names",
           "classification": "implementation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "done",
+          "external_blockers": [],
+          "worker_status": "landed_71dae3d3f"
         },
         {
           "id": "5046408a-9706-4ca0-9302-54d20e2088aa",
           "short_id": "5046408a",
           "title": "Configurable worktree root independent of the data root",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
           "worker_status": "implementation_running",
           "worker": "split_root_impl Astra/xhigh; split_root_consumers Terra/high"
@@ -468,8 +469,9 @@
           "short_id": "cd603c8e",
           "title": "Document command reference states the show and history semantics",
           "classification": "documentation",
-          "status": "backlog",
-          "external_blockers": []
+          "status": "in_progress",
+          "external_blockers": [],
+          "worker_status": "dispatched_out_of_wave_2026-11-06"
         }
       ]
     },
@@ -530,15 +532,15 @@
   "escalations": [
     {
       "issue": "a273667c",
-      "status": "resumed_floor_approved_merging_main",
+      "status": "done_2026-11-06",
       "subject": "Git>=2.42 andDocker runtimeTrixie proposal",
-      "evidence": "/tmp/f4d9502a-lead/git-floor-decision.md andgit-floor-decision.patch; stewardpresentingconcreteproposal; noanswerinferred 2026-11-06: user approved floor/runtime (via steward 9b). Branch 43706d377 merged with main: json.rs read_path_bytes conflicts with 504 split-root (selection wrapper + code_checkout_top_level). Resolution dispatched (Sol/high); reviewed bytes change, so full cargo-ci + code-review rerun before landing. Issue criteria unchanged; six-file footprint (incl. Dockerfile/INSTALL.md floor) needs no scope edit. Excluded ancestors d0c98247f/7701663df verified absent."
+      "evidence": "/tmp/f4d9502a-lead/git-floor-decision.md andgit-floor-decision.patch; stewardpresentingconcreteproposal; noanswerinferred 2026-11-06: user approved floor/runtime (via steward 9b). Branch 43706d377 merged with main: json.rs read_path_bytes conflicts with 504 split-root (selection wrapper + code_checkout_top_level). Resolution dispatched (Sol/high); reviewed bytes change, so full cargo-ci + code-review rerun before landing. Issue criteria unchanged; six-file footprint (incl. Dockerfile/INSTALL.md floor) needs no scope edit. Excluded ancestors d0c98247f/7701663df verified absent. Branch a41286a02 cargo-ci pass + code-review 0 findings; refreshed 30406d0ab (lib 3247, contracts 557); landed 8ae117d30; forced merged cargo-ci pass; closed, lease released. 1acfa592 now ready."
     },
     {
       "issue": "c140921c",
-      "status": "conditional_design_recorded",
+      "status": "implementing_footprint_extended_to_5",
       "subject": "Preserve originalrevisionexpression beforepeeling canonicalcommit",
-      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded. Snapshot uses code_checkout; explicit 504 Done prerequisite recorded after steward approval. 2026-11-06: floor/runtime approved by user (via steward); 504 Done. Remaining prerequisite: a273667c Done."
+      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded. Snapshot uses code_checkout; explicit 504 Done prerequisite recorded after steward approval. 2026-11-06: floor/runtime approved by user (via steward); 504 Done. Remaining prerequisite: a273667c Done. 2026-11-06 steward 9b: footprint extended to a fifth file, crates/jit/src/storage/repository_state_store_tests.rs, limited to the two pinned-capture process assertions (~1750, ~1915): identify the resolution child as the shared cat-file --batch-check -Z Types session with one shared predicate form, counts unchanged; missed file per plan lines 68/99, not new scope."
     },
     {
       "issue": "5046408a",
@@ -871,6 +873,27 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "reason": "Merge main into reviewed floor proposal; resolve read_path_bytes against 504 split-root."
+    },
+    {
+      "issue": "c140921c",
+      "vendor": "openai",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "reason": "Shared git-module revision producer (contract change) per approved four-file plan; base 6ff69d202."
+    },
+    {
+      "issue": "1acfa592",
+      "vendor": "openai",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "reason": "Bounded doc-show migration with exact criteria; disjoint from c140; base b22cbb54c."
+    },
+    {
+      "issue": "cd603c8e",
+      "vendor": "openai",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "reason": "One-file docs correction with exact criteria; out of wave order per steward."
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
@@ -1618,5 +1641,18 @@
       "5046408a": "2026-11-05T10:31:15.107216481Z"
     },
     "next_after_explicit_resume": "Verify current main/worktrees/leases, start approved783 actor correction; resolve504boundaryR1 proposal finding and independentR2 before13-file edits, after actorland+Done and504refresh."
-  }
+  },
+  "standing_rules": [
+    {
+      "granted": "2026-11-06",
+      "by": "steward just-in-time-9b",
+      "rule": "A DAG-ready issue with a footprint disjoint from in-flight work, whose statements no earlier-wave issue can invalidate, may go out of wave order without asking; record each use here.",
+      "uses": [
+        {
+          "issue": "cd603c8e",
+          "note": "explicitly approved (option 1) before the rule; docs/reference/cli-commands.md only; lands after c140921c"
+        }
+      ]
+    }
+  ]
 }

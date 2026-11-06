@@ -88,7 +88,7 @@
           "title": "Storage reads configuration files and the registry file loaders are gone",
           "classification": "implementation",
           "worker": "tbd",
-          "status": "dispatched (codex gpt-6.1-sol high) after 5046408a landed a652f3dff",
+          "status": "done",
           "note": "held: rewrites JitConfig::load/config validate, which the frozen f4d9502a 5046408a patch also rewrites"
         },
         {
@@ -148,7 +148,7 @@
         },
         {
           "short_id": "1b7f58ae",
-          "status": "dispatched (claude opus)"
+          "status": "done"
         }
       ]
     }
@@ -219,5 +219,18 @@
   ],
   "notes": [
     "Wave 1 leaves 12064c7b, 4334df62, 9a2563fd, c2b3cefa, f6477007, 4d834432 done; worktrees reclaimed. 1a737bb4 (W1b) and wave 2 (d2acb105, 7fefd776, 905364c1) in flight; dispatched together because all are dependency-ready and their shared files are in disjoint functions."
+  ],
+  "story_checkpoints": [
+    {
+      "story": "a991f42b",
+      "result": "done",
+      "evidence": "children 1b7f58ae, 4334df62, f7a59f5f done (+4d834432, 7fefd776, d58f80c9, 01a88d32 for REQ-02..04); main sweep: only publish_file stages and renames in production storage/serve code; one read leaf-open sequence"
+    }
+  ],
+  "decisions": [
+    {
+      "issue": "693a2fdd",
+      "decision": "A Done request diverted to Gated stays reported in errors only (today's behaviour): REQ-03's parenthetical '(modified and failed), as today' contradicts today's code, and REQ-01 requires test_apply_bulk_update_best_effort (errors-only) to pass unchanged."
+    }
   ]
 }

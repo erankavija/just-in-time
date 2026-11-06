@@ -259,13 +259,6 @@ impl WorktreePaths {
         Self::leases_dir(shared_jit).join(format!("{issue_id}.json"))
     }
 
-    /// The stage file a change to the issue's lease record is written to before
-    /// its rename. Its `.tmp` suffix puts an interrupted operation's residue
-    /// under `jit recover`'s temp-file cleanup.
-    pub fn lease_stage_path(shared_jit: &Path, issue_id: &IssueId) -> PathBuf {
-        Self::leases_dir(shared_jit).join(format!("{issue_id}.json.tmp"))
-    }
-
     /// The issue a [`Self::lease_path`] file name names, or `None` for any
     /// other name in the lease directory.
     pub fn lease_record_issue(file_name: &OsStr) -> Option<IssueId> {
@@ -383,6 +376,18 @@ impl WorktreePaths {
         self.relocated_worktree_checkout
             .as_ref()
             .map(|checkout| checkout.git_dir.as_path())
+    }
+
+    /// The `jit` directory under [`Self::checkout_git_dir`], holding that
+    /// checkout's identity.
+    pub(crate) fn checkout_control_dir(&self) -> Option<PathBuf> {
+        self.checkout_git_dir().map(|git_dir| git_dir.join("jit"))
+    }
+
+    /// The git directories' `jit` control directories: the shared control
+    /// plane, then [`Self::checkout_control_dir`] when there is one.
+    pub(crate) fn git_control_dirs(&self) -> impl Iterator<Item = PathBuf> {
+        std::iter::once(self.shared_jit.clone()).chain(self.checkout_control_dir())
     }
 
     /// Check if we're in a secondary worktree (not main worktree).

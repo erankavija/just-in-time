@@ -1,7 +1,7 @@
 //! Integration tests for the read-only `jit doc` commands
 //!
 //! Tests for:
-//! - doc show without git (filesystem fallback)
+//! - doc show without git
 //! - doc show with git
 //! - doc show with --at commit
 //! - doc dir, the canonical artifact directory resolver
@@ -42,19 +42,30 @@ fn test_doc_show_without_git() {
     ])
     .unwrap();
 
+    let document = cli
+        .run_json(["doc", "show", short_id, "design.md"])
+        .unwrap();
+    assert!(document["content"]
+        .as_str()
+        .unwrap()
+        .contains("# Design Document"));
+    assert_eq!(document["commit"], "working-tree");
+
+    cli.run([
+        "doc",
+        "add",
+        short_id,
+        "design.md",
+        "--commit",
+        "HEAD",
+        "--skip-scan",
+    ])
+    .unwrap();
     let output = cli
         .command(["doc", "show", short_id, "design.md"])
         .output()
         .unwrap();
-
-    assert!(
-        output.status.success(),
-        "doc show should work without git: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("# Design Document"));
-    assert!(stdout.contains("This is a test document"));
+    assert!(!output.status.success(), "a pinned read requires git");
 }
 
 #[test]

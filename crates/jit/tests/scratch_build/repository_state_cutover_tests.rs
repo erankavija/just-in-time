@@ -477,7 +477,7 @@ type WriteClass = (&'static str, &'static [&'static str], &'static str);
 /// Writes whose target lies outside repository state, each class recognised by
 /// the shape that fixes its target: any one of its markers in the writing
 /// function's code.
-const NON_REPOSITORY_WRITES: [WriteClass; 8] = [
+const NON_REPOSITORY_WRITES: [WriteClass; 9] = [
     (
         "advisory lock",
         &[
@@ -528,12 +528,19 @@ const NON_REPOSITORY_WRITES: [WriteClass; 8] = [
         "a build script runs at compile time against the source checkout, before any \
          repository exists",
     ),
+    (
+        "data-root control file",
+        &["ControlFile"],
+        "the closed set of machine-local data-root files the storage format names, each \
+         published directly beside repository state and creating no directory",
+    ),
 ];
 
 /// The [`NON_REPOSITORY_WRITES`] classes whose targets lie outside every
 /// repository root, so a directory they create is never the data root. Lock,
-/// identity, debris, and server-state targets live inside the data root, where
-/// creating a parent directory can create the root itself.
+/// identity, debris, server-state, and data-root control-file targets live
+/// inside the data root, where creating a parent directory can create the root
+/// itself.
 const OUTSIDE_ROOT_WRITES: [&str; 4] = [
     "claims control plane",
     "git directory",

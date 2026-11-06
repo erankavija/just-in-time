@@ -408,10 +408,12 @@ impl<S: IssueStore> ConfigOps<'_, S> {
     /// The effective-configuration snapshot behind both `jit config get` and
     /// `jit config show`.
     ///
-    /// Reading `.jit/config.toml` lives behind `EffectiveConfig::load` in
-    /// [`crate::config`].
+    /// Declaration reads are owned by [`crate::storage::configuration_store`].
     pub fn effective_config_snapshot(&self) -> Result<serde_json::Value> {
-        EffectiveConfig::load(self.exec.repository_layout()?)?.full_snapshot()
+        let config = crate::storage::configuration_store::load_configuration(
+            self.exec.repository_layout()?,
+        )?;
+        EffectiveConfig::new(config).full_snapshot()
     }
 
     /// Diagnose all admitted repository declarations; storage and input failures remain errors.
@@ -433,10 +435,9 @@ impl<S: IssueStore> ConfigOps<'_, S> {
     /// configuration surface (REQ-01 of jit:043ae624), returning the value the
     /// CLI needs to print.
     ///
-    /// Loads the same repository [`EffectiveConfig`] `jit
-    /// config show` uses via [`EffectiveConfig::load`] (which owns the
-    /// filesystem read; this command touches no `std::fs` itself), snapshots it once via [`EffectiveConfig::full_snapshot`], then
-    /// walks `key` with [`resolve_dotted_key`]. An unknown key (top-level or
+    /// Loads the same snapshot as `jit config show` through
+    /// [`Self::effective_config_snapshot`], then walks `key` with
+    /// [`resolve_dotted_key`]. An unknown key (top-level or
     /// nested) surfaces as the shared [`InvalidArgumentError`] (exit 2) —
     /// naming the valid top-level sections for an unknown top-level key —
     /// rather than a bare `anyhow!` string, so `--json` callers get a

@@ -2803,9 +2803,7 @@ jit doc show <ID> <PATH> [--at <COMMIT>]
 
 `--at <COMMIT>` reads the document as it stood at that commit. Without it, a
 pinned reference reads at its pinned commit, and any other document reads from
-the committed tree at `HEAD` when a Git repository exists, or from the working
-tree otherwise. An uncommitted derived file is therefore listed by
-[`jit doc list`](#jit-doc-list) but cannot be shown until it is committed.
+the working tree, including uncommitted edits and derived files.
 
 ### `jit doc history`
 

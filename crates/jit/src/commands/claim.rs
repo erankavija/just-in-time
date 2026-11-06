@@ -3,7 +3,6 @@
 //! Provides CLI interface to the lease-based claim coordination system.
 
 use super::CommandExecutor;
-use crate::config::JitConfig;
 use crate::domain::identity::{IssueId, IssueIdPrefix, LeaseId};
 use crate::errors::{GitRequirementGap, RequiresGitError};
 use crate::storage::claim_coordinator::{read_leases, LeaseChange};
@@ -89,7 +88,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
         let agent = resolve_agent_id(agent_id.map(|s| s.to_string()))?;
 
         // Load config for policy limits
-        let coord_config = JitConfig::load(&storage.repository_layout()?)?.coordination();
+        let coord_config =
+            crate::storage::configuration_store::load_configuration(&storage.repository_layout()?)?
+                .coordination();
 
         // Create file locker with the default lock-acquisition timeout
         let locker = FileLocker::with_configured_timeout();
@@ -628,12 +629,11 @@ fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> R
     report.expired_leases_evicted = lapsed.expired;
     report.stale_leases_reclaimed = lapsed.reclaimed;
 
-    // 3. Remove interrupted lease operations' stage files; lease records are
-    // not `*.tmp` files.
-    sweep_temp_files(
-        &crate::storage::WorktreePaths::leases_dir(&paths.shared_jit),
-        report,
-    );
+    // 3. Remove interrupted control-file publications' stage files; lease
+    // records, `claims.seq` and identities are not `*.tmp` files.
+    paths
+        .git_control_dirs()
+        .for_each(|dir| sweep_temp_files(&dir, report));
 
     Ok(())
 }
@@ -2114,9 +2114,8 @@ mod tests {
             },
         )?;
         let record = WorktreePaths::lease_path(&shared_jit, &leased);
-        let stale_stage = WorktreePaths::lease_stage_path(&shared_jit, &leased);
-        let fresh_stage =
-            WorktreePaths::lease_stage_path(&shared_jit, &crate::test_utils::issue_id(2));
+        let stale_stage = WorktreePaths::leases_dir(&shared_jit).join(".jit-stage.stale.tmp");
+        let fresh_stage = WorktreePaths::leases_dir(&shared_jit).join(".jit-stage.fresh.tmp");
         fs::write(&stale_stage, "interrupted")?;
         fs::write(&fresh_stage, "in flight")?;
         let past_threshold = std::time::SystemTime::now()

@@ -671,61 +671,16 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         path: &str,
         at_commit: Option<&str>,
     ) -> Result<DocumentContentResult> {
-        use git2::Repository;
-
         let full_id = issue_id.clone();
         let issue = self.exec.storage.load_issue(&full_id)?;
         let doc = self.require_issue_document(issue, path)?;
-
-        // Determine which commit to view
-        let reference = if let Some(at) = at_commit {
-            at
-        } else if let Some(ref commit) = doc.commit {
-            commit.as_str()
-        } else {
-            "HEAD"
-        };
-
-        // Read content: try git first, fall back to filesystem if git unavailable
-        let content = if at_commit.is_some() || doc.commit.is_some() {
-            // Explicit version requested - require git
-            let repo = Repository::open(
-                self.exec
-                    .require_worktree_paths()?
-                    .code_checkout_top_level()
-                    .unwrap_or(self.exec.require_layout()?.worktree_root()),
-            )
-            .context("Git repository required when viewing specific commit version")?;
-            self.read_file_from_git(&repo, &doc.path, reference)
-                .with_context(|| format!("Failed to read {} from git at {}", doc.path, reference))?
-        } else {
-            // No specific version - try git, fall back to filesystem
-            match Repository::open(
-                self.exec
-                    .require_worktree_paths()?
-                    .code_checkout_top_level()
-                    .unwrap_or(self.exec.require_layout()?.worktree_root()),
-            ) {
-                Ok(repo) => {
-                    // Git available - read from git
-                    self.read_file_from_git(&repo, &doc.path, "HEAD")
-                        .with_context(|| format!("Failed to read {} from git", doc.path))?
-                }
-                Err(_) => {
-                    // Git not available - read from filesystem via storage layer
-                    self.exec
-                        .storage
-                        .read_path_text(&doc.path, None)
-                        .map(|(text, _)| text)
-                        .with_context(|| format!("Failed to read {} from filesystem", doc.path))?
-                }
-            }
-        };
+        let reference = at_commit.or(doc.commit.as_deref());
+        let (content, commit) = self.exec.storage.read_path_text(&doc.path, reference)?;
 
         Ok(DocumentContentResult {
             path: doc.path.clone(),
             label: doc.label.clone(),
-            commit: reference.to_string(),
+            commit: reference.unwrap_or(&commit).to_string(),
             doc_type: doc.doc_type.clone(),
             content,
         })
