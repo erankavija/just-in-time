@@ -13,7 +13,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "d025ceb0-0454-4872-a8d2-fdec9e4879f5",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:49:01.966058219Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "78cb05ed-83b0-4bbb-ae56-69176457a7f0",
   "labels": [
     "type:task",
@@ -28,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Build-policy check rejects native git and OpenSSL linkage",
-  "updated_at": "2026-11-06T05:20:40.826449898Z"
+  "updated_at": "2026-11-06T05:49:01.966058219Z"
 }
