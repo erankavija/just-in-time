@@ -540,7 +540,7 @@
       "issue": "c140921c",
       "status": "implementing_footprint_extended_to_5",
       "subject": "Preserve originalrevisionexpression beforepeeling canonicalcommit",
-      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded. Snapshot uses code_checkout; explicit 504 Done prerequisite recorded after steward approval. 2026-11-06: floor/runtime approved by user (via steward); 504 Done. Remaining prerequisite: a273667c Done. 2026-11-06 steward 9b: footprint extended to a fifth file, crates/jit/src/storage/repository_state_store_tests.rs, limited to the two pinned-capture process assertions (~1750, ~1915): identify the resolution child as the shared cat-file --batch-check -Z Types session with one shared predicate form, counts unchanged; missed file per plan lines 68/99, not new scope."
+      "ruling": "Approved optionA four-file shared resolver correction; durable dev/active/c140921c/revision-producer-plan.md. Implementation waits for explicit floor/runtime approval and a273 landed+Done. d9 and933 actual producer prerequisites recorded. Snapshot uses code_checkout; explicit 504 Done prerequisite recorded after steward approval. 2026-11-06: floor/runtime approved by user (via steward); 504 Done. Remaining prerequisite: a273667c Done. 2026-11-06 steward 9b: footprint extended to a fifth file, crates/jit/src/storage/repository_state_store_tests.rs, limited to the two pinned-capture process assertions (~1750, ~1915): identify the resolution child as the shared cat-file --batch-check -Z Types session with one shared predicate form, counts unchanged; missed file per plan lines 68/99, not new scope. 2026-11-06 steward 9b: sixth (final for this class) file crates/jit/tests/cli_query_graph/check_links_tests.rs, assertion at line 741 only: exactly 2 cat-file --batch-check -Z children (resolution session + presence batch; per-asset regression gives 4), shared predicate form. Any further argv-shape failure: sweep all and send one list."
     },
     {
       "issue": "5046408a",
@@ -1653,6 +1653,13 @@
           "note": "explicitly approved (option 1) before the rule; docs/reference/cli-commands.md only; lands after c140921c"
         }
       ]
+    }
+  ],
+  "follow_up_candidates": [
+    {
+      "from": "c140921c",
+      "candidate": "doc check-links could reuse one cat-file Types session for commit resolution and HEAD asset presence in commands/document.rs, saving one process.",
+      "status": "noted; not filed unless a D-19/D-20 reason appears (steward 9b)"
     }
   ]
 }
