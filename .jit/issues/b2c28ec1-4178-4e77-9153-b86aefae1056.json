@@ -14,7 +14,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "75285114-5c19-4cce-bfeb-c170ac09f2f0",
+      "status": "passed",
+      "updated_at": "2026-11-06T05:28:55.578730170Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e3ff064f-dd20-4877-aea5-f7034b157762",
+      "status": "failed",
+      "updated_at": "2026-11-06T05:34:57.835884973Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b2c28ec1-4178-4e77-9153-b86aefae1056",
   "labels": [
     "type:task",
@@ -29,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Relative path inputs validate through RootRelativePath::parse",
-  "updated_at": "2026-11-06T04:40:37.253606382Z"
+  "updated_at": "2026-11-06T05:34:57.835884973Z"
 }

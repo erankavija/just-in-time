@@ -203,6 +203,13 @@
       "issue": "693a2fdd",
       "detail": "code-review 3fe7575a F1: REQ-03 '(modified and failed)' vs REQ-01 'remaining tests pass unchanged' (test_apply_bulk_update_best_effort asserts errors-only). Recommended: comply with REQ-03, update the one test.",
       "status": "open"
+    },
+    {
+      "to": "steward just-in-time-9b",
+      "category": "criterion premise removed upstream",
+      "issue": "b2c28ec1",
+      "detail": "code-review e3ff064f F1: REQ-06 graph.rs rustdoc clause; the cited audit list was deleted by deb6d3beb (6ac41880). Recommended: rule vacuously satisfied and record on issue.",
+      "status": "open"
     }
   ],
   "rework_counts": {
