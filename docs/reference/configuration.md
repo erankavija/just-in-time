@@ -514,8 +514,8 @@ issue that requires the gate.
 Some writes reach a leased issue without the check: `jit issue release`
 (timeout recovery with a required reason; its event names who released),
 `jit issue claim` on an unleased issue, promotions of dependents, the rewrite of
-dependents when a dependency is deleted, the derived repair and transitive
-reduction of `jit validate --fix` (its type fix does refuse), `jit archive
+dependents when a dependency is deleted, the type repairs, derived-state repair,
+and transitive reduction performed by `jit validate --fix`, `jit archive
 --execute` on a terminal target, and `jit recover`, which replays what already
 committed.
 
