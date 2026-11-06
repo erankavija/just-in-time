@@ -58,7 +58,11 @@ fn test_issue_lifecycle_works_without_coordinator() {
     // Release issue
     h.executor
         .issues()
-        .release_issue(&IssueIdPrefix::from(&id), "Test release")
+        .release_issue_as(
+            &IssueIdPrefix::from(&id),
+            "Test release",
+            "human:reviewer".parse().unwrap(),
+        )
         .unwrap();
 
     // After release, assignee is cleared (state stays in-progress though)

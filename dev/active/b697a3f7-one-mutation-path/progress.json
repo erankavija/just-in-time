@@ -14,7 +14,8 @@
           "title": "Type labels have one exact extraction",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "landing"
+          "status": "done",
+          "landed": "ee9e410db"
         },
         {
           "id": "f6477007-09ab-4d53-8fec-ca4741c3cf78",
@@ -30,7 +31,7 @@
           "title": "Gate registry edits keep the authored file",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "pending"
+          "status": "rework-1"
         },
         {
           "id": "4334df62-95ca-4d3a-9a56-842b2174a5b5",
@@ -38,7 +39,7 @@
           "title": "The no-follow leaf open exists once and serves storage, profile and exact-store reads",
           "classification": "implementation",
           "worker": "codex gpt-6.1-sol high",
-          "status": "pending"
+          "status": "rework-1"
         },
         {
           "id": "c2b3cefa-d690-4c6c-94dd-feaa3156acea",
@@ -46,7 +47,9 @@
           "title": "Dedicated, gate and template writes check their leases in their publishing session",
           "classification": "implementation",
           "worker": "claude opus (lock order and lease contract)",
-          "status": "pending"
+          "status": "rework-1 (code-review F1 fab37724)",
+          "commit": "df59347fb",
+          "landed": "6672a5e01"
         }
       ]
     },
@@ -132,9 +135,19 @@
     }
   ],
   "rework_counts": {
-    "f6477007": 1
+    "f6477007": 1,
+    "4334df62": 1,
+    "9a2563fd": 1,
+    "c2b3cefa": 1
   },
-  "surfaced_pitfalls": [],
+  "surfaced_pitfalls": [
+    {
+      "found_in": "c2b3cefa review",
+      "subject": "pre-session lease checks with no owning issue",
+      "detail": "After c2b3cefa and planned d3c94dc5, the read form refuse_foreign_lease is still called before the publishing session by dispatch/gate.rs evaluate_many (batch pre-check), commands/document.rs:228 and :546 (document writes) and commands/validate.rs:234. Epic REQ-04 says no pre-session lease check remains, so this is a criterion gap to close with a remediation task inside the epic before the epic gate, not a follow-up.",
+      "status": "open"
+    }
+  ],
   "started_at": "2026-11-06T01:20:00+02:00",
   "coordination": [
     {

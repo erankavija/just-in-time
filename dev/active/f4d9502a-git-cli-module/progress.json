@@ -542,16 +542,17 @@
     },
     {
       "issue": "5046408a",
-      "status": "boundary_design_R2_pass_awaiting_783_landing",
+      "status": "boundary_implementation_dispatched",
       "subject": "Eager full configuration assembly blocks existing diagnostics and repair",
-      "evidence": "Cycle3 original config report/repair regressions pass; complete CLI1222pass/3fail and contracts548pass/2fail. Full registry sweep adds hidden item search/recover mismatches. Source frozen at376978ed0 + ten-file difff0c5fd8a; no new full gate. 2026-11-06: amended selected-A (DataRootHandle retained across lock chain) passed independent Astra/high R2 within 13 files; dev/active/5046408a/boundary-proposal.md, boundary-design-review-r1.md, -r2.md.",
+      "evidence": "Cycle3 original config report/repair regressions pass; complete CLI1222pass/3fail and contracts548pass/2fail. Full registry sweep adds hidden item search/recover mismatches. Source frozen at376978ed0 + ten-file difff0c5fd8a; no new full gate. 2026-11-06: amended selected-A (DataRootHandle retained across lock chain) passed independent Astra/high R2 within 13 files; dev/active/5046408a/boundary-proposal.md, boundary-design-review-r1.md, -r2.md. 2026-11-06: frozen patch committed e16a759e6 (diff f0c5fd8a preserved), main merged at 6c6bdd57e (only tracker JSON conflicted; resolved to main). 13-file boundary implementation dispatched.",
       "ruling": "Steward chooses A: shared typed item/recover adapters and data-only worktree exec with its own under-lock pending refusal; Io source fix approved. Exact13files subject to fresh independent bounded design review before edits. No contract cutover B or retry reset. Release actor concern excluded from504: reproduce unchanged main under same sanitized inputs, audit injection; if reproduced propose separate bounded same-epic task outside53manifest/noREQcredit for approval before creation/dispatch."
     },
     {
       "issue": "783b33fa",
-      "status": "dispatched_2026-11-06",
+      "status": "done_2026-11-06",
       "subject": "Explicit actor input for issue release; isolated correction outside original manifest",
-      "ruling": "Steward approves four hard criteria/fourfiles, Sol/high and temporary fourth tree. Native504 prerequisite; actorlands+Done before504refresh. Fifthowner requires evidence/approval; no newCLIflag/ambient actor/parallel producer."
+      "ruling": "Steward approves four hard criteria/fourfiles, Sol/high and temporary fourth tree. Native504 prerequisite; actorlands+Done before504refresh. Fifthowner requires evidence/approval; no newCLIflag/ambient actor/parallel producer.",
+      "evidence": "Landed daaca4bc5 (source 08f374b0e); worktree cargo-ci + code-review (0 findings) pass; lead sanitized contracts 552/552 without JIT_* identity; forced merged cargo-ci pass on 6672a5e01."
     }
   ],
   "rework_counts": {
@@ -848,6 +849,14 @@
       "effort": "high",
       "classification": "independent design review R2",
       "reason": "Fresh bounded review of amended selected-A; PASS."
+    },
+    {
+      "issue": "5046408a",
+      "vendor": "openai",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "reason": "Cycle 3 continued: implement R2-accepted selected-A boundary within 13 files; same steward-recorded tier.",
+      "base": "6c6bdd57e"
     }
   ],
   "dispatch_policy": "Select available Codex models and effort by difficulty: Luna mechanical work, Sol/Terra bounded engineering, Astra difficult architecture/concurrency. Record reason for each dispatch. Isolated worktrees; lead owns state, review and coordinated landing.",
