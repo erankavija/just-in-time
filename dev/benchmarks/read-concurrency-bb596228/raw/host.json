@@ -1,0 +1,65 @@
+{
+  "logical_cpus": 24,
+  "cpu_model": "AMD Ryzen 9 5900X 12-Core Processor",
+  "kernel": "Linux 7.2.14-arch1-1",
+  "measurement_fs": "ext4",
+  "window_s": 15,
+  "rounds": 5,
+  "reader_counts": [
+    0,
+    1,
+    8
+  ],
+  "load_wait": {
+    "threshold": 2.0,
+    "timeout_s": 10800,
+    "waited_s": 90,
+    "loadavg_at_start": [
+      "1.97",
+      "4.14",
+      "5.26"
+    ]
+  },
+  "binaries": {
+    "base": {
+      "commit": "369d35a42f0ecc5067d930415c44908defdc0e36",
+      "sha256": "b5ba9298e54fda902b68858b8e7a930e6b29669df5e2fb11bb5f4420d126da4a",
+      "version": "jit 1.0.0 (profile release)"
+    },
+    "tip": {
+      "commit": "8070b5bb416484b75417e4b8fd960aa6f5cfc629",
+      "sha256": "36764622df86307fff42d85fa13b965417992b0454ad5444dca904d3908c14f7",
+      "version": "jit 1.0.0 (profile release)"
+    }
+  },
+  "fixture": {
+    "generator": "scripts/benchmark-session-cost.sh (SESSION_BENCH_FIXTURE_DIR)",
+    "issue_count": 665,
+    "document": "docs/read-bench.md, unpinned, on the target issue",
+    "targets": {
+      "base": "f681e412-9912-4c7d-b6a9-cfd53598b630",
+      "tip": "f5d69a10-d4d2-4172-b303-685886f3f160"
+    }
+  },
+  "writer_argv": [
+    "jit",
+    "issue",
+    "update",
+    "<id>",
+    "--priority",
+    "high|normal"
+  ],
+  "reader_argv": [
+    "jit",
+    "doc",
+    "check-links",
+    "--scope",
+    "issue:<id>",
+    "--json"
+  ],
+  "loadavg_at_end": [
+    "8.42",
+    "7.92",
+    "6.75"
+  ]
+}
