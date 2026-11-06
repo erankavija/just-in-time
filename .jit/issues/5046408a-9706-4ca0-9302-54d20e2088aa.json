@@ -134,6 +134,12 @@
       "status": "passed",
       "updated_at": "2026-11-06T01:51:22.743779201Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6fb86f91-03e4-49dc-9c1a-ad3a0eaeaa59",
+      "status": "passed",
+      "updated_at": "2026-11-06T02:05:08.695100587Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "5046408a-9706-4ca0-9302-54d20e2088aa",
@@ -148,5 +154,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Configurable worktree root independent of the data root",
-  "updated_at": "2026-11-06T01:51:22.743779201Z"
+  "updated_at": "2026-11-06T02:05:08.695100587Z"
 }
