@@ -23,7 +23,7 @@
           "title": "Process liveness and signalling go through one PID guard",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "rework-3 (steward-authorized final)",
+          "status": "done",
           "landed": "7c6855d8a"
         },
         {

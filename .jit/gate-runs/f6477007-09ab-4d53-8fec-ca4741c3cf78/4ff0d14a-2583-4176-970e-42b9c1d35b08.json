@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "45bafb40ebf6e81f0dcfdf780393fabb22d9310f",
+  "completed_at": "2026-11-06T01:06:29.885942504Z",
+  "duration_ms": 205069,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable process-liveness and PID-guard criteria are satisfied; cargo-ci passed with coverage of all tagged commits.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f6477007-09ab-4d53-8fec-ca4741c3cf78",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4ff0d14a-2583-4176-970e-42b9c1d35b08",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T01:03:04.816638684Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `cb4a03bd`, `f7878ea2`, `731a92a6`, `1cf48574` (`jit:f6477007`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-20` (charter), `@/issue/b697a3f7/requirement/REQ-20` (issue), `@/invariant/pid-safety`, `@/invariant/convention-convergence`, `@/invariant/orthogonal-tests`, `@/invariant/essential-code-prose`, `@/gate/cargo-ci`\nGate evidence: `cargo-ci` passed (exit 0); its recorded ancestry contains all attributable commits\nTruncation recovery: re-read tagged patches by commit and affected path after truncated combined output\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable process-liveness and PID-guard criteria are satisfied; cargo-ci passed with coverage of all tagged commits.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
