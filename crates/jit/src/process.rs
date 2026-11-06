@@ -3,13 +3,13 @@
 //! live processes from being treated as stale.
 
 /// Converts a PID only when it is positive and representable by `kill(2)`'s `i32` interface.
-pub(crate) fn checked_pid(pid: u32) -> Option<i32> {
+pub fn checked_pid(pid: u32) -> Option<i32> {
     i32::try_from(pid).ok().filter(|pid| *pid > 0)
 }
 
 /// Converts a safe PID to the negative process-group ID used by `kill(2)`; PID 1 is refused
 /// because negating it would target every process owned by the caller.
-pub(crate) fn process_group_target(pid: u32) -> Option<i32> {
+pub fn process_group_target(pid: u32) -> Option<i32> {
     checked_pid(pid).filter(|pid| *pid > 1).map(|pid| -pid)
 }
 
