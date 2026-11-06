@@ -3194,11 +3194,14 @@ fn bind_configuration(backend: &FileSessionBackend) {
         .storage
         .configure_repository_layout(&backend.layout)
         .unwrap();
-    backend.storage.bind_selection(
-        ConfigurationObservation::capture(backend.layout.data_root()).unwrap(),
-        false,
-        false,
-    );
+    backend
+        .storage
+        .bind_selection(
+            ConfigurationObservation::capture(backend.layout.data_root()).unwrap(),
+            false,
+            false,
+        )
+        .unwrap();
 }
 
 fn commit_configuration(backend: &FileSessionBackend, bytes: &[u8]) {
@@ -3308,12 +3311,49 @@ fn test_configuration_read_with_held_writer_and_pending_record_conflicts_without
 }
 
 #[test]
+fn test_initialized_configuration_discards_index_and_declarations_crossed_by_one_commit() {
+    let backend = FileSessionBackend::seeded();
+    let data = backend.layout.data_root();
+    std::fs::write(data.join("index.json"), b"invalid captured index").unwrap();
+    let result = ConfigurationObservation::attempt(data, true, || {
+        let index = crate::repository_state::RepositoryIndex::default()
+            .to_pretty_bytes()
+            .unwrap();
+        let offset = std::fs::metadata(data.join("events.jsonl")).unwrap().len();
+        backend.commit(
+            &RedoRecord::new(
+                Vec::new(),
+                vec![
+                    put_file(VirtualPath::INDEX, &index),
+                    put_file(VirtualPath::CONFIG, b"[worktree]\nroot = '../new-code'\n"),
+                ],
+                Vec::new(),
+                event_append(offset),
+            )
+            .unwrap(),
+        );
+        backend.storage.recover_pending_records().unwrap();
+    })
+    .unwrap();
+    assert!(
+        result.is_none(),
+        "a crossed capture cannot return its stale index error or new declarations"
+    );
+    let observation = ConfigurationObservation::capture_initialized(data).unwrap();
+    assert_eq!(
+        observation.worktree(true, false).unwrap().root,
+        Some(PathBuf::from("../new-code"))
+    );
+    assert_eq!(observation.admit().unwrap(), ReadAdmission::Granted);
+}
+
+#[test]
 fn test_configuration_observation_admits_absent_ancestry_until_publication_or_replacement() {
     let outer = TempDir::new().unwrap();
     let ancestor = outer.path().join("new");
     let data = ancestor.join("nested/data");
     let observation = ConfigurationObservation::capture(&data).unwrap();
-    assert!(observation.config.worktree.is_none());
+    assert!(observation.assemble().unwrap().worktree.is_none());
     assert_eq!(observation.admit().unwrap(), ReadAdmission::Granted);
     assert!(std::fs::read_dir(outer.path()).unwrap().next().is_none());
 
@@ -3330,7 +3370,7 @@ fn test_configuration_observation_admits_absent_ancestry_until_publication_or_re
     assert_eq!(observation.admit().unwrap(), ReadAdmission::Moved);
     let published = ConfigurationObservation::capture(&data).unwrap();
     assert_eq!(
-        published.config.worktree.unwrap().root,
+        published.worktree(true, false).unwrap().root,
         Some(PathBuf::from("../code"))
     );
 }
@@ -3351,7 +3391,7 @@ fn test_data_read_rejects_ancestor_published_during_absence_discovery() {
     ));
     let selected = ConfigurationObservation::capture(&data).unwrap();
     assert_eq!(
-        selected.config.worktree.unwrap().root,
+        selected.worktree(true, false).unwrap().root,
         Some(PathBuf::from("../code"))
     );
 }

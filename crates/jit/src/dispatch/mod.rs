@@ -15,7 +15,7 @@
 //! emitter renders (human) or lists (`--json`). Handlers resolve issue-id arguments with
 //! [`resolve_issue`].
 
-use crate::cli::{Cli, Commands, IssueCommands, ProfileCommands};
+use crate::cli::{Cli, Commands, ConfigCommands, IssueCommands, ProfileCommands};
 use crate::commands::{open_repository, CommandExecutor, OpenedRepository, RepositoryInvocation};
 use crate::config_manager::ConfigManager;
 use crate::domain::identity::{IssueId, IssueIdPrefix};
@@ -119,19 +119,25 @@ fn count_message(count: usize, prefix: &str, suffix: &str) -> String {
     format!("{prefix}{count}{suffix}")
 }
 
+/// Repository authority or the result of a diagnostic that needs only data.
+pub enum BootstrapResult {
+    Repository(Box<OpenedRepository>),
+    ConfigValidation(crate::commands::ConfigValidationReport),
+}
+
 /// Open the repository `cli`'s command runs over; `--schema`, a missing
 /// command, `version` and `init` run without one.
 ///
 /// # Errors
 ///
 /// An unusable linked-checkout write token, or [`open_repository`]'s failure.
-pub fn bootstrap(cli: &Cli) -> anyhow::Result<Option<OpenedRepository>> {
+pub fn bootstrap(cli: &Cli) -> anyhow::Result<Option<BootstrapResult>> {
     let command = match &cli.command {
         Some(Commands::Version | Commands::Init(_)) | None => return Ok(None),
         Some(_) if cli.schema => return Ok(None),
         Some(command) => command,
     };
-    open_repository(RepositoryInvocation {
+    let invocation = RepositoryInvocation {
         current_dir: std::env::current_dir()?,
         data_dir_override: std::env::var("JIT_DATA_DIR").ok().map(PathBuf::from),
         worktree_root_override: std::env::var_os("JIT_WORKTREE_ROOT").map(PathBuf::from),
@@ -143,8 +149,14 @@ pub fn bootstrap(cli: &Cli) -> anyhow::Result<Option<OpenedRepository>> {
         // Read before any repository work, so an unusable token fails the
         // invocation even for a command that never writes.
         write_override: ConfigManager::invocation_write_override()?,
-    })
-    .map(Some)
+    };
+    if matches!(command, Commands::Config(ConfigCommands::Validate)) {
+        return crate::commands::ConfigValidationReport::for_invocation(&invocation)
+            .map(BootstrapResult::ConfigValidation)
+            .map(Some);
+    }
+    open_repository(invocation)
+        .map(|repository| Some(BootstrapResult::Repository(Box::new(repository))))
 }
 
 /// Run `cli`'s command over the `repository` [`bootstrap`] opened for it and
@@ -155,7 +167,7 @@ pub fn bootstrap(cli: &Cli) -> anyhow::Result<Option<OpenedRepository>> {
 /// The handler's failure, for the caller to render.
 pub fn dispatch(
     cli: Cli,
-    mut repository: Option<OpenedRepository>,
+    repository: Option<BootstrapResult>,
     mode: OutputMode,
     out: &mut dyn Write,
     err: &mut dyn Write,
@@ -170,6 +182,17 @@ pub fn dispatch(
     let command = cli
         .command
         .ok_or_else(|| anyhow!("No command provided. Use --help for usage."))?;
+    let mut repository = match repository {
+        Some(BootstrapResult::ConfigValidation(report)) => {
+            anyhow::ensure!(
+                matches!(command, Commands::Config(ConfigCommands::Validate)),
+                "config diagnostic provided for another command"
+            );
+            return config::dispatch_validation(report, mode, out, err);
+        }
+        Some(BootstrapResult::Repository(repository)) => Some(repository),
+        None => None,
+    };
     // The server child runs its own startup recovery, so holding this session
     // across the wait deadlocks the child against the parent.
     if let Some(guard) = repository

@@ -1229,16 +1229,8 @@ impl JitConfig {
             crate::storage::repository_state_store::ConfigurationObservation::capture(
                 layout.data_root(),
             )?
-            .config,
+            .assemble()?,
         )
-    }
-
-    pub(crate) fn from_declaration_bytes(bytes: &[Option<Vec<u8>>; 3]) -> Result<Self> {
-        Ok(crate::declarations::assemble_configuration(
-            bytes[0].as_deref(),
-            bytes[1].as_deref(),
-            bytes[2].as_deref(),
-        )?)
     }
 
     /// Validate every explicitly-declared `[item_kinds.X]` table, requiring all

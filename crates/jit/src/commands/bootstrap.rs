@@ -106,40 +106,23 @@ pub fn open_repository(invocation: RepositoryInvocation) -> Result<OpenedReposit
                             .context("failed to discover repository worktree layout")?,
                     ),
                 };
+                let guard_policy = invocation.opens_mutation_session && base.holds_linked_store();
+                let worktree = observation
+                    .worktree(invocation.worktree_root_override.is_none(), guard_policy)?;
                 let selection = invocation
                     .worktree_root_override
                     .as_ref()
                     .map(|path| (WorktreeRootSource::Environment, path))
                     .or_else(|| {
-                        observation
-                            .config
-                            .worktree
+                        worktree
+                            .root
                             .as_ref()
-                            .and_then(|worktree| worktree.root.as_ref())
                             .map(|path| (WorktreeRootSource::Configuration, path))
                     });
                 let (worktree_paths, layout) = match selection {
                     Some((setting, supplied)) => {
-                        let resolved = normalize_absolute_path(&data_root.join(supplied));
-                        let invalid = |reason: String| InvalidWorktreeRootError {
-                            setting,
-                            supplied: supplied.clone(),
-                            resolved: resolved.clone(),
-                            reason,
-                        };
-                        if supplied.as_os_str().is_empty() {
-                            return Err(invalid("path is empty".into()).into());
-                        }
-                        crate::storage::repository_state_store::ensure_symlink_free_ancestry(
-                            &data_root.join(supplied),
-                            false,
-                        )
-                        .map_err(|error| invalid(error.to_string()))?;
-                        crate::storage::capability_fs::open_absolute_dir_nofollow(&resolved)
-                            .map_err(|error| invalid(error.to_string()))?;
-                        let layout = discover_repository_layout(&resolved, &data_root)
-                            .map_err(|error| invalid(error.to_string()))?;
-                        (base.with_worktree_root(&resolved)?, layout)
+                        let layout = validate_worktree_root(&data_root, setting, supplied)?;
+                        (base.with_worktree_root(layout.worktree_root())?, layout)
                     }
                     None => (
                         base.clone(),
@@ -147,13 +130,7 @@ pub fn open_repository(invocation: RepositoryInvocation) -> Result<OpenedReposit
                             .context("failed to construct repository layout")?,
                     ),
                 };
-                let declared = observation
-                    .config
-                    .worktree
-                    .as_ref()
-                    .map_or(LinkedCheckoutWriteStance::DEFAULT, |worktree| {
-                        worktree.write_policy()
-                    });
+                let declared = worktree.write_policy();
                 let write_override = linked_checkout_write_decision(
                     invocation.opens_mutation_session,
                     &worktree_paths,
@@ -164,8 +141,8 @@ pub fn open_repository(invocation: RepositoryInvocation) -> Result<OpenedReposit
                 storage.bind_selection(
                     observation,
                     invocation.worktree_root_override.is_some(),
-                    worktree_paths.holds_linked_store(),
-                );
+                    guard_policy,
+                )?;
                 let retained_session = match (
                     invocation.opens_mutation_session,
                     invocation.coordinates_claims_first,
@@ -227,7 +204,7 @@ pub fn open_repository(invocation: RepositoryInvocation) -> Result<OpenedReposit
 /// `.jit/` and never crosses a `.git` boundary. Absent a match it falls back to
 /// `<current_dir>/.jit`, so validation's "repository not found" names a
 /// sensible path.
-fn select_data_root(invocation: &RepositoryInvocation) -> (PathBuf, PathBuf) {
+pub(super) fn select_data_root(invocation: &RepositoryInvocation) -> (PathBuf, PathBuf) {
     let current_dir = &invocation.current_dir;
     let discovered_root = |discovered: Option<PathBuf>| {
         discovered.map_or_else(
@@ -255,6 +232,33 @@ fn select_data_root(invocation: &RepositoryInvocation) -> (PathBuf, PathBuf) {
         }
         None => discovered_root(discover_jit_dir(current_dir)),
     }
+}
+
+/// Validate an explicitly supplied root without selecting a default or probing Git.
+pub(super) fn validate_worktree_root(
+    data_root: &Path,
+    setting: WorktreeRootSource,
+    supplied: &Path,
+) -> Result<RepositoryLayout> {
+    let resolved = normalize_absolute_path(&data_root.join(supplied));
+    let invalid = |reason: String| InvalidWorktreeRootError {
+        setting,
+        supplied: supplied.to_path_buf(),
+        resolved: resolved.clone(),
+        reason,
+    };
+    if supplied.as_os_str().is_empty() {
+        return Err(invalid("path is empty".into()).into());
+    }
+    crate::storage::repository_state_store::ensure_symlink_free_ancestry(
+        &data_root.join(supplied),
+        false,
+    )
+    .map_err(|error| invalid(error.to_string()))?;
+    crate::storage::capability_fs::open_absolute_dir_nofollow(&resolved)
+        .map_err(|error| invalid(error.to_string()))?;
+    discover_repository_layout(&resolved, data_root)
+        .map_err(|error| invalid(error.to_string()).into())
 }
 
 fn normalize_absolute_path(path: &Path) -> PathBuf {
@@ -431,6 +435,66 @@ mod tests {
             .err()
             .unwrap();
             assert!(error.downcast_ref::<InvalidWorktreeRootError>().is_some());
+        }
+    }
+
+    #[test]
+    fn test_open_repository_projects_only_required_root_fields() {
+        let (temp, _) = setup_test_repo().unwrap();
+        let code = temp.path().join("code");
+        std::fs::create_dir(&code).unwrap();
+        let config = temp.path().join(".jit/config.toml");
+        std::fs::write(&config, "[project]\nname = 'INVALID'\n[worktree]\nroot = '../code'\nenforce_leases = 'invalid'\nwrite_policy = 'invalid'\n").unwrap();
+        assert_eq!(
+            open_repository(invocation(temp.path()))
+                .unwrap()
+                .layout
+                .worktree_root(),
+            code
+        );
+        for bytes in ["broken = [", "[worktree]\nroot = 42\n"] {
+            std::fs::write(&config, bytes).unwrap();
+            let opened = open_repository(RepositoryInvocation {
+                worktree_root_override: Some(code.clone()),
+                ..invocation(temp.path())
+            })
+            .unwrap();
+            assert_eq!(opened.layout.worktree_root(), code);
+            assert!(open_repository(invocation(temp.path())).is_err());
+        }
+    }
+
+    #[test]
+    fn test_open_repository_requires_original_linked_policy_even_with_override() {
+        let (primary, _) = setup_test_repo().unwrap();
+        let git = crate::test_harness::git::GitRepository::init(primary.path());
+        git.commit("base data");
+        let outer = tempfile::tempdir().unwrap();
+        let linked = outer.path().join("linked");
+        git.git(&["worktree", "add", "-b", "linked", linked.to_str().unwrap()]);
+        let data = linked.join(".jit");
+        for bytes in ["[worktree]\nwrite_policy = 'invalid'\n", "broken = ["] {
+            std::fs::write(data.join("config.toml"), bytes).unwrap();
+            let before = std::fs::read(data.join("events.jsonl")).unwrap();
+            let error = open_repository(RepositoryInvocation {
+                worktree_root_override: Some(linked.clone()),
+                opens_mutation_session: true,
+                write_override: Some(LinkedCheckoutWriteStance::Allow),
+                ..invocation(&linked)
+            })
+            .err()
+            .unwrap();
+            assert!(
+                error
+                    .downcast_ref::<crate::declarations::ConfigurationAssemblyError>()
+                    .is_some(),
+                "{error:#}"
+            );
+            assert_eq!(std::fs::read(data.join("events.jsonl")).unwrap(), before);
+            assert_eq!(
+                std::fs::read_to_string(data.join("config.toml")).unwrap(),
+                bytes
+            );
         }
     }
 

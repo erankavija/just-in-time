@@ -405,6 +405,33 @@ pub(crate) fn parse_repository_index(bytes: &[u8]) -> Result<Index> {
     }
 }
 
+/// Validate initialized-store facts from the same capture as its consumers.
+pub(crate) fn validate_captured_index(
+    root: &Path,
+    exists: bool,
+    index: &crate::repository_state::RepositoryEntry,
+) -> Result<Index> {
+    use crate::repository_state::RepositoryEntry;
+    if !exists {
+        return Err(RepositoryNotFoundError::new(root.display().to_string()).into());
+    }
+    match index {
+        RepositoryEntry::Absent => anyhow::bail!(
+            "JIT repository at '{}' is not properly initialized (missing index.json)\n\n\
+             Initialize with: jit init",
+            root.display()
+        ),
+        RepositoryEntry::File { content, .. } => parse_repository_index(content.bytes()),
+        _ => Err(
+            crate::storage::RepositoryStateStoreError::UnsafeTarget(format!(
+                "{:?}",
+                VirtualPath::INDEX
+            ))
+            .into(),
+        ),
+    }
+}
+
 /// File-backed repository reader and mutation-session provider.
 ///
 /// This implementation stores each issue as a separate JSON file in `.jit/issues/`,
@@ -767,23 +794,7 @@ impl JsonFileStorage {
     /// Check if the storage directory exists and is initialized.
     /// Returns an error with a helpful message if not.
     pub fn validate(&self) -> Result<()> {
-        if !self.root.exists() {
-            return Err(RepositoryNotFoundError::new(self.root.display().to_string()).into());
-        }
-
-        let index_path = self.resolve_virtual_path(&VirtualPath::INDEX)?;
-        if !index_path.exists() {
-            anyhow::bail!(
-                "JIT repository at '{}' is not properly initialized (missing index.json)\n\n\
-                 Initialize with: jit init",
-                self.root.display()
-            );
-        }
-
-        // `validate()` runs for every non-init command, so this version check guards
-        // even commands that never load the index themselves (jit:def64ac4).
         self.load_index()?;
-
         Ok(())
     }
 
@@ -829,10 +840,22 @@ impl JsonFileStorage {
     }
 
     fn load_index(&self) -> Result<Index> {
-        let index_path = self.resolve_virtual_path(&VirtualPath::INDEX)?;
-        let bytes = fs::read(&index_path)
-            .with_context(|| format!("Failed to read file: {}", index_path.display()))?;
-        parse_repository_index(&bytes)
+        use crate::storage::repository_state_store::{
+            retry_optimistic_reads, DataReadSession, ReadAdmission,
+        };
+        retry_optimistic_reads("initialized store", || {
+            let session = DataReadSession::open(&self.root)?;
+            let index = session.read(
+                &VirtualPath::INDEX,
+                crate::repository_state::ReadMode::Whole,
+            );
+            if session.admit()? != ReadAdmission::Granted {
+                return Ok(None);
+            }
+            Ok(Some(index.map_err(Into::into).and_then(|index| {
+                validate_captured_index(&self.root, session.has_data_root(), &index)
+            })))
+        })
     }
 
     /// The active ids of this checkout's store layered over the primary checkout's.

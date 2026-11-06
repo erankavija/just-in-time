@@ -474,6 +474,10 @@ impl DataReadSession {
         })
     }
 
+    pub(crate) fn has_data_root(&self) -> bool {
+        self.roots.root(RepositoryRootClass::Data).is_some()
+    }
+
     pub(crate) fn read(
         &self,
         path: &VirtualPath,
@@ -539,35 +543,74 @@ pub(crate) struct ConfigurationObservation {
     evidence: RepositoryRootEvidence,
     opened: CommitObservation,
     declarations: [Option<Vec<u8>>; 3],
-    pub(crate) config: crate::config::JitConfig,
+    document: crate::declarations::ConfigurationDocument,
 }
 
 impl ConfigurationObservation {
     pub(crate) fn capture(data: &Path) -> anyhow::Result<Self> {
-        retry_optimistic_reads("configuration selection", || Self::attempt(data))
+        retry_optimistic_reads("configuration selection", || {
+            Self::attempt(data, false, || {})
+        })
     }
 
-    fn attempt(data: &Path) -> anyhow::Result<Option<anyhow::Result<Self>>> {
+    pub(crate) fn capture_initialized(data: &Path) -> anyhow::Result<Self> {
+        retry_optimistic_reads("initialized configuration", || {
+            Self::attempt(data, true, || {})
+        })
+    }
+
+    fn attempt(
+        data: &Path,
+        initialized: bool,
+        after_index: impl FnOnce(),
+    ) -> anyhow::Result<Option<anyhow::Result<Self>>> {
         let session = match DataReadSession::open(data) {
             Err(RepositoryStateStoreError::RetryableConflict { .. }) => return Ok(None),
             other => other?,
         };
+        let index = initialized.then(|| session.read(&VirtualPath::INDEX, ReadMode::Whole));
+        after_index();
         let declarations = session.declarations();
         if session.admit()? != ReadAdmission::Granted {
             return Ok(None);
         }
-        Ok(Some(declarations.map_err(Into::into).and_then(
-            |declarations| {
-                let config = crate::config::JitConfig::from_declaration_bytes(&declarations)?;
-                Ok(Self {
-                    data_root: session.data_root,
-                    evidence: session.evidence,
-                    opened: session.opened,
-                    declarations,
-                    config,
-                })
-            },
-        )))
+        Ok(Some((|| {
+            if let Some(index) = index {
+                super::json::validate_captured_index(
+                    &session.data_root,
+                    session.has_data_root(),
+                    &index?,
+                )?;
+            }
+            let declarations = declarations?;
+            let document =
+                crate::declarations::ConfigurationDocument::parse(declarations[0].as_deref());
+            Ok(Self {
+                data_root: session.data_root,
+                evidence: session.evidence,
+                opened: session.opened,
+                declarations,
+                document,
+            })
+        })()))
+    }
+
+    pub(crate) fn assemble(
+        &self,
+    ) -> Result<crate::config::JitConfig, crate::declarations::ConfigurationAssemblyError> {
+        self.document.assemble(
+            self.declarations[1].as_deref(),
+            self.declarations[2].as_deref(),
+        )
+    }
+
+    pub(crate) fn worktree(
+        &self,
+        needs_root: bool,
+        needs_policy: bool,
+    ) -> Result<crate::config::WorktreeConfig, crate::declarations::ConfigurationAssemblyError>
+    {
+        self.document.worktree(needs_root, needs_policy)
     }
 
     pub(in crate::storage) fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError> {
@@ -750,18 +793,10 @@ impl JsonFileStorage {
         observation: ConfigurationObservation,
         overridden: bool,
         guard_policy: bool,
-    ) {
-        let configured_root = observation
-            .config
-            .worktree
-            .as_ref()
-            .and_then(|worktree| worktree.root.clone());
-        let policy = guard_policy.then(|| {
-            observation.config.worktree.as_ref().map_or(
-                crate::domain::LinkedCheckoutWriteStance::DEFAULT,
-                |worktree| worktree.write_policy(),
-            )
-        });
+    ) -> anyhow::Result<()> {
+        let worktree = observation.worktree(!overridden, guard_policy)?;
+        let policy = guard_policy.then(|| worktree.write_policy());
+        let configured_root = worktree.root;
         *self
             .bootstrap_selection
             .lock()
@@ -771,6 +806,7 @@ impl JsonFileStorage {
             overridden,
             policy,
         });
+        Ok(())
     }
 
     pub(in crate::storage) fn selection_observation(
@@ -800,15 +836,11 @@ impl JsonFileStorage {
                     .unwrap_or_else(RepositoryStateStoreError::Other)
             })?,
         };
-        let root = observation
-            .config
-            .worktree
-            .as_ref()
-            .and_then(|worktree| worktree.root.as_ref());
-        let policy = observation.config.worktree.as_ref().map_or(
-            crate::domain::LinkedCheckoutWriteStance::DEFAULT,
-            |worktree| worktree.write_policy(),
-        );
+        let worktree = observation
+            .worktree(!overridden, mutation && expected_policy.is_some())
+            .map_err(|error| RepositoryStateStoreError::Other(error.into()))?;
+        let root = worktree.root.as_ref();
+        let policy = worktree.write_policy();
         if (!overridden && root != configured_root.as_ref())
             || (mutation && expected_policy.is_some_and(|expected| expected != policy))
             || observation.admit()? != ReadAdmission::Granted
