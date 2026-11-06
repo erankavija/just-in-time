@@ -323,6 +323,20 @@ impl VirtualPath {
         Self::INDEX,
     ];
 
+    /// The declaration files of the declaration set: configuration, gates,
+    /// templates, rules, and invariants.
+    pub const DECLARATION_FILES: [Self; 5] = [
+        Self::CONFIG,
+        Self::GATES,
+        Self::TEMPLATES,
+        Self::RULES,
+        Self::INVARIANTS,
+    ];
+
+    /// The declaration directories of the declaration set, each declaring
+    /// through the `*.json` files its listing names.
+    pub const DECLARATION_DIRECTORIES: [Self; 1] = [Self::GATE_PRESETS];
+
     /// Data-root paths holding history: the event log, the gate-run records, and
     /// the redo scratch directory, which can hold appended event bytes.
     pub fn history_paths() -> [String; 3] {

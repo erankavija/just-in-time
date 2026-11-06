@@ -1,8 +1,12 @@
 //! Snapshot export command implementation
 
-use crate::commands::{ArchiveOps, SnapshotExportResult};
+use crate::commands::{ArchiveOps, SessionStep, SnapshotExportResult};
 use crate::document::{AdapterRegistry, AssetScanner};
+use crate::domain::identity::IssueId;
 use crate::domain::{DocumentReference, Issue, State};
+use crate::repository_state::{
+    CaptureBudget, CaptureError, CaptureSpec, RepositoryImage, VirtualPath,
+};
 use crate::snapshot::{
     compute_sha256, AssetSnapshot, DocumentSnapshot, IssuesInfo, MetadataInfo, RepoInfo,
     SnapshotFormat, SnapshotManifest, SnapshotScope, SourceInfo, SourceMode, VerificationInfo,
@@ -18,12 +22,10 @@ type SnapshotDirectories = BTreeSet<crate::domain::relative_path::RootRelativePa
 type SnapshotFiles = BTreeMap<crate::domain::relative_path::RootRelativePath, Vec<u8>>;
 const MAX_REPOSITORY_SNAPSHOT_BYTES: u64 = 128 * 1024 * 1024;
 
-struct SnapshotExporter<'a, S: IssueStore> {
-    storage: &'a S,
+struct SnapshotExporter {
     checkout: Option<GitCheckout>,
     object_reader: RefCell<Option<GitObjectReader>>,
     worktree_root: PathBuf,
-    data_root: PathBuf,
     created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -65,43 +67,125 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
     }
 }
 
-impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
+/// The issue ids whose records `scope` reads: its one issue, or every issue
+/// the captured listing names.
+fn scope_issue_ids(image: &RepositoryImage, scope: &SnapshotScope) -> Result<Vec<IssueId>> {
+    match scope {
+        SnapshotScope::Issue(id) => Ok(vec![id.clone()]),
+        SnapshotScope::All | SnapshotScope::Label { .. } => {
+            Ok(crate::repository_state::captured_issue_ids(image)?)
+        }
+    }
+}
+
+/// The declaration files and each `*.json` file a captured declaration
+/// directory lists; a directory with any other occupant is refused.
+fn declaration_paths(image: &RepositoryImage) -> Result<Vec<VirtualPath>> {
+    let listed = VirtualPath::DECLARATION_DIRECTORIES
+        .iter()
+        .map(|directory| {
+            image
+                .listed_json_files(directory)
+                .map_err(|error| match error {
+                    CaptureError::NotADirectory(directory) => anyhow!(
+                        "declaration directory '{}' must be an ordinary directory",
+                        directory.repository_relative()
+                    ),
+                    error => error.into(),
+                })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(VirtualPath::DECLARATION_FILES
+        .into_iter()
+        .chain(listed.into_iter().flatten())
+        .collect())
+}
+
+/// Capture `scope`'s issue records and the declaration set in one image;
+/// `None` is a retryable conflict.
+fn capture_snapshot_image(
+    session: &mut dyn crate::storage::RepositoryMutationSession,
+    scope: &SnapshotScope,
+) -> Result<Option<RepositoryImage>> {
+    let directories = VirtualPath::DECLARATION_DIRECTORIES;
+    // The issue listing and one listing per declaration directory.
+    let budget = CaptureBudget {
+        max_listings: 1 + directories.len(),
+        max_bytes: super::CAPTURE_MAX_BYTES,
+        max_depth: 32,
+    };
+    let mut spec = CaptureSpec::new(
+        VirtualPath::DECLARATION_FILES
+            .into_iter()
+            .chain(directories.clone()),
+        budget,
+    )?;
+    spec.discover_listings(directories)?;
+    match scope {
+        SnapshotScope::Issue(id) => spec.discover_paths([VirtualPath::issue_record(id)])?,
+        SnapshotScope::All | SnapshotScope::Label { .. } => {
+            spec.discover_listing(VirtualPath::ISSUES)?
+        }
+    }
+    super::capture_discovering(session, spec, |image, spec| {
+        Ok(spec.discover_paths(
+            declaration_paths(image)?.into_iter().chain(
+                scope_issue_ids(image, scope)?
+                    .iter()
+                    .map(VirtualPath::issue_record),
+            ),
+        )?)
+    })
+}
+
+/// Select the captured `issues` `scope` exports.
+fn enumerate_issues(issues: Vec<Issue>, scope: &SnapshotScope) -> Vec<Issue> {
+    match scope {
+        SnapshotScope::All => issues,
+        SnapshotScope::Issue(id) => issues.into_iter().filter(|issue| &issue.id == id).collect(),
+        SnapshotScope::Label { namespace, value } => {
+            let target_label = format!("{}:{}", namespace, value);
+            issues
+                .into_iter()
+                .filter(|issue| issue.labels.contains(&target_label))
+                .collect()
+        }
+    }
+}
+
+/// Write the stored bytes of each issue record in `issues` and of each
+/// declaration file `image` holds below `base`.
+fn copy_jit_state(base: &Path, image: &RepositoryImage, issues: &[Issue]) -> Result<()> {
+    issues
+        .iter()
+        .map(|issue| VirtualPath::issue_record(&issue.id))
+        .chain(declaration_paths(image)?)
+        .try_for_each(|path| {
+            let Some(bytes) = image.file_bytes(&path)? else {
+                return Ok(());
+            };
+            let relative =
+                crate::domain::relative_path::RootRelativePath::parse(path.repository_relative())?;
+            let destination = base.join(relative.as_path());
+            if let Some(parent) = destination.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(destination, bytes)?;
+            Ok(())
+        })
+}
+
+impl SnapshotExporter {
     fn new(
-        storage: &'a S,
         checkout: Option<GitCheckout>,
         worktree_root: PathBuf,
-        data_root: PathBuf,
         created_at: chrono::DateTime<chrono::Utc>,
     ) -> Self {
         Self {
-            storage,
             checkout,
             object_reader: RefCell::new(None),
             worktree_root,
-            data_root,
             created_at,
-        }
-    }
-
-    /// Enumerate issues based on scope
-    fn enumerate_issues(&self, scope: &SnapshotScope) -> Result<Vec<Issue>> {
-        match scope {
-            SnapshotScope::All => self.storage.list_issues(),
-            SnapshotScope::Issue(id) => {
-                let issue = self.storage.load_issue(id)?;
-                Ok(vec![issue])
-            }
-            SnapshotScope::Label { namespace, value } => {
-                // Filter issues by label "namespace:value"
-                let target_label = format!("{}:{}", namespace, value);
-                let all_issues = self.storage.list_issues()?;
-                let matching_issues: Vec<Issue> = all_issues
-                    .into_iter()
-                    .filter(|issue| issue.labels.contains(&target_label))
-                    .collect();
-
-                Ok(matching_issues)
-            }
         }
     }
 
@@ -392,7 +476,7 @@ impl<'a, S: IssueStore> SnapshotExporter<'a, S> {
 This snapshot contains:
 - {issue_count} issues (.jit/issues/)
 - {doc_count} documents with associated assets
-- Complete JIT configuration and gate definitions
+- The repository's declaration files, as stored (.jit/)
 
 ## Verification
 
@@ -429,39 +513,6 @@ This is a read-only export. Future versions may support:
         )
     }
 
-    /// Copy .jit state files to snapshot
-    fn copy_jit_state(&self, base: &Path, issues: &[Issue]) -> Result<()> {
-        let jit_dir = base.join(".jit");
-        std::fs::create_dir_all(
-            base.join(crate::repository_state::VirtualPath::ISSUES.repository_relative()),
-        )?;
-
-        // Copy issue files
-        for issue in issues {
-            let issue_json = serde_json::to_string_pretty(issue)?;
-            let relative = crate::domain::relative_path::RootRelativePath::parse(
-                crate::repository_state::VirtualPath::issue_record(&issue.id).repository_relative(),
-            )?;
-            let issue_path = base.join(relative.as_path());
-            std::fs::write(issue_path, issue_json)?;
-        }
-
-        for path in [
-            crate::repository_state::VirtualPath::CONFIG,
-            crate::repository_state::VirtualPath::GATES,
-        ] {
-            let relative = path.relative();
-            if let Some(bytes) = crate::storage::capability_fs::read_repository_file_nofollow(
-                &self.data_root,
-                relative,
-            )? {
-                std::fs::write(jit_dir.join(relative.as_path()), bytes)?;
-            }
-        }
-
-        Ok(())
-    }
-
     /// Generate checksums.txt file for verification
     fn generate_checksums_file(&self, base: &Path, docs: &[DocumentSnapshot]) -> Result<()> {
         let mut checksums = Vec::new();
@@ -482,19 +533,24 @@ This is a read-only export. Future versions may support:
         Ok(())
     }
 
+    /// Stage the snapshot of `scope` from `image` and the documents `mode` reads.
     fn assemble(
         &self,
+        image: &RepositoryImage,
         scope: &SnapshotScope,
         mode: &SourceMode,
     ) -> Result<(tempfile::TempDir, SnapshotManifest, Vec<String>)> {
-        let issues = self.enumerate_issues(scope)?;
+        let issues = enumerate_issues(
+            super::captured_issues(image, &scope_issue_ids(image, scope)?)?,
+            scope,
+        );
         if issues.is_empty() {
             return Err(anyhow!("No issues found in scope: {}", scope));
         }
         let doc_refs = self.extract_documents(&issues);
         let temp_dir = tempfile::TempDir::new()?;
         let base = temp_dir.path();
-        self.copy_jit_state(base, &issues)?;
+        copy_jit_state(base, image, &issues)?;
 
         let mut doc_snapshots = Vec::new();
         let mut warnings = Vec::new();
@@ -669,20 +725,28 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
         out_path: Option<&Path>,
     ) -> Result<(SnapshotExportResult, Vec<String>)> {
         use crate::repository_state::{
-            classify_repository_export, CaptureBudget, RepositoryExportDestination,
-            RepositoryExportIntent,
+            classify_repository_export, RepositoryExportDestination, RepositoryExportIntent,
         };
 
         let layout = self.exec.require_layout()?;
         let exporter = SnapshotExporter::new(
-            &self.exec.storage,
             self.exec.require_worktree_paths()?.code_checkout(),
             layout.worktree_root().to_path_buf(),
-            layout.data_root().to_path_buf(),
             chrono::Utc::now(),
         );
         let output_path = exporter.determine_output_path(out_path)?;
-        let (staging, manifest, mut warnings) = exporter.assemble(scope, mode)?;
+        let image = super::with_mutation_session(
+            &self.exec.storage,
+            &layout,
+            "snapshot export",
+            |session| {
+                Ok(match capture_snapshot_image(session, scope)? {
+                    Some(image) => SessionStep::Done(image),
+                    None => SessionStep::Retry,
+                })
+            },
+        )?;
+        let (staging, manifest, mut warnings) = exporter.assemble(&image, scope, mode)?;
         let tree = SnapshotTree::scan(staging.path())?;
         let destination = classify_repository_export(&layout, invocation_dir, &output_path)?;
         let budget = CaptureBudget {
@@ -764,6 +828,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::repository_state::RepositoryEntry;
     use crate::snapshot::{
         DocumentSnapshot, IssuesInfo, MetadataInfo, RepoInfo, SnapshotManifest, SourceInfo,
         VerificationInfo,
@@ -772,142 +837,128 @@ mod tests {
     use crate::test_utils::document_reference;
     use std::collections::HashMap;
 
-    fn exporter(storage: &InMemoryStorage) -> SnapshotExporter<'_, InMemoryStorage> {
-        SnapshotExporter::new(
-            storage,
-            None,
-            PathBuf::from("."),
-            PathBuf::from(".jit"),
-            chrono::Utc::now(),
-        )
+    fn exporter() -> SnapshotExporter {
+        SnapshotExporter::new(None, PathBuf::from("."), chrono::Utc::now())
+    }
+
+    fn labelled_issue(title: &str, labels: &[&str]) -> Issue {
+        let mut issue = crate::test_utils::fixture_issue(title.to_string(), String::new());
+        issue.labels = labels.iter().map(|label| label.to_string()).collect();
+        issue
+    }
+
+    fn label_scope(namespace: &str, value: &str) -> SnapshotScope {
+        SnapshotScope::Label {
+            namespace: namespace.to_string(),
+            value: value.to_string(),
+        }
     }
 
     #[test]
     fn test_enumerate_issues_all() {
-        let storage = InMemoryStorage::new();
+        let issues = vec![
+            labelled_issue("Issue 1", &[]),
+            labelled_issue("Issue 2", &[]),
+        ];
 
-        // Create a couple of issues
-        let issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
-        let issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
-        crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
-        crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
-
-        let exporter = exporter(&storage);
-        let issues = exporter.enumerate_issues(&SnapshotScope::All).unwrap();
-
-        assert_eq!(issues.len(), 2);
+        assert_eq!(
+            enumerate_issues(issues.clone(), &SnapshotScope::All),
+            issues
+        );
     }
 
     #[test]
     fn test_enumerate_issues_single() {
-        let storage = InMemoryStorage::new();
+        let issue = labelled_issue("Test Issue", &[]);
+        let issues = vec![issue.clone(), labelled_issue("Other Issue", &[])];
 
-        let issue = crate::test_utils::fixture_issue("Test Issue".to_string(), String::new());
-        let issue_id = issue.id.clone();
-        crate::commands::test_helpers::seed_issue(&storage, issue);
+        let selected = enumerate_issues(issues, &SnapshotScope::Issue(issue.id.clone()));
 
-        let exporter = exporter(&storage);
-        let issues = exporter
-            .enumerate_issues(&SnapshotScope::Issue(issue_id.clone()))
-            .unwrap();
-
-        assert_eq!(issues.len(), 1);
-        assert_eq!(issues[0].id, issue_id);
+        assert_eq!(selected, vec![issue]);
     }
 
     #[test]
     fn test_enumerate_issues_label_epic() {
-        let storage = InMemoryStorage::new();
+        let issues = vec![
+            labelled_issue("Issue 1", &["epic:auth"]),
+            labelled_issue("Issue 2", &["epic:auth"]),
+            labelled_issue("Issue 3", &["epic:billing"]),
+            labelled_issue("Issue 4", &[]),
+        ];
 
-        // Create issues with epic labels
-        let mut issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
-        issue1.labels.push("epic:auth".to_string());
-        crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
+        let selected = enumerate_issues(issues.clone(), &label_scope("epic", "auth"));
 
-        let mut issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
-        issue2.labels.push("epic:auth".to_string());
-        crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
-
-        // Create issue with different epic
-        let mut issue3 = crate::test_utils::fixture_issue("Issue 3".to_string(), String::new());
-        issue3.labels.push("epic:billing".to_string());
-        crate::commands::test_helpers::seed_issue(&storage, issue3.clone());
-
-        // Create unrelated issue
-        let issue4 = crate::test_utils::fixture_issue("Issue 4".to_string(), String::new());
-        crate::commands::test_helpers::seed_issue(&storage, issue4.clone());
-
-        let exporter = exporter(&storage);
-        let issues = exporter
-            .enumerate_issues(&SnapshotScope::Label {
-                namespace: "epic".to_string(),
-                value: "auth".to_string(),
-            })
-            .unwrap();
-
-        assert_eq!(issues.len(), 2);
-        assert!(issues
-            .iter()
-            .all(|i| i.labels.contains(&"epic:auth".to_string())));
+        assert_eq!(selected, issues[..2].to_vec());
     }
 
     #[test]
     fn test_enumerate_issues_label_milestone() {
-        let storage = InMemoryStorage::new();
+        let issues = vec![
+            labelled_issue("Issue 1", &["milestone:v1.0"]),
+            labelled_issue("Issue 2", &["milestone:v2.0"]),
+        ];
 
-        let mut issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
-        issue1.labels.push("milestone:v1.0".to_string());
-        crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
+        let selected = enumerate_issues(issues.clone(), &label_scope("milestone", "v1.0"));
 
-        let mut issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
-        issue2.labels.push("milestone:v2.0".to_string());
-        crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
-
-        let exporter = exporter(&storage);
-        let issues = exporter
-            .enumerate_issues(&SnapshotScope::Label {
-                namespace: "milestone".to_string(),
-                value: "v1.0".to_string(),
-            })
-            .unwrap();
-
-        assert_eq!(issues.len(), 1);
-        assert_eq!(issues[0].labels, vec!["milestone:v1.0"]);
+        assert_eq!(selected, issues[..1].to_vec());
     }
 
     #[test]
     fn test_enumerate_issues_label_no_matches() {
-        let storage = InMemoryStorage::new();
+        let issues = vec![labelled_issue("Issue", &[])];
 
-        let issue = crate::test_utils::fixture_issue("Issue".to_string(), String::new());
-        crate::commands::test_helpers::seed_issue(&storage, issue);
+        assert!(enumerate_issues(issues, &label_scope("epic", "nonexistent")).is_empty());
+    }
 
-        let exporter = exporter(&storage);
-        let issues = exporter
-            .enumerate_issues(&SnapshotScope::Label {
-                namespace: "epic".to_string(),
-                value: "nonexistent".to_string(),
+    #[test]
+    fn test_copy_jit_state_rejects_symlinked_declaration() {
+        let symlink = RepositoryEntry::Symlink {
+            target: crate::repository_state::CapturedBytes::new(
+                ".jit/rules.toml",
+                b"../outside.toml".to_vec(),
+            )
+            .unwrap(),
+            mode: crate::repository_state::FileMode::Regular,
+        };
+        let image = VirtualPath::DECLARATION_FILES
+            .into_iter()
+            .chain(VirtualPath::DECLARATION_DIRECTORIES)
+            .fold(
+                crate::test_harness::image::ImageBuilder::new(),
+                |builder, path| builder.entry(path, RepositoryEntry::Absent),
+            )
+            .entry(VirtualPath::RULES, symlink);
+        let image = VirtualPath::DECLARATION_DIRECTORIES
+            .into_iter()
+            .fold(image, |builder, directory| {
+                builder.listing(
+                    directory,
+                    crate::repository_state::DirectoryListing::new([]).unwrap(),
+                )
             })
-            .unwrap();
+            .build();
+        let base = tempfile::tempdir().unwrap();
 
-        assert_eq!(issues.len(), 0);
+        let error = copy_jit_state(base.path(), &image, &[]).unwrap_err();
+
+        assert!(matches!(
+            error.downcast_ref::<crate::repository_state::CaptureError>(),
+            Some(crate::repository_state::CaptureError::UnsafeCapturedOccupant(path))
+                if *path == VirtualPath::RULES
+        ));
     }
 
     #[test]
     fn test_extract_documents() {
-        let storage = InMemoryStorage::new();
-
         let mut issue1 = crate::test_utils::fixture_issue("Issue 1".to_string(), String::new());
         issue1.documents.push(document_reference("docs/design.md"));
-        crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
 
         let mut issue2 = crate::test_utils::fixture_issue("Issue 2".to_string(), String::new());
         issue2.documents.push(document_reference("docs/impl.md"));
         // Duplicate document reference
         issue2.documents.push(document_reference("docs/design.md"));
-        crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
-        let exporter = exporter(&storage);
+        let exporter = exporter();
         let issues = vec![issue1, issue2];
         let docs = exporter.extract_documents(&issues);
 
@@ -920,9 +971,7 @@ mod tests {
 
     #[test]
     fn test_extract_documents_empty() {
-        let storage = InMemoryStorage::new();
-
-        let exporter = exporter(&storage);
+        let exporter = exporter();
         let docs = exporter.extract_documents(&[]);
 
         assert_eq!(docs.len(), 0);
@@ -930,8 +979,7 @@ mod tests {
 
     #[test]
     fn test_generate_readme() {
-        let storage = InMemoryStorage::new();
-        let exporter = exporter(&storage);
+        let exporter = exporter();
 
         let manifest = SnapshotManifest {
             version: "1".to_string(),
@@ -997,8 +1045,7 @@ mod tests {
 
     #[test]
     fn test_determine_output_path() {
-        let storage = InMemoryStorage::new();
-        let exporter = exporter(&storage);
+        let exporter = exporter();
 
         // With explicit path
         let explicit = std::path::Path::new("my-snapshot");
@@ -1141,14 +1188,11 @@ mod tests {
         repository.write(".gitignore", "ignored\n");
         let commit = repository.commit("initial");
         repository.write("ignored", "local cache");
-        let storage = InMemoryStorage::new();
         let exporter = SnapshotExporter::new(
-            &storage,
             crate::storage::WorktreePaths::detect_from(repository.root())
                 .unwrap()
                 .git(),
             repository.root().to_path_buf(),
-            repository.root().join(".jit"),
             chrono::Utc::now(),
         );
 
@@ -1171,14 +1215,11 @@ mod tests {
             "https://example.com/repository.git",
         ]);
         repository.git(&["branch", "--move", "main"]);
-        let storage = InMemoryStorage::new();
         let exporter = SnapshotExporter::new(
-            &storage,
             crate::storage::WorktreePaths::detect_from(repository.root())
                 .unwrap()
                 .git(),
             repository.root().to_path_buf(),
-            repository.root().join(".jit"),
             chrono::Utc::now(),
         );
 

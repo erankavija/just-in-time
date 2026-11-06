@@ -222,11 +222,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         with_mutation_attempts("dependency mutation", || {
             let claims_guard = claims_mutation_guard(self.require_worktree_paths()?)?;
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(crate::commands::validate::MutationBase { image, issues }) =
-                self.capture_mutation_base(session.as_mut(), &[], &[])?
-            else {
+            let Some(base) = self.capture_mutation_base(session.as_mut(), &[], &[])? else {
                 return Ok(AttemptOutcome::Retry);
             };
+            let (image, issues) = (&base.image, &base.issues);
             let CapturedDependencyMutation::Batch {
                 issue_id,
                 dependency_ids,
@@ -235,15 +234,20 @@ impl<S: IssueStore> CommandExecutor<S> {
             else {
                 unreachable!("removals use the captured removal coordinator");
             };
-            let source_id = super::require_issue_in_capture(&issues, issue_id)?;
-            let graph = super::CapturedGraphEvidence::capture(&image, &issues, &context)?;
+            let source_id = super::require_issue_in_capture(issues, issue_id)?;
+            let graph = super::CapturedGraphEvidence::capture(
+                base.declarations()?,
+                image,
+                issues,
+                &context,
+            )?;
             let warnings = refuse_foreign_leases_held(
                 graph.declarations.config().enforcement_mode(),
                 std::slice::from_ref(&source_id),
                 claims_guard.as_ref(),
             )?;
             let mut derived =
-                derive_batch_dependency_add(&issues, &source_id, dependency_ids, *policy, &graph)?;
+                derive_batch_dependency_add(issues, &source_id, dependency_ids, *policy, &graph)?;
             if let CapturedDependencyOutcome::Batch(result) = &mut derived.outcome {
                 result.warnings = warnings;
             }
@@ -253,7 +257,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     None => Ok(AttemptOutcome::Done(derived.outcome)),
                 };
             }
-            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
+            let plan = finalize(&layout, image, &context, &derived.intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -277,18 +281,22 @@ impl<S: IssueStore> CommandExecutor<S> {
             // Claims coordination precedes the session that resolves and publishes removal.
             let claims_guard = claims_mutation_guard(self.require_worktree_paths()?)?;
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(crate::commands::validate::MutationBase { image, issues }) =
-                self.capture_mutation_base(session.as_mut(), &[], &[])?
-            else {
+            let Some(base) = self.capture_mutation_base(session.as_mut(), &[], &[])? else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let graph = super::CapturedGraphEvidence::capture(&image, &issues, &context)?;
+            let (image, issues) = (&base.image, &base.issues);
+            let graph = super::CapturedGraphEvidence::capture(
+                base.declarations()?,
+                image,
+                issues,
+                &context,
+            )?;
             let resolved_request: CapturedDependencyMutation = match &request {
                 CapturedDependencyMutation::RemoveSingle {
                     issue_id,
                     dependency_id,
                 } => CapturedDependencyMutation::RemoveSingle {
-                    issue_id: super::require_issue_in_capture(&issues, issue_id)?,
+                    issue_id: super::require_issue_in_capture(issues, issue_id)?,
                     dependency_id: dependency_id.clone(),
                 },
                 CapturedDependencyMutation::RemoveBatch {
@@ -318,14 +326,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             )?
             .into_iter()
             .next();
-            let derived = derive_dependency_removal(&issues, &resolved_request, warning, &graph)?;
+            let derived = derive_dependency_removal(issues, &resolved_request, warning, &graph)?;
             if derived.intents.is_empty() {
                 return match derived.error_after_apply {
                     Some(error) => Err(error.into()),
                     None => Ok(AttemptOutcome::Done(derived.outcome)),
                 };
             }
-            let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
+            let plan = finalize(&layout, image, &context, &derived.intents, None)?;
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }

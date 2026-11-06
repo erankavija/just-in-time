@@ -85,6 +85,67 @@ fn test_snapshot_export_all_directory() {
     );
 }
 
+#[test]
+fn test_snapshot_export_copies_issue_records_as_stored() {
+    let temp = JitCli::initialised().unwrap();
+    let id = temp
+        .create_issue(["--title", "Stored record", "--label", "epic:auth"])
+        .unwrap();
+    let record = format!(".jit/issues/{id}.json");
+
+    temp.command(["snapshot", "export", "--out", "snapshot"])
+        .assert()
+        .success();
+
+    assert_eq!(
+        fs::read_to_string(temp.root().join("snapshot").join(&record)).unwrap(),
+        fs::read_to_string(temp.root().join(&record)).unwrap()
+    );
+}
+
+#[test]
+fn test_snapshot_export_includes_every_declaration_file() {
+    let temp = JitCli::initialised().unwrap();
+    let issue = temp.create_issue(["--title", "Preset source"]).unwrap();
+    temp.command([
+        "gate",
+        "define",
+        "review",
+        "--title",
+        "Review",
+        "--description",
+        "human review",
+    ])
+    .assert()
+    .success();
+    temp.command(["gate", "add", &issue, "review"])
+        .assert()
+        .success();
+    temp.command(["gate", "preset", "create", &issue, "custom"])
+        .assert()
+        .success();
+    fs::write(temp.root().join(".jit/templates.toml"), "# templates\n").unwrap();
+
+    temp.command(["snapshot", "export", "--out", "snapshot"])
+        .assert()
+        .success();
+
+    for declaration in [
+        ".jit/config.toml",
+        ".jit/gates.toml",
+        ".jit/rules.toml",
+        ".jit/templates.toml",
+        ".jit/invariants.toml",
+        ".jit/config/gate-presets/custom.json",
+    ] {
+        assert_eq!(
+            fs::read_to_string(temp.root().join("snapshot").join(declaration)).ok(),
+            Some(fs::read_to_string(temp.root().join(declaration)).unwrap()),
+            "{declaration} is exported as stored"
+        );
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn test_snapshot_export_git_mode_reads_all_documents_and_assets_through_one_object_reader() {

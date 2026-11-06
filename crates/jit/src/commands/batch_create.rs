@@ -300,32 +300,33 @@ impl<S: IssueStore> IssueOps<'_, S> {
             &layout,
             "batch issue creation",
             |session| {
-                let Some(crate::commands::validate::MutationBase { image, issues }) = self
+                let Some(base) = self
                     .exec
                     .capture_mutation_base(session, &issue_paths, &[])?
                 else {
                     return Ok(SessionStep::Retry);
                 };
-                let declarations = crate::repository_state::declarations_from_image(&image)?;
+                let declarations = base.declarations()?;
                 let problems = Self::collect_batch_problems_from_declarations(
                     &defs,
                     &created_issue_ids,
-                    &declarations,
-                    &issues,
+                    declarations,
+                    &base.issues,
                 )?;
                 if !problems.is_empty() {
                     return Err(BatchValidationError { problems }.into());
                 }
-                let drafts = Self::batch_drafts(&defs, &created_issue_ids, &declarations, &issues)?
-                    .into_iter()
-                    .map(|draft| {
-                        draft.map_err(|_| {
-                            anyhow!("validated batch contains an unresolved label key")
+                let drafts =
+                    Self::batch_drafts(&defs, &created_issue_ids, declarations, &base.issues)?
+                        .into_iter()
+                        .map(|draft| {
+                            draft.map_err(|_| {
+                                anyhow!("validated batch contains an unresolved label key")
+                            })
                         })
-                    })
-                    .collect::<Result<Vec<_>>>()?;
+                        .collect::<Result<Vec<_>>>()?;
                 let intents = [MutationIntent::CreateIssueBatch { drafts }];
-                let plan = finalize(&layout, &image, &context, &intents, None)?;
+                let plan = finalize(&layout, &base.image, &context, &intents, None)?;
                 Ok(SessionStep::Apply(
                     plan,
                     BatchCreateOutcome {
@@ -578,12 +579,9 @@ impl<S: IssueStore> IssueOps<'_, S> {
             &layout,
             "batch validation",
             |session| {
-                let Some(crate::commands::validate::MutationBase { image, issues }) =
-                    self.exec.capture_mutation_base(session, &[], &[])?
-                else {
+                let Some(base) = self.exec.capture_mutation_base(session, &[], &[])? else {
                     return Ok(None);
                 };
-                let declarations = crate::repository_state::declarations_from_image(&image)?;
                 let ids = batch_issue_ids(
                     &crate::repository_state::MutationContext::preview(),
                     defs.len(),
@@ -591,8 +589,8 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 Ok(Some(Self::collect_batch_problems_from_declarations(
                     defs,
                     &ids,
-                    &declarations,
-                    &issues,
+                    base.declarations()?,
+                    &base.issues,
                 )?))
             },
         )
