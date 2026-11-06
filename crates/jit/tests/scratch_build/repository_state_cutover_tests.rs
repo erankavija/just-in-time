@@ -546,9 +546,10 @@ const OUTSIDE_ROOT_WRITES: [&str; 4] = [
 const IN_ROOT_DIRECTORIES: [WriteClass; 2] = [
     (
         "beneath a held root",
-        &["CapabilityRoots"],
-        "capability roots hold only roots that exist, so a directory created through one \
-         lies beneath that root, never at it",
+        &["CapabilityRoots", "DirectoryHandles"],
+        "capability roots, and the directory handles walked beneath a held root, hold only \
+         directories that exist, so a directory created through one lies beneath that root, \
+         never at it",
     ),
     (
         "redo record scratch",

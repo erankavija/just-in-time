@@ -7,6 +7,7 @@ use crate::storage::redo_record::{RedoRecord, WorktreeRootBinding};
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, DirEntry, File, Metadata, OpenOptions};
 use cap_std::{ambient_authority, fs::MetadataExt as _};
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::{ErrorKind, Read};
 use std::path::{Component, Path, PathBuf};
 
@@ -224,38 +225,163 @@ pub(in crate::storage) fn open_capability_parent(
     Ok(Some((current, leaf.clone())))
 }
 
-/// Open the parent directory of a repository-relative target, creating the
-/// ancestors it lacks.
+/// The directory handles one pass over a root opens, keyed by root-relative
+/// directory path, so a directory several targets share is opened once.
 ///
-/// Each directory it creates is synced into the parent that now names it before
-/// the walk descends, so a file published underneath is reachable after a crash
-/// rather than hanging off an entry the filesystem never wrote
-/// (`@/inv/atomic-writes`). An ancestor that already exists costs no sync.
-pub(in crate::storage) fn open_or_create_capability_parent(
-    root: &Dir,
-    path: &Path,
-) -> Result<(Dir, String), CapabilityFsError> {
-    let components = path
-        .components()
-        .map(|component| component.as_os_str().to_string_lossy().into_owned())
-        .collect::<Vec<_>>();
-    let (leaf, parents) = components
-        .split_last()
-        .ok_or_else(|| CapabilityFsError::UnsafeTarget(path.display().to_string()))?;
-    parents
-        .iter()
-        .try_fold(root.try_clone()?, |current, component| {
-            match current.symlink_metadata(component) {
-                Err(error) if error.kind() == ErrorKind::NotFound => {
-                    current.create_dir(component)?;
-                    sync_capability_directory(&current)?;
-                }
-                Err(error) => return Err(error.into()),
-                Ok(_) => {}
-            }
-            open_child_dir_nofollow(&current, component)
+/// It also holds the directories the pass marked changed, so a caller can sync
+/// each once after its last change rather than once per entry it wrote.
+pub(in crate::storage) struct DirectoryHandles<'r> {
+    root: &'r Dir,
+    opened: BTreeMap<PathBuf, Dir>,
+    changed: BTreeSet<PathBuf>,
+    #[cfg(test)]
+    opens: usize,
+    #[cfg(test)]
+    syncs: usize,
+}
+
+impl<'r> DirectoryHandles<'r> {
+    pub(in crate::storage) fn new(root: &'r Dir) -> Self {
+        Self {
+            root,
+            opened: BTreeMap::new(),
+            changed: BTreeSet::new(),
+            #[cfg(test)]
+            opens: 0,
+            #[cfg(test)]
+            syncs: 0,
+        }
+    }
+
+    /// The parent of `target` with its leaf name, opening the ancestors no
+    /// earlier call opened; `Ok(None)` when an ancestor is absent.
+    ///
+    /// # Errors
+    ///
+    /// A symlinked or non-directory ancestor is an unsafe target.
+    pub(in crate::storage) fn open_parent(
+        &mut self,
+        target: &Path,
+    ) -> Result<Option<(&Dir, String)>, CapabilityFsError> {
+        let (parent, leaf) = split_target(target)?;
+        Ok(match walk_held_directories(self, &parent, false)? {
+            true => Some((self.handle(&parent)?, leaf)),
+            false => None,
         })
-        .map(|parent| (parent, leaf.clone()))
+    }
+
+    /// [`Self::open_parent`], creating the ancestors it lacks.
+    ///
+    /// Every directory on the walk is marked changed: a pass may have created
+    /// any of them, and a replay meeting one an earlier pass created cannot
+    /// tell it from one that was already durable.
+    ///
+    /// # Errors
+    ///
+    /// A symlinked or non-directory ancestor is an unsafe target.
+    pub(in crate::storage) fn open_or_create_parent(
+        &mut self,
+        target: &Path,
+    ) -> Result<(&Dir, String), CapabilityFsError> {
+        let (parent, leaf) = split_target(target)?;
+        walk_held_directories(self, &parent, true)?;
+        self.changed
+            .extend(parent.ancestors().map(Path::to_path_buf));
+        Ok((self.handle(&parent)?, leaf))
+    }
+
+    /// Mark the parent of `target` changed.
+    pub(in crate::storage) fn mark_parent_changed(&mut self, target: &Path) {
+        self.changed
+            .insert(target.parent().unwrap_or(Path::new("")).to_path_buf());
+    }
+
+    /// Fsync each directory marked changed once, so every entry the pass wrote
+    /// is durable (`@/inv/atomic-writes`).
+    pub(in crate::storage) fn sync_changed(&mut self) -> std::io::Result<()> {
+        let changed = std::mem::take(&mut self.changed);
+        let directories = changed
+            .iter()
+            .filter_map(|directory| self.lookup(directory))
+            .collect::<Vec<_>>();
+        directories
+            .iter()
+            .try_for_each(|directory| sync_capability_directory(directory))?;
+        #[cfg(test)]
+        {
+            self.syncs += directories.len();
+        }
+        Ok(())
+    }
+
+    /// How many directories this instance opened.
+    #[cfg(test)]
+    pub(in crate::storage) fn opens(&self) -> usize {
+        self.opens
+    }
+
+    /// How many directory fsyncs this instance ran.
+    #[cfg(test)]
+    pub(in crate::storage) fn syncs(&self) -> usize {
+        self.syncs
+    }
+
+    fn handle(&self, directory: &Path) -> Result<&Dir, CapabilityFsError> {
+        self.lookup(directory)
+            .ok_or_else(|| CapabilityFsError::UnsafeTarget(directory.display().to_string()))
+    }
+
+    fn lookup(&self, directory: &Path) -> Option<&Dir> {
+        match directory.as_os_str().is_empty() {
+            true => Some(self.root),
+            false => self.opened.get(directory),
+        }
+    }
+}
+
+/// Open each component of `directory` beneath `handles`' root that no earlier
+/// walk opened, creating an absent one when `create` holds, so a directory it
+/// creates lies beneath that root, never at it; `false` when one is absent and
+/// `create` does not hold.
+fn walk_held_directories(
+    handles: &mut DirectoryHandles,
+    directory: &Path,
+    create: bool,
+) -> Result<bool, CapabilityFsError> {
+    let mut current = PathBuf::new();
+    for component in directory.components() {
+        let parent = current.clone();
+        current.push(component);
+        if handles.opened.contains_key(&current) {
+            continue;
+        }
+        let name = component.as_os_str();
+        let opened = match open_child_dir_nofollow(handles.handle(&parent)?, name) {
+            Err(CapabilityFsError::Io(error)) if error.kind() == ErrorKind::NotFound => {
+                if !create {
+                    return Ok(false);
+                }
+                handles.handle(&parent)?.create_dir(name)?;
+                open_child_dir_nofollow(handles.handle(&parent)?, name)?
+            }
+            outcome => outcome?,
+        };
+        #[cfg(test)]
+        {
+            handles.opens += 1;
+        }
+        handles.opened.insert(current.clone(), opened);
+    }
+    Ok(true)
+}
+
+/// A target's parent directory and leaf name.
+fn split_target(target: &Path) -> Result<(PathBuf, String), CapabilityFsError> {
+    let leaf = target
+        .file_name()
+        .ok_or_else(|| CapabilityFsError::UnsafeTarget(target.display().to_string()))?;
+    let parent = target.parent().unwrap_or(Path::new("")).to_path_buf();
+    Ok((parent, leaf.to_string_lossy().into_owned()))
 }
 
 pub(in crate::storage) fn open_descendant_dir_nofollow(

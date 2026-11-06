@@ -1,0 +1,33 @@
+{
+  "assignee": "agent:b697a3f7-lead",
+  "claimed_at": "2026-11-06T01:14:55.127765246Z",
+  "context": {},
+  "created_at": "2026-11-06T00:59:18.957415319Z",
+  "dependencies": [
+    "c2b3cefa-d690-4c6c-94dd-feaa3156acea"
+  ],
+  "description": "Move the remaining pre-session lease checks of document references and gate definition edits into their publishing sessions, and drop the lease check from the `validate --fix` type repair, so no command reads leases outside the claims lock before its write.\n\n## Background\n\n- The in-session lease check is `refuse_foreign_leases_held` (`crates/jit/src/commands/mod.rs`): a `claims_mutation_guard` taken before the repository session, the enforcement mode read from the captured configuration, and a strict refusal returned as `ForeignLeaseError` (`crates/jit/src/errors.rs`). Assign, unassign, the issue gate commands, gate evaluation and template application already check this way.\n- The read form, `refuse_foreign_lease` and `refuse_foreign_leases` on `CommandExecutor` (both over `refuse_foreign_leases_read`), reads leases before the publishing session opens, outside the claims lock, with the mode taken from the executor's disk-backed configuration cache. Besides bulk update and the batch dependency edits, which move separately, its callers are:\n  - `add_document_reference` and `remove_document_reference` (`crates/jit/src/commands/document.rs`), which check the referencing issue before `publish_document_add` and `publish_document_remove`;\n  - `update_gate` and `remove_gate_definition` (`crates/jit/src/commands/gate.rs`), which check every issue requiring the gate through `refuse_foreign_leases_on_gate_users`, listing all issues from storage before `publish_gate_registry_mutation` opens its session;\n  - the `validate --fix` type repair (`crates/jit/src/commands/validate.rs`), which checks each repaired issue before it is written.\n- Lock order: the claims guard must be taken before any repository session (`crates/jit/src/storage/guard_order.rs`). `DocCommands::coordinates_claims_first` classifies `doc add` and `doc remove` repository-first, and `gate update` and the definition-removing `gate remove` follow `GateCommands::coordinates_claims_first` (`crates/jit/src/cli.rs`). `CLAIM_FIRST_LEAF_COMMANDS` and `test_claim_first_classification_covers_exact_cli_callers` pin the classification.\n- A validate repair is a system-derived write, not a user request for the issues it touches, so the lease rule does not apply to it, as for readiness corrections of dependents.\n\n## Success Criteria\n\n- [hard] REQ-01: `doc add` and `doc remove` check the referencing issue's lease through `refuse_foreign_leases_held` inside the session that publishes the reference change, holding a claims guard taken before that session, and are classified claims-first in the classification and its inventory test.\n- [hard] REQ-02: `gate update` and gate definition removal check the issues that require the gate through `refuse_foreign_leases_held` inside the session that publishes the registry edit, taking those issues from the captured image rather than a storage listing, holding a claims guard taken before that session; both verbs are classified claims-first in the classification and its inventory test, and `refuse_foreign_leases_on_gate_users` no longer exists.\n- [hard] REQ-03: The `validate --fix` type repair performs no lease check.\n- [hard] REQ-04: Neither `refuse_foreign_lease`, `refuse_foreign_leases` on `CommandExecutor` nor `refuse_foreign_leases_read` has a caller outside bulk update and `dep add`/`dep rm`.\n- [hard] REQ-05: Harness tests show, for `doc add` and for gate definition removal, strict mode refusing on another agent's lease with an error that downcasts to `ForeignLeaseError` while publishing nothing, warn mode returning the warning with the write applied, and an unleased issue accepting the write; and a `validate --fix` type repair on another agent's leased issue applying in strict mode.\n\n## Notes\n\n- Behaviour change: document reference and gate definition edits read leases under the claims lock and the mode from the captured configuration, and `doc add`/`doc remove` lock claims before the repository; which writes refuse is otherwise unchanged. A `validate --fix` type repair no longer refuses or warns on another agent's lease.\n- The refusal text stays byte-identical and the process exit status is unchanged.\n- Locate symbols by name; line positions move as neighbouring changes land.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-06T00:59:18.957415319Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "905364c1-e1e2-4150-8aa9-2a489d3e5977",
+  "labels": [
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:session-coherence",
+    "component:core",
+    "component:gates",
+    "component:cli",
+    "per:@/charter/D-20",
+    "satisfies:b697a3f7/REQ-04",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Document and gate definition writes check their leases in their publishing session",
+  "updated_at": "2026-11-06T01:14:55.127765246Z"
+}
