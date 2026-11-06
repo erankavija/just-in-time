@@ -9,10 +9,12 @@
 //! orphan stage it left is removed by the next publication.
 
 use crate::repository_state::RepositoryAction;
-use crate::storage::atomic_write::{rename_noreplace_cap, sync_capability_directory};
+use crate::storage::atomic_write::{
+    rename_noreplace_cap, sync_capability_directory, write_staged_file,
+};
 use crate::storage::capability_fs::{open_child_dir_nofollow, DataRoot, DirectoryHandles};
-use crate::storage::redo_apply::write_staged_file;
 use crate::storage::repository_state_store::RepositoryStateStoreError;
+use crate::storage::RedoApplyError;
 use cap_std::fs::Dir;
 use std::io::ErrorKind;
 use std::path::Path;
@@ -60,8 +62,9 @@ pub(in crate::storage) fn stage_new_data_root<'a>(
         let relative = action.path().relative();
         let mut stage_file = |bytes: &[u8], mode| {
             let (parent, leaf) = handles.open_or_create_parent(relative.as_path())?;
-            write_staged_file(parent, &leaf, bytes, mode)
-                .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
+            write_staged_file(parent, &leaf, bytes, mode).map_err(|source| {
+                RepositoryStateStoreError::RedoApply(Box::new(RedoApplyError::from(source)))
+            })
         };
         match action {
             RepositoryAction::CreateDirectory { .. } if relative.is_root() => Ok(()),
