@@ -3052,11 +3052,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         .map(|outcome| outcome.issue)
     }
 
-    fn publish_captured_release(&self, issue_id: &IssueId, reason: String) -> Result<Issue>
+    fn publish_captured_release(
+        &self,
+        issue_id: &IssueId,
+        reason: String,
+        released_by: crate::domain::Assignee,
+    ) -> Result<Issue>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let released_by = claim::resolve_release_actor(self.require_worktree_paths()?)?;
         let outcome =
             self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Release {
                 issue_id: issue_id.clone(),
