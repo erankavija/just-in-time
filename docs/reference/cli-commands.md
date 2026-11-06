@@ -1041,6 +1041,7 @@ jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
 - **Predictable:** Safer for large-scale changes
 - **Clear reporting:** Shows modified/skipped/error counts
 - **Same state derivation:** Single-issue and bulk updates run prechecks on `ready → in_progress`, refusing the change when one fails, and divert a `done` request with unpassed gates to `gated`
+- **Same field derivation:** A gate or assignee change writes the same issue state and events whether a bulk update, a single-issue update, or the dedicated assign and gate commands request it
 
 **When to use bulk vs single-issue update:**
 - **Single-issue:** One issue's fields, gates, and assignee change together

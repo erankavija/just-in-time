@@ -29,7 +29,7 @@ This guide shows you how to write rules, using ready-to-copy examples:
 
 ## How validation works
 
-When you create or update an issue, the engine:
+When you create an issue or change it, including its assignee and gates, the engine:
 
 1. **Projects** the issue into a canonical JSON shape (see
    [the projection](#the-projection) below).
