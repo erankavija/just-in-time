@@ -4593,12 +4593,15 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(issue.state, State::Ready);
     }
 
-    #[test]
-    fn test_update_issue_state_in_progress_refused_when_precheck_fails() {
-        let executor = setup();
+    /// A `Ready` issue and a declared automatic precheck gate whose checker
+    /// fails, required by the issue when `required` holds.
+    fn seed_ready_issue_with_failing_precheck(
+        executor: &CommandExecutor<InMemoryStorage>,
+        required: bool,
+    ) -> (IssueId, GateKey) {
         let gate_key: GateKey = "precheck-fail".parse().unwrap();
         let issue_id = seed_issue_requiring_exec_gates(
-            &executor,
+            executor,
             State::Ready,
             &[(gate_key.as_str(), "exit 1")],
         );
@@ -4612,21 +4615,41 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 },
             )
             .unwrap();
+        if !required {
+            let mut issue = executor.storage.load_issue(&issue_id).unwrap();
+            issue.gates_required.clear();
+            issue.gates_status.clear();
+            seed_issue(executor.storage(), issue);
+        }
+        (issue_id, gate_key)
+    }
 
-        let error = executor
-            .issues()
-            .update_issue(
-                &issue_id,
-                None,
-                None,
-                None,
-                Some(State::InProgress),
-                Vec::new(),
-                Vec::new(),
-                None,
-                None,
-                false,
-            )
+    fn start_work_updating_gates(
+        executor: &CommandExecutor<InMemoryStorage>,
+        issue_id: &IssueId,
+        local: crate::commands::IssueLocalUpdate,
+    ) -> anyhow::Result<crate::commands::IssueMutation> {
+        executor.issues().update_issue_resolved(
+            &IssueIdPrefix::from(issue_id),
+            None,
+            None,
+            None,
+            Some(State::InProgress),
+            Vec::new(),
+            Vec::new(),
+            None,
+            None,
+            local,
+            false,
+        )
+    }
+
+    #[test]
+    fn test_update_issue_state_in_progress_refused_when_precheck_fails() {
+        let executor = setup();
+        let (issue_id, gate_key) = seed_ready_issue_with_failing_precheck(&executor, true);
+
+        let error = start_work_updating_gates(&executor, &issue_id, Default::default())
             .expect_err("a failing precheck refuses the state change");
 
         assert!(error
@@ -4635,6 +4658,49 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::Ready);
         assert_eq!(issue.gates_status[&gate_key].status, GateStatus::Failed);
+    }
+
+    #[test]
+    fn test_update_issue_state_in_progress_runs_precheck_gate_added_in_same_update() {
+        let executor = setup();
+        let (issue_id, gate_key) = seed_ready_issue_with_failing_precheck(&executor, false);
+
+        let error = start_work_updating_gates(
+            &executor,
+            &issue_id,
+            crate::commands::IssueLocalUpdate {
+                add_gates: vec![gate_key.clone()],
+                ..Default::default()
+            },
+        )
+        .expect_err("the added failing precheck refuses the state change");
+
+        assert!(error
+            .downcast_ref::<crate::errors::TransitionBlockedError>()
+            .is_some());
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(issue.state, State::Ready);
+        assert!(!issue.gates_required.contains(&gate_key));
+    }
+
+    #[test]
+    fn test_update_issue_state_in_progress_skips_precheck_gate_removed_in_same_update() {
+        let executor = setup();
+        let (issue_id, gate_key) = seed_ready_issue_with_failing_precheck(&executor, true);
+
+        start_work_updating_gates(
+            &executor,
+            &issue_id,
+            crate::commands::IssueLocalUpdate {
+                remove_gates: vec![gate_key.clone()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(issue.state, State::InProgress);
+        assert!(!issue.gates_required.contains(&gate_key));
     }
 
     #[cfg(unix)]
