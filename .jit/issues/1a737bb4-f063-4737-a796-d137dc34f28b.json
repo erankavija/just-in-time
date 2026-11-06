@@ -8,12 +8,26 @@
   ],
   "description": "Add one public, pure gate-preset catalog built from a captured image, move every preset reader onto it, and delete `PresetManager` and the `IssueStore` preset methods, so presets are listed, parsed and looked up in one place with no preset file I/O outside storage capture.\n\n## Background\n\n- `load_presets_from_custom_files` (`crates/jit/src/gate_presets.rs:158`, `pub(crate)`) is the shared parse policy: canonical names, `.json` suffix, filename stem equal to the embedded name, sorted diagnostics. `PresetInfo` is declared at `gate_presets.rs:189`; `gate_presets` is a public module (`crates/jit/src/lib.rs:17`).\n- Two command-layer image readers wrap that policy with their own listing helpers today: `listed_gate_preset_paths` and `parse_captured_gate_presets` (`crates/jit/src/commands/gate.rs:244,262`), and `listed_json_paths` and `parse_template_presets` (`crates/jit/src/commands/template.rs:620,690`). Both filter `*.json` names of the `VirtualPath::GATE_PRESETS` listing (`crates/jit/src/repository_state/path.rs:342`). `capture_gate_preset_image` (`gate.rs:292`) uses the listing helper to extend its capture (`:330`), and `apply_gate_preset` (`:1256`) looks the preset up through `parse_captured_gate_presets` (`:1305`). The template capture uses its listing helper (`template.rs:401`), and `derive_captured_template_apply` (`:330`) parses the presets at `:342`.\n- `CommandExecutor::list_gate_presets` and `show_gate_preset` (`gate.rs:1242-1251`) forward to `IssueStore::list_gate_presets` and `get_gate_preset` (`crates/jit/src/storage/mod.rs:356,363`). The JSON backend reads the presets directory from disk through `PresetManager` (`crates/jit/src/storage/json.rs:1445-1453`); the memory backend parses its own state (`crates/jit/src/storage/memory.rs:901-921`, over the helper `gate_presets_from_repository_state`, `memory.rs:204-240`). `gate preset apply` reads the captured image instead (`apply_gate_preset`, `gate.rs:1256-1311`), so show and apply read two sources. `main.rs` calls both methods (`crates/jit/src/main.rs:4194,4236`); their signatures stay. Reads run through `with_read_session` (`crates/jit/src/commands/mod.rs`), whose closure takes `&mut dyn RepositoryReadSession`.\n- `PresetManager` (`crates/jit/src/gate_presets/manager.rs:10-97`, a 342-line file) reads `.jit/config/gate-presets/` with `fs::read_dir` (`load_presets`, `manager.rs:24-64`, read at `:43`) and a nix no-follow open on a path joined from literals (`read_regular_preset_no_follow`, `:100-148`). It is re-exported at `crates/jit/src/gate_presets.rs:18`, named in that module's rustdoc (`:8-12`, which also says every preset is a project's own; no built-in presets exist), and used only by the JSON backend and its own tests. Its tests own properties a captured reader must keep: a missing presets directory lists nothing, a symlinked or non-file `*.json` occupant is refused, invalid JSON and a stem mismatch are refused, and the listing is sorted by name (`manager.rs:178-341`).\n- `IssueStore::list_gate_presets` and `get_gate_preset` are also forwarded by two test wrappers (`crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs:179-183`, imports at `:17`; `crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs:909-918`). `crates/jit/tests/fast_docs_templates/template_apply_tests.rs` probes presets through storage (`:720,868,979,1001`) and its comments name `PresetManager::new` (`:949,987`).\n\n## Success Criteria\n\n- [hard] REQ-01: `crate::gate_presets` exports one `pub` catalog constructed from a captured `RepositoryImage`: it derives the preset paths from the `GATE_PRESETS` listing, parses them through `load_presets_from_custom_files`, lists `PresetInfo` sorted by name, and looks a preset up by name, failing with `PresetNotFoundError` when absent. Catalog unit tests over built images own the listing properties: an absent presets directory lists none, the listing is sorted with gate counts, a symlinked or non-file `*.json` occupant is refused, and invalid JSON or a stem mismatch is refused.\n- [hard] REQ-02: `capture_gate_preset_image`, `apply_gate_preset`, the template capture and `derive_captured_template_apply` obtain preset paths and presets only through the catalog; `listed_gate_preset_paths`, `parse_captured_gate_presets`, `listed_json_paths` and `parse_template_presets` no longer exist.\n- [hard] REQ-03: `list_gate_presets` and `show_gate_preset` capture the `GATE_PRESETS` listing and its `*.json` files in one `with_read_session` closure and answer through the catalog; neither calls an `IssueStore` preset method. A harness test writes the same custom preset files into the in-memory and the JSON-file backends and shows that list and show give equal answers on both, and that the preset `show` reports is the one `apply` attaches.\n- [hard] REQ-04: `crates/jit/src/gate_presets/manager.rs` and `PresetManager` no longer exist and the `gate_presets` module rustdoc names the catalog as the reader; `IssueStore` declares no gate-preset method, and neither backend, `gate_presets_from_repository_state`, nor either test wrapper implements or forwards one.\n- [hard] REQ-05: The template application tests that probed presets through storage use the executor's preset show and keep their assertions, including that a malformed preset file propagates a parse error rather than `PresetNotFoundError`; the gate preset apply and template apply suites pass unchanged.\n- [hard] REQ-06: `docs/reference/storage-format.md` lists `gate preset list` and `gate preset show` among the commands that read through the driver, under the rule `lock-free-read-consumers` states.\n\n## Notes\n\n- Behaviour change: `gate preset list` and `gate preset show` take no repository lock while uncontended and complete a leftover redo record only through the driver's locked fallback. Output is unchanged.\n- The catalog names the directory through `VirtualPath::GATE_PRESETS`, never a literal (`@/inv/domain-agnostic`).\n- `lock-free-read-consumers`, which this task follows, owns the read-discipline statement in `docs/reference/storage-format.md`; this task adds only its own commands to the list there.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-06T01:45:04.453546017Z",
   "first_ready_at": "2026-11-04T19:18:50.515099468Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "f87854a5-c47b-4697-b6a6-cb8995874324",
+      "status": "passed",
+      "updated_at": "2026-11-06T01:40:52.659577186Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "35c96665-cea5-4254-93cd-3d2416b43eee",
+      "status": "passed",
+      "updated_at": "2026-11-06T01:44:57.784131582Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1a737bb4-f063-4737-a796-d137dc34f28b",
   "labels": [
     "type:task",
@@ -30,7 +44,7 @@
     "satisfies:b697a3f7/REQ-21"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "One pure gate-preset catalog serves every preset reader",
-  "updated_at": "2026-11-06T01:14:54.746510673Z"
+  "updated_at": "2026-11-06T01:45:04.453546017Z"
 }

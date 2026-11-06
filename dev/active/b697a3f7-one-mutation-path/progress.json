@@ -73,7 +73,7 @@
           "title": "One pure gate-preset catalog serves every preset reader",
           "classification": "implementation",
           "worker": "codex gpt-6.1-sol high",
-          "status": "landing 7e24a0c93",
+          "status": "done",
           "note": "shares gate.rs/template.rs with c2b3cefa"
         }
       ]
