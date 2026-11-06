@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-053b109e",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "032d41e21b5ab598a719abda55e09167f8995daa",
+  "completed_at": "2026-11-06T05:05:22.251262901Z",
+  "duration_ms": 218437,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The Cargo.lock-only update preserves manifests and feature selections, and recorded passing validation covers the implementation commit.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "053b109e-4abc-45b1-8f7b-2ab7682815ba",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "815efd1f-f8fd-484f-b974-4c5d802ed086",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-06T05:01:43.813963497Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 22893b355, 85dc01a15, 153fa54e3, 3860167b6, 6900d305c, 032d41e2 (`jit:053b109e`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-11 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci, @/gate/cargo-ci-features, @/gate/dependency-audit, @/gate/jit-validate (.jit/gates.toml); @/invariant/bounded-rust-build-footprint, @/invariant/no-ignored-tests (.jit/invariants.toml)\nGate evidence: cargo-ci, cargo-ci-features, jit-validate, and dependency-audit passed (all exit 0); code-review pending\nTruncation recovery: inspected the implementation patch separately and re-read current manifests, lockfile entries, audit-policy paths, and gate metadata; omitted truncated historical gate stdout under the records-of-past policy.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The Cargo.lock-only update preserves manifests and feature selections, and recorded passing validation covers the implementation commit.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
