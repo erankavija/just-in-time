@@ -18,6 +18,7 @@
   ],
   "description": "Delete the layout detection entry point and accessors that only tests reach, and confirm that the git module exposes only operations production code calls and is the only production code that starts git.\n\n## Background\n\n- `WorktreePaths::detect_from` (`crates/jit/src/storage/worktree_paths.rs:54-56`) lost its production caller when repository validation stopped checking the claims index. Tests call it at `crates/jit/src/commands/mod.rs:4353`, `:4383` and `:4468`.\n- `WorktreePaths::detect` (`crates/jit/src/storage/worktree_paths.rs:28-30`) detects from the process working directory and has no production caller; its one test, `test_detect_in_main_worktree` (`crates/jit/src/storage/worktree_paths.rs:271-287`), detects the test process's own checkout.\n- `WorktreePaths::is_main_worktree` (`crates/jit/src/storage/worktree_paths.rs:174-176`) has one caller, a test at `crates/jit/src/commands/worktree.rs:1004`.\n- Each `storage::git` operation landed as a primitive just before its first production consumer. `Git::with_program` stays visible in production builds until the revision resolver bridge and storage's pinned inspection stop using it; REQ-02 narrows it to `test-support`.\n- `crates/jit/tests/cli_repo_workflow/init_tests.rs:169` names `WorktreePaths::detect()` in a comment.\n- A grep of `crates/jit/src` and `crates/server/src` finds the remaining git spawns only in `#[cfg(test)]` modules and in `jit::test_harness`.\n\n## Success Criteria\n\n- [hard] REQ-01: `WorktreePaths` has one detection function, `detect_for_data_root`. `detect`, `detect_from`, `is_main_worktree` and `test_detect_in_main_worktree` no longer exist, the remaining test callers use `detect_for_data_root` and `is_worktree`, and no comment names a deleted detection entry point.\n- [hard] REQ-02: Every public item of `storage::git` has a production caller, and constructors taking another executable compile only under `test-support`.\n- [hard] REQ-03: Among production sources, only `crates/jit/src/storage/git.rs` constructs a process for git or names the git executable; `#[cfg(test)]` modules, code compiled only under `test-support` (`jit::test_harness`), and integration tests may.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
+  "done_at": "2026-11-06T05:51:21.911467596Z",
   "first_ready_at": "2026-11-06T05:20:10.236593888Z",
   "gates_required": [
     "cargo-ci",
@@ -25,9 +26,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "ec12e7db-c5e2-42f8-b045-2392a13c7514",
+      "run_id": "91fdd8ec-8a6f-4959-b1e3-de5ca534d77b",
       "status": "passed",
-      "updated_at": "2026-11-06T05:43:23.845216920Z",
+      "updated_at": "2026-11-06T05:51:04.828663093Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -52,7 +53,7 @@
     "satisfies:f4d9502a/REQ-11"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Trim the layout and git module surface to production callers",
-  "updated_at": "2026-11-06T05:49:00.708504097Z"
+  "updated_at": "2026-11-06T05:51:21.911467596Z"
 }

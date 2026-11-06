@@ -510,9 +510,9 @@
           "short_id": "34851181",
           "title": "Trim the layout and git module surface to production callers",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "external_blockers": [],
-          "worker_status": "dispatched_2026-11-06"
+          "worker_status": "landed_ed94892e7"
         },
         {
           "id": "78cb05ed-83b0-4bbb-ae56-69176457a7f0",
