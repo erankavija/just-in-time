@@ -212,7 +212,8 @@
     "c2b3cefa": 2,
     "d2acb105": 1,
     "700a96dd": 1,
-    "d3c94dc5": 1
+    "d3c94dc5": 1,
+    "30334066": 1
   },
   "surfaced_pitfalls": [
     {
@@ -259,6 +260,11 @@
       "story": "a991f42b",
       "result": "done",
       "evidence": "children 1b7f58ae, 4334df62, f7a59f5f done (+4d834432, 7fefd776, d58f80c9, 01a88d32 for REQ-02..04); main sweep: only publish_file stages and renames in production storage/serve code; one read leaf-open sequence"
+    },
+    {
+      "story": "93e3f1ad",
+      "result": "done",
+      "evidence": "main sweep: no read-form lease caller (only refuse_foreign_leases rule + refuse_foreign_leases_held remain), no check_auto_transitions/AutoReady/AutoBacklog, no bulk preview, refusal text only in ForeignLeaseError Display; children d2acb105, fe9147fa, c2b3cefa, 905364c1, d3c94dc5, 693a2fdd done"
     }
   ],
   "decisions": [

@@ -552,16 +552,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         };
         let base = |spec: &mut CaptureSpec| -> Result<()> {
             spec.discover_paths(
-                [
-                    VirtualPath::CONFIG,
-                    VirtualPath::INVARIANTS,
-                    VirtualPath::RULES,
-                    VirtualPath::GATES,
-                    VirtualPath::TEMPLATES,
-                    VirtualPath::INDEX,
-                ]
-                .into_iter()
-                .chain(extra_paths.iter().cloned()),
+                VirtualPath::DECLARATION_FILES
+                    .into_iter()
+                    .chain([VirtualPath::INDEX])
+                    .chain(extra_paths.iter().cloned()),
             )?;
             spec.discover_listings([VirtualPath::ISSUES])?;
             spec.discover_tail(VirtualPath::EVENTS)?;

@@ -970,6 +970,35 @@ impl RepositoryImage {
         &self.data.listings
     }
 
+    /// The `*.json` files `directory`'s captured listing names, in name order;
+    /// an occupant other than a directory is refused as
+    /// [`CaptureError::NotADirectory`], and an absent directory lists nothing.
+    pub fn listed_json_files(
+        &self,
+        directory: &VirtualPath,
+    ) -> Result<Vec<VirtualPath>, CaptureError> {
+        if !matches!(
+            self.entry(directory)?,
+            RepositoryEntry::Absent | RepositoryEntry::Directory { .. }
+        ) {
+            return Err(CaptureError::NotADirectory(directory.clone()));
+        }
+        self.data
+            .listings
+            .get(directory)
+            .ok_or_else(|| CaptureError::IncompleteListing(directory.clone()))?
+            .names()
+            .iter()
+            .filter(|name| name.ends_with(".json"))
+            .map(|name| {
+                Ok(VirtualPath::from_root(
+                    directory.root_class(),
+                    directory.relative().join(name),
+                )?)
+            })
+            .collect()
+    }
+
     /// Read an exactly captured entry; uncaptured reads are always errors.
     pub fn entry(&self, path: &VirtualPath) -> Result<&RepositoryEntry, CaptureError> {
         self.data.layout.ensure_canonical(path)?;
@@ -1618,6 +1647,8 @@ pub enum CaptureError {
     UndiscoveredRepositoryPath(VirtualPath),
     #[error("captured path {0:?} has a symlink or unsupported occupant")]
     UnsafeCapturedOccupant(VirtualPath),
+    #[error("captured path {0:?} is not a directory")]
+    NotADirectory(VirtualPath),
 }
 
 /// Invalid exact delta.
@@ -1656,6 +1687,30 @@ mod tests {
         }
     }
     use crate::repository_state::RepositoryRootEvidence;
+
+    #[test]
+    fn test_listed_json_files_lists_json_names_and_refuses_a_non_directory_occupant() {
+        let directory = VirtualPath::GATE_PRESETS;
+        let listing =
+            DirectoryListing::new(["a.json".to_string(), "notes.txt".to_string()]).unwrap();
+        let listed = crate::test_harness::image::ImageBuilder::new()
+            .entry(directory.clone(), RepositoryEntry::Absent)
+            .listing(directory.clone(), listing.clone())
+            .build();
+        let occupied = crate::test_harness::image::ImageBuilder::new()
+            .file(directory.clone(), b"not a directory")
+            .listing(directory.clone(), listing)
+            .build();
+
+        assert_eq!(
+            listed.listed_json_files(&directory).unwrap(),
+            vec![VirtualPath::data("config/gate-presets/a.json").unwrap()]
+        );
+        assert!(matches!(
+            occupied.listed_json_files(&directory),
+            Err(CaptureError::NotADirectory(path)) if path == directory
+        ));
+    }
 
     fn layout() -> RepositoryLayout {
         RepositoryLayout::new(

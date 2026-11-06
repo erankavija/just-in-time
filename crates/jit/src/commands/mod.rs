@@ -2396,9 +2396,18 @@ pub(crate) fn image_virtual_bytes(
 /// Parse the issues the captured listing names, in listing order, reporting a
 /// missing record as issue-not-found.
 fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> Result<Vec<Issue>> {
-    use crate::repository_state::{captured_issue_ids, parse_issue_records, IssueRecordsError};
+    captured_issues(image, &crate::repository_state::captured_issue_ids(image)?)
+}
 
-    parse_issue_records(&captured_issue_ids(image)?, |path| image.file_bytes(path))
+/// Parse the captured records of `ids`, in the order given, reporting a
+/// missing record as issue-not-found.
+fn captured_issues(
+    image: &crate::repository_state::RepositoryImage,
+    ids: &[crate::domain::identity::IssueId],
+) -> Result<Vec<Issue>> {
+    use crate::repository_state::{parse_issue_records, IssueRecordsError};
+
+    parse_issue_records(ids, |path| image.file_bytes(path))
         .map(|records| records.into_iter().map(|(issue, _)| issue).collect())
         .map_err(|error| match error {
             IssueRecordsError::Missing(id) => crate::storage::IssueNotFoundError::new(id).into(),

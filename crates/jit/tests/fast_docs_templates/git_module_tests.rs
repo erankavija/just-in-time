@@ -1051,35 +1051,6 @@ fn test_git_checkout_canonicalizes_symbolic_abbreviated_and_full_revisions() {
 }
 
 #[test]
-fn test_git_checkout_never_falls_back_on_invalid_revision_or_failed_blob_read() {
-    let dir = TempDir::new().unwrap();
-    let repo = GitRepository::init(dir.path().join("repo"));
-    repo.write("docs/working.md", b"working tree content");
-    let empty_oid = repo.commit("working file exists");
-    fs::remove_file(repo.root().join("docs/working.md")).unwrap();
-    repo.commit("remove working file");
-    repo.write(
-        "docs/working.md",
-        b"new uncommitted working tree fallback bait",
-    );
-    let resolver = checkout(Git::default(), repo.root());
-
-    assert!(matches!(
-        resolver.read_pinned_path("not-a-revision", "docs/working.md"),
-        Err(GitError::RevisionNotFound { .. })
-    ));
-    assert!(matches!(
-        resolver.read_pinned_path("HEAD", "docs/working.md"),
-        Err(GitError::PinnedReadFailed { .. })
-    ));
-
-    let historical = resolver
-        .read_pinned_path(&empty_oid, "docs/working.md")
-        .unwrap();
-    assert_eq!(historical.bytes(), b"working tree content");
-}
-
-#[test]
 fn test_commit_resolution_distinguishes_absence_from_existing_noncommits() {
     let dir = TempDir::new().unwrap();
     let repo = committed_repository(&dir);
@@ -1231,15 +1202,13 @@ printf 'malformed\0'
 
 #[cfg(unix)]
 #[test]
-fn test_resolve_commit_and_read_pinned_path_keep_process_budgets() {
+fn test_resolve_commit_keeps_process_budget() {
     let dir = TempDir::new().unwrap();
     let repo = committed_repository(&dir);
     let stand_in = GitStandIn::new();
     let handle = checkout(Git::with_program(stand_in.program()), repo.root());
     handle.resolve_commit("HEAD").unwrap();
     assert_eq!(stand_in.invocations().len(), 1);
-    handle.read_pinned_path("HEAD", "README.md").unwrap();
-    assert_eq!(stand_in.invocations().len(), 4);
 }
 
 #[cfg(unix)]

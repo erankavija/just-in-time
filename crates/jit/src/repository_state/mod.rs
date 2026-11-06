@@ -1398,6 +1398,28 @@ mod tests {
     const MALFORMED_ITEM_KINDS: &str = "[item_kinds.custom]\nsection = \"Items\"\n";
 
     #[test]
+    fn test_validation_declarations_from_image_assembles_from_declaration_files_and_index() {
+        let paths = VirtualPath::DECLARATION_FILES
+            .into_iter()
+            .chain([VirtualPath::INDEX])
+            .collect::<Vec<_>>();
+        let budget = CaptureBudget {
+            max_listings: 0,
+            max_bytes: u64::MAX,
+            max_depth: usize::MAX,
+        };
+        let image = paths
+            .iter()
+            .fold(ImageBuilder::new(), |builder, path| {
+                builder.file(path.clone(), "")
+            })
+            .with_spec(CaptureSpec::new(paths, budget).unwrap())
+            .build();
+
+        validation_declarations_from_image(&image).unwrap();
+    }
+
+    #[test]
     fn test_validation_declarations_from_image_rejects_malformed_item_kinds() {
         let image = ImageBuilder::new()
             .files(&[
