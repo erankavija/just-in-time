@@ -765,7 +765,8 @@ impl<S: IssueStore> GateOps<'_, S> {
     ///
     /// The issue's lease is checked under a claims guard in the inputs session,
     /// before any verdict lookup or checker run, and again in the session that
-    /// records the run, whose lease warnings are returned with the result.
+    /// records the run; the result carries each lease warning either session
+    /// raised, once.
     pub fn check_gate_with(
         &self,
         issue_id: &IssueId,
@@ -782,7 +783,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         let mutation = super::production_mutation_context();
         let run_id = mutation.gate_run_id_at(0);
         let run_paths = super::gate_run_record_paths(&mutation, issue_id, 1);
-        let (target_id, image, issue, issues, registry, runs, captured) =
+        let (target_id, image, issue, issues, registry, runs, captured, input_warnings) =
             with_mutation_attempts("gate evaluation inputs", || {
                 let claims_guard =
                     super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
@@ -796,7 +797,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 else {
                     return Ok(AttemptOutcome::Retry);
                 };
-                super::refuse_foreign_leases_held(
+                let input_warnings = super::refuse_foreign_leases_held(
                     crate::repository_state::assemble_config(&image)?.enforcement_mode(),
                     std::slice::from_ref(&target_id),
                     claims_guard.as_ref(),
@@ -822,7 +823,14 @@ impl<S: IssueStore> GateOps<'_, S> {
                 };
                 let captured = captured_gate_evaluation(&image, &issue, gate_key, gate, &runs)?;
                 Ok(AttemptOutcome::Done((
-                    target_id, image, issue, issues, registry, runs, captured,
+                    target_id,
+                    image,
+                    issue,
+                    issues,
+                    registry,
+                    runs,
+                    captured,
+                    input_warnings,
                 )))
             })?;
 
@@ -878,11 +886,20 @@ impl<S: IssueStore> GateOps<'_, S> {
             else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let warnings = super::refuse_foreign_leases_held(
+            let record_warnings = super::refuse_foreign_leases_held(
                 crate::repository_state::assemble_config(&final_image)?.enforcement_mode(),
                 std::slice::from_ref(&target_id),
                 claims_guard.as_ref(),
             )?;
+            let warnings = input_warnings
+                .iter()
+                .chain(
+                    record_warnings
+                        .iter()
+                        .filter(|warning| !input_warnings.contains(warning)),
+                )
+                .cloned()
+                .collect::<Vec<_>>();
             let mut final_issue = captured_bound_issue(&final_image, &target_id)?;
             let final_registry = captured_gate_registry(&final_image)?;
             let final_gate = required_automated_gate(&final_issue, &final_registry, gate_key)?;
@@ -1793,24 +1810,39 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         );
     }
 
-    #[test]
-    fn test_check_gate_strict_refuses_another_agents_lease_before_the_checker_runs() {
-        let executor = crate::commands::test_helpers::setup_coordinated_with_enforcement("strict");
-        let marker_dir = tempfile::tempdir().unwrap();
-        let marker = marker_dir.path().join("checker-ran");
-        let key: GateKey = "recording-gate".parse().unwrap();
+    /// An issue requiring an automated gate whose checker runs `command`, in a
+    /// Git checkout enforcing `mode`, leased by another agent; answers the
+    /// executor, issue, gate key and holder.
+    fn leased_automated_gate_fixture(
+        mode: &str,
+        command: impl FnOnce(&std::path::Path) -> String,
+    ) -> (
+        CommandExecutor<crate::storage::InMemoryStorage>,
+        IssueId,
+        GateKey,
+        crate::domain::Assignee,
+    ) {
+        let executor = crate::commands::test_helpers::setup_coordinated_with_enforcement(mode);
+        let key: GateKey = "leased-gate".parse().unwrap();
+        let mut issue = crate::test_utils::fixture_issue("Leased".to_string(), String::new());
+        issue.gates_required = vec![key.clone()];
+        let issue_id = issue.id.clone();
+        let lease = crate::test_lease_store::lease_path(
+            &executor.require_worktree_paths().unwrap().shared_jit,
+            &issue_id,
+        );
         let mut registry = executor.storage.load_gate_registry().unwrap();
         registry.gates.insert(
             key.clone(),
             crate::declarations::GateDefinition {
                 version: 1,
                 key: key.clone(),
-                title: "Recording".to_string(),
+                title: "Leased".to_string(),
                 description: String::new(),
                 stage: GateStage::Postcheck,
                 mode: GateMode::Auto,
                 checker: Some(GateChecker::Exec {
-                    command: format!("touch '{}'", marker.display()),
+                    command: command(&lease),
                     timeout_seconds: 10,
                     working_dir: None,
                     env: HashMap::new(),
@@ -1824,11 +1856,17 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             },
         );
         seed_gate_registry(executor.storage(), &registry);
-        let mut issue = crate::test_utils::fixture_issue("Leased".to_string(), String::new());
-        issue.gates_required = vec![key.clone()];
-        let issue_id = issue.id.clone();
         seed_issue(executor.storage(), issue);
-        crate::commands::test_helpers::plant_foreign_lease(&executor, &issue_id);
+        let holder = crate::commands::test_helpers::plant_foreign_lease(&executor, &issue_id);
+        (executor, issue_id, key, holder)
+    }
+
+    #[test]
+    fn test_check_gate_strict_refuses_another_agents_lease_before_the_checker_runs() {
+        let marker_dir = tempfile::tempdir().unwrap();
+        let marker = marker_dir.path().join("checker-ran");
+        let (executor, issue_id, key, _) =
+            leased_automated_gate_fixture("strict", |_| format!("touch '{}'", marker.display()));
 
         let error = executor.gates().check_gate(&issue_id, &key).unwrap_err();
 
@@ -1839,6 +1877,45 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             "{error:#}"
         );
         assert!(!marker.exists(), "the checker ran despite the refusal");
+    }
+
+    #[test]
+    fn test_check_gate_with_warn_keeps_the_warning_of_a_lease_released_while_the_checker_runs() {
+        let (executor, issue_id, key, holder) =
+            leased_automated_gate_fixture("warn", |lease| format!("rm '{}'", lease.display()));
+
+        let (result, warnings) = executor
+            .gates()
+            .check_gate_with(&issue_id, &key, super::VerdictSource::Execute)
+            .unwrap();
+
+        assert_eq!(result.status, GateRunStatus::Passed, "{result:?}");
+        assert!(
+            warnings
+                .iter()
+                .any(|warning| warning.contains(&holder.to_string())),
+            "{warnings:?}"
+        );
+    }
+
+    #[test]
+    fn test_check_gate_with_warn_reports_a_lease_held_through_both_sessions_once() {
+        let (executor, issue_id, key, holder) =
+            leased_automated_gate_fixture("warn", |_| "exit 0".to_string());
+
+        let (_, warnings) = executor
+            .gates()
+            .check_gate_with(&issue_id, &key, super::VerdictSource::Execute)
+            .unwrap();
+
+        assert_eq!(
+            warnings
+                .iter()
+                .filter(|warning| warning.contains(&holder.to_string()))
+                .count(),
+            1,
+            "{warnings:?}"
+        );
     }
 
     #[test]
