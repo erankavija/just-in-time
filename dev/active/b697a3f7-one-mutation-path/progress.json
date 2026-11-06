@@ -23,7 +23,7 @@
           "title": "Process liveness and signalling go through one PID guard",
           "classification": "implementation",
           "worker": "codex gpt-6-luna xhigh",
-          "status": "rework-2 (code-review F1 406917d9)",
+          "status": "escalated (code-review F1 90b9291f)",
           "landed": "7c6855d8a"
         },
         {
@@ -133,6 +133,13 @@
       "category": "blocker outside scope (f4d9502a chain)",
       "decision": "option 1: accept the wait; re-escalate when the last dispatchable wave is in flight, with remaining reachable count, blocked IDs, and any proposal to decouple a blocked issue; do not reshape the graph unilaterally",
       "status": "resolved"
+    },
+    {
+      "to": "steward just-in-time-9b",
+      "category": "rework exceeded MAX_REWORK_ATTEMPTS",
+      "issue": "f6477007",
+      "detail": "third distinct code-review finding (run 90b9291f): exited-process test lacks #[cfg(unix)]; requested one more round",
+      "status": "open"
     }
   ],
   "rework_counts": {
