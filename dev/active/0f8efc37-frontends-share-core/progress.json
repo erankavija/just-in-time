@@ -72,7 +72,7 @@
           "short_id": "d4172016",
           "title": "Converge document operation adapters",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "4538b071-a0f7-4ae6-8c1d-a11b76962b6e",
@@ -151,7 +151,7 @@
       ],
       "dependent": "3a61ff16-9afb-4c7c-9583-8ce588581350",
       "status": "done",
-      "reduction": "bb03df0a\u21926d93ab14 direct edge removed by transitive reduction; reachability through 0f8efc37\u21923a61ff16\u21924858de06 retained."
+      "reduction": "bb03df0a→6d93ab14 direct edge removed by transitive reduction; reachability through 0f8efc37→3a61ff16→4858de06 retained."
     },
     {
       "id": "38df8a6c-1a33-48e1-95b0-bc816c354a5f",
@@ -160,11 +160,18 @@
         "32607213-7402-4c17-9889-7a6286e1959e"
       ],
       "dependent": "3a61ff16-9afb-4c7c-9583-8ce588581350",
-      "status": "awaiting_user_approval",
-      "approval": "Automatic approval review rejected the exact esbuild@0.25.12 allowScripts entry; no workaround authorized."
+      "status": "blocked_on_permission",
+      "approval": "User authorized exact esbuild@0.25.12 allowScripts entry on 2026-11-08 via d5; entry applied in worktree branch worktree-agent-38df8a6c-2; verification npm ci --offline denied by session auto-mode classifier, awaiting user permission"
     }
   ],
-  "escalations": [],
+  "escalations": [
+    {
+      "issue": "38df8a6c",
+      "to": "just-in-time-d5",
+      "date": "2026-11-08",
+      "summary": "clean-install verification needs user permission"
+    }
+  ],
   "rework_counts": {
     "9c3eb2bf": 2,
     "cd0ac0f7": 1,
@@ -172,7 +179,7 @@
     "6326532e": 3
   },
   "started_at": "2026-11-04T23:10:18.497421+00:00",
-  "note": "All currently actionable frontend leaves landed with merged gates. Browser convergence awaits user approval for 38df installer policy; document adapters await external Git issue 933ff852 and its prerequisites. D-25 installed verification is linked.",
+  "note": "Session 2 (2026-11-08): d4172016 stale claim released and reclaimed; prior WIP preserved and rebased; opus worker dispatched.",
   "surfaced_pitfalls": [
     {
       "issue": "abf68973",
