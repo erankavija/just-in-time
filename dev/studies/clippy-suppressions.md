@@ -51,26 +51,6 @@ Clippy suggests `.iter_mut().enumerate()`, but this only provides mutable access
 
 ---
 
-### 4. `dead_code` - Public API Methods
-
-**Locations:**
-- `crates/jit/src/commands/document.rs`: `read_document_content`, `get_document_history`, `get_document_diff`, `get_linked_document_paths`
-- `crates/jit/src/commands/labels.rs`: `get_issue`
-
-**Reason:** These are public API methods that form part of the library interface but are not currently called by the CLI binary itself.
-
-**Usage:**
-- Document methods: Used by `jit-server` for REST API endpoints
-- Label methods: Part of public API for external consumers
-
-**Why not remove:**
-- Library crate provides API beyond just the CLI binary
-- `jit-server` depends on these methods
-- Removing would break API compatibility
-- Future features may require these
-
----
-
 ## Policy
 
 All clippy warnings must be either:

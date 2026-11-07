@@ -105,6 +105,35 @@ impl From<crate::domain::artifact_conformance::ReportedArtifact> for ArtifactCon
     }
 }
 
+/// An issue document's bytes at its selected version.
+#[derive(Debug)]
+pub struct DocumentReading {
+    pub document: crate::domain::DocumentReference,
+    pub bytes: Vec<u8>,
+    /// Storage's resolved short commit, or `working-tree`.
+    pub commit: String,
+}
+
+impl DocumentReading {
+    /// The bytes decoded as UTF-8, with invalid sequences replaced by U+FFFD.
+    pub fn text(&self) -> String {
+        String::from_utf8_lossy(&self.bytes).into_owned()
+    }
+}
+
+impl From<DocumentReading> for DocumentContentResult {
+    fn from(reading: DocumentReading) -> Self {
+        let content = reading.text();
+        Self {
+            path: reading.document.path,
+            label: reading.document.label,
+            commit: reading.commit,
+            doc_type: reading.document.doc_type,
+            content,
+        }
+    }
+}
+
 const EXTERNAL_URL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 const EXTERNAL_URL_WORKERS: usize = 4;
 
@@ -483,20 +512,6 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             })
     }
 
-    /// [`find_issue_document`](Self::find_issue_document) with the typed
-    /// [`PathReadError`](crate::storage::PathReadError) kept as the CLI error,
-    /// so an absent document classifies by variant.
-    fn require_issue_document(
-        &self,
-        issue: crate::domain::Issue,
-        path: &str,
-    ) -> Result<crate::domain::DocumentReference>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        Ok(self.find_issue_document(issue, path)?)
-    }
-
     /// List `issue_id`'s documents: its explicit links, then the files it owns
     /// by location under its artifact directories.
     pub fn list_document_references(
@@ -780,59 +795,87 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         })
     }
 
-    pub fn show_document_content(
+    /// `issue_id`'s document at `path`, explicit or derived.
+    ///
+    /// # Errors
+    ///
+    /// [`PathReadError::NotFound`](crate::storage::PathReadError::NotFound)
+    /// when the issue has no such document.
+    fn require_issue_document(
+        &self,
+        issue_id: &IssueId,
+        path: &str,
+    ) -> Result<crate::domain::DocumentReference>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let issue = self.exec.storage.load_issue(issue_id)?;
+        Ok(self.find_issue_document(issue, path)?)
+    }
+
+    /// The code checkout diff reads through.
+    fn require_code_checkout(&self) -> Result<crate::storage::git::GitCheckout> {
+        use crate::errors::{GitRequirementGap, RequiresGitError};
+
+        Ok(self
+            .exec
+            .require_worktree_paths()?
+            .code_checkout()
+            .ok_or_else(|| RequiresGitError::new(GitRequirementGap::NoRepository))?)
+    }
+
+    /// Read a document's bytes at `at_commit`, else its pinned commit, else
+    /// the working tree.
+    pub fn document_content(
         &self,
         issue_id: &IssueId,
         path: &str,
         at_commit: Option<&str>,
-    ) -> Result<DocumentContentResult>
+    ) -> Result<DocumentReading>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = issue_id.clone();
-        let issue = self.exec.storage.load_issue(&full_id)?;
-        let doc = self.require_issue_document(issue, path)?;
-        let reference = at_commit.or(doc.commit.as_deref());
-        let (content, commit) = self.exec.storage.read_path_text(&doc.path, reference)?;
-
-        Ok(DocumentContentResult {
-            path: doc.path.clone(),
-            label: doc.label.clone(),
-            commit: reference.unwrap_or(&commit).to_string(),
-            doc_type: doc.doc_type.clone(),
-            content,
+        let document = self.require_issue_document(issue_id, path)?;
+        let reference = at_commit.or(document.commit.as_deref());
+        let (bytes, commit) = self
+            .exec
+            .storage
+            .read_path_bytes(&document.path, reference)?;
+        Ok(DocumentReading {
+            document,
+            bytes,
+            commit,
         })
     }
 
-    pub fn document_history(
-        &self,
-        issue_id: &IssueId,
-        path: &str,
-    ) -> Result<crate::commands::DocumentHistory>
+    /// The commits that changed a document, newest first; empty without a
+    /// Git checkout or before its first commit.
+    pub fn document_history(&self, issue_id: &IssueId, path: &str) -> Result<DocumentHistory>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = issue_id.clone();
-        let issue = self.exec.storage.load_issue(&full_id)?;
-        self.require_issue_document(issue, path)?;
-
-        let checkout = self
-            .exec
-            .require_worktree_paths()?
-            .code_checkout()
-            .ok_or_else(|| anyhow!("Not a git repository"))?;
-        let commits = checkout
-            .file_history(path)?
-            .into_iter()
-            .map(commit_info_from_git)
-            .collect();
-
-        Ok(crate::commands::DocumentHistory {
+        self.require_issue_document(issue_id, path)?;
+        let commits = match self.exec.require_worktree_paths()?.code_checkout() {
+            None => Vec::new(),
+            Some(checkout) => match checkout.file_history(path) {
+                Ok(commits) => commits,
+                // `git log` fails on an unborn branch; only then is a failure empty history.
+                Err(error) => match checkout.head() {
+                    Ok(None) => Vec::new(),
+                    _ => return Err(error.into()),
+                },
+            },
+        }
+        .into_iter()
+        .map(commit_info_from_git)
+        .collect();
+        Ok(DocumentHistory {
             path: path.to_string(),
             commits,
         })
     }
 
+    /// A line diff of a document between `from` and `to` (default `HEAD`).
     pub fn document_diff(
         &self,
         issue_id: &IssueId,
@@ -843,21 +886,15 @@ impl<S: IssueStore> DocumentOps<'_, S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = issue_id.clone();
-        let issue = self.exec.storage.load_issue(&full_id)?;
-        self.require_issue_document(issue, path)?;
-
+        self.require_issue_document(issue_id, path)?;
+        let checkout = self.require_code_checkout()?;
         let layout = self.exec.require_layout()?;
         let paths = self.exec.require_worktree_paths()?;
-        let checkout = paths
-            .code_checkout()
-            .ok_or_else(|| anyhow!("Not a git repository"))?;
-
         let to_ref = to.unwrap_or("HEAD");
         let checkout_top_level = paths
             .code_checkout_top_level()
             .unwrap_or(layout.worktree_root());
-        let diff_output = render_document_diff(
+        let diff = render_document_diff(
             &checkout,
             checkout_top_level,
             layout.worktree_root(),
@@ -865,194 +902,16 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             from,
             to_ref,
         )?;
-
         Ok(DocumentDiffResult {
             path: path.to_string(),
             from_commit: from.to_string(),
             to_commit: to_ref.to_string(),
-            diff: diff_output,
-        })
-    }
-
-    /// Load an issue, returning a typed [`crate::storage::PathReadError`].
-    ///
-    /// Delegates to [`IssueStore::load_issue_or_not_found`], which each
-    /// backend implements without string-matching: `JsonFileStorage` checks for
-    /// file existence structurally, and `InMemoryStorage` checks the HashMap.
-    fn load_issue_typed(
-        &self,
-        issue_id: &IssueId,
-    ) -> Result<crate::domain::Issue, crate::storage::PathReadError> {
-        self.exec.storage.load_issue_or_not_found(issue_id)
-    }
-
-    /// Read document content from git or filesystem.
-    ///
-    /// Note: This method is part of the public API used by jit-server.
-    /// It's not called from the CLI binary, hence the dead_code warning.
-    ///
-    /// Returns typed [`crate::storage::PathReadError`] so route handlers can distinguish 404
-    /// (file or document not found) from 500 (storage failure)
-    /// without string-matching on error messages.
-    #[allow(dead_code)]
-    pub fn read_document_content(
-        &self,
-        issue_id: &IssueId,
-        path: &str,
-        at_commit: Option<&str>,
-    ) -> Result<(String, String), crate::storage::PathReadError>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        let issue = self.load_issue_typed(issue_id)?;
-        let doc = self.find_issue_document(issue, path)?;
-
-        // Prefer explicit at_commit; fall back to the doc's pinned commit; then
-        // None (working-tree read).
-        let effective_commit = at_commit.or(doc.commit.as_deref());
-
-        // The storage layer now enforces repo-relative paths and canonicalizes
-        // working-tree reads against the repo root (see
-        // `JsonFileStorage::read_path_bytes`), so we pass the stored path
-        // through unchanged.
-        self.exec
-            .storage
-            .read_path_text(&doc.path, effective_commit)
-    }
-
-    /// Read raw document bytes for an issue-scoped path (byte-faithful variant).
-    ///
-    /// Unlike [`Self::read_document_content`], this method does not convert file
-    /// content to `String`, so binary artifacts are round-tripped without loss.
-    ///
-    /// Steps:
-    /// 1. Load the issue and find its document at `path`, explicit or derived.
-    /// 2. Resolve the effective commit: explicit `at_commit` → doc's pinned commit → `None`.
-    /// 3. For working-tree reads, resolve the document path relative to the repo
-    ///    root so callers do not need to know the process CWD.
-    /// 4. Delegate to `IssueStore::read_path_bytes` with the resolved path and commit.
-    ///
-    /// Note: Part of public API used by jit-server.
-    #[allow(dead_code)]
-    pub fn read_document_bytes(
-        &self,
-        issue_id: &IssueId,
-        path: &str,
-        at_commit: Option<&str>,
-    ) -> Result<(Vec<u8>, String), crate::storage::PathReadError>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        let issue = self.load_issue_typed(issue_id)?;
-        let doc = self.find_issue_document(issue, path)?;
-
-        // Prefer explicit at_commit; fall back to the doc's pinned commit; then
-        // None (working-tree read).
-        let effective_commit = at_commit.or(doc.commit.as_deref());
-
-        // `JsonFileStorage::read_path_bytes` parses paths with
-        // `RootRelativePath::parse`, rejects the root identity, and checks
-        // working-tree reads for containment against the repository root.
-        // That makes pre-resolving to an absolute path here both unnecessary
-        // and actively harmful, so we simply pass the stored repo-relative path
-        // through.
-        self.exec
-            .storage
-            .read_path_bytes(&doc.path, effective_commit)
-    }
-
-    /// Get document history from git.
-    ///
-    /// Note: Part of public API used by jit-server.
-    ///
-    /// Returns [`crate::storage::PathReadError::NotFound`] when the issue has no document at
-    /// `path` so that route handlers can return HTTP 404 without
-    /// string-matching on the error message.
-    #[allow(dead_code)]
-    pub fn get_document_history(
-        &self,
-        issue_id: &IssueId,
-        path: &str,
-    ) -> Result<Vec<CommitInfo>, crate::storage::PathReadError>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::storage::PathReadError;
-
-        let issue = self.load_issue_typed(issue_id)?;
-        self.find_issue_document(issue, path)?;
-
-        let paths = self
-            .exec
-            .require_worktree_paths()
-            .map_err(PathReadError::Other)?;
-        Ok(paths
-            .code_checkout()
-            .and_then(|checkout| checkout.file_history(path).ok())
-            .unwrap_or_default()
-            .into_iter()
-            .map(commit_info_from_git)
-            .collect())
-    }
-
-    /// Get diff between document versions.
-    ///
-    /// Note: Part of public API used by jit-server.
-    ///
-    /// Returns [`crate::storage::PathReadError::NotFound`] when the issue has no document at
-    /// `path` so that route handlers can return HTTP 404 without
-    /// string-matching on the error message.
-    #[allow(dead_code)]
-    pub fn get_document_diff(
-        &self,
-        issue_id: &IssueId,
-        path: &str,
-        from: &str,
-        to: Option<&str>,
-    ) -> Result<String, crate::storage::PathReadError>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::storage::PathReadError;
-
-        let issue = self.load_issue_typed(issue_id)?;
-        self.find_issue_document(issue, path)?;
-
-        let layout = self.exec.require_layout().map_err(PathReadError::Other)?;
-        let paths = self
-            .exec
-            .require_worktree_paths()
-            .map_err(PathReadError::Other)?;
-        let Some(checkout) = paths.code_checkout() else {
-            return Err(PathReadError::Other(anyhow!(
-                "Document diff not available (requires git repository with history)"
-            )));
-        };
-        let to_ref = to.unwrap_or("HEAD");
-        let checkout_top_level = paths
-            .code_checkout_top_level()
-            .unwrap_or(layout.worktree_root());
-
-        render_document_diff(
-            &checkout,
-            checkout_top_level,
-            layout.worktree_root(),
-            path,
-            from,
-            to_ref,
-        )
-        .map_err(|_| {
-            PathReadError::Other(anyhow!(
-                "Document diff not available (requires git repository with history)"
-            ))
+            diff,
         })
     }
 
     /// Every issue's document paths, explicit or derived, sorted and
     /// deduplicated.
-    ///
-    /// Note: Part of public API used by jit-server search functionality.
-    #[allow(dead_code)]
     pub fn get_issue_document_paths(&self) -> Result<Vec<String>>
     where
         S: crate::storage::RepositoryStateStore,
@@ -2109,6 +1968,120 @@ mod tests {
     };
     use crate::test_utils::document_reference;
     use std::collections::BTreeSet;
+
+    /// Explicit commit, then pinned commit, then working tree select the
+    /// bytes read, byte for byte.
+    #[test]
+    fn test_document_content_reads_the_selected_version_bytes() {
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+        let git = crate::test_harness::git::GitRepository::init(repo.path());
+        let path = "artifact.bin";
+        let [pinned, explicit, working]: [&[u8]; 3] = [
+            b"pinned\0\xff\r\n",
+            b"explicit\0\xfe\r\n",
+            b"working\0\xfd\r\n",
+        ];
+        let pin = git.write(path, pinned).commit("Pinned version");
+        let at = git.write(path, explicit).commit("Explicit version");
+        git.write(path, working);
+        let [pinned_issue, unpinned_issue] = [Some(pin.as_str()), None].map(|commit| {
+            let id = executor
+                .issues()
+                .create_issue(
+                    "Bytes".into(),
+                    String::new(),
+                    crate::domain::Priority::Normal,
+                    vec![],
+                    vec![],
+                    None,
+                    None,
+                    false,
+                )
+                .unwrap()
+                .issue
+                .id;
+            executor
+                .documents()
+                .add_document_reference(&id, path, commit, None, None, true)
+                .unwrap();
+            id
+        });
+        let read = |id: &IssueId, at_commit: Option<&str>| {
+            executor
+                .documents()
+                .document_content(id, path, at_commit)
+                .unwrap()
+        };
+
+        for (reading, bytes, commit) in [
+            (read(&pinned_issue, Some(&at)), explicit, &at[..7]),
+            (read(&pinned_issue, None), pinned, &pin[..7]),
+            (read(&unpinned_issue, None), working, "working-tree"),
+        ] {
+            assert_eq!(reading.bytes, bytes);
+            assert_eq!(reading.commit, commit);
+        }
+    }
+
+    /// History is an empty list, not an error, without a Git checkout and
+    /// before the checkout's first commit.
+    #[test]
+    fn test_document_history_is_empty_without_git_or_commits() {
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(
+            "[worktree]\nenforce_leases = \"off\"\n",
+        )
+        .unwrap();
+        std::fs::write(repo.path().join("notes.md"), "notes").unwrap();
+        let id = executor
+            .issues()
+            .create_issue(
+                "History".into(),
+                String::new(),
+                crate::domain::Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap()
+            .issue
+            .id;
+        executor
+            .documents()
+            .add_document_reference(&id, "notes.md", None, None, None, true)
+            .unwrap();
+        let history = |executor: &CommandExecutor<crate::storage::JsonFileStorage>| {
+            executor
+                .documents()
+                .document_history(&id, "notes.md")
+                .unwrap()
+                .commits
+        };
+
+        assert!(history(&executor).is_empty());
+        crate::test_harness::git::GitRepository::init(repo.path());
+        let paths = crate::storage::WorktreePaths::detect_for_data_root(
+            &repo.path().join(".jit"),
+            repo.path(),
+        )
+        .unwrap();
+        assert!(history(&executor.with_worktree_paths(paths)).is_empty());
+    }
+
+    #[test]
+    fn test_document_reading_text_replaces_invalid_utf8() {
+        let reading = DocumentReading {
+            document: document_reference("latin1.txt"),
+            bytes: b"caf\xE9".to_vec(),
+            commit: "working-tree".to_string(),
+        };
+
+        assert_eq!(reading.text(), "caf\u{FFFD}");
+    }
 
     #[test]
     fn test_validate_external_url_times_out_when_server_never_answers() {
