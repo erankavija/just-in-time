@@ -64,7 +64,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Run the server and web UI on the core's shared mechanisms",
-  "updated_at": "2026-11-07T23:42:45.693557397Z"
+  "updated_at": "2026-11-07T23:57:55.045487600Z"
 }
