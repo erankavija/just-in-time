@@ -1983,7 +1983,19 @@
     "fb38bf1f": "REQ-05 added (commands import nothing from output, structural test); measure added conversion code at planning and report revised estimate vs +375 ceiling (6a)",
     "b23b1bf3": "gate_evaluate-many is the last legacy schema-table row; test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema targets it: repoint or delete with the row (or leave to da30b92a)"
   },
-  "coordination": "Steward01a1a886-d199-7093-b096-7acbab6adb48; f4d9502a lead01a1a88a-3bda-7302-8fdf-0662e2095cc1;0f8efc37 planning lead01a1a88d-d433-7032-b70a-eb7c4c59d62f. One epic per execution lead; coordinate main landing reservations.",
+  "coordination": [
+    "Steward01a1a886-d199-7093-b096-7acbab6adb48; f4d9502a lead01a1a88a-3bda-7302-8fdf-0662e2095cc1;0f8efc37 planning lead01a1a88d-d433-7032-b70a-eb7c4c59d62f. One epic per execution lead; coordinate main landing reservations.",
+    {
+      "date": "2026-11-08",
+      "from": "just-in-time-d5 (invoker)",
+      "rules": [
+        "escalations route to just-in-time-d5; user-only: permission prompts, reversing explicit user decisions",
+        "commit code/docs by explicit path; commit .jit/ whole via git commit -- .jit/ naming issue IDs",
+        "review gates use gpt-6.1-sol via gates.toml (be302dc9c); non-gate reviews: codex exec --ephemeral -s read-only -m gpt-6.1-sol high; log vendor/model/effort",
+        "forward review findings outside success criteria (speculative edges, extra mechanism) to d5 with gate run ID and quote before acting"
+      ]
+    }
+  ],
   "incidents": [
     {
       "date": "2026-11-04",
