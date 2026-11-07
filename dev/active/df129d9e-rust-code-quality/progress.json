@@ -678,6 +678,16 @@
           "status": "in_progress",
           "model_tier": "opus",
           "tier_reason": "cross-cutting script, self-test, Rust test and prose retirement"
+        },
+        {
+          "key": "over-limit-tests",
+          "id": "0b35be66-d62d-443d-ac86-91c906a6efea",
+          "short_id": "0b35be66",
+          "title": "Bring the tests the enforced limits flagged under their per-test limits",
+          "classification": "implementation",
+          "status": "in_progress",
+          "model_tier": "opus",
+          "tier_reason": "proptest/coverage-preserving cost cuts across five modules"
         }
       ]
     },
@@ -848,6 +858,11 @@
     {
       "id": "755964b2",
       "why": "Literal facade intra-doc link criterion regression found by epic pitfall audit; bounded existing documentation repair"
+    },
+    {
+      "id": "0b35be66",
+      "reason": "f487aeef enforcement flagged 10 tests over 2s/6s limits on a quiet host; blocks f487aeef",
+      "date": "2026-11-08"
     }
   ],
   "escalations": [
@@ -1006,7 +1021,8 @@
     "0546fc82": 4,
     "ab168296": 0,
     "755964b2": 1,
-    "fe3ad1b0": 1
+    "fe3ad1b0": 1,
+    "f487aeef": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1053,7 +1069,12 @@
     "Codex workers attempted `jit recover` despite the no-tracker-writes rule; briefs now name it explicitly.",
     "Lead review asked for a shared test helper (shared-test-contracts) that the code-review then read as recreating a removed wrapper against REQ-03; check a rework instruction against the issue's literal criteria before sending it.",
     "Lead's 4575a03d Notes correction searched only architecture/ paths and wrongly said the f2532a2d copies were gone; they were under eval/. Search the whole archive dir before asserting absence.",
-    "Two workers ran git checkout to measure the merge-base line count; briefs now say production-lines.py takes a revision and needs no checkout."
+    "Two workers ran git checkout to measure the merge-base line count; briefs now say production-lines.py takes a revision and needs no checkout.",
+    {
+      "source": "session 15 lead",
+      "summary": "Shared main index: git commit after git add <one path> swept another lead staged deletions (f191e0fca). Commit code/docs with git commit -- <paths>; commit .jit/ whole with git commit -- .jit/.",
+      "disposition": "process rule"
+    }
   ],
   "external_blockers": {},
   "started_at": "2026-10-21T05:00:00Z",

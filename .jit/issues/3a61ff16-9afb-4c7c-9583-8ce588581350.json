@@ -11,11 +11,19 @@
   ],
   "description": "Browser refresh, search and graph layout consume shared server results efficiently.\n\n## Success Criteria\n\n- [hard] REQ-01: The browser exposes shared search results, graph metadata and live configured hierarchy across refreshes; indexed bulk passes preserve layout semantics.\n",
   "documents": [],
+  "first_ready_at": "2026-11-07T23:07:07.370031926Z",
   "gates_required": [
     "repo-validate",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "run_id": "c6bb5a61-cfad-4ad7-ac77-bd4fd2d4a3ef",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:07:30.252724570Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3a61ff16-9afb-4c7c-9583-8ce588581350",
   "labels": [
     "type:story",
@@ -23,7 +31,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Browser convergence",
-  "updated_at": "2026-11-05T00:01:34.702986595Z"
+  "updated_at": "2026-11-07T23:07:30.252724570Z"
 }

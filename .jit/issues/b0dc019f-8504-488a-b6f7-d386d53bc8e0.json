@@ -11,7 +11,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "868e4c77-e11a-44ad-b3b3-05e7ba121246",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:08:11.908360329Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b0dc019f-8504-488a-b6f7-d386d53bc8e0",
   "labels": [
     "type:task",
@@ -26,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Domain names nothing from repository_state and type labels have no hand-written filter",
-  "updated_at": "2026-11-07T22:55:19.907098509Z"
+  "updated_at": "2026-11-07T23:08:11.908360329Z"
 }

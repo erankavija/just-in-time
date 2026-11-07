@@ -15,7 +15,33 @@ pass_context = true
 prompt_file = "./contrib/gates/breakdown-review-prompt.md"
 
 [gates.checker.env]
-REVIEWER_AGENT = 'codex exec -m gpt-5.6-sol -c model_reasoning_effort="high"'
+REVIEWER_AGENT = 'codex exec --sandbox read-only -m gpt-6.1-sol -c model_reasoning_effort="high"'
+
+[gates.reserved]
+
+[[gates]]
+version = 1
+key = "build-budget-selftest"
+title = "Build-budget checker self-test"
+description = "Runs scripts/rust-build-budget.sh --self-test over synthetic policy, Cargo-output and sparse-executable fixtures. Any non-zero exit fails the gate, including missing-tool errors."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+
+[gates.checker]
+type = "exec"
+command = "./scripts/rust-build-budget.sh --self-test"
+timeout_seconds = 300
+pass_context = false
+
+[gates.checker.env]
+
+[gates.inputs]
+roots = [
+    "scripts/rust-build-budget.sh",
+    "scripts/production-lines.py",
+]
+exclude = []
 
 [gates.reserved]
 
@@ -36,26 +62,20 @@ pass_context = false
 
 [gates.checker.env]
 
-# Inputs: the worktree root. The Rust suites this gate runs read the repository
-# itself (the profile package's live-source conformance walks the worktree and
-# the documentation projections compare against docs/), so the footprint is the
-# tree. The walk consults no ignore rule, so the exclusions name the git-ignored
-# generated and machine-local trees no step opens; the paths jit writes while
-# recording results never enter a digest.
 [gates.inputs]
 roots = ["."]
 exclude = [
-  ".agents/cache-pool",
-  ".agents/worktrees",
-  ".claude",
-  ".jit/server.log",
-  ".jit/server.pid.json",
-  "badges",
-  "coverage.json",
-  "target",
-  "web/dist",
-  "web/node_modules",
-  "web/test-output.log",
+    ".agents/cache-pool",
+    ".agents/worktrees",
+    ".claude",
+    ".jit/server.log",
+    ".jit/server.pid.json",
+    "badges",
+    "coverage.json",
+    "target",
+    "web/dist",
+    "web/node_modules",
+    "web/test-output.log",
 ]
 
 [gates.reserved]
@@ -77,24 +97,52 @@ pass_context = false
 
 [gates.checker.env]
 
-# Inputs: the same tree-wide footprint as cargo-ci — the feature-enabled run
-# compiles and tests the same crate over the same repository. See the cargo-ci
-# declaration for why the footprint is the tree and what the exclusions are.
 [gates.inputs]
 roots = ["."]
 exclude = [
-  ".agents/cache-pool",
-  ".agents/worktrees",
-  ".claude",
-  ".jit/server.log",
-  ".jit/server.pid.json",
-  "badges",
-  "coverage.json",
-  "target",
-  "web/dist",
-  "web/node_modules",
-  "web/test-output.log",
+    ".agents/cache-pool",
+    ".agents/worktrees",
+    ".claude",
+    ".jit/server.log",
+    ".jit/server.pid.json",
+    "badges",
+    "coverage.json",
+    "target",
+    "web/dist",
+    "web/node_modules",
+    "web/test-output.log",
 ]
+
+[gates.reserved]
+
+[[gates]]
+version = 1
+key = "cargo-ci-selftest"
+title = "cargo-ci self-test"
+description = "Runs scripts/cargo-ci-selftest.sh against the shipped CI pipeline. Any non-zero exit fails the gate, including missing-tool errors."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+
+[gates.checker]
+type = "exec"
+command = "./scripts/cargo-ci-selftest.sh"
+timeout_seconds = 900
+pass_context = false
+
+[gates.checker.env]
+
+[gates.inputs]
+roots = [
+    "scripts/benchmark-rust-build.sh",
+    "scripts/benchmark-session-cost.sh",
+    "scripts/cargo-ci-selftest.sh",
+    "scripts/cargo-ci.sh",
+    "scripts/profile-test-suite.sh",
+    "scripts/production-lines.py",
+    "scripts/rust-build-budget.sh",
+]
+exclude = []
 
 [gates.reserved]
 
@@ -115,7 +163,7 @@ pass_context = true
 prompt_file = "./contrib/gates/code-review-prompt.md"
 
 [gates.checker.env]
-REVIEWER_AGENT = 'codex exec --sandbox read-only -m gpt-5.6-terra -c model_reasoning_effort="high"'
+REVIEWER_AGENT = 'codex exec --sandbox read-only -m gpt-6.1-sol -c model_reasoning_effort="high"'
 
 [gates.reserved]
 
@@ -170,7 +218,42 @@ pass_context = true
 prompt_file = "./scripts/doc-review-prompt.md"
 
 [gates.checker.env]
-REVIEWER_AGENT = 'codex exec -m gpt-5.6-terra -c model_reasoning_effort="high"'
+REVIEWER_AGENT = 'codex exec --sandbox read-only -m gpt-6.1-sol -c model_reasoning_effort="high"'
+
+[gates.reserved]
+
+[[gates]]
+version = 1
+key = "docs-check-selftest"
+title = "Documentation checker self-test"
+description = "Runs scripts/docs-check-selftest.sh against documentation checkers and their repository fixtures. Any non-zero exit or SKIP notice fails; permission preconditions must be enforced."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+
+[gates.checker]
+type = "exec"
+command = '''out=$(./scripts/docs-check-selftest.sh 2>&1); rc=$?; printf '%s\n' "$out"; [ "$rc" -eq 0 ] && ! printf '%s\n' "$out" | grep -q '^SKIP:''''
+timeout_seconds = 600
+pass_context = false
+
+[gates.checker.env]
+
+[gates.inputs]
+roots = ["."]
+exclude = [
+    ".agents/cache-pool",
+    ".agents/worktrees",
+    ".claude",
+    ".jit/server.log",
+    ".jit/server.pid.json",
+    "badges",
+    "coverage.json",
+    "target",
+    "web/dist",
+    "web/node_modules",
+    "web/test-output.log",
+]
 
 [gates.reserved]
 
@@ -190,30 +273,22 @@ timeout_seconds = 300
 pass_context = false
 
 [gates.checker.env]
-# The adopter documentation surface, supplied explicitly. The checker defaults
-# to this same shipped surface when invoked without an override; repository
-# citation scanning and archival permanence are separate configured contracts.
 DOCS_FOOTPRINT = "docs/"
 
-# Inputs: the tree-wide footprint. The citation checker derives its comparison
-# from every tracked file and resolves `@/` items through the repository's
-# registries; the projection checker re-renders through a jit binary built from
-# the workspace; the shipped-policy checker clones the repository and runs
-# `jit init`. The exclusions are cargo-ci's.
 [gates.inputs]
 roots = ["."]
 exclude = [
-  ".agents/cache-pool",
-  ".agents/worktrees",
-  ".claude",
-  ".jit/server.log",
-  ".jit/server.pid.json",
-  "badges",
-  "coverage.json",
-  "target",
-  "web/dist",
-  "web/node_modules",
-  "web/test-output.log",
+    ".agents/cache-pool",
+    ".agents/worktrees",
+    ".claude",
+    ".jit/server.log",
+    ".jit/server.pid.json",
+    "badges",
+    "coverage.json",
+    "target",
+    "web/dist",
+    "web/node_modules",
+    "web/test-output.log",
 ]
 
 [gates.reserved]
@@ -235,7 +310,7 @@ pass_context = true
 prompt_file = "./scripts/holistic-review-prompt.md"
 
 [gates.checker.env]
-REVIEWER_AGENT = 'codex exec --sandbox read-only -m gpt-5.6-terra -c model_reasoning_effort="high"'
+REVIEWER_AGENT = 'codex exec --sandbox read-only -m gpt-6.1-sol -c model_reasoning_effort="high"'
 
 [gates.reserved]
 
@@ -260,6 +335,60 @@ pass_context = false
 
 [[gates]]
 version = 1
+key = "land-script-test"
+title = "Landing script test suite"
+description = "Runs the jit-execution-lead skill's test-land.sh, which drives land.sh through `jit worktree exec` over fixture repositories it owns: sync commit, merge, conflict abort, refusals and the real pre-commit hook. Any non-zero exit fails the gate."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+
+[gates.checker]
+type = "exec"
+command = "./.agents/skills/jit-execution-lead/scripts/test-land.sh"
+timeout_seconds = 300
+pass_context = false
+
+[gates.checker.env]
+
+[gates.inputs]
+roots = [
+    ".agents/skills/jit-execution-lead/scripts/land.sh",
+    ".agents/skills/jit-execution-lead/scripts/test-land.sh",
+]
+exclude = []
+
+[gates.reserved]
+
+[[gates]]
+version = 1
+key = "manifest-tool-test"
+title = "Breakdown-manifest tool test suite"
+description = "Runs the jit-planning-lead skill's evals/test-manifest-tool.sh, which exercises scripts/breakdown_manifest.py over its fixture manifests and the shared batch structural-conformance fixture. Any non-zero exit fails the gate, including a missing python3 under set -e."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+
+[gates.checker]
+type = "exec"
+command = "./.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh"
+timeout_seconds = 300
+pass_context = false
+
+[gates.checker.env]
+
+[gates.inputs]
+roots = [
+    ".agents/skills/jit-planning-lead/evals/fixtures",
+    ".agents/skills/jit-planning-lead/evals/test-manifest-tool.sh",
+    ".agents/skills/jit-planning-lead/scripts/breakdown_manifest.py",
+    "crates/jit/tests/fixtures/batch-structural-conformance.json",
+]
+exclude = []
+
+[gates.reserved]
+
+[[gates]]
+version = 1
 key = "npm-ci"
 title = "NPM CI (test + lint + build)"
 description = "Web workspace checks: vitest suite, ESLint, and production build all clean. Web-side equivalent of cargo-ci. Scoped to web/."
@@ -275,19 +404,46 @@ pass_context = false
 
 [gates.checker.env]
 
-# Inputs: the web workspace, which is the whole of what this gate tests, lints
-# and builds. Two exclusions, both stated rather than inherited from an ignore
-# rule: `web/dist` is this gate's own build output, and `web/node_modules` is
-# 339 MB that would be walked on every evaluation. The installed tree is not
-# digested; web/package-lock.json is, and it is what moves when a dependency
-# version changes.
 [gates.inputs]
-roots = [
-  "web",
-]
+roots = ["web"]
 exclude = [
-  "web/dist",
-  "web/node_modules",
+    "web/dist",
+    "web/node_modules",
+]
+
+[gates.reserved]
+
+[[gates]]
+version = 1
+key = "package-drift"
+title = "Package Drift"
+description = "The generated registry regions hold what the jit-dogfood package declares, and gate inputs hold their footprints. Runs the dev-only package-drift example."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+
+[gates.checker]
+type = "exec"
+command = "cargo run --quiet -p jit --example package-drift"
+timeout_seconds = 600
+pass_context = false
+
+[gates.checker.env]
+
+[gates.inputs]
+roots = ["."]
+exclude = [
+    ".agents/cache-pool",
+    ".agents/worktrees",
+    ".claude",
+    ".jit/server.log",
+    ".jit/server.pid.json",
+    "badges",
+    "coverage.json",
+    "target",
+    "web/dist",
+    "web/node_modules",
+    "web/test-output.log",
 ]
 
 [gates.reserved]
@@ -309,7 +465,30 @@ pass_context = true
 prompt_file = "./contrib/gates/plan-review-prompt.md"
 
 [gates.checker.env]
-REVIEWER_AGENT = 'codex exec -m gpt-5.6-terra -c model_reasoning_effort="high"'
+REVIEWER_AGENT = 'codex exec --sandbox read-only -m gpt-6.1-sol -c model_reasoning_effort="high"'
+
+[gates.reserved]
+
+[[gates]]
+version = 1
+key = "profile-suite-selftest"
+title = "Suite profiler self-test"
+description = "Runs scripts/profile-test-suite.sh --self-test over the suite profiler. Any non-zero exit fails the gate, including missing-tool errors."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+
+[gates.checker]
+type = "exec"
+command = "./scripts/profile-test-suite.sh --self-test"
+timeout_seconds = 300
+pass_context = false
+
+[gates.checker.env]
+
+[gates.inputs]
+roots = ["scripts/profile-test-suite.sh"]
+exclude = []
 
 [gates.reserved]
 
@@ -349,10 +528,6 @@ pass_context = false
 
 [gates.checker.env]
 
-# No inputs: scripts/secret-scan.sh scans every tracked file, the tracker's
-# records included, and those records never enter an input digest, so a reused
-# verdict could pass a record that gained a secret. The gate runs on every
-# evaluation.
 [gates.reserved]
 
 [[gates]]
@@ -363,180 +538,6 @@ description = "Manual threat-model review covers path containment, symlink and j
 stage = "precheck"
 mode = "manual"
 priority = 100
-
-[gates.reserved]
-
-[[gates]]
-version = 1
-key = "cargo-ci-selftest"
-title = "cargo-ci self-test"
-description = "Runs scripts/cargo-ci-selftest.sh against the shipped CI pipeline. Any non-zero exit fails the gate, including missing-tool errors."
-stage = "postcheck"
-mode = "auto"
-priority = 100
-
-[gates.checker]
-type = "exec"
-command = "./scripts/cargo-ci-selftest.sh"
-timeout_seconds = 900
-pass_context = false
-
-[gates.checker.env]
-
-# Inputs: the self-test, the pipeline it drives, and the scripts that pipeline
-# delegates to. The fixture crates are generated by the self-test itself.
-[gates.inputs]
-roots = [
-  "scripts/benchmark-rust-build.sh",
-  "scripts/benchmark-session-cost.sh",
-  "scripts/cargo-ci-selftest.sh",
-  "scripts/cargo-ci.sh",
-  "scripts/profile-test-suite.sh",
-  "scripts/production-lines.py",
-  "scripts/rust-build-budget.sh",
-]
-
-[gates.reserved]
-
-[[gates]]
-version = 1
-key = "profile-suite-selftest"
-title = "Suite profiler self-test"
-description = "Runs scripts/profile-test-suite.sh --self-test over the suite profiler. Any non-zero exit fails the gate, including missing-tool errors."
-stage = "postcheck"
-mode = "auto"
-priority = 100
-
-[gates.checker]
-type = "exec"
-command = "./scripts/profile-test-suite.sh --self-test"
-timeout_seconds = 300
-pass_context = false
-
-[gates.checker.env]
-
-[gates.inputs]
-roots = [
-  "scripts/profile-test-suite.sh",
-]
-
-[gates.reserved]
-
-[[gates]]
-version = 1
-key = "build-budget-selftest"
-title = "Build-budget checker self-test"
-description = "Runs scripts/rust-build-budget.sh --self-test over synthetic policy, Cargo-output and sparse-executable fixtures. Any non-zero exit fails the gate, including missing-tool errors."
-stage = "postcheck"
-mode = "auto"
-priority = 100
-
-[gates.checker]
-type = "exec"
-command = "./scripts/rust-build-budget.sh --self-test"
-timeout_seconds = 300
-pass_context = false
-
-[gates.checker.env]
-
-[gates.inputs]
-roots = [
-  "scripts/rust-build-budget.sh",
-  "scripts/production-lines.py",
-]
-
-[gates.reserved]
-
-[[gates]]
-version = 1
-key = "docs-check-selftest"
-title = "Documentation checker self-test"
-description = "Runs scripts/docs-check-selftest.sh against documentation checkers and their repository fixtures. Any non-zero exit or SKIP notice fails; permission preconditions must be enforced."
-stage = "postcheck"
-mode = "auto"
-priority = 100
-
-[gates.checker]
-type = "exec"
-command = "out=$(./scripts/docs-check-selftest.sh 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ \"$rc\" -eq 0 ] && ! printf '%s\\n' \"$out\" | grep -q '^SKIP:'"
-timeout_seconds = 600
-pass_context = false
-
-[gates.checker.env]
-
-[gates.inputs]
-roots = ["."]
-exclude = [
-  ".agents/cache-pool",
-  ".agents/worktrees",
-  ".claude",
-  ".jit/server.log",
-  ".jit/server.pid.json",
-  "badges",
-  "coverage.json",
-  "target",
-  "web/dist",
-  "web/node_modules",
-  "web/test-output.log",
-]
-
-[gates.reserved]
-
-[[gates]]
-version = 1
-key = "shipped-policy-regions-selftest"
-title = "Shipped-policy region generator self-test"
-description = "Runs scripts/generate-shipped-policy-regions-selftest.sh: the generator changes nothing on a current tree, restores a corrupted region while keeping every byte outside its markers, and fails on malformed markers. Any non-zero exit fails the gate, including exit 2 for a missing git or jit."
-stage = "postcheck"
-mode = "auto"
-priority = 100
-
-[gates.checker]
-type = "exec"
-command = "./scripts/generate-shipped-policy-regions-selftest.sh"
-timeout_seconds = 300
-pass_context = false
-
-[gates.checker.env]
-
-# Inputs: the self-test, the generator, the files whose regions it renders, and
-# the shipped package it renders them from.
-[gates.inputs]
-roots = [
-  "docs/reference/configuration.md",
-  "docs/reference/example-config.toml",
-  "profiles/jit-default",
-  "scripts/generate-shipped-policy-regions-selftest.sh",
-  "scripts/generate-shipped-policy-regions.sh",
-]
-
-[gates.reserved]
-
-[[gates]]
-version = 1
-key = "workflow-contract-selftest"
-title = "Workflow-contract harness self-test"
-description = "Runs scripts/workflow-contract-selftest.sh, which shows the workflow-contract harness rejects each defect in its case vectors and that the actionlint wiring rejects an actionlint-only defect. Any non-zero exit fails the gate, including exit 2 for a missing python3 and the failure reported when actionlint is unavailable."
-stage = "postcheck"
-mode = "auto"
-priority = 100
-
-[gates.checker]
-type = "exec"
-command = "./scripts/workflow-contract-selftest.sh"
-timeout_seconds = 300
-pass_context = false
-
-[gates.checker.env]
-
-[gates.inputs]
-roots = [
-  ".github",
-  "scripts/workflow-contract-selftest.sh",
-  "scripts/workflow-contract.py",
-  "scripts/workflow-contract.sh",
-  "test-vectors/workflow-contract",
-]
 
 [gates.reserved]
 
@@ -559,26 +560,27 @@ pass_context = false
 
 [gates.inputs]
 roots = [
-  "crates/jit/src/storage/json.rs",
-  "dev/archive/1cc809de-repository-state-quality/studies/perf/session-cost-27ffbd2d.json",
-  "scripts/benchmark-session-cost-selftest.sh",
-  "scripts/benchmark-session-cost.sh",
+    "crates/jit/src/storage/json.rs",
+    "dev/archive/1cc809de-repository-state-quality/studies/perf/session-cost-27ffbd2d.json",
+    "scripts/benchmark-session-cost-selftest.sh",
+    "scripts/benchmark-session-cost.sh",
 ]
+exclude = []
 
 [gates.reserved]
 
 [[gates]]
 version = 1
-key = "standards-scan-test"
-title = "Standards-scan test suite"
-description = "Runs the jit-project-lead skill's test-standards-scan.sh, which seeds a jit init fixture with issues and documents for each asserted finding and checks the findings standards-scan.sh emits. Any non-zero exit fails the gate, including exit 2 for a missing jit, jq or gawk."
+key = "shipped-policy-regions-selftest"
+title = "Shipped-policy region generator self-test"
+description = "Runs scripts/generate-shipped-policy-regions-selftest.sh: the generator changes nothing on a current tree, restores a corrupted region while keeping every byte outside its markers, and fails on malformed markers. Any non-zero exit fails the gate, including exit 2 for a missing git or jit."
 stage = "postcheck"
 mode = "auto"
 priority = 100
 
 [gates.checker]
 type = "exec"
-command = "./.agents/skills/jit-project-lead/scripts/test-standards-scan.sh"
+command = "./scripts/generate-shipped-policy-regions-selftest.sh"
 timeout_seconds = 300
 pass_context = false
 
@@ -586,9 +588,13 @@ pass_context = false
 
 [gates.inputs]
 roots = [
-  ".agents/skills/jit-project-lead/scripts/standards-scan.sh",
-  ".agents/skills/jit-project-lead/scripts/test-standards-scan.sh",
+    "docs/reference/configuration.md",
+    "docs/reference/example-config.toml",
+    "profiles/jit-default",
+    "scripts/generate-shipped-policy-regions-selftest.sh",
+    "scripts/generate-shipped-policy-regions.sh",
 ]
+exclude = []
 
 [gates.reserved]
 
@@ -611,25 +617,26 @@ pass_context = false
 
 [gates.inputs]
 roots = [
-  ".agents/skills/jit-project-lead/scripts/standards-fix.sh",
-  ".agents/skills/jit-project-lead/scripts/standards-scan.sh",
-  ".agents/skills/jit-project-lead/scripts/test-standards-fix.sh",
+    ".agents/skills/jit-project-lead/scripts/standards-fix.sh",
+    ".agents/skills/jit-project-lead/scripts/standards-scan.sh",
+    ".agents/skills/jit-project-lead/scripts/test-standards-fix.sh",
 ]
+exclude = []
 
 [gates.reserved]
 
 [[gates]]
 version = 1
-key = "manifest-tool-test"
-title = "Breakdown-manifest tool test suite"
-description = "Runs the jit-planning-lead skill's evals/test-manifest-tool.sh, which exercises scripts/breakdown_manifest.py over its fixture manifests and the shared batch structural-conformance fixture. Any non-zero exit fails the gate, including a missing python3 under set -e."
+key = "standards-scan-test"
+title = "Standards-scan test suite"
+description = "Runs the jit-project-lead skill's test-standards-scan.sh, which seeds a jit init fixture with issues and documents for each asserted finding and checks the findings standards-scan.sh emits. Any non-zero exit fails the gate, including exit 2 for a missing jit, jq or gawk."
 stage = "postcheck"
 mode = "auto"
 priority = 100
 
 [gates.checker]
 type = "exec"
-command = "./.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh"
+command = "./.agents/skills/jit-project-lead/scripts/test-standards-scan.sh"
 timeout_seconds = 300
 pass_context = false
 
@@ -637,11 +644,39 @@ pass_context = false
 
 [gates.inputs]
 roots = [
-  ".agents/skills/jit-planning-lead/evals/fixtures",
-  ".agents/skills/jit-planning-lead/evals/test-manifest-tool.sh",
-  ".agents/skills/jit-planning-lead/scripts/breakdown_manifest.py",
-  "crates/jit/tests/fixtures/batch-structural-conformance.json",
+    ".agents/skills/jit-project-lead/scripts/standards-scan.sh",
+    ".agents/skills/jit-project-lead/scripts/test-standards-scan.sh",
 ]
+exclude = []
+
+[gates.reserved]
+
+[[gates]]
+version = 1
+key = "workflow-contract-selftest"
+title = "Workflow-contract harness self-test"
+description = "Runs scripts/workflow-contract-selftest.sh, which shows the workflow-contract harness rejects each defect in its case vectors and that the actionlint wiring rejects an actionlint-only defect. Any non-zero exit fails the gate, including exit 2 for a missing python3 and the failure reported when actionlint is unavailable."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+
+[gates.checker]
+type = "exec"
+command = "./scripts/workflow-contract-selftest.sh"
+timeout_seconds = 300
+pass_context = false
+
+[gates.checker.env]
+
+[gates.inputs]
+roots = [
+    ".github",
+    "scripts/workflow-contract-selftest.sh",
+    "scripts/workflow-contract.py",
+    "scripts/workflow-contract.sh",
+    "test-vectors/workflow-contract",
+]
+exclude = []
 
 [gates.reserved]
 
@@ -664,69 +699,10 @@ pass_context = false
 
 [gates.inputs]
 roots = [
-  ".agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh",
-  ".agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh",
-  ".agents/skills/jit-execution-lead/scripts/test-worktree-cache.sh",
+    ".agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh",
+    ".agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh",
+    ".agents/skills/jit-execution-lead/scripts/test-worktree-cache.sh",
 ]
-
-[gates.reserved]
-
-[[gates]]
-version = 1
-key = "land-script-test"
-title = "Landing script test suite"
-description = "Runs the jit-execution-lead skill's test-land.sh, which drives land.sh through `jit worktree exec` over fixture repositories it owns: sync commit, merge, conflict abort, refusals and the real pre-commit hook. Any non-zero exit fails the gate."
-stage = "postcheck"
-mode = "auto"
-priority = 100
-
-[gates.checker]
-type = "exec"
-command = "./.agents/skills/jit-execution-lead/scripts/test-land.sh"
-timeout_seconds = 300
-pass_context = false
-
-[gates.checker.env]
-
-[gates.inputs]
-roots = [
-  ".agents/skills/jit-execution-lead/scripts/land.sh",
-  ".agents/skills/jit-execution-lead/scripts/test-land.sh",
-]
-
-[gates.reserved]
-
-[[gates]]
-version = 1
-key = "package-drift"
-title = "Package Drift"
-description = "The generated registry regions hold what the jit-dogfood package declares, and gate inputs hold their footprints. Runs the dev-only package-drift example."
-stage = "postcheck"
-mode = "auto"
-priority = 100
-
-[gates.checker]
-type = "exec"
-command = "cargo run --quiet -p jit --example package-drift"
-timeout_seconds = 600
-pass_context = false
-
-[gates.checker.env]
-
-[gates.inputs]
-roots = ["."]
-exclude = [
-  ".agents/cache-pool",
-  ".agents/worktrees",
-  ".claude",
-  ".jit/server.log",
-  ".jit/server.pid.json",
-  "badges",
-  "coverage.json",
-  "target",
-  "web/dist",
-  "web/node_modules",
-  "web/test-output.log",
-]
+exclude = []
 
 [gates.reserved]
