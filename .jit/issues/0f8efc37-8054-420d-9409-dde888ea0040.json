@@ -4,6 +4,7 @@
   "context": {},
   "created_at": "2026-10-20T20:12:38.027010524Z",
   "dependencies": [
+    "1471c12a-5117-45e0-8712-f4968ff7b934",
     "3a61ff16-9afb-4c7c-9583-8ce588581350",
     "a236e81e-4890-4607-931a-e3d3612c3899",
     "c8e79465-e28c-4dea-8c25-ad3fdc812e34"
@@ -37,6 +38,12 @@
     "holistic-review"
   ],
   "gates_status": {
+    "holistic-review": {
+      "run_id": "ea3ab36e-fba6-48d1-b8e0-d92583179503",
+      "status": "failed",
+      "updated_at": "2026-11-07T23:41:56.103025852Z",
+      "updated_by": "auto:executor"
+    },
     "repo-validate": {
       "run_id": "baac5a7f-44df-4fa5-9379-a350a11a87dd",
       "status": "passed",
@@ -57,7 +64,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Run the server and web UI on the core's shared mechanisms",
-  "updated_at": "2026-11-07T23:36:37.239626224Z"
+  "updated_at": "2026-11-07T23:42:45.693557397Z"
 }

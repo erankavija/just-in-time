@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-07T23:42:46.148670910Z",
+  "context": {},
+  "created_at": "2026-11-07T23:42:39.042291451Z",
+  "dependencies": [],
+  "description": "Linked-document search returns root-relative paths that the document routes accept.\n\n## Background\n\nHolistic review run `ea3ab36e-fba6-48d1-b8e0-d92583179503` (F1, blocking) found that `search::search_files` passes canonicalized absolute paths to ripgrep, which reports them verbatim. The combined HTTP search forwards those absolute paths, and the browser sends them to document endpoints that reject absolute paths with HTTP 400.\n\n## Success Criteria\n\n- [hard] REQ-01: Linked-document matches from the combined HTTP search carry the repository-relative path of the linked document, which the issue-document content route accepts; a test proves a returned match path loads through that route.\n- [hard] REQ-02: Top-level `jit search` raw-content results keep their documented path contract.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-07T23:42:39.042291451Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "1471c12a-5117-45e0-8712-f4968ff7b934",
+  "labels": [
+    "epic:frontends-share-core",
+    "story:frontend-server",
+    "milestone:v1.0",
+    "satisfies:0f8efc37/REQ-08",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "in_progress",
+  "title": "Return repository-relative paths from linked-document search",
+  "updated_at": "2026-11-07T23:42:46.148670910Z"
+}

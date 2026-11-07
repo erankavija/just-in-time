@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "786635a1-ae08-45af-9722-94dceaf93700",
+      "status": "failed",
+      "updated_at": "2026-11-07T23:39:41.658036149Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6ffb399f-f495-4517-92f9-b35ca72fe4b4",
+      "status": "failed",
+      "updated_at": "2026-11-07T23:42:41.187468965Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "219b9df8-5f17-4d01-a332-065faed23f7b",
   "labels": [
     "type:task",
@@ -25,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Test declaration fixtures validate paths through the canonical validator",
-  "updated_at": "2026-11-07T23:31:34.450311905Z"
+  "updated_at": "2026-11-07T23:42:41.187468965Z"
 }
