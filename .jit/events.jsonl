@@ -25744,3 +25744,7 @@
 {"fields":["dependencies"],"id":"bb07f057-8873-48f5-822f-bb96d7cfb3fb","issue_id":"dfb2f10d-c4fd-4b8d-b7b1-3df71749523a","timestamp":"2026-11-07T22:55:10.422769478Z","type":"issue_updated","updated_by":"dependency-add"}
 {"from":"ready","id":"7863fe41-9583-48fa-9435-c870ff68f015","issue_id":"b0dc019f-8504-488a-b6f7-d386d53bc8e0","timestamp":"2026-11-07T22:55:19.907098509Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"7fe0d803-8b97-462f-ad1d-9a991b4f1668","issue_id":"b0dc019f-8504-488a-b6f7-d386d53bc8e0","timestamp":"2026-11-07T22:55:19.907098509Z","type":"issue_claimed"}
+{"from":"in_progress","id":"4871d988-78be-4612-8c49-e9badbab9a74","issue_id":"d4172016-0225-4ae8-aa37-3e4f28a1922c","timestamp":"2026-11-07T22:58:51.640248676Z","to":"ready","type":"issue_state_changed"}
+{"assignee":"agent:f4d9502a-lead","id":"f983f335-68b4-4380-a33f-289ef616673c","issue_id":"d4172016-0225-4ae8-aa37-3e4f28a1922c","reason":"stale claim: f4d9502a lead's epic is complete; 0f8efc37 lead resumes the preserved WIP","released_by":"human:Vesa-Kaskivuo","timestamp":"2026-11-07T22:58:51.640248676Z","type":"issue_released"}
+{"from":"ready","id":"ed417bab-a6d0-4516-b9ca-cf67c67e9924","issue_id":"d4172016-0225-4ae8-aa37-3e4f28a1922c","timestamp":"2026-11-07T22:58:51.999488845Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"630f4a9f-28e6-4320-8177-016c8df01cac","issue_id":"d4172016-0225-4ae8-aa37-3e4f28a1922c","timestamp":"2026-11-07T22:58:51.999488845Z","type":"issue_claimed"}
