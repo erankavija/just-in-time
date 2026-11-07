@@ -1,7 +1,7 @@
 {
   "epic_id": "0f8efc37-8054-420d-9409-dde888ea0040",
   "epic_short_id": "0f8efc37",
-  "current_wave": 3,
+  "current_wave": 6,
   "waves": [
     {
       "wave_number": 1,
@@ -72,7 +72,7 @@
           "short_id": "d4172016",
           "title": "Converge document operation adapters",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "4538b071-a0f7-4ae6-8c1d-a11b76962b6e",
@@ -112,7 +112,7 @@
           "short_id": "c8e79465",
           "title": "Server convergence",
           "classification": "checkpoint",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -180,7 +180,8 @@
       "issue": "abf68973",
       "source": "preliminary code-review F1",
       "summary": "Reviewer flags satisfies:c8e79465/REQ-01 on server-modules as not directly establishing route behavior; reconcile against server-story REQ-01 before container completion.",
-      "status": "open"
+      "status": "resolved",
+      "resolution": "satisfies namespace denotes contribution, not sole delivery (.jit/config.toml [namespaces.satisfies]); c8e79465 REQ-01 is delivered jointly by route-level children 0f302914, 6326532e, 4d8791fb, ca44bb7c, 4538b071, d4172016; c8e79465 code-review passed with 0 findings."
     }
   ],
   "decision_d25": {
@@ -227,6 +228,23 @@
       "effort": "high",
       "verdict": "fail",
       "finding": "split combined server test (@/inv/orthogonal-tests)"
+    },
+    {
+      "issue": "d4172016",
+      "gate": "code-review",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "tree": "a4ce0b488"
+    },
+    {
+      "issue": "c8e79465",
+      "gate": "code-review",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass"
     }
   ],
   "amendments": [
