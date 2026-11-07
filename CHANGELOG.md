@@ -8,9 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- **`jit search` result paths are relative to the search root.** Each
-  result's `path` is relative to the `.jit/` data directory instead of
-  absolute. See [`jit search`](docs/reference/cli-commands.md#jit-search).
+- **Search result paths are relative to the search root.** Each `jit search`
+  result's `path` is relative to the `.jit/` data directory, and each
+  linked-document match from the server's combined search is relative to the
+  repository, rather than absolute, so a match path opens through the document
+  routes. See [`jit search`](docs/reference/cli-commands.md#jit-search).
 
 - **Every repository write appends an event.** A write that records no domain
   event, such as `jit config set`, `jit project render`, `jit validate --fix`
