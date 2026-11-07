@@ -1,12 +1,6 @@
 # Worktree Dispatch Protocol
 
-This protocol governs how the jit-execution-lead skill dispatches parallel sub-agent workers when the work needs file-system isolation (i.e., multiple workers editing the same crate / module / source tree).
-
-It exists because two recurring failure modes are not prevented by an agent
-tool's built-in `isolation: "worktree"` parameter:
-
-1. **TRAP 1 — stale-base worktrees.** All four parallel workers' worktrees branched from a 41-commit-old ancestor instead of current `main` HEAD. The workers never saw the most recent Wave-3 closures. Their per-file diffs vs. main mixed real worker changes with apparent "reverts" that were just commits absent from the worker branch. Naïve integration would have clobbered the missing commits.
-2. **TRAP 6 — worker file leakage into main.** Two of the four workers wrote files into the parent (main) checkout instead of their isolated worktree, contaminating main with worker artefacts that had to be detected and reverted post hoc.
+This protocol governs how the jit-execution-lead skill dispatches parallel sub-agent workers when the work needs file-system isolation (i.e., multiple workers editing the same crate / module / source tree). It guards against two failures that the Agent tool's `isolation: "worktree"` parameter does not prevent: worktrees branched from a stale ancestor, and workers writing into the main checkout.
 
 ## Protocol
 
@@ -19,40 +13,27 @@ git checkout main
 git status        # tracked changes allowed only under the resolved data root
 ```
 
-The script obtains the absolute data root from `jit worktree info --field data_root` (requires `jit`). Staged or unstaged changes under that root may remain: workers branch from the committed main revision. Any other tracked change blocks dispatch and is named in the refusal; commit or stash it first. An external data root exempts no checkout path. The snapshot includes all dirt, preserving the leak-check baseline in step 4.
+The script obtains the absolute data root from `jit worktree info --field data_root` (requires `jit`). Staged or unstaged changes under that root may remain: workers branch from the committed main revision. Any other tracked change blocks dispatch and is named in the refusal; commit or stash it first. An external data root exempts no checkout path.
 
-### Step 2 — Manual worktree creation + snapshot
-
-Run the project's wrapper script:
+### Step 2 — Create worktrees
 
 ```bash
 .agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh <short-id-1> <short-id-2> ...
 ```
 
-The script lives in this skill's directory and is generic across projects (it operates on whatever git repo your current working directory belongs to). It:
-
-1. Verifies the current branch is `main` and no tracked change lies outside the resolved data root.
-2. Snapshots `git status -uall --porcelain` of main to `/tmp/lead-pre-dispatch-<ts>.txt` and links `/tmp/lead-pre-dispatch-latest.txt` to it.
-3. For each short-id, runs `git worktree add -b worktree-agent-<short-id> .agents/worktrees/agent-<short-id> <main-HEAD-sha>`. Anchoring explicitly on `main`'s commit SHA (not the branch name) prevents any race where main moves mid-dispatch.
-4. Verifies each worktree's HEAD SHA exactly matches `main`'s HEAD SHA.
-5. Seeds each worktree from the shared cache pool when one exists (see **Build-artifact recycling**).
-6. Creates one temporary directory per worktree and emits a prompt-header block per dispatched issue. The worker exports that directory as `TMPDIR` for every build and test command.
-
-The temporary directory is `<LEAD_WORKTREE_TMP_ROOT>/<repo-root-without-leading-slash>/agent-<short-id>`. `LEAD_WORKTREE_TMP_ROOT` defaults to `/tmp/lead-worker-tmp`; set it to an absolute path outside the repository when another disk is needed. Use the same value for dispatch and reclaim. The directories stay outside the worktrees, so reclaim removes them without harvesting them into the cache pool.
+Per short-id, the script creates `.agents/worktrees/agent-<short-id>` on branch `worktree-agent-<short-id>`, anchored to `main`'s HEAD SHA and verified against it. It snapshots main's `git status -uall` for the leak check, seeds build caches from the shared cache pool, creates a per-worker temporary directory the worker exports as `TMPDIR`, and emits a prompt-header block per issue. Its header comment documents the environment variables (`LEAD_CACHE_POOL`, `LEAD_WORKTREE_TMP_ROOT`, `LEAD_SNAPSHOT_DIR`); use the same values for dispatch and reclaim.
 
 ### Step 3 — Dispatch
 
 Call `Agent` with:
 
-- `subagent_type: "general-purpose"`
-- **No `isolation` parameter.** Manual worktree creation in step 2 replaces it. Using `isolation: "worktree"` after manual creation would create a *second*, stale-base worktree alongside the manual one and re-introduce TRAP 1.
-- The prompt prefixed with the boilerplate emitted by the dispatch script. The boilerplate names the worktree path, the branch, and the path-discipline rules (no checkout-specific absolute paths, run every command from the worktree root).
-- `run_in_background: true` for parallel work. Background mode is required so the lead can dispatch the rest of the wave without waiting on each worker.
+- **No `isolation` parameter.** Using `isolation: "worktree"` after manual creation creates a second, stale-base worktree.
+- The prompt prefixed with the header block the script emitted. It names the worktree path, the branch, and the path-discipline rules.
+- `run_in_background: true` for parallel work.
 
-Worker worktrees are linked checkouts, so jit's `worktree.write_policy`
-(refusing by default) governs state-mutating jit commands run from them. This
-composes with the protocol's division of labor — workers use the tracker
-read-only; the lead owns issue state from the primary.
+Worker worktrees are linked checkouts, so jit's `worktree.write_policy` (refusing by default) governs state-mutating jit commands run from them: workers use the tracker read-only, and the lead owns issue state from the primary.
+
+A worker whose sandbox cannot write outside its worktree (observed with codex linked-checkout workspaces) must leave its toolchain's build-output and cache directories at their in-worktree defaults; dispatch-time seeding still reaches it.
 
 ### Step 4 — Post-completion leak check
 
@@ -62,14 +43,12 @@ After all dispatched workers complete (or fail / time out), run:
 .agents/skills/jit-execution-lead/scripts/check-leak-into-main.sh
 ```
 
-This compares main's current `git status -uall` against the dispatch-time snapshot. Files unique to the current state are likely worker leaks. The script prints recovery commands.
-
-If leaks are detected:
+It compares main's current `git status -uall` against the dispatch-time snapshot and prints recovery commands for each leak:
 
 - **Tracked-file modifications** (` M <path>`): `git restore <path>` to revert.
 - **Untracked files** (`?? <path>`): `mv` them to the correct worktree (and amend the worker's preserve commit if applicable), or `rm` if unwanted.
 
-Re-run the leak check until it returns clean before doing any commits on main.
+Re-run the leak check until it returns clean before doing any commits on main. Run it after every wave, even when the wave looks clean.
 
 ### Step 5 — Gate the merged tree
 
@@ -83,41 +62,23 @@ scripts/cargo-ci.sh       # this project's gate; use whichever one your project 
 
 `land.sh` holds the repository write lock while it commits pending tracker state as `chore(jit): sync tracker` and merges. On a conflict it aborts the merge, keeps that commit, and names the paths: resolve them with `git merge` by hand.
 
-This closes a gap that the leak check (Step 4) and the per-issue gates cannot: both evidence a pre-merge working tree. A worker branch anchored before a module deletion, merged after it, cleanly re-adds a declaration referencing a file that no longer exists. A branch that changes a function's signature merges cleanly with a branch that adds a caller of the old form. In each case the merge finds no textual overlap and reports no conflict, the leak check reports no leak because the merge is legitimate, and every per-issue gate still reads green because each ran on a tree that predates the combination. Only a check run on the merged tree observes it.
-
-The gate must compile **and run** the project's tests. A build-only check is not enough: `cargo build` and its equivalents compile neither test targets nor dev-dependencies, so a merge that breaks only test code passes such a check, as does a merge that compiles and fails when the tests run. Both have been observed here.
-
-State what this does and does not establish. The gate judges a working tree, so its verdict is the merge commit's verdict only while that tree is clean — check `git status --porcelain` first, and read a gate run over uncommitted edits as evidence about those edits, not about any commit. Gating once after several merges judges only the final tree: an intermediate merge commit that does not build is never observed, so gate after each merge whenever per-merge attribution matters.
+The gate must compile **and run** the project's tests; a build-only check is insufficient. Its verdict belongs to the merge commit only when the tree is clean, and gating once after several merges judges only the final tree.
 
 If the gate reports failure, repair the merge commit (`git commit --amend` or a follow-up fix commit) and re-run it before merging the next branch.
 
-When the check runs through the tracker's own gate evaluation (`jit gate
-evaluate`), another agent's active lease on the issue refuses it.
+When the check runs through the tracker's own gate evaluation (`jit gate evaluate`), another agent's active lease on the issue refuses it.
 
 ### Step 6 — Reclaim worktrees once the wave closes
 
-Merging a branch does not reclaim its worktree. One worktree accumulates per dispatched issue, each carrying a full build tree, so a container exhausts host storage unless the lead prunes.
-
-After each wave closes, with no build running:
+Merging a branch does not reclaim its worktree. After each wave closes, with no build running:
 
 ```bash
 .agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh <short-id>...
 ```
 
-The script harvests each worktree's build caches into the shared cache pool, removes the worktree, and prunes. It refuses a worktree whose branch has commits unmerged into main — those carry salvage points; merge first, or set `LEAD_RECLAIM_FORCE=1` for a truly abandoned worktree. Removing a worktree does not delete its branch, so the lead-preserve salvage points below survive.
+The script harvests each worktree's build caches into the shared cache pool, removes the worktree and its temporary directory, and prunes. It refuses a worktree whose branch has commits unmerged into main; merge first, or set `LEAD_RECLAIM_FORCE=1` for an abandoned worktree. Removing a worktree keeps its branch, so lead-preserve salvage points survive. Use the script rather than a bare `git worktree remove`, which discards the warm caches.
 
-Reclaim through the script rather than a bare `git worktree remove`, which discards the warm caches the next wave would reuse.
-
-## Build-artifact recycling
-
-A wave of N worktrees pays the project's full dependency compilation N times. The shared **cache pool** closes that loop:
-
-- **Location.** `LEAD_CACHE_POOL`, default `<repo>/.agents/cache-pool`; point it at a roomier disk-backed filesystem when the repo's disk is tight. Neither the pool nor any worktree cache goes on tmpfs: caches run to RAM-sized multiples, and a full tmpfs fails process spawning host-wide.
-- **Layout.** One subdirectory per cache-directory name, mirroring the worktree root: `pool/<name>` seeds and harvests `worktree/<name>`.
-- **Seed on dispatch** (automatic): each new worktree receives every pool entry, hardlinked when pool and worktree share a filesystem, copied otherwise. Anything under a directory named `build`, every `*.d` file, and every entry whose name starts with `.`, at any depth, is always copied, because build tools rewrite or lock them in place. A worktree seeded before this rule keeps its shared inodes until reseeded.
-- **Harvest on reclaim** (automatic): every git-ignored top-level directory of the worktree merges back into the pool, newest file wins. Incremental-compilation directories are excluded and any already in the pool are removed. In each Cargo `deps` directory, only the newest hashed generation per target and artifact kind survives, including coherent dep-info and library metadata companions; older generations already in the pool are removed too. Generation age is its newest companion's mtime; ties use descending filename order. Profiles and target triples stay separate, as do static and dynamic artifacts. Build-script outputs and fingerprints keep their existing cache behavior. A harvested file replaces the pool's file rather than writing through it. Set `LEAD_CACHE_DIRS` to name the directories explicitly when the default is too broad. Without rsync, the cp fallback uses tar for directory metadata.
-- **Growth.** Repeated builds replace superseded Cargo artifact generations. Additional targets, profiles, dependencies, and other toolchains' caches can still grow the pool. Delete it when necessary and let the next harvest rebuild it warm — it is a cache, never a source of truth.
-- **Sandboxed workers.** A worker whose sandbox cannot write outside its worktree (observed with codex linked-checkout workspaces) must leave its toolchain's build-output and cache directories at their in-worktree defaults; dispatch-time seeding still reaches it.
+The cache pool is a cache, never a source of truth: delete it when it grows too large and the next harvest rebuilds it.
 
 ## Lead-preserve workflow on worker truncation
 
@@ -132,47 +93,11 @@ git -c user.name="<your-name> (lead-preserve)" commit -m \
 
 Lead-preserve commits are **never merged to main**. They live on the worker branch as a salvage point. The next-session lead decides whether to rebase the branch onto current main, fold into a rework cycle, or discard.
 
-## Recovery — when this protocol was not followed
-
-If you discover after the fact that worktrees were created via Agent's `isolation: "worktree"` and may have a stale base:
-
-```bash
-# For each worker branch, rebase onto current main:
-cd .agents/worktrees/agent-<id>
-git merge-base HEAD main          # inspect ancestor
-git log --oneline ^HEAD main      # commits on main not on the worker branch
-git rebase main                    # bring the worker up to current main
-# resolve conflicts; re-run cargo-ci before any integration to main
-```
-
-After rebase, re-evaluate the worker's diff vs. main — pre-rebase, the diff was contaminated with apparent "reverts" of commits that simply weren't on the worker branch. Post-rebase, the diff is the worker's actual work.
-
-Document the rebase in the next handoff. The worker's spec compliance must be re-checked: a worker that didn't see the existing fp_generic / dispatch-hoist / etc. on main may have accidentally duplicated or collided with that code.
-
-## Why each guard works
-
-| Failure mode | Guard | Where it fires |
-|---|---|---|
-| Worktree branched from stale ancestor | Step 2 verifies `git rev-parse HEAD` of every worktree equals `main`'s | Pre-dispatch — a mismatch fails the script |
-| Worker writes files into main's checkout | Step 4 diffs `git status -uall` vs. snapshot | Post-dispatch — a leak shows up as "entries present now, not in snapshot" |
-| Clean merge leaves `main` broken | Step 5 runs the project's build-and-test gate on the merged tree, which no per-issue gate saw | Post-merge — the gate fails on the combination even when every per-issue gate and the leak check are green |
-| Lead forgets the post-dispatch check | The dispatch script's final line reminds the lead | Lead reads the reminder every time |
-| Worker bundles commits, then crashes mid-batch | Per-issue dispatch prompt rule: "commit each spiral step before proceeding" | Worker prompt — this is on the worker, not on the protocol |
-| Every worktree rebuilds the world cold; reclaim discards warm caches | Step 2 seeds each worktree from the cache pool; Step 6 harvests caches back before removal | Dispatch and reclaim — automatic in both scripts |
-
-The leak-check row (Step 4) is worth emphasizing: the post-dispatch check is
-the only guard against worker leakage into main. Run it after every wave, even
-when the wave looks clean by inspection.
-
 ## Implementation
 
-The scripts live in this skill's `scripts/` subdirectory and are project-agnostic. They use `git rev-parse --show-toplevel` from the agent's current working directory to anchor onto whatever repo the lead is operating in, so the same scripts work for every project that uses this skill.
+The scripts live in this skill's `scripts/` subdirectory and are project-agnostic: they anchor on `git rev-parse --show-toplevel` of the current working directory. Each script's header comment documents its environment variables and exit codes. Reference them by path from this skill; do not copy them into project trees.
 
 - `.agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh`
 - `.agents/skills/jit-execution-lead/scripts/check-leak-into-main.sh`
 - `.agents/skills/jit-execution-lead/scripts/reclaim-worker-worktree.sh`
 - `.agents/skills/jit-execution-lead/scripts/land.sh`
-
-Read them directly if you need to understand the invariants. They are shellcheck-clean and smoke-tested. Each script's header comment documents its optional environment variables.
-
-Do **not** copy the scripts into individual project trees — the canonical copy lives with the skill, and projects should reference them via the relative path conventions used in this protocol so improvements propagate to every project automatically.

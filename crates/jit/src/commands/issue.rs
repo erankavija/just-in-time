@@ -3656,15 +3656,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             )
             .expect("a declared --type update must be accepted");
         let issue = executor.storage.load_issue(&issue_id).unwrap();
-        let type_labels: Vec<&str> = issue
-            .labels
-            .iter()
-            .filter(|l| l.starts_with("type:"))
-            .map(|s| s.as_str())
-            .collect();
+        let type_labels: Vec<&str> = crate::labels::type_label_values(&issue.labels).collect();
         assert_eq!(
             type_labels,
-            vec![format!("type:{declared}")],
+            vec![declared.as_str()],
             "update --type must leave exactly one canonical type label"
         );
     }

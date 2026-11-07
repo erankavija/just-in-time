@@ -32,35 +32,9 @@ All 8 invariants from jit-manage are inherited and apply without modification. I
 
 ## Section 1: Project Discovery
 
-Before any orchestration, discover the project's expectations. This context informs every subsequent phase.
+Follow jit-manage Step 0 (`.jit/` exists, `jit recover`). Then read `.jit/config.toml`, `jit gate list --json`, and `.jit/templates.toml`.
 
-1. **JIT pre-flight.** Follow jit-manage Step 0:
-   - Verify `.jit/` exists.
-   - Run `jit recover` to clean stale locks.
-   - Read `.jit/config.toml` — extract `[type_hierarchy]`, `[documentation]`, `[validation]`, and `[namespaces]`.
-
-2. **Quality gates.** Run `jit gate list --json`. Learn every configured gate, what it checks, and whether it's automated or manual.
-
-3. **Documentation config.** From `.jit/config.toml` `[documentation]`:
-   - `development_root` — where development docs live
-   - `managed_paths` — paths the lead manages (design docs, studies, sessions)
-   - `permanent_paths` — user-facing documentation paths
-   - `archive_root` — where completed docs are archived
-
-4. **Type hierarchy.** From `.jit/config.toml` `[type_hierarchy]`:
-   - Map types to levels (e.g., milestone=1, epic=2, story=3, task=4)
-   - Identify strategic types
-   - Map types to membership label namespaces via `[type_hierarchy.label_associations]`
-
-5. **Planning bracket (if the ruleset uses it).** From `.jit/templates.toml`, the single source of truth for the bracket:
-   - A container type is **breakable** iff some template's `applies_to` list includes it (e.g. `epic` for an SDD ruleset, `goal` for a research ruleset).
-   - The bracket node types `P` and `B` are the template's `planning`- and `breakdown`-role node `type`s.
-   - `P`'s plan-doc location is the planning node's `doc` field (an `{container.id}`-templated path, or inline body when absent).
-   - The gate presets are the `gates` declared on each node — the planning node's gate(s) (plan-review) and the breakdown node's gates (coverage-preview + breakdown-review).
-
-   Breakable types are **always read from the templates, never hardcoded**. If no template applies to the epic's type, the project does not use the bracket — drive the plain (non-bracketed) breakdown flow throughout (Section 3B).
-
-Hold all discovered context in working memory for the duration of the session.
+A container type is **breakable** iff some template's `applies_to` includes it. That template's `planning`- and `breakdown`-role nodes give the bracket node types `P` and `B`, `P`'s plan-doc location (its `doc` field), and each node's gates. When no template applies to the epic's type, drive the plain breakdown (Section 3B).
 
 ## Section 2: Epic Intake
 
@@ -78,7 +52,7 @@ Hold all discovered context in working memory for the duration of the session.
    - If all children are `done`, skip to Section 10.
 
 3. **Check linked documents.** `jit doc list <epic-id>`.
-   - If no design doc exists and the epic is non-trivial (multiple success criteria, cross-cutting scope), dispatch an architect agent to create one (see Section 6 dispatch with `design` classification).
+   - If no design doc exists and the epic is non-trivial (multiple success criteria, cross-cutting scope), dispatch a worker to write one (Section 6, design output).
    - Wait for the design doc before proceeding to breakdown.
 
 4. **Claim the epic.** `jit issue claim <epic-id> agent:jit-execution-lead`. Commit JIT state.
@@ -88,8 +62,6 @@ Hold all discovered context in working memory for the duration of the session.
    - Jump to the appropriate phase and wave.
    - Verify loaded state matches current JIT state (children may have changed).
    - Also read every `handoff*.md` in that directory, in order (oldest to newest). Every trap in every **Traps — do not repeat these** section remains in force unless a later handoff records its resolution.
-
-6. **Inform the user.** Briefly state: which epic you're leading, how many success criteria, whether children exist, and what phase you're entering. This is informational — do not wait for approval.
 
 ## Section 3: Breakdown
 
@@ -128,11 +100,9 @@ Convert the epic's children into ordered execution waves.
    - Routine implementation choice (per `references/escalation-policy.md`): create a small `decision` task recording the chosen value and reasoning, and wire the dependent issue onto it.
    - Architectural impact, multiple plausible options, or shared infrastructure: escalate per policy entry 6 (`AskUserQuestion` when the invoker is the human). Do not pick the option yourself.
 
-4. **Classify each issue.** Read `references/task-classifier.md`. Assign each child a classification: `design`, `research`, `implementation`, or `documentation`. This determines which agent prompt template is used.
+4. **Assess parallelism within each wave.** Read `.agents/skills/jit-parallel/references/conflict-heuristics.md` if present. Serialize issues likely to touch the same files (move one to a sub-wave). Dispatch any wave needing filesystem isolation through the worktree steps in Section 6 (`references/worktree-dispatch-protocol.md`) — never through Agent's `isolation: "worktree"` parameter.
 
-5. **Assess parallelism within each wave.** Read `.agents/skills/jit-parallel/references/conflict-heuristics.md` if present. Serialize issues likely to touch the same files (move one to a sub-wave). Dispatch any wave needing filesystem isolation through the worktree steps in Section 6 (`references/worktree-dispatch-protocol.md`) — never through Agent's `isolation: "worktree"` parameter.
-
-6. **Persist the wave plan** to `progress.json` in the epic's artifact directory (`jit doc dir <epic-id> dev/active`) per `references/progress-file.md`.
+5. **Persist the wave plan** to `progress.json` in the epic's artifact directory (`jit doc dir <epic-id> dev/active`) per `references/progress-file.md`.
 
 ## Section 5: Orchestration Loop
 
@@ -170,28 +140,21 @@ For each issue that passes review, follow jit-manage Workflow E:
 
 Follow jit-parallel's dispatch patterns (read `.agents/skills/jit-parallel/SKILL.md` Steps 1–2).
 
-### Compose prompts
-For each issue in the wave, select the prompt template based on its classification from Section 4:
-
-| Classification | Prompt template |
-|---|---|
-| `design` | `references/architect-agent-prompt.md` |
-| `research` | `references/explorer-agent-prompt.md` |
-| `implementation` | `.agents/skills/jit-parallel/references/agent-prompt-template.md` |
-| `documentation` | `references/doc-agent-prompt.md` |
-
-Fill each template with:
-- Full issue context from `jit issue show` (title, description, success criteria, linked docs)
-- The gates defined on the issue and the requirement that the work be sufficient to pass them
-- The return contract (`.agents/skills/jit-manage/references/return-contract.md`), appended verbatim
-- The worker constraints: never transition issue state, pass gates, or write `.jit/` — the lead owns all state changes. The one exception is `jit doc add` to link every durable artifact the worker produces (jit-manage invariant 8). Verify links in review (Section 7); add any the worker missed.
-
-### Agent type
-Dispatch all agents as `general-purpose` (they need write access to produce artifacts).
+### Compose the brief
+Write one brief per issue containing:
+- The issue from `jit issue show`, verbatim, and its linked docs from `jit doc list`. Qualified addresses (`@/…`) in it resolve with `jit item show`.
+- The issue's gates, and the requirement that the work pass them.
+- The expected output for the kind of work:
+  - **design:** a design doc at `$(jit doc dir <id> dev/active)/design.md`, written to `.jit/reference/content-standards.md`, with no implementation code.
+  - **research:** a findings doc at `$(jit doc dir <id> dev/active)/findings.md` that answers the issue's question and recommends an option.
+  - **documentation:** docs at the location `[documentation]` in `.jit/config.toml` assigns, matching the existing docs' structure and voice.
+  - **implementation:** test-first changes with the project's test suite passing.
+- The worker constraints: commit with the issue's short ID per the project's commit conventions; never transition issue state, pass gates, or write `.jit/`, since the lead owns all state. The one exception is `jit doc add` to link every durable artifact the worker produces (jit-manage invariant 8). Verify links in review (Section 7); add any the worker missed.
+- The return contract (`.agents/skills/jit-manage/references/return-contract.md`), verbatim, at the end.
 
 ### Claim and dispatch
 1. Claim each issue: `jit issue claim <id> agent:worker`. Commit in batch.
-2. For any parallel dispatch needing filesystem isolation, follow `references/worktree-dispatch-protocol.md`: run `.agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh <short-id>...` (creates worktrees anchored to current `main` HEAD, SHA-verified; project-agnostic), prefix each prompt with the header block the script emits, and dispatch with `subagent_type: "general-purpose"` and **no** `isolation` parameter.
+2. For any parallel dispatch needing filesystem isolation, follow `references/worktree-dispatch-protocol.md`: run `.agents/skills/jit-execution-lead/scripts/dispatch-worker-worktree.sh <short-id>...` (creates worktrees anchored to current `main` HEAD, SHA-verified; project-agnostic), prefix each prompt with the header block the script emits, and dispatch with **no** `isolation` parameter.
 3. Send a **single message** with one Agent call per issue for concurrent execution.
 4. After every parallel wave completes, run
    `.agents/skills/jit-execution-lead/scripts/check-leak-into-main.sh` and
@@ -200,9 +163,9 @@ Dispatch all agents as `general-purpose` (they need write access to produce arti
 ## Section 7: Lead Review
 
 For each completed sub-agent, read `references/lead-review-protocol.md` **in
-full** before the review and apply it: six tiers in order, a failure at any tier
-is an automatic FAIL; complete Tiers 1.5 and 2.75 before any rework; observe the
-No-argue discipline. Record the structured verdict; on FAIL, pass it to the
+full** before the review and apply it: five checks in order, any failure is a
+FAIL, all five run on every round before any rework; observe the No-argue
+discipline. Record the structured verdict; on FAIL, pass it to the
 rework protocol (Section 8).
 
 ## Section 8: Rework
@@ -215,7 +178,7 @@ When a sub-agent's output fails review:
    - Read `references/rework-prompt-template.md`.
    - Fill it with the review verdict (specific failures, file references, expected behavior).
    - Prepend it to the original dispatch prompt, which keeps the return contract at its end.
-   - Dispatch a new `general-purpose` agent with the combined prompt.
+   - Dispatch a new worker with the combined prompt.
    - Increment `rework_counts[issue_id]` in the progress file.
    - When the rework agent completes, return to Section 7 for re-review.
 
@@ -263,13 +226,7 @@ After all waves are complete:
 
 3. **Run epic gates.** First reconcile `surfaced_pitfalls` against the epic's criteria per `references/lead-review-protocol.md` — a deferred finding whose subject a criterion names is a criterion violation, not a follow-up. Then `jit gate evaluate-all <epic-id>` runs the checkers; `jit gate status-all <epic-id>` then reports readiness without re-running anything. Handle gate results per jit-manage Workflow E.
 
-4. **Produce completion report.** Read `references/completion-report-template.md`. Fill it with:
-   - Metrics: children completed, waves, rework cycles, escalations, dispatches
-   - Success criteria mapping
-   - Key autonomous decisions
-   - Escalation log
-   - Issues discovered during execution
-   - Holistic quality notes
+4. **Produce completion report.** Fill `references/completion-report-template.md`.
 
 5. **Transition.** `jit issue update <epic-id> --state done`. Commit JIT state.
 
@@ -277,4 +234,3 @@ After all waves are complete:
 
 7. **Report.** Present the completion report to the user.
 
-8. **Stop.** The epic is done. Do not pick up new work.

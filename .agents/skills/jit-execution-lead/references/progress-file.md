@@ -11,7 +11,7 @@ Persist the wave plan to `progress.json` in the epic's artifact directory, resol
     {
       "wave_number": 1,
       "issues": [
-        {"id": "<full-id>", "short_id": "<short-id>", "title": "...", "classification": "implementation", "status": "pending"}
+        {"id": "<full-id>", "short_id": "<short-id>", "title": "...", "status": "pending"}
       ]
     }
   ],

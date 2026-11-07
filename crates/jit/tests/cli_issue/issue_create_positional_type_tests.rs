@@ -204,16 +204,16 @@ fn test_update_type_flag_replaces_existing_type_label() {
     );
 
     let issue = repo.run_json(["issue", "show", &id]).unwrap();
-    let type_labels: Vec<&str> = issue["labels"]
+    let labels: Vec<String> = issue["labels"]
         .as_array()
         .unwrap()
         .iter()
-        .map(|v| v.as_str().unwrap())
-        .filter(|l| l.starts_with("type:"))
+        .map(|v| v.as_str().unwrap().to_string())
         .collect();
+    let type_labels: Vec<&str> = jit::labels::type_label_values(&labels).collect();
     assert_eq!(
         type_labels,
-        vec![type_label(&taxonomy_repo.taxonomy, 3)],
+        vec![taxonomy_repo.taxonomy.type_at_level(3)],
         "update --type must leave exactly one type label, got: {type_labels:?}"
     );
 }
@@ -243,16 +243,16 @@ fn test_create_type_flag_overrides_default_type() {
     );
     let id = first_issue_id(&repo);
     let issue = repo.run_json(["issue", "show", &id]).unwrap();
-    let type_labels: Vec<&str> = issue["labels"]
+    let labels: Vec<String> = issue["labels"]
         .as_array()
         .unwrap()
         .iter()
-        .map(|v| v.as_str().unwrap())
-        .filter(|l| l.starts_with("type:"))
+        .map(|v| v.as_str().unwrap().to_string())
         .collect();
+    let type_labels: Vec<&str> = jit::labels::type_label_values(&labels).collect();
     assert_eq!(
         type_labels,
-        vec![type_label(&taxonomy_repo.taxonomy, 2)],
+        vec![taxonomy_repo.taxonomy.type_at_level(2)],
         "create --type must produce exactly one type label, got: {type_labels:?}"
     );
 }

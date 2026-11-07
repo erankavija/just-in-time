@@ -675,7 +675,9 @@
           "short_id": "f487aeef",
           "title": "Enforce the per-test limits and retire the whole-suite budget",
           "classification": "implementation",
-          "status": "ready"
+          "status": "in_progress",
+          "model_tier": "opus",
+          "tier_reason": "cross-cutting script, self-test, Rust test and prose retirement"
         }
       ]
     },
@@ -946,6 +948,13 @@
       "issue": "10fdad38",
       "summary": "shared test helper vs REQ-03 direct calls",
       "status": "resolved: D-01; done"
+    },
+    {
+      "date": "2026-11-08",
+      "kind": "hold-release",
+      "issue": "f487aeef",
+      "summary": "user lifted timing hold (session 15)",
+      "status": "resolved: run chain"
     }
   ],
   "rework_counts": {
@@ -1628,7 +1637,7 @@
         "criteria": {
           "REQ-01": "two jit suites; three workspace targets",
           "REQ-02": "exact normalized inventory5038;1684 renamed3354 unchanged",
-          "REQ-03": "3-target706MiB budgets;1177002600\u2192673455960B",
+          "REQ-03": "3-target706MiB budgets;1177002600→673455960B",
           "REQ-04": "normal libtest1180CLI+504contracts passes together; no test logic changes",
           "REQ-05": "guide and CI commands updated"
         },
@@ -1932,9 +1941,22 @@
       "rules": "from 03:30 no new dispatch/landing/CI; by 03:55 no cargo/npm/test from lead or workers; hold until 6a releases",
       "mechanism": "background timer touches the landing hold file at 03:30; lead stops any running worker cargo by 03:55 (TaskStop on owned tasks)",
       "status": "cancelled by 6a 2026-11-04 (gf2 session closed); 03:30 timer disarmed; full parallelism"
+    },
+    {
+      "date": "2026-11-08",
+      "window": "03:30-04:30 EET",
+      "requester": "gf2-16 benchmark via peer session",
+      "rule": "no builds/tests/gates/compiling subagents; none started after 02:50; resume ~04:30"
     }
   ],
-  "f487aeef_hold": "User decision in session 13: preserve dynamic host-pool sharing; defer timing enforcement. Defect reproduced in cargo-pool-run token acquisition; fixed invocation budgeting declined. No host edits.",
+  "f487aeef_hold": {
+    "held": "User decision in session 13: preserve dynamic host-pool sharing; defer timing enforcement. Defect reproduced in cargo-pool-run token acquisition; fixed invocation budgeting declined. No host edits.",
+    "released": {
+      "date": "2026-11-08",
+      "by": "user",
+      "ruling": "Lift hold, run chain: cargo-pool-run fixed or false timeouts acceptable; implement f487aeef, run fba8d478 trials, then report and close"
+    }
+  },
   "notes_for_tasks": {
     "0eca332a": "ErrorCode::GateCheckError unconstructed after f87f9b00 (still referenced in server routes.rs and output.rs)",
     "fb38bf1f": "REQ-05 added (commands import nothing from output, structural test); measure added conversion code at planning and report revised estimate vs +375 ceiling (6a)",
@@ -2049,7 +2071,7 @@
         "scope": "current Git requirement docs consistent withD24; targeted links pass"
       }
     },
-    "count_correction": "487 worker\u221217 used optional flags; default committedb0c51b0e7 is73630 vs e47a08419 73631, therefore\u22121. All final counts use noflags.",
+    "count_correction": "487 worker−17 used optional flags; default committedb0c51b0e7 is73630 vs e47a08419 73631, therefore−1. All final counts use noflags.",
     "f35c86de": {
       "merge": "6d9a1ed76",
       "status": "done",
@@ -2183,7 +2205,7 @@
     },
     "f9977efd": {
       "status": "done",
-      "dependency_ruling": "Steward approved removing only f997\u2192f487 sequencing edge;5687/83e retained. Timing and host-lock trial stay held.",
+      "dependency_ruling": "Steward approved removing only f997→f487 sequencing edge;5687/83e retained. Timing and host-lock trial stay held.",
       "test_owner_ruling": "Steward approved existing shell self-test as canonical fixture owner, no recreated Rust suite.",
       "scope_commit": "5595358f9",
       "implementation": "16aada055",

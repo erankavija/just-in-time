@@ -5,6 +5,7 @@
   "dependencies": [
     "12064c7b-9429-4f58-b739-4143cb9d399f",
     "9623fe6a-d9f9-4a28-80e2-cc490553b7f9",
+    "b0dc019f-8504-488a-b6f7-d386d53bc8e0",
     "b2c28ec1-4178-4e77-9153-b86aefae1056",
     "f6477007-09ab-4d53-8fec-ca4741c3cf78"
   ],
@@ -28,7 +29,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Layering and duplicated primitives converge on one form",
-  "updated_at": "2026-11-06T06:08:37.311372129Z"
+  "updated_at": "2026-11-07T22:55:10.422769478Z"
 }

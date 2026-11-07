@@ -10,10 +10,10 @@ Every escalation targets **the invoker** — the party that invoked this executi
 
 ## Constants
 
-| Setting | Value | Rationale |
-|---|---|---|
-| MAX_REWORK_ATTEMPTS | 2 | Two retries (3 total attempts) gives enough signal. Beyond that, the problem is likely unclear requirements or a genuinely hard design issue. |
-| MAX_SAME_FINDING_REPEATS | 3 | A review failing three times for the same root-cause finding (even across different issue counters) signals a structural problem the worker cannot solve alone. The threshold is 3 rather than 2 to tolerate one genuinely bad attempt before escalating. |
+| Setting | Value |
+|---|---|
+| MAX_REWORK_ATTEMPTS | 2 (3 total attempts) |
+| MAX_SAME_FINDING_REPEATS | 3 |
 
 ## Decision Tree
 
@@ -37,7 +37,7 @@ Before every non-trivial decision, run through this tree:
    Repeated failure after specific feedback suggests the requirements are ambiguous, the task is harder than scoped, or there's a systemic issue. Present the full history and let the invoker decide: provide guidance, take over, or reject.
 
 5a. **Same root-cause finding repeated MAX_SAME_FINDING_REPEATS times**
-   Independent of the overall rework counter, if the reviewer flags the **same underlying finding** (not just the same issue) three times, escalate even if MAX_REWORK_ATTEMPTS has not been hit. The worker is not making progress against that specific class of problem and continuing to dispatch costs cycles without learning. Example: three successive reviews all cite "verification harness attaches to a test-copied helper, not the production API path" — after the third, escalate rather than dispatching a fourth. Determining "same root-cause finding" requires judgement: ignore surface wording, compare the underlying defect class.
+   Independent of the overall rework counter, if the reviewer flags the **same underlying finding** (not just the same issue) three times, escalate even if MAX_REWORK_ATTEMPTS has not been hit. Determining "same root-cause finding" requires judgement: ignore surface wording, compare the underlying defect class.
 
 6. **Architectural decision with significant trade-offs**
    When multiple valid approaches exist and the choice has lasting consequences (data model shape, public API surface, integration patterns), the invoker should make the call. Routine implementation choices (internal data structures, local algorithms) are fine to make autonomously.
