@@ -312,7 +312,8 @@
   "850eaad3": 1,
   "b2c28ec1": 2,
   "030df4b1": 1,
-  "219b9df8": 1
+  "219b9df8": 1,
+  "42046050": 1
  },
  "surfaced_pitfalls": [
   {
@@ -331,7 +332,7 @@
    "found_in": "030df4b1",
    "subject": "captured declaration parse fails on a missing default rule schema",
    "detail": "The captured-declaration parse fails with MissingCapture when a default schema file named by rules.toml is absent, so test_missing_default_schema_still_validates_and_enforces will not carry over unchanged when 42046050 removes the disk-backed rule caches; 42046050 must reconcile that test's semantics.",
-   "status": "open",
+   "status": "resolved by 42046050 per invoker ruling (pending rework 1)",
    "owner": "42046050"
   },
   {
@@ -395,6 +396,10 @@
   {
    "issue": "bb596228",
    "decision": "Accept base-ratio premise difference (base R(8)/R(1)=16.6 because a single base reader waits behind the writer); README records it; tip verdict passes on the fixed thresholds."
+  },
+  {
+   "issue": "42046050",
+   "decision": "Invoker ruling: keep captured-parse skip of an absent optional default schema (production change: MissingCapture error -> successful validate); reason: regression from moving reads to captured images, D-20 one capability one answer, REQ-03 keeps the test. Condition: one rule both readers call (rework 1). Recorded as stated deviation on the issue."
   }
  ],
  "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",
