@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3b2cd6aa-049f-409c-ae72-0261ccd4fc7e",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:55:52.701765739Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "8e11f85f-9577-48a2-b26e-e3b5e9fd28ce",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:57:40.728656554Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1471c12a-5117-45e0-8712-f4968ff7b934",
   "labels": [
     "epic:frontends-share-core",
@@ -23,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Return repository-relative paths from linked-document search",
-  "updated_at": "2026-11-07T23:42:46.148670910Z"
+  "updated_at": "2026-11-07T23:57:40.728656554Z"
 }
