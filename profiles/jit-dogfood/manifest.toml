@@ -536,10 +536,6 @@ source = "assets/live/.agents/skills/jit-execution-lead/SKILL.md"
 target = ".agents/skills/jit-execution-lead/SKILL.md"
 
 [[asset]]
-source = "assets/live/.agents/skills/jit-execution-lead/references/architect-agent-prompt.md"
-target = ".agents/skills/jit-execution-lead/references/architect-agent-prompt.md"
-
-[[asset]]
 source = "assets/live/.agents/skills/jit-execution-lead/references/bracketed-breakdown.md"
 target = ".agents/skills/jit-execution-lead/references/bracketed-breakdown.md"
 
@@ -548,16 +544,8 @@ source = "assets/live/.agents/skills/jit-execution-lead/references/completion-re
 target = ".agents/skills/jit-execution-lead/references/completion-report-template.md"
 
 [[asset]]
-source = "assets/live/.agents/skills/jit-execution-lead/references/doc-agent-prompt.md"
-target = ".agents/skills/jit-execution-lead/references/doc-agent-prompt.md"
-
-[[asset]]
 source = "assets/live/.agents/skills/jit-execution-lead/references/escalation-policy.md"
 target = ".agents/skills/jit-execution-lead/references/escalation-policy.md"
-
-[[asset]]
-source = "assets/live/.agents/skills/jit-execution-lead/references/explorer-agent-prompt.md"
-target = ".agents/skills/jit-execution-lead/references/explorer-agent-prompt.md"
 
 [[asset]]
 source = "assets/live/.agents/skills/jit-execution-lead/references/handoff-template.md"
@@ -574,10 +562,6 @@ target = ".agents/skills/jit-execution-lead/references/progress-file.md"
 [[asset]]
 source = "assets/live/.agents/skills/jit-execution-lead/references/rework-prompt-template.md"
 target = ".agents/skills/jit-execution-lead/references/rework-prompt-template.md"
-
-[[asset]]
-source = "assets/live/.agents/skills/jit-execution-lead/references/task-classifier.md"
-target = ".agents/skills/jit-execution-lead/references/task-classifier.md"
 
 [[asset]]
 source = "assets/live/.agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md"
