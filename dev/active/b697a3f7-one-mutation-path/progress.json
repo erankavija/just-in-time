@@ -179,7 +179,7 @@
      "id": "b0dc019f-8504-488a-b6f7-d386d53bc8e0",
      "short_id": "b0dc019f",
      "title": "Domain names nothing from repository_state and type labels have no hand-written filter",
-     "status": "in_progress"
+     "status": "merged bf72f7b1f; cargo-ci passed; code-review held pending invoker decision on reviewer model"
     }
    ]
   }
@@ -239,6 +239,13 @@
    "detail": "code-review e3ff064f F1: REQ-06 graph.rs rustdoc clause; the cited audit list was deleted by deb6d3beb (6ac41880). Recommended: rule vacuously satisfied and record on issue.",
    "status": "resolved",
    "decision": "steward: REQ-06 corrected (read_repo_file rustdoc names the parser; no other parser/splitter named in crates/); ruling dev/active/b2c28ec1/criteria-ruling.md; code-review passed on re-run"
+  },
+  {
+   "to": "just-in-time-d5",
+   "category": "gate configuration (shared infrastructure)",
+   "issue": "b0dc019f",
+   "detail": "code-review/holistic-review REVIEWER_AGENT pinned to gpt-5.6-terra in .jit/gates.toml; invoker asked for gpt-6.1-sol reviewers. Options: change gates.toml repo-wide, keep gate config and use sol for non-gate reviews, or hold.",
+   "status": "open"
   }
  ],
  "rework_counts": {
@@ -329,5 +336,6 @@
    "decision": "Accept base-ratio premise difference (base R(8)/R(1)=16.6 because a single base reader waits behind the writer); README records it; tip verdict passes on the fixed thresholds."
   }
  ],
- "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10"
+ "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",
+ "review_dispatches": []
 }
