@@ -174,26 +174,37 @@ pub(crate) fn seed_gate_registry(storage: &InMemoryStorage, registry: &GateRegis
     );
 }
 
-/// Count session opens via [`MutationPoint::SessionOpen`], the moment every
-/// session open crosses exactly once, injecting no failure. Shared by tests
-/// that assert a session-open budget.
-pub(crate) struct SessionOpenCounter(AtomicUsize);
+/// Count mutation-session opens ([`MutationPoint::SessionOpen`]) and read-session
+/// opens ([`MutationPoint::ReadSessionOpen`]) separately, injecting no failure.
+/// Each open crosses its point exactly once. Shared by tests that assert a
+/// session-open budget.
+#[derive(Default)]
+pub(crate) struct SessionOpenCounter {
+    mutation: AtomicUsize,
+    read: AtomicUsize,
+}
 
 impl SessionOpenCounter {
     pub(crate) fn new() -> Arc<Self> {
-        Arc::new(Self(AtomicUsize::new(0)))
+        Arc::default()
     }
 
-    pub(crate) fn count(&self) -> usize {
-        self.0.load(Ordering::SeqCst)
+    pub(crate) fn mutation_opens(&self) -> usize {
+        self.mutation.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn read_opens(&self) -> usize {
+        self.read.load(Ordering::SeqCst)
     }
 }
 
 impl crate::storage::MutationInterruptionInjector for SessionOpenCounter {
     fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
-        if point == &MutationPoint::SessionOpen {
-            self.0.fetch_add(1, Ordering::SeqCst);
-        }
+        match point {
+            MutationPoint::SessionOpen => self.mutation.fetch_add(1, Ordering::SeqCst),
+            MutationPoint::ReadSessionOpen => self.read.fetch_add(1, Ordering::SeqCst),
+            _ => return Ok(()),
+        };
         Ok(())
     }
 }
@@ -728,7 +739,11 @@ mod tests {
         );
 
         assert_eq!(wrapped_image, Some(image(&reference)));
-        assert_eq!(counter.count(), 0, "initialization bypasses the wrapper");
+        assert_eq!(
+            counter.mutation_opens(),
+            0,
+            "initialization bypasses the wrapper"
+        );
         executor
             .issues()
             .create_issue(
@@ -743,7 +758,7 @@ mod tests {
             )
             .unwrap();
         assert!(
-            counter.count() > 0,
+            counter.mutation_opens() > 0,
             "the executor mutates through the wrapper"
         );
     }
@@ -760,7 +775,7 @@ mod tests {
         memory_executor(storage.clone());
 
         assert_eq!(
-            counter.count(),
+            counter.mutation_opens(),
             0,
             "initialization must not open the scenario store"
         );

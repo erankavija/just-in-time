@@ -175,7 +175,7 @@ Archive evidence is addressed by its target. A container record is written at
 repository-relative document path. The archive execution finalizer
 (`finalize_archive_execution`) appends the execution to this record in the same
 redo record as the archive event. Preview and execution share one planner,
-`capture_archive_plan`, which captures it by target.
+`plan_archive_target`, which captures it by target.
 
 ```json
 {

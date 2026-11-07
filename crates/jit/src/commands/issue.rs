@@ -4037,7 +4037,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
             id
         });
-        let opened = counter.count();
+        let opened = counter.mutation_opens();
 
         executor
             .issues()
@@ -4056,7 +4056,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .unwrap();
 
         (
-            counter.count() - opened,
+            counter.mutation_opens() - opened,
             dependent_id.map(|id| executor.storage.load_issue(&id).unwrap().state),
         )
     }
@@ -4093,7 +4093,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             crate::commands::test_helpers::seed_issue(&executor.storage, dependent);
             id
         });
-        let opened = counter.count();
+        let opened = counter.mutation_opens();
 
         executor
             .issues()
@@ -4101,7 +4101,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .unwrap();
 
         (
-            counter.count() - opened,
+            counter.mutation_opens() - opened,
             dependent_id.map(|id| executor.storage.load_issue(&id).unwrap().state),
         )
     }
