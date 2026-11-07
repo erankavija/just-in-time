@@ -189,7 +189,7 @@ The former targets remain modules grouped by execution model:
 | `cli` | CLI subprocess | `cli_issue`, `cli_gate`, `cli_query_graph`, `cli_item_validate`, `cli_repo_workflow` |
 
 The `cargo-ci` gate runs `scripts/rust-build-budget.sh` as a `budget` step after
-its measured suite and its `excluded-tests` step, on warm Cargo artifacts,
+its test suite and its `excluded-tests` step, on warm Cargo artifacts,
 pointing it with `--root` at the workspace that run compiled. The checker derives the integration-test
 target count and unique active test-executable bytes from `cargo metadata` and
 `cargo test --workspace --no-run --message-format=json`, and asserts the debug
@@ -286,28 +286,24 @@ the enforced `@/inv/bounded-rust-build-footprint` project invariant.
 `cargo-ci`'s `budget` step (`scripts/rust-build-budget.sh`) enforces build budgets on every
 gate run. The integration-test target count and unique active test-executable bytes derive
 from `cargo metadata` and `cargo test --workspace --no-run --message-format=json` rather than
-a `target/` directory scan, which would include stale per-hash artifacts. The suite-duration
-budget uses the measured nextest-plus-doctest duration, which `scripts/cargo-ci.sh` passes in
-as `--test-suite-ms`: the suite must finish under `MAX_TEST_SUITE_SECONDS`. The checker also
+a `target/` directory scan, which would include stale per-hash artifacts. The checker also
 caps `crates/jit/src/main.rs` at `MAX_MAIN_RS_CODE_LINES`, using the shared
 `scripts/production-lines.py --file` counter. Budget constants are declared once in the
 checker and derived from a measurement of this tree and a stated headroom rule in
-[dev/benchmarks/rust-build-budgets/README.md](benchmarks/rust-build-budgets/README.md); see
-[dev/benchmarks/suite-enforcement-4b7c06d0/README.md](benchmarks/suite-enforcement-4b7c06d0/README.md)
-for the measured margin the suite-duration budget leaves on an idle and a contended host.
-"5. Inherent Test Costs" below attributes what the measured suite duration is spent on.
+[dev/benchmarks/rust-build-budgets/README.md](benchmarks/rust-build-budgets/README.md).
 
-The suite-duration measurement is taken over a target the `suite-build` step has already
-built and read into the page cache, so a fresh target directory and a warm one reach the same verdict and
-a duration failure is about the tree (jit:0708d692). The suite runs no nested Cargo build:
-`.config/nextest.toml` declares no setup script, which `scratch_build/build_profile_policy_tests.rs`
-asserts. Profiled-repository fixtures and the recorded-failure corpus are built inside the suite
-on first use from a cache keyed by their inputs. Their first-run construction contributes to
-the duration margin the budgets README records; see
-[dev/benchmarks/cold-warm-verdict-0708d692/README.md](benchmarks/cold-warm-verdict-0708d692/README.md)
-for the cold and warm figures behind this paragraph. Re-measuring needs `--force`, since
-`jit gate evaluate` reuses a recorded verdict over unchanged declared inputs, `target/` not
-among them.
+### Per-test limits
+
+[`.config/nextest.toml`](../.config/nextest.toml) bounds each test by its layer: the unit layer
+is lib and bin targets (inline `#[cfg(test)]` tests), and the integration layer is every
+`crates/*/tests/*` target, selected by nextest's `kind(test)` filter. The limits are derived in
+[dev/benchmarks/per-test-durations-1eb949a5/README.md](benchmarks/per-test-durations-1eb949a5/README.md).
+A test still running at its layer's limit is terminated, named as `TIMEOUT`, and fails the
+`test` step; `scripts/cargo-ci.sh` classifies a timeout on a loaded host as environment-sensitive
+(exit 75) and on a quiet host as a verdict. `scripts/cargo-ci-selftest.sh` runs the shipped
+configuration over fixture tests that never finish. Doctests are outside the limits. A test over
+its limit sheds its waste (explicit signals or injected clocks, never sleeps); the limit is not
+raised. "5. Inherent Test Costs" below attributes what the slowest tests spend their time on.
 
 A separate benchmark threshold — at most 10 GiB for the complete fresh validation target
 directory — is validated by the protocol below once per build-topology
@@ -410,9 +406,7 @@ per-test duration, `warm_duration_ms`, for every test nextest ran in the default
 state warm, one warmup run ahead of the measured run, `ceil(exec_time_seconds * 1000)`.
 It predates the redo-record cutover and is stale against the current suite: refresh it with
 `./scripts/profile-test-suite.sh` before adding a row below or changing a figure.
-Its slowest test sits well under the per-test bound in
-[`.config/nextest.toml`](../.config/nextest.toml); the budgets README above records the whole
-run's margin under `MAX_TEST_SUITE_SECONDS`. The tables below attribute cost, not risk: for every test whose
+Every test is bounded by its layer's per-test limit (section 4). The tables below attribute cost, not risk: for every test whose
 measured cost is a direct consequence of the property it proves — a real subprocess, a
 real redo-record round trip through storage, real filesystem publication,
 genuine concurrency, or a property-based search over many generated cases — this names it,
@@ -653,9 +647,8 @@ cargo test --doc --workspace
 ```
 
 The committed nextest policy is documented in
-[`.config/nextest.toml`](../.config/nextest.toml), which also pins a per-test ceiling: a
-slow-timeout of 10s, terminated after a second 10s grace period, so any single test that
-runs past 20s fails the run rather than hanging it.
+[`.config/nextest.toml`](../.config/nextest.toml), which also enforces the per-test limits
+(section 4): a test past its layer's limit fails the run rather than slowing it.
 
 Lint and format alongside tests. Both must be clean before a commit:
 

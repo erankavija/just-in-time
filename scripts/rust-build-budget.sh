@@ -22,11 +22,6 @@
 #                        their on-disk sizes summed.
 #   --dynamic-dependencies FILE pre-captured executable<TAB>DT_NEEDED listing;
 #                        default: inspect the built jit and jit-server binaries.
-#   --test-suite-ms INTEGER measured nextest-plus-doctest suite duration, taken
-#                        over a target the caller has already built and read
-#                        into the page cache, so the value is the suite's
-#                        execution cost rather than compilation or first-touch
-#                        artifact I/O; absent: skip this check.
 #
 #   --self-test          exercise the checker with synthetic inputs; no Cargo.
 #
@@ -44,7 +39,6 @@ set -euo pipefail
 # value here without re-deriving it there leaves a limit nothing measured.
 readonly MAX_INTEGRATION_TARGETS=3
 readonly MAX_EXECUTABLE_BYTES=$((706 * 1024 * 1024)) # MiB; derivation in README
-readonly MAX_TEST_SUITE_SECONDS=30
 readonly MAX_MAIN_RS_CODE_LINES=40
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -52,16 +46,14 @@ ROOT=$(dirname "$SCRIPT_DIR")
 METADATA_JSON=""
 ARTIFACTS_JSON=""
 DYNAMIC_DEPENDENCIES_FILE=""
-TEST_SUITE_MS=""
-TEST_SUITE_MS_PROVIDED=false
 
 usage() {
-  sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 # Exercise the shipped checker against owned synthetic inputs, never Cargo.
 self_test() (
-  local tool work fixture script expected actual token value
+  local tool work fixture script expected actual token
   for tool in jq python3 mktemp mkdir rm truncate cat awk grep head sort stat dirname sed ln; do
     command -v "$tool" >/dev/null 2>&1 || {
       echo "rust-build-budget: self-test requires '$tool' on PATH" >&2
@@ -108,7 +100,6 @@ EOF
     shift
     actual=0
     (
-      unset BUSY_HOST_OVERRIDE
       "$BASH" "$script" --root "$fixture" \
         --metadata-json "$fixture/metadata.json" \
         --artifacts-json "$fixture/artifacts.jsonl" \
@@ -205,31 +196,6 @@ EOF
   run_checker 1
   assert_report stderr "duplicate TLS backend" native-tls ureq
 
-  seed_fixture duration-absent
-  run_checker 0
-  assert_report stdout suite-duration=skipped
-
-  for value in 29.999 -1 ""; do
-    seed_fixture "duration-invalid-${value:-empty}"
-    run_checker 2 --test-suite-ms "$value"
-    assert_report stderr test-suite-ms integer
-  done
-
-  seed_fixture duration-below
-  value=$((MAX_TEST_SUITE_SECONDS * 1000 - 1))
-  run_checker 0 --test-suite-ms "$value"
-  assert_report stdout "suite-duration=${value}ms"
-
-  seed_fixture duration-at-threshold
-  value=$((MAX_TEST_SUITE_SECONDS * 1000))
-  run_checker 1 --test-suite-ms "$value"
-  assert_report stderr "$value" threshold
-
-  seed_fixture duration-above-and-diagnostic
-  value=$((MAX_TEST_SUITE_SECONDS * 1500))
-  run_checker 1 --test-suite-ms "$value"
-  assert_report stderr "$value" threshold warm first-touch "Corrective area"
-
   # Only dirname is needed before tool preflight; this PATH deliberately lacks jq.
   mkdir "$work/no-jq"
   ln -s "$(command -v dirname)" "$work/no-jq/dirname"
@@ -262,13 +228,6 @@ while [ "$#" -gt 0 ]; do
         exit 2
       fi
       DYNAMIC_DEPENDENCIES_FILE="$2"; shift 2
-      ;;
-    --test-suite-ms)
-      if [ "$#" -lt 2 ]; then
-        echo "rust-build-budget: missing value for --test-suite-ms" >&2
-        exit 2
-      fi
-      TEST_SUITE_MS="$2"; TEST_SUITE_MS_PROVIDED=true; shift 2
       ;;
     -h | --help) usage; exit 0 ;;
     *)
@@ -355,34 +314,6 @@ dep_line() {
 
 # --- Checks -----------------------------------------------------------------
 errors=()
-
-suite_duration_status="skipped"
-if [ "$TEST_SUITE_MS_PROVIDED" = true ]; then
-  if ! [[ "$TEST_SUITE_MS" =~ ^[0-9]+$ ]]; then
-    echo "rust-build-budget: invalid --test-suite-ms value: expected a non-negative integer" >&2
-    exit 2
-  fi
-  suite_duration_threshold_ms=$((MAX_TEST_SUITE_SECONDS * 1000))
-  # Order by digit count before comparing arithmetically, because bash's (( ))
-  # is 64-bit and wraps: `(( 9223372036854775808 >= 30000 ))` is false, so an
-  # unguarded comparison lets a long enough value pass the budget it exceeds.
-  # Stripping leading zeros makes digit count a magnitude order, so a wider
-  # value exceeds the threshold without arithmetic and every value that reaches
-  # (( )) fits the threshold's width.
-  measured_ms="${TEST_SUITE_MS#"${TEST_SUITE_MS%%[!0]*}"}"
-  measured_ms="${measured_ms:-0}"
-  if [ "${#measured_ms}" -gt "${#suite_duration_threshold_ms}" ] \
-    || { [ "${#measured_ms}" -eq "${#suite_duration_threshold_ms}" ] \
-      && (( measured_ms >= suite_duration_threshold_ms )); }; then
-    if [ -n "${BUSY_HOST_OVERRIDE:-}" ]; then
-      suite_duration_status="${TEST_SUITE_MS}ms"
-    else
-      errors+=("test suite duration: observed ${TEST_SUITE_MS} ms, threshold ${suite_duration_threshold_ms} ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').")
-    fi
-  else
-    suite_duration_status="${TEST_SUITE_MS}ms"
-  fi
-fi
 
 main_rs_lines=$(python3 "$SCRIPT_DIR/production-lines.py" --file "$ROOT/crates/jit/src/main.rs") || exit 2
 if [ "$main_rs_lines" -gt "$MAX_MAIN_RS_CODE_LINES" ]; then
@@ -545,4 +476,4 @@ fi
 
 # REQ-06: one concise, parseable success line. cargo-ci.sh's summarize_pass
 # folds it into the persisted gate summary.
-echo "rust-build-budget: integration-targets=${target_count}/${MAX_INTEGRATION_TARGETS} active-executables=${#executables[@]} bytes=${executable_bytes}/${MAX_EXECUTABLE_BYTES} profile=${profile_mode} dep-features=${dep_feature_policy} dynamic-dependencies=${dynamic_dependencies_status} suite-duration=${suite_duration_status} main-rs-lines=${main_rs_lines}/${MAX_MAIN_RS_CODE_LINES}"
+echo "rust-build-budget: integration-targets=${target_count}/${MAX_INTEGRATION_TARGETS} active-executables=${#executables[@]} bytes=${executable_bytes}/${MAX_EXECUTABLE_BYTES} profile=${profile_mode} dep-features=${dep_feature_policy} dynamic-dependencies=${dynamic_dependencies_status} main-rs-lines=${main_rs_lines}/${MAX_MAIN_RS_CODE_LINES}"
