@@ -25802,3 +25802,11 @@
 {"fields":["dependencies"],"id":"21770c64-d182-42fb-ad81-b798c0525e6c","issue_id":"dfb2f10d-c4fd-4b8d-b7b1-3df71749523a","timestamp":"2026-11-07T23:31:34.265078684Z","type":"issue_updated","updated_by":"dependency-add"}
 {"from":"ready","id":"540c1081-8346-4fa6-b70e-09dfc1be552d","issue_id":"219b9df8-5f17-4d01-a332-065faed23f7b","timestamp":"2026-11-07T23:31:34.450311905Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"c3b17380-95f4-4bab-aa2b-a683ce8afc33","issue_id":"219b9df8-5f17-4d01-a332-065faed23f7b","timestamp":"2026-11-07T23:31:34.450311905Z","type":"issue_claimed"}
+{"gate_key":"code-review","id":"b7290b99-f164-4a5a-9a61-687b4594d160","issue_id":"d4172016-0225-4ae8-aa37-3e4f28a1922c","timestamp":"2026-11-07T23:32:20.279423098Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"backlog","id":"55c7bd96-52ff-4d8c-b12c-64ce5b338f6a","issue_id":"c8e79465-e28c-4dea-8c25-ad3fdc812e34","timestamp":"2026-11-07T23:32:30.651652689Z","to":"ready","type":"issue_state_changed"}
+{"from":"in_progress","id":"ee515bbe-42ba-485d-85bc-9e8bfd6befd2","issue_id":"d4172016-0225-4ae8-aa37-3e4f28a1922c","timestamp":"2026-11-07T23:32:30.651652689Z","to":"done","type":"issue_state_changed"}
+{"id":"aa1f1cf9-cfb6-4f94-a91d-b599cdfe3a23","issue_id":"d4172016-0225-4ae8-aa37-3e4f28a1922c","timestamp":"2026-11-07T23:32:30.651652689Z","type":"issue_completed"}
+{"id":"50714f06-788f-4435-ad3b-48aa775f5a8e","issue_id":"f14fe734-8a09-417b-b32e-bb826b154dc5","priority":"normal","timestamp":"2026-11-07T23:32:32.595644073Z","title":"Converge lexical path normalization on one primitive","type":"issue_created"}
+{"gate_key":"repo-validate","id":"c62e20e3-292a-4b61-851e-c18265af65d4","issue_id":"c8e79465-e28c-4dea-8c25-ad3fdc812e34","timestamp":"2026-11-07T23:32:41.812348599Z","type":"gate_failed","updated_by":"auto:executor"}
+{"fields":["labels"],"id":"d5865645-cbdb-4510-a15a-c088e1d9be9e","issue_id":"f14fe734-8a09-417b-b32e-bb826b154dc5","timestamp":"2026-11-07T23:33:04.892472947Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["dependencies"],"id":"25802129-9907-4f06-bfea-761dfd5606fe","issue_id":"0735879a-ed40-450e-9959-5cfe80653745","timestamp":"2026-11-07T23:33:05.272392131Z","type":"issue_updated","updated_by":"dependency-add"}
