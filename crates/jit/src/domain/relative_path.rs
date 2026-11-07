@@ -24,7 +24,7 @@ pub(crate) fn enters(path: &str, reserved: &str) -> bool {
 /// so root-vs-descendant is a type-level distinction rather than a value test.
 ///
 /// The descendant payload is [`Cow<'static, str>`] so well-known paths can be
-/// `Cow::Borrowed` const associated items of [`crate::repository_state::VirtualPath`], while parsing and
+/// `Cow::Borrowed` const associated items, while parsing and
 /// deserialization mint `Cow::Owned`. `Cow`'s `Eq`/`Ord`/`Hash` compare and
 /// hash by `str` content, so a borrowed const and an owned parse of the same
 /// path unify as one map key.
@@ -148,7 +148,6 @@ impl schemars::JsonSchema for RootRelativePath {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository_state::RepositoryLayoutError;
 
     #[test]
     fn test_parse_and_serde_reject_noncanonical_spellings() {
@@ -192,16 +191,5 @@ mod tests {
             serde_json::from_str::<RootRelativePath>("\"\"").unwrap(),
             RootRelativePath::Root
         );
-    }
-
-    #[test]
-    fn test_rejected_parse_converts_to_lexical_escape_with_the_input_text() {
-        let error = RootRelativePath::parse("a/../b").unwrap_err();
-        let layout = RepositoryLayoutError::from(error.clone());
-        assert!(matches!(
-            &layout,
-            RepositoryLayoutError::LexicalEscape(text) if text == "a/../b"
-        ));
-        assert_eq!(layout.to_string(), error.to_string());
     }
 }

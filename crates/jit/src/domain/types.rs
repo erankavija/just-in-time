@@ -493,7 +493,7 @@ pub enum ReadinessCorrection {
 impl Issue {
     /// Draft issue `id` carrying no authoritative lifecycle timestamps.
     ///
-    /// The lifecycle timestamps hold a sentinel epoch; the `repository_state`
+    /// The lifecycle timestamps hold a sentinel epoch; the repository
     /// finalizer stamps `created_at`, `updated_at`, and `first_ready_at`, so time
     /// authority stays solely in the finalizer. A created issue's `id` is the one
     /// its mutation context derived for it.

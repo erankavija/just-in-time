@@ -1285,4 +1285,15 @@ mod tests {
         hashed.insert(owned, 2);
         assert_eq!(hashed.len(), 1, "owned twin must overwrite, not add a slot");
     }
+
+    #[test]
+    fn test_rejected_parse_converts_to_lexical_escape_with_the_input_text() {
+        let error = RootRelativePath::parse("a/../b").unwrap_err();
+        let layout = RepositoryLayoutError::from(error.clone());
+        assert!(matches!(
+            &layout,
+            RepositoryLayoutError::LexicalEscape(text) if text == "a/../b"
+        ));
+        assert_eq!(layout.to_string(), error.to_string());
+    }
 }
