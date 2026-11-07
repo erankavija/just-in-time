@@ -507,10 +507,12 @@ gate_workspace_root() {
 # authoritative measurement because they describe what this run actually
 # skipped; searching Rust sources would only be a proxy and would also match
 # attributes or fences that do not hold a test out of the default run.
+# nextest decides what it skips when it lists the tests, so a run fail-fast
+# stopped ("N/M tests run") still reports the skipped count.
 check_no_excluded_tests() {
   local reporter skipped ignored
 
-  reporter=$(grep -E 'Summary .* [0-9]+ tests run:' "$WORK/test.out" | tail -1 || true)
+  reporter=$(grep -E 'Summary .* [0-9]+(/[0-9]+)? tests run:' "$WORK/test.out" | tail -1 || true)
   skipped=$(grep -oP '\K[0-9]+(?= skipped)' <<<"$reporter" | tail -1 || true)
   if [ -z "$reporter" ] || ! grep -qP '[0-9]+ passed' <<<"$reporter"; then
     echo "cargo-ci: reporter-contract failure: could not parse pinned nextest success summary for excluded-test measurement" >&2
