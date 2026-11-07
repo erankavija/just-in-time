@@ -186,6 +186,12 @@
      "short_id": "f98f2353",
      "title": "Type-label extraction and process-group liveness each go through their one shared form",
      "status": "done"
+    },
+    {
+     "id": "219b9df8",
+     "short_id": "219b9df8",
+     "title": "Test declaration fixtures validate paths through the canonical validator",
+     "status": "rework 1"
     }
    ]
   },
@@ -305,7 +311,8 @@
   "30334066": 1,
   "850eaad3": 1,
   "b2c28ec1": 2,
-  "030df4b1": 1
+  "030df4b1": 1,
+  "219b9df8": 1
  },
  "surfaced_pitfalls": [
   {
@@ -425,6 +432,23 @@
    "effort": "high",
    "verdict": "pass",
    "run": "11ef1b9b"
+  },
+  {
+   "issue": "219b9df8",
+   "review": "code-review gate",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "fail F1 capability_fs read_confined_relative",
+   "run": "6ffb399f"
+  },
+  {
+   "issue": "dfb2f10d",
+   "review": "story checkpoint round 2 (non-gate)",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "1 blocking finding -> 219b9df8"
   }
  ]
 }
