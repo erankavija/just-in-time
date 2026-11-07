@@ -280,7 +280,10 @@ container it would reconcile also appears here. Active, untyped, unknown-type,
 leaf, and Archived issues whose pre-archive state was non-terminal are excluded. Each selected container is
 fully evaluated through the same resolved-hierarchy planner as `archive
 container`, including zero-document containers and ineligible plans. Ordinary
-sequencing edges do not enlarge a candidate's resolved subtree.
+sequencing edges do not enlarge a candidate's resolved subtree. Every candidate
+is planned in one read session that shares one capture budget, so a repository
+whose candidates together read more than that budget allows fails the whole
+listing with the capture budget error instead of reporting a partial list.
 
 The JSON shape is exactly
 `{"schema_version":1,"count":N,"candidates":[...]}`. Every entry in
