@@ -744,21 +744,21 @@ async fn get_document_content<S: IssueStore + RepositoryStateStore + Send + Sync
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentContentResponse>, StatusCode> {
-    let (content, commit_hash) = execute_blocking(&state, {
+    let reading = execute_blocking(&state, {
         let path = path.clone();
         move |executor| {
             let id = resolve_issue_path_id(executor, &id)?;
-            Ok(executor
+            executor
                 .documents()
-                .read_document_content(&id, &path, query.commit.as_deref())?)
+                .document_content(&id, &path, query.commit.as_deref())
         }
     })
     .await?;
 
     Ok(Json(DocumentContentResponse {
         path: path.clone(),
-        commit: commit_hash,
-        content,
+        content: reading.text(),
+        commit: reading.commit,
         content_type: infer_content_type(&path),
     }))
 }
@@ -787,27 +787,26 @@ fn raw_document_response(path: &str, bytes: Vec<u8>) -> Response<Body> {
 /// Get raw document bytes (issue-scoped variant)
 ///
 /// Verifies that `path` is a document of the requested issue, explicit or
-/// derived, then reads the file as raw bytes via `read_document_bytes` (which
-/// delegates to `IssueStore::read_path_bytes`).  Binary artifacts are served faithfully
-/// without any UTF-8 conversion.  HTML responses for working-tree reads get a
-/// `<base href>` injected so sibling assets resolve via `/api/raw/*path`.
+/// derived, then serves its selected-version bytes from `document_content`.
+/// Binary artifacts are served faithfully; HTML responses get a `<base href>`
+/// injected so sibling assets resolve via `/api/raw/*path`.
 async fn get_document_raw<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
-    let (bytes, _commit_hash) = execute_blocking(&state, {
+    let reading = execute_blocking(&state, {
         let path = path.clone();
         move |executor| {
             let id = resolve_issue_path_id(executor, &id)?;
-            Ok(executor
+            executor
                 .documents()
-                .read_document_bytes(&id, &path, query.commit.as_deref())?)
+                .document_content(&id, &path, query.commit.as_deref())
         }
     })
     .await?;
 
-    Ok(raw_document_response(&path, bytes))
+    Ok(raw_document_response(&path, reading.bytes))
 }
 
 /// Get raw document bytes (path-only variant)
@@ -895,7 +894,7 @@ async fn get_document_history<S: IssueStore + RepositoryStateStore + Send + Sync
         let path = path.clone();
         move |executor| {
             let id = resolve_issue_path_id(executor, &id)?;
-            Ok(executor.documents().get_document_history(&id, &path)?)
+            Ok(executor.documents().document_history(&id, &path)?.commits)
         }
     })
     .await?;
@@ -943,12 +942,12 @@ async fn get_document_diff<S: IssueStore + RepositoryStateStore + Send + Sync + 
         let diff =
             executor
                 .documents()
-                .get_document_diff(&id, &path, &query.from, query.to.as_deref())?;
+                .document_diff(&id, &path, &query.from, query.to.as_deref())?;
         Ok(Json(DocumentDiffResponse {
-            path,
-            from: query.from,
-            to: query.to.unwrap_or_else(|| "HEAD".to_string()),
-            diff,
+            path: diff.path,
+            from: diff.from_commit,
+            to: diff.to_commit,
+            diff: diff.diff,
         }))
     })
     .await

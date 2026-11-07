@@ -2818,7 +2818,8 @@ the working tree, including uncommitted edits and derived files.
 
 List Git's history for the document path, newest first, including a commit that
 deletes it. Git's default history simplification can omit a merge when the
-document matches a parent; uncommitted changes do not appear.
+document matches a parent; uncommitted changes do not appear. Outside a Git
+checkout, or before its first commit, the list is empty.
 
 ```bash
 jit doc history <ID> <PATH>

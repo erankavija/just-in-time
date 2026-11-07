@@ -1110,24 +1110,13 @@ fn test_read_path_reports_a_missing_file_and_refuses_unsafe_paths<B: Backend>() 
         store.read_path_bytes("does-not-exist.md", None),
         Err(PathReadError::NotFound(_))
     ));
-    assert!(matches!(
-        store.read_path_text("does-not-exist.md", None),
-        Err(PathReadError::NotFound(_))
-    ));
     for path in INVALID_PATHS {
         assert!(
             matches!(
                 store.read_path_bytes(path, None),
                 Err(PathReadError::InvalidPath(_))
             ),
-            "bytes read of {path:?} was not refused"
-        );
-        assert!(
-            matches!(
-                store.read_path_text(path, None),
-                Err(PathReadError::InvalidPath(_))
-            ),
-            "text read of {path:?} was not refused"
+            "read of {path:?} was not refused"
         );
     }
 }
@@ -1151,11 +1140,6 @@ fn test_read_path_reads_a_seeded_file_and_refuses_a_directory<B: Backend>() {
             (content.as_bytes().to_vec(), "working-tree".to_string()),
             "bytes of {path}"
         );
-        assert_eq!(
-            store.read_path_text(path, None).unwrap(),
-            (content.to_string(), "working-tree".to_string()),
-            "text of {path}"
-        );
     }
     assert!(matches!(
         store.read_path_bytes("docs", None),
@@ -1163,7 +1147,7 @@ fn test_read_path_reads_a_seeded_file_and_refuses_a_directory<B: Backend>() {
     ));
 }
 
-fn test_read_path_keeps_exact_bytes_and_decodes_invalid_utf8_lossily<B: Backend>() {
+fn test_read_path_keeps_exact_bytes_of_invalid_utf8<B: Backend>() {
     let repository = Repository::<B>::empty();
     let path = VirtualPath::worktree("docs/latin1.txt").unwrap();
     repository.write(&path, b"caf\xE9");
@@ -1175,13 +1159,6 @@ fn test_read_path_keeps_exact_bytes_and_decodes_invalid_utf8_lossily<B: Backend>
             .unwrap()
             .0,
         b"caf\xE9"
-    );
-    assert_eq!(
-        store
-            .read_path_text(path.relative().as_str(), None)
-            .unwrap()
-            .0,
-        "caf\u{FFFD}"
     );
 }
 
@@ -1220,10 +1197,6 @@ fn test_read_path_at_commit_returns_the_state_recorded_for_that_commit<B: Backen
             store.read_path_bytes("docs/plan.md", Some(commit)).unwrap(),
             (content.as_bytes().to_vec(), label(commit))
         );
-        assert_eq!(
-            store.read_path_text("docs/plan.md", Some(commit)).unwrap(),
-            (content.to_string(), label(commit))
-        );
     }
     assert_eq!(
         store
@@ -1259,15 +1232,10 @@ fn test_read_path_at_an_unknown_commit_reports_commit_not_found<B: Backend>() {
 
     for commit in ["no-such-commit", "0000000000000000000000000000000000000000"] {
         let bytes = store.read_path_bytes("docs/plan.md", Some(commit));
-        let text = store.read_path_text("docs/plan.md", Some(commit));
 
         assert!(
             matches!(bytes, Err(PathReadError::CommitNotFound(_))),
             "{commit}: {bytes:?}"
-        );
-        assert!(
-            matches!(text, Err(PathReadError::CommitNotFound(_))),
-            "{commit}: {text:?}"
         );
     }
 }
@@ -1383,7 +1351,7 @@ conformance_suite!(
         test_read_repo_file_reads_present_files_and_refuses_unsafe_paths,
         test_read_path_reports_a_missing_file_and_refuses_unsafe_paths,
         test_read_path_reads_a_seeded_file_and_refuses_a_directory,
-        test_read_path_keeps_exact_bytes_and_decodes_invalid_utf8_lossily,
+        test_read_path_keeps_exact_bytes_of_invalid_utf8,
         test_read_repo_file_refuses_invalid_utf8,
         test_read_path_at_commit_returns_the_state_recorded_for_that_commit,
         test_read_path_at_an_unknown_commit_reports_commit_not_found,

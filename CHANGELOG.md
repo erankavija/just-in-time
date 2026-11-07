@@ -26,6 +26,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (exit `1`) only on a broken link; warnings still appear in the output and
   the JSON result.
 
+- **`jit doc show` and the server's document routes read through one core
+  operation.** `jit doc show` reports the resolved short commit, as the server
+  does, rather than echoing the requested reference. Document history outside
+  a Git checkout, or before its first commit, is an empty list from both
+  `jit doc history` and the server, and Git failures computing history are
+  reported rather than hidden.
+
 ### Removed
 
 - **The profile ownership lifecycle.** An applied package is now repository
