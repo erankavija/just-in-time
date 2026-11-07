@@ -7,8 +7,8 @@
 //! `[roles]` and `[anchors]` tables — so a repository that names them differently
 //! still completes the whole bracket flow (`@/inv/domain-agnostic`).
 //!
-//! These drive `CommandExecutor` in-process against a real on-disk
-//! `templates.toml` (the bindings are read from the repository, so an in-test TOML
+//! These drive `CommandExecutor` in-process against a `templates.toml` seeded
+//! into the store (the bindings are read from the repository, so an in-test TOML
 //! string would not exercise them), covering the library contract:
 //!
 //! - a repository that renames all three bindings: apply and `--force` refresh end
@@ -26,6 +26,19 @@ use jit::domain::identity::IssueId;
 use jit::domain::{Issue, Priority};
 use jit::storage::{InMemoryStorage, IssueStore};
 use std::collections::BTreeMap;
+
+/// The container anchor `jit apply` auto-binds, read from captured declarations.
+fn container_anchor(executor: &CommandExecutor<InMemoryStorage>) -> String {
+    executor
+        .config()
+        .captured_declarations()
+        .unwrap()
+        .config()
+        .templates
+        .anchors
+        .container_anchor()
+        .to_string()
+}
 
 /// A `plan` template whose planning role is `spec`, breakdown role is `split`,
 /// and container anchor is `target`, with the `[roles]`/`[anchors]` tables that
@@ -159,7 +172,7 @@ fn test_renamed_bindings_complete_the_bracket_flow_end_to_end() {
     // The auto-bound anchor is the repository's, not a compiled-in name. This is
     // the binding `jit apply <template> <container>` fills from its positional
     // argument.
-    let anchor = executor.templates().container_anchor().unwrap().to_string();
+    let anchor = container_anchor(&executor);
     assert_eq!(anchor, "target");
 
     // --- apply ---
@@ -243,10 +256,7 @@ fn test_absent_bindings_reproduce_the_shipped_names_end_to_end() {
             ..MemoryDeclarations::default()
         },
     );
-    assert_eq!(
-        executor.templates().container_anchor().unwrap(),
-        "container"
-    );
+    assert_eq!(container_anchor(&executor), "container");
 
     let container = create_container(&executor, "Auth epic");
     let bindings = BTreeMap::from([("container".to_string(), container.clone())]);
@@ -273,8 +283,5 @@ fn test_absent_bindings_reproduce_the_shipped_names_end_to_end() {
 #[test]
 fn test_container_anchor_defaults_without_a_templates_file() {
     let executor = memory_executor_declaring(InMemoryStorage::new(), MemoryDeclarations::default());
-    assert_eq!(
-        executor.templates().container_anchor().unwrap(),
-        "container"
-    );
+    assert_eq!(container_anchor(&executor), "container");
 }

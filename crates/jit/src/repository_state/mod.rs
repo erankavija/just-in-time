@@ -479,14 +479,22 @@ pub(crate) fn validation_declarations_from_image(
     let rules = match image.file_bytes(&VirtualPath::RULES)? {
         Some(bytes) => (|| -> Result<RuleSet, DeclarationParseError> {
             let content = std::str::from_utf8(bytes)?;
+            // An absent optional schema is skipped, as the storage loader does;
+            // the parse substitutes its placeholder.
             let schemas = RuleSet::schema_requests(content)?
                 .into_iter()
-                .map(|request| -> Result<_, DeclarationParseError> {
-                    let path = VirtualPath::schema_reference(&request.reference)?;
-                    let bytes = image.file_bytes(&path)?.ok_or_else(|| {
-                        DeclarationParseError::MissingCapture(request.reference.clone())
-                    })?;
-                    Ok((request.reference, bytes.to_vec()))
+                .filter_map(|request| -> Option<Result<_, DeclarationParseError>> {
+                    let bytes = VirtualPath::schema_reference(&request.reference)
+                        .map_err(DeclarationParseError::from)
+                        .and_then(|path| Ok(image.file_bytes(&path)?.map(<[u8]>::to_vec)));
+                    match bytes {
+                        Ok(Some(bytes)) => Some(Ok((request.reference, bytes))),
+                        Ok(None) if !request.required => None,
+                        Ok(None) => Some(Err(DeclarationParseError::MissingCapture(
+                            request.reference,
+                        ))),
+                        Err(error) => Some(Err(error)),
+                    }
                 })
                 .collect::<Result<Vec<_>, DeclarationParseError>>()?;
             let parsed = RuleSet::parse(content, Some(&config), schemas)?;

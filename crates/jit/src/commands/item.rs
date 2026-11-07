@@ -488,7 +488,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
                 // structurally routed, not mis-split, even on the error path.
                 let scope = addr
                     .scope
-                    .bind_local(declarations.config().project_name())
+                    .bind_local(crate::config_manager::project_name_from_config(
+                        declarations.config(),
+                    ))
                     .map_err(|err| {
                     anyhow!(
                         "cannot resolve item address '{qualified}' (kind '{kind}', self-id '{}'): {err}",

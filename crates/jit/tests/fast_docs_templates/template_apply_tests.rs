@@ -167,7 +167,7 @@ fn container_binding(id: &IssueId) -> BTreeMap<String, IssueId> {
 }
 
 #[test]
-fn test_named_apply_auto_binding_comes_from_captured_template_not_cached_config() {
+fn test_named_apply_auto_binding_comes_from_captured_template() {
     let h = TestHarness::new();
     let epic = create_epic(&h, "Captured anchor epic");
     let templates = r#"

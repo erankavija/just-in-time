@@ -94,6 +94,21 @@ mod tests {
     }
 
     #[test]
+    fn test_load_ruleset_malformed_file_is_an_error_rather_than_an_empty_set() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            data_path(dir.path(), &VirtualPath::RULES),
+            "[[rules]]\nname = \"broken\"\nassert = {}\n",
+        )
+        .unwrap();
+        assert!(load_ruleset(
+            &crate::test_utils::repository_layout_for_data_root(dir.path()),
+            &empty_config()
+        )
+        .is_err());
+    }
+
+    #[test]
     fn test_load_ruleset_reads_referenced_schema_from_same_root() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(data_path(dir.path(), &VirtualPath::SCHEMAS)).unwrap();

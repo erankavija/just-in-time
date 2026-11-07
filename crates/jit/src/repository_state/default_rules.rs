@@ -2,9 +2,8 @@
 //!
 //! `.jit/rules.toml` declares the operative issue/label ruleset (DR §8.2/§8.4).
 //! This module produces the FIXED default rule set that `jit init` serializes
-//! into that file, that
-//! [`CommandExecutor::effective_rules`](crate::commands::CommandExecutor) builds
-//! IN MEMORY when no `rules.toml` exists yet (no disk write on the read path),
+//! into that file, that the captured declaration parse builds IN MEMORY when
+//! no `rules.toml` exists yet (no disk write on the read path),
 //! and that [`reconcile_default_rules_with_config`] reconciles a scaffolded
 //! file's default rules against the current registry at load — so a default
 //! rule's assertion and the family's membership follow `config.toml`,
