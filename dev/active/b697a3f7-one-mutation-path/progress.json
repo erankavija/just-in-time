@@ -185,7 +185,7 @@
      "id": "f98f2353-eec3-4473-8c83-811cdcdcea5f",
      "short_id": "f98f2353",
      "title": "Type-label extraction and process-group liveness each go through their one shared form",
-     "status": "in_progress"
+     "status": "done"
     }
    ]
   },
@@ -365,7 +365,8 @@
  ],
  "notes": [
   "Wave 1 leaves 12064c7b, 4334df62, 9a2563fd, c2b3cefa, f6477007, 4d834432 done; worktrees reclaimed. 1a737bb4 (W1b) and wave 2 (d2acb105, 7fefd776, 905364c1) in flight; dispatched together because all are dependency-ready and their shared files are in disjoint functions.",
-  "Session 2026-11-08 (lead invoked by just-in-time-d5): c0775a83 resumed in its worktree after a lead-preserve WIP commit and a rebase onto main; host quiet window 03:30-04:30 Helsinki, no cargo from 03:15; coordinating crates/jit edits with df129d9e lead just-in-time-55. Pending pitfall: output.rs IssueScope (graph traversal key) shares its name with domain IssueScope; not a REQ-20 violation, raise in holistic review if it matters."
+  "Session 2026-11-08 (lead invoked by just-in-time-d5): c0775a83 resumed in its worktree after a lead-preserve WIP commit and a rebase onto main; host quiet window 03:30-04:30 Helsinki, no cargo from 03:15; coordinating crates/jit edits with df129d9e lead just-in-time-55. Pending pitfall: output.rs IssueScope (graph traversal key) shares its name with domain IssueScope; not a REQ-20 violation, raise in holistic review if it matters.",
+  "Trap: dispatch-worker-worktree.sh's default TMPDIR (/tmp/lead-worker-tmp/<repo-path>/agent-<id>) is too long for unix sockets; profile::package socket test fails with SUN_LEN. Briefs must set a short TMPDIR such as /tmp/lw-<id>."
  ],
  "story_checkpoints": [
   {
@@ -415,6 +416,15 @@
    "model": "gpt-6.1-sol",
    "effort": "high",
    "verdict": "2 blocking findings -> f98f2353"
+  },
+  {
+   "issue": "f98f2353",
+   "review": "code-review gate",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "pass",
+   "run": "11ef1b9b"
   }
  ]
 }

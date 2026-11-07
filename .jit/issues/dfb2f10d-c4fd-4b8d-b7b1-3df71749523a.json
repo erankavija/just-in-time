@@ -30,7 +30,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Layering and duplicated primitives converge on one form",
-  "updated_at": "2026-11-07T23:15:38.466479178Z"
+  "updated_at": "2026-11-07T23:28:40.744507649Z"
 }
