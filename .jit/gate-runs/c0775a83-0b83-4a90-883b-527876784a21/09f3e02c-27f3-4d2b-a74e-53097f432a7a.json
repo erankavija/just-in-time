@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e73757a5e5842af2d20e4eef6a0a2c50fa0ab693",
+  "completed_at": "2026-11-07T23:21:22.471522631Z",
+  "duration_ms": 153951,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard criteria are satisfied; no attributable blocking or advisory defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c0775a83-0b83-4a90-883b-527876784a21",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "09f3e02c-27f3-4d2b-a74e-53097f432a7a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-07T23:18:48.519825045Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:c0775a83` — `51d06393b7d576a18241e4dbd1d6c3577407cbe6`, `e73757a5e5842af2d20e4eef6a0a2c50fa0ab693`; individual patches inspected.\nPolicy sources: `AGENTS.md` (sole applicable agent policy), `dev/TESTING.md`, `.jit/config.toml`, `.jit/invariants.toml`, `.jit/gates.toml`, `dev/vision/9db27a3a-charter.md`.\nResolved items: `@/charter/D-20`, `@/charter/D-25` → `dev/vision/9db27a3a-charter.md`; `@/issue/c0775a83/requirement/REQ-01`, `@/issue/c0775a83/requirement/REQ-02`, `@/issue/c0775a83/requirement/REQ-03`, `@/issue/c0775a83/requirement/REQ-04`, `@/issue/c0775a83/requirement/REQ-05` → context issue description; `@/issue/b697a3f7/requirement/REQ-06`, `@/issue/b697a3f7/requirement/REQ-21` → parent issue description; `@/invariant/orthogonal-tests`, `@/invariant/essential-code-prose`, `@/invariant/shared-test-contracts`, `@/invariant/semantic-test-assertions`, `@/invariant/architecture-dependency-direction`, `@/invariant/derived-state-coherence`, `@/invariant/convention-convergence`, `@/invariant/single-source-prose` → `.jit/invariants.toml`; `@/gate/jit-validate` → `.jit/gates.toml`.\nGate evidence: cargo-ci passed, exit 0, `2026-11-07T23:16:52.956713576+00:00`; wrapper ancestry confirms coverage of both tagged commits; stdout unavailable; not rerun. Current code-review projection pending, exit none.\nTruncation recovery: reread archive patches by line range, remaining patches separately, and dependency descriptions individually; all relevant truncated evidence recovered.\n\nNo findings. All five hard criteria are satisfied: shared derivation and planning in `crates/jit/src/commands/archive.rs:412`, session-count and preview-parity coverage at `archive.rs:1161`, shared-budget documentation at `docs/reference/cli-commands.md:283`, and read-driver coverage at `docs/reference/storage-format.md:147`.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard criteria are satisfied; no attributable blocking or advisory defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -2,7 +2,7 @@
  "epic_id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
  "epic_short_id": "b697a3f7",
  "lead_agent_id": "agent:b697a3f7-lead",
- "current_wave": 8,
+ "current_wave": 9,
  "waves": [
   {
    "wave_number": 1,
@@ -173,13 +173,48 @@
      "id": "c0775a83-0b83-4a90-883b-527876784a21",
      "short_id": "c0775a83",
      "title": "Archive candidates plan in one read-only session",
-     "status": "in_progress"
+     "status": "done"
     },
     {
      "id": "b0dc019f-8504-488a-b6f7-d386d53bc8e0",
      "short_id": "b0dc019f",
      "title": "Domain names nothing from repository_state and type labels have no hand-written filter",
      "status": "done"
+    },
+    {
+     "id": "f98f2353-eec3-4473-8c83-811cdcdcea5f",
+     "short_id": "f98f2353",
+     "title": "Type-label extraction and process-group liveness each go through their one shared form",
+     "status": "in_progress"
+    }
+   ]
+  },
+  {
+   "wave_number": 9,
+   "issues": [
+    {
+     "id": "42046050",
+     "short_id": "42046050",
+     "title": "The executor holds no disk-backed configuration; ConfigManager and JitConfig::load are gone",
+     "status": "in_progress"
+    },
+    {
+     "id": "4e2bed35",
+     "short_id": "4e2bed35",
+     "title": "Container marker and destination evidence are declared once",
+     "status": "in_progress"
+    }
+   ]
+  },
+  {
+   "wave_number": 10,
+   "issues": [
+    {
+     "id": "45d0a971",
+     "short_id": "45d0a971",
+     "title": "Cost evidence: the epic's four cost reductions against the base binary",
+     "status": "pending",
+     "note": "after 04:30 quiet window; coordinate with df129d9e fba8d478 quiet-host trials"
     }
    ]
   }
@@ -203,6 +238,16 @@
    "short_id": "b0dc019f",
    "title": "Domain names nothing from repository_state and type labels have no hand-written filter",
    "reason": "dfb2f10d checkpoint sweep: domain/relative_path.rs test imports repository_state (REQ-18); four hand-written type: filters in tests (REQ-20)",
+   "depends_on": [],
+   "blocks": [
+    "dfb2f10d"
+   ]
+  },
+  {
+   "id": "f98f2353-eec3-4473-8c83-811cdcdcea5f",
+   "short_id": "f98f2353",
+   "title": "Type-label extraction and process-group liveness each go through their one shared form",
+   "reason": "dfb2f10d sol checkpoint review: template_apply_tests type_of (REQ-20 type extraction); serve_cli_tests process_group_survives (REQ-20 liveness); invoker ruled option 1 shape",
    "depends_on": [],
    "blocks": [
     "dfb2f10d"
@@ -281,6 +326,13 @@
    "detail": "The captured-declaration parse fails with MissingCapture when a default schema file named by rules.toml is absent, so test_missing_default_schema_still_validates_and_enforces will not carry over unchanged when 42046050 removes the disk-backed rule caches; 42046050 must reconcile that test's semantics.",
    "status": "open",
    "owner": "42046050"
+  },
+  {
+   "found_in": "c0775a83 completion evidence",
+   "subject": "archive candidates per-candidate cost",
+   "detail": "One-session candidates: 233 s for 230 candidates against 254 s per-candidate path on this repository; per-candidate planning (reachability, hashing, citation scan) dominates, not base derivation. 45d0a971 REQ-02(b) requires tip per-candidate slope <= 0.5 x base; may fail. Invoker warned 01:28.",
+   "status": "open",
+   "owner": "45d0a971"
   }
  ],
  "started_at": "2026-11-06T01:20:00+02:00",
@@ -346,6 +398,23 @@
    "model": "gpt-6.1-sol",
    "effort": "high",
    "verdict": "pass"
+  },
+  {
+   "issue": "c0775a83",
+   "review": "code-review gate",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "pass",
+   "run": "09f3e02c"
+  },
+  {
+   "issue": "dfb2f10d",
+   "review": "story checkpoint (non-gate)",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "2 blocking findings -> f98f2353"
   }
  ]
 }
