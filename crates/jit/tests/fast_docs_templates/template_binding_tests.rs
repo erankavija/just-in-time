@@ -123,10 +123,7 @@ fn create_container(executor: &CommandExecutor<InMemoryStorage>, title: &str) ->
 
 /// The issue's `type:` label value, if any.
 fn type_of(issue: &Issue) -> Option<String> {
-    issue
-        .labels
-        .iter()
-        .find_map(|l| l.strip_prefix("type:").map(str::to_string))
+    jit::labels::type_label_value(&issue.labels).map(str::to_string)
 }
 
 // =========== REQ-2: renamed bindings complete the whole bracket flow ===========
