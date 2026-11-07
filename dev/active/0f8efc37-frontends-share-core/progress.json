@@ -1,7 +1,7 @@
 {
   "epic_id": "0f8efc37-8054-420d-9409-dde888ea0040",
   "epic_short_id": "0f8efc37",
-  "current_wave": 6,
+  "current_wave": 7,
   "waves": [
     {
       "wave_number": 1,
@@ -139,6 +139,18 @@
           "status": "done"
         }
       ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {
+          "id": "1471c12a-5117-45e0-8712-f4968ff7b934",
+          "short_id": "1471c12a",
+          "title": "Return repository-relative paths from linked-document search",
+          "classification": "implementation",
+          "status": "dispatched"
+        }
+      ]
     }
   ],
   "created_during_execution": [
@@ -163,6 +175,13 @@
       "status": "done",
       "approval": "User authorized exact esbuild@0.25.12 allowScripts entry on 2026-11-08 via d5; entry applied in worktree branch worktree-agent-38df8a6c-2; verification npm ci --offline denied by session auto-mode classifier, awaiting user permission",
       "parked": "Uncommitted web/package.json entry on worktree-agent-38df8a6c-2; commit only after clean-install verification passes. Old branch worktree-agent-38df8a6c untouched pending user cleanup."
+    },
+    {
+      "id": "1471c12a-5117-45e0-8712-f4968ff7b934",
+      "reason": "Holistic review ea3ab36e F1 (blocking): linked-document search returns absolute paths rejected by document routes",
+      "dependent": "0f8efc37-8054-420d-9409-dde888ea0040",
+      "status": "dispatched",
+      "approval": "steward d5 approved; fix at source in core search_selected"
     }
   ],
   "escalations": [],
@@ -245,6 +264,16 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "verdict": "pass"
+    },
+    {
+      "issue": "0f8efc37",
+      "gate": "holistic-review",
+      "run": "ea3ab36e-fba6-48d1-b8e0-d92583179503",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "fail",
+      "findings": "F1 blocking -> 1471c12a; F2 advisory forwarded to steward, no action"
     }
   ],
   "amendments": [
