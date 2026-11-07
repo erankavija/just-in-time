@@ -21,6 +21,7 @@
 use super::atomic_write::{
     publish_file, rename_noreplace_cap, unique_stage_name, write_staged_file, Durability,
 };
+use crate::domain::relative_path::RootRelativePath;
 use crate::repository_state::FileMode;
 use anyhow::{Context, Result};
 use cap_std::fs::Dir;
@@ -157,18 +158,20 @@ pub(crate) fn publish_external_directory_noreplace(
     directories: &[PathBuf],
     files: &[PathBuf],
 ) -> Result<ExternalExportOutcome> {
+    let directories = descendants(directories)?;
+    let files = descendants(files)?;
     let target = path.as_path();
     let (parent_path, leaf, parent) = external_parent(target)?;
     let stage_name = unique_stage_name();
     parent.create_dir(&stage_name)?;
     let stage = super::capability_fs::open_child_dir_nofollow(&parent, &stage_name)?;
     let prepare = (|| -> Result<()> {
-        for relative in directories {
+        for relative in &directories {
             create_external_stage_directory(&stage, relative)?;
         }
-        for relative in files {
+        for relative in &files {
             let (target_parent, target_leaf) = create_external_stage_parent(&stage, relative)?;
-            let input = fs::File::open(source.join(relative))?;
+            let input = fs::File::open(source.join(relative.as_path()))?;
             write_staged_file(&target_parent, &target_leaf, input, FileMode::Regular)?;
             target_parent.try_clone()?.into_std_file().sync_all()?;
         }
@@ -246,43 +249,56 @@ fn external_file_noreplace_target(
     }
 }
 
-fn create_external_stage_directory(root: &Dir, relative: &Path) -> Result<()> {
-    let mut current = root.try_clone()?;
-    for component in relative.components() {
-        let name = Path::new(component.as_os_str());
-        match current.symlink_metadata(name) {
-            Ok(metadata) if metadata.is_dir() && !metadata.is_symlink() => {}
-            Ok(_) => anyhow::bail!("external export stage has an unsafe occupant"),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                current.create_dir(name)?;
-                current.try_clone()?.into_std_file().sync_all()?;
+/// Each staged-tree path as a descendant of the stage root, refusing any other.
+fn descendants(paths: &[PathBuf]) -> Result<Vec<RootRelativePath>> {
+    paths
+        .iter()
+        .map(|path| match RootRelativePath::parse(path) {
+            Ok(descendant @ RootRelativePath::Descendant(_)) => Ok(descendant),
+            _ => Err(anyhow::anyhow!(
+                "external export stage path {} is not a descendant",
+                path.display()
+            )),
+        })
+        .collect()
+}
+
+fn create_external_stage_directory(root: &Dir, relative: &RootRelativePath) -> Result<()> {
+    relative
+        .segments()
+        .try_fold(root.try_clone()?, |current, name| {
+            match current.symlink_metadata(name) {
+                Ok(metadata) if metadata.is_dir() && !metadata.is_symlink() => {}
+                Ok(_) => anyhow::bail!("external export stage has an unsafe occupant"),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    current.create_dir(name)?;
+                    current.try_clone()?.into_std_file().sync_all()?;
+                }
+                Err(error) => return Err(error.into()),
             }
-            Err(error) => return Err(error.into()),
-        }
-        current = super::capability_fs::open_child_dir_nofollow(&current, name)?;
-    }
-    Ok(())
+            Ok(super::capability_fs::open_child_dir_nofollow(
+                &current, name,
+            )?)
+        })
+        .map(drop)
 }
 
-fn open_external_stage_directory(root: &Dir, relative: &Path) -> Result<Dir> {
-    let mut current = root.try_clone()?;
-    for component in relative.components() {
-        current = super::capability_fs::open_child_dir_nofollow(
-            &current,
-            Path::new(component.as_os_str()),
-        )?;
-    }
-    Ok(current)
+fn open_external_stage_directory(root: &Dir, relative: &RootRelativePath) -> Result<Dir> {
+    relative
+        .segments()
+        .try_fold(root.try_clone()?, |current, name| {
+            Ok(super::capability_fs::open_child_dir_nofollow(
+                &current, name,
+            )?)
+        })
 }
 
-fn create_external_stage_parent(root: &Dir, relative: &Path) -> Result<(Dir, PathBuf)> {
-    let leaf = relative
-        .file_name()
-        .ok_or_else(|| anyhow::anyhow!("external export file has no name"))?
-        .into();
-    let parent = relative.parent().unwrap_or_else(|| Path::new(""));
-    create_external_stage_directory(root, parent)?;
-    Ok((open_external_stage_directory(root, parent)?, leaf))
+fn create_external_stage_parent(root: &Dir, relative: &RootRelativePath) -> Result<(Dir, PathBuf)> {
+    let (parent, leaf) = relative
+        .split_leaf()
+        .ok_or_else(|| anyhow::anyhow!("external export file has no name"))?;
+    create_external_stage_directory(root, &parent)?;
+    Ok((open_external_stage_directory(root, &parent)?, leaf.into()))
 }
 
 #[cfg(test)]
@@ -343,6 +359,26 @@ mod tests {
                 .unwrap()
                 .count(),
             1
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_external_directory_noreplace_refuses_a_non_descendant_stage_path_without_residue() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source-tree");
+        std::fs::create_dir_all(&source).unwrap();
+        let target = external_target(root.path(), "snapshot");
+
+        let result =
+            publish_external_directory_noreplace(&target, &source, &[], &[PathBuf::from("../x")]);
+
+        assert!(result.is_err());
+        assert_eq!(
+            std::fs::read_dir(root.path().join("output"))
+                .unwrap()
+                .count(),
+            0
         );
     }
 
