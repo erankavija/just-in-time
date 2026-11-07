@@ -161,7 +161,9 @@
       ],
       "dependent": "3a61ff16-9afb-4c7c-9583-8ce588581350",
       "status": "blocked_on_permission",
-      "approval": "User authorized exact esbuild@0.25.12 allowScripts entry on 2026-11-08 via d5; entry applied in worktree branch worktree-agent-38df8a6c-2; verification npm ci --offline denied by session auto-mode classifier, awaiting user permission"
+      "approval": "User authorized exact esbuild@0.25.12 allowScripts entry on 2026-11-08 via d5; entry applied in worktree branch worktree-agent-38df8a6c-2; verification npm ci --offline denied by session auto-mode classifier, awaiting user permission",
+      "blocked_command": "cd /mnt/nvme/jit/agents/worktrees/agent-38df8a6c/web && npm ci --offline",
+      "parked": "Uncommitted web/package.json entry on worktree-agent-38df8a6c-2; commit only after clean-install verification passes. Old branch worktree-agent-38df8a6c untouched pending user cleanup."
     }
   ],
   "escalations": [
