@@ -18,9 +18,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "367c99ba-013e-4493-b8f5-2c195b619eb0",
+      "run_id": "a15ee475-d335-4944-a11b-945e3f252dfa",
       "status": "passed",
-      "updated_at": "2026-11-07T23:23:04.285648082Z",
+      "updated_at": "2026-11-07T23:29:47.394600741Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Converge document operation adapters",
-  "updated_at": "2026-11-07T23:25:43.580688746Z"
+  "updated_at": "2026-11-07T23:29:47.394600741Z"
 }

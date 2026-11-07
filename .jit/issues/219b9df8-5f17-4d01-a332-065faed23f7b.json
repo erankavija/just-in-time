@@ -1,0 +1,29 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-07T23:31:34.450311905Z",
+  "context": {},
+  "created_at": "2026-11-07T23:31:33.885692984Z",
+  "dependencies": [],
+  "description": "Route the test fixture `declaration_dir` through the canonical relative-path validator, closing the round-2 `one-form-convergence` checkpoint finding.\n\n## Background\n\n- `declaration_dir` (`crates/jit/src/test_utils.rs`) validates each worktree-relative fixture path with `Path::components()`, accepting only `Normal` and `CurDir` components. On unix it accepts `./a`, `a//b` and `a:b`, which `RootRelativePath::parse` (`crates/jit/src/domain/relative_path.rs`) rejects.\n- `RootRelativePath::parse` is the one safe-relative-path validator; `profile/package.rs` already delegates to it and requires a `Descendant`.\n- Epic criterion: `b697a3f7` REQ-20 (safe relative paths, with one validator); story `dfb2f10d` REQ-02. Sol checkpoint review round 2, finding 1.\n\n## Success Criteria\n\n- [hard] REQ-01: `declaration_dir` accepts a path only when `RootRelativePath::parse` returns a `Descendant`, and refuses every other path before writing anything.\n- [hard] REQ-02: No code under `crates/` other than `RootRelativePath::parse` decides whether a relative path input is safe by inspecting its components; normalizers that resolve `.` and `..` in absolute or link paths are outside this criterion.\n- [hard] REQ-03: Every existing `declaration_dir` caller still passes, with any fixture path that used a now-refused spelling rewritten in canonical form.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-07T23:31:33.885692984Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "219b9df8-5f17-4d01-a332-065faed23f7b",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:one-form-convergence",
+    "component:core",
+    "per:@/charter/D-20",
+    "satisfies:b697a3f7/REQ-20"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Test declaration fixtures validate paths through the canonical validator",
+  "updated_at": "2026-11-07T23:31:34.450311905Z"
+}

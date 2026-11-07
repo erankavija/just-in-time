@@ -25796,3 +25796,9 @@
 {"from":"backlog","id":"8d943544-5832-4759-b6dd-41c182b3c9b8","issue_id":"dfb2f10d-c4fd-4b8d-b7b1-3df71749523a","timestamp":"2026-11-07T23:28:40.744507649Z","to":"ready","type":"issue_state_changed"}
 {"from":"in_progress","id":"3e71a537-5169-4245-b4e1-4fed757c34b7","issue_id":"f98f2353-eec3-4473-8c83-811cdcdcea5f","timestamp":"2026-11-07T23:28:40.744507649Z","to":"done","type":"issue_state_changed"}
 {"id":"c3f9023b-bb4d-49b5-ae91-78f97692726c","issue_id":"f98f2353-eec3-4473-8c83-811cdcdcea5f","timestamp":"2026-11-07T23:28:40.744507649Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"a22e6fc8-aa37-4a46-af67-6150ab9c5c83","issue_id":"d4172016-0225-4ae8-aa37-3e4f28a1922c","timestamp":"2026-11-07T23:29:47.394600741Z","type":"gate_passed","updated_by":"auto:executor"}
+{"id":"114eb6a9-df5e-4985-8ffd-d34d4291f9e5","issue_id":"219b9df8-5f17-4d01-a332-065faed23f7b","priority":"high","timestamp":"2026-11-07T23:31:33.885692984Z","title":"Test declaration fixtures validate paths through the canonical validator","type":"issue_created"}
+{"from":"ready","id":"293c81a7-b2e0-48d3-970a-201bd04c1a16","issue_id":"dfb2f10d-c4fd-4b8d-b7b1-3df71749523a","timestamp":"2026-11-07T23:31:34.265078684Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"21770c64-d182-42fb-ad81-b798c0525e6c","issue_id":"dfb2f10d-c4fd-4b8d-b7b1-3df71749523a","timestamp":"2026-11-07T23:31:34.265078684Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"540c1081-8346-4fa6-b70e-09dfc1be552d","issue_id":"219b9df8-5f17-4d01-a332-065faed23f7b","timestamp":"2026-11-07T23:31:34.450311905Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"c3b17380-95f4-4bab-aa2b-a683ce8afc33","issue_id":"219b9df8-5f17-4d01-a332-065faed23f7b","timestamp":"2026-11-07T23:31:34.450311905Z","type":"issue_claimed"}
