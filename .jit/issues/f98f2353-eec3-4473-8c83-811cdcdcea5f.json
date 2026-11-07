@@ -1,0 +1,29 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-07T23:15:46.602609318Z",
+  "context": {},
+  "created_at": "2026-11-07T23:15:38.082474166Z",
+  "dependencies": [],
+  "description": "Route the last hand-written type-label extraction through the shared extractor, closing the `one-form-convergence` story checkpoint finding from its sol review.\n\n## Background\n\n- `crates/jit/tests/fast_docs_templates/template_apply_tests.rs` defines `type_of`, which parses each label with `parse_label` and compares its namespace to the literal `\"type\"`. `crates/jit/src/labels.rs` owns that extraction (`type_label_value`), and `b0dc019f` already moved the four prefix-based sites onto it.\n- Epic criterion: `b697a3f7` REQ-20 (type extraction from labels has one normalisation); story `dfb2f10d` REQ-02.\n\n## Success Criteria\n\n- [hard] REQ-01: `type_of` in `template_apply_tests.rs` delegates to `jit::labels::type_label_value`, or its callers use the extractor directly.\n- [hard] REQ-02: No code under `crates/` outside `labels.rs` extracts a type label by comparing a parsed namespace to `\"type\"` or by handling the `type:` prefix.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-07T23:15:38.082474166Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "f98f2353-eec3-4473-8c83-811cdcdcea5f",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:one-form-convergence",
+    "component:core",
+    "per:@/charter/D-20",
+    "satisfies:b697a3f7/REQ-20"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "The last hand-written type-label extraction goes through the shared extractor",
+  "updated_at": "2026-11-07T23:15:46.602609318Z"
+}

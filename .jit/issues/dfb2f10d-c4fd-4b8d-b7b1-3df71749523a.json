@@ -7,7 +7,8 @@
     "9623fe6a-d9f9-4a28-80e2-cc490553b7f9",
     "b0dc019f-8504-488a-b6f7-d386d53bc8e0",
     "b2c28ec1-4178-4e77-9153-b86aefae1056",
-    "f6477007-09ab-4d53-8fec-ca4741c3cf78"
+    "f6477007-09ab-4d53-8fec-ca4741c3cf78",
+    "f98f2353-eec3-4473-8c83-811cdcdcea5f"
   ],
   "description": "Aggregate the layering fixes and the one-form convergences: domain purity and typed domain errors, and each duplicated primitive or rule listed by the epic reduced to one form.\n\n## Success Criteria\n\n- [hard] REQ-01: The domain layer imports nothing from `repository_state`, returns typed errors, and reports layout violations through a domain type matched exhaustively.\n- [hard] REQ-02: Process liveness, safe relative paths, issue scopes and type extraction each have one form.\n- [hard] REQ-03: Adopter documentation states the issue scope grammar as the code now behaves.\n",
   "documents": [],
@@ -29,7 +30,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Layering and duplicated primitives converge on one form",
-  "updated_at": "2026-11-07T23:12:12.293120448Z"
+  "updated_at": "2026-11-07T23:15:38.466479178Z"
 }
