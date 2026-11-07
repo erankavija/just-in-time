@@ -4,6 +4,7 @@
 //! resolves paths, and computes metadata (MIME types, hashes).
 
 use crate::document::{link_target::is_external_reference, AdapterRegistry};
+use crate::domain::relative_path::RootRelativePath;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -247,46 +248,38 @@ impl AssetScanner {
         })
     }
 
-    /// Resolve relative path to absolute path from repo root
+    /// Resolve an asset link to its worktree-relative path.
     ///
-    /// Security: Validates that resolved path doesn't escape repo root, and
-    /// that the normalized result is a path
+    /// Refuses a link that climbs above the repository root or resolves to
+    /// anything other than a descendant
     /// [`VirtualPath::worktree`](crate::repository_state::VirtualPath::worktree)
     /// can represent. A destination the worktree identity rejects therefore
     /// fails here, where the caller degrades it to a scan warning, rather than
     /// failing the mutation that consumes the resolved paths.
     fn resolve_path(&self, asset_path: &str, doc_path: &Path) -> Result<PathBuf, String> {
-        let base_path = if let Some(stripped) = asset_path.strip_prefix('/') {
-            // Root-relative path: strip leading slash
-            PathBuf::from(stripped)
-        } else {
-            // Relative path: resolve from document's directory
-            let doc_dir = doc_path.parent().unwrap_or(Path::new(""));
-            doc_dir.join(asset_path)
+        let (directory, link) = match asset_path.strip_prefix('/') {
+            Some(stripped) => (RootRelativePath::Root, stripped),
+            None => (
+                RootRelativePath::parse(doc_path.parent().unwrap_or(Path::new("")))
+                    .map_err(|error| error.to_string())?,
+                asset_path,
+            ),
         };
-
-        // Security check: count parent dir references before normalization
-        let parent_count = asset_path.matches("..").count();
-        let doc_depth = doc_path
-            .parent()
-            .unwrap_or(Path::new(""))
-            .components()
-            .count();
-
-        if !asset_path.starts_with('/') && parent_count > doc_depth {
-            return Err(format!(
+        let resolved = directory.resolve_link(link).ok_or_else(|| {
+            format!(
                 "Path escape detected: {} would escape repository root (going up {} levels from depth {})",
-                asset_path, parent_count, doc_depth
-            ));
+                asset_path,
+                link.split('/').filter(|segment| *segment == "..").count(),
+                directory.depth()
+            )
+        })?;
+        match crate::repository_state::VirtualPath::worktree(&resolved)
+            .map_err(|error| error.to_string())?
+            .relative()
+        {
+            RootRelativePath::Descendant(_) => Ok(PathBuf::from(resolved)),
+            RootRelativePath::Root => Err(format!("{asset_path} resolves to the repository root")),
         }
-
-        // Normalize path (resolve .. and .)
-        let normalized = normalize_path(&base_path);
-
-        crate::repository_state::VirtualPath::worktree(&normalized)
-            .map_err(|error| error.to_string())?;
-
-        Ok(normalized)
     }
 
     /// Classify assets as shared or per-doc based on reference count
@@ -338,21 +331,6 @@ impl AssetScanner {
 
         classified
     }
-}
-
-/// Normalize a path by resolving . and .. components
-fn normalize_path(path: &Path) -> PathBuf {
-    let mut components = Vec::new();
-    for component in path.components() {
-        match component {
-            std::path::Component::CurDir => {}
-            std::path::Component::ParentDir => {
-                components.pop();
-            }
-            c => components.push(c),
-        }
-    }
-    components.iter().collect()
 }
 
 /// Compute SHA256 hash of file content
@@ -543,6 +521,16 @@ mod tests {
     }
 
     #[test]
+    fn test_resolve_path_keeps_a_double_dot_inside_a_file_name() {
+        let temp = TempDir::new().unwrap();
+        let scanner = AssetScanner::new(AdapterRegistry::with_builtins(), temp.path());
+
+        let resolved = scanner.resolve_path("a..b..c.png", Path::new("doc.md"));
+
+        assert_eq!(resolved, Ok(PathBuf::from("a..b..c.png")));
+    }
+
+    #[test]
     fn test_resolve_path_rejects_a_path_the_worktree_identity_cannot_represent() {
         let temp = TempDir::new().unwrap();
         let scanner = AssetScanner::new(AdapterRegistry::with_builtins(), temp.path());
@@ -555,16 +543,6 @@ mod tests {
                 .is_err_and(|error| error.contains("memchr::symbol")),
             "{result:?}"
         );
-    }
-
-    #[test]
-    fn test_normalize_path() {
-        assert_eq!(
-            normalize_path(Path::new("./file.md")),
-            PathBuf::from("file.md")
-        );
-        assert_eq!(normalize_path(Path::new("a/./b")), PathBuf::from("a/b"));
-        assert_eq!(normalize_path(Path::new("a/b/../c")), PathBuf::from("a/c"));
     }
 
     #[test]

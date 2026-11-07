@@ -881,7 +881,7 @@ impl super::gate_run_reader::GateRunTree for JsonFileStorage {
                 .is_empty()
             {
                 true => Ok(Some(root)),
-                false => super::capability_fs::open_capability_parent(&root, relative)?
+                false => super::capability_fs::open_capability_parent(&root, directory.relative())?
                     .map(|(parent, leaf)| {
                         super::capability_fs::open_child_dir_nofollow(&parent, leaf)
                     })

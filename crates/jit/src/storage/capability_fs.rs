@@ -202,27 +202,23 @@ impl CapabilityRoots {
 /// unsafe target, not a clean absence.
 pub(in crate::storage) fn open_capability_parent(
     root: &Dir,
-    path: &Path,
+    path: &RootRelativePath,
 ) -> Result<Option<(Dir, String)>, CapabilityFsError> {
-    let components = path
-        .components()
-        .map(|component| component.as_os_str().to_string_lossy().into_owned())
-        .collect::<Vec<_>>();
-    let (leaf, parents) = components
-        .split_last()
-        .ok_or_else(|| CapabilityFsError::UnsafeTarget(path.display().to_string()))?;
+    let (parents, leaf) = path
+        .split_leaf()
+        .ok_or_else(|| CapabilityFsError::UnsafeTarget(path.as_path().display().to_string()))?;
     let mut current = root.try_clone()?;
-    for component in parents {
+    for component in parents.segments() {
         match current.symlink_metadata(component) {
             Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
-                return Err(CapabilityFsError::UnsafeTarget(component.clone()))
+                return Err(CapabilityFsError::UnsafeTarget(component.to_owned()))
             }
             Ok(_) => current = open_child_dir_nofollow(&current, component)?,
             Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error.into()),
         }
     }
-    Ok(Some((current, leaf.clone())))
+    Ok(Some((current, leaf.to_owned())))
 }
 
 /// The directory handles one pass over a root opens, keyed by root-relative
@@ -386,13 +382,12 @@ fn split_target(target: &Path) -> Result<(PathBuf, String), CapabilityFsError> {
 
 pub(in crate::storage) fn open_descendant_dir_nofollow(
     root: &Dir,
-    path: &Path,
+    path: &RootRelativePath,
 ) -> Result<Dir, CapabilityFsError> {
-    let mut current = root.try_clone()?;
-    for component in path.components() {
-        current = open_child_dir_nofollow(&current, Path::new(component.as_os_str()))?;
-    }
-    Ok(current)
+    path.segments()
+        .try_fold(root.try_clone()?, |current, name| {
+            open_child_dir_nofollow(&current, name)
+        })
 }
 
 /// The kind required of an opened leaf handle.
@@ -591,7 +586,7 @@ pub(crate) fn read_repository_file_nofollow(
         return Err(CapabilityFsError::UnsafeTarget(root.display().to_string()));
     }
     let root = open_absolute_dir_nofollow(root)?;
-    let Some((parent, leaf)) = open_capability_parent(&root, relative.as_path())? else {
+    let Some((parent, leaf)) = open_capability_parent(&root, relative)? else {
         return Ok(None);
     };
     read_leaf_nofollow(&parent, &leaf, relative.as_path())
@@ -626,8 +621,7 @@ fn read_confined_relative(
         return Err(unsafe_target());
     }
     let components = relative
-        .as_str()
-        .split('/')
+        .segments()
         .map(std::ffi::OsString::from)
         .collect::<Vec<_>>();
     let mut current = root.try_clone()?;

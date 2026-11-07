@@ -100,6 +100,41 @@ impl RootRelativePath {
         }
     }
 
+    /// The path's segments below the root (none for the root).
+    pub(crate) fn segments(&self) -> impl Iterator<Item = &str> {
+        self.as_str()
+            .split('/')
+            .filter(|segment| !segment.is_empty())
+    }
+
+    /// The parent and leaf of a descendant; `None` for the root.
+    pub(crate) fn split_leaf(&self) -> Option<(Self, &str)> {
+        match self.as_str().rsplit_once('/') {
+            _ if self.is_root() => None,
+            Some((parent, leaf)) => Some((Self::Descendant(Cow::Owned(parent.to_owned())), leaf)),
+            None => Some((Self::Root, self.as_str())),
+        }
+    }
+
+    /// `link`, a `/`-separated link spelled from this directory, with its `.`
+    /// and `..` segments applied lexically. `None` when a `..` climbs above the
+    /// root; the result is unvalidated text for [`parse`](Self::parse).
+    pub(crate) fn resolve_link(&self, link: &str) -> Option<String> {
+        self.segments()
+            .chain(link.split('/'))
+            .try_fold(Vec::new(), |mut resolved, segment| {
+                match segment {
+                    "" | "." => {}
+                    ".." => {
+                        resolved.pop()?;
+                    }
+                    name => resolved.push(name),
+                }
+                Some(resolved)
+            })
+            .map(|resolved| resolved.join("/"))
+    }
+
     /// This path extended by `child`, a canonical relative path.
     pub(crate) fn join(&self, child: &str) -> Self {
         Self::Descendant(Cow::Owned(match self {
@@ -169,6 +204,35 @@ mod tests {
                 "{spelling:?}"
             );
         }
+    }
+
+    #[test]
+    fn test_resolve_link_applies_dot_segments_and_refuses_climbing_above_the_root() {
+        let directory = RootRelativePath::parse("dev/active").unwrap();
+        assert_eq!(
+            directory.resolve_link("./a/../b..c").as_deref(),
+            Some("dev/active/b..c")
+        );
+        assert_eq!(
+            directory.resolve_link("../../file.md").as_deref(),
+            Some("file.md")
+        );
+        assert_eq!(directory.resolve_link("../../../file.md"), None);
+        assert_eq!(RootRelativePath::Root.resolve_link("a/../../b"), None);
+    }
+
+    #[test]
+    fn test_split_leaf_separates_a_descendant_and_refuses_the_root() {
+        let nested = RootRelativePath::parse("a/b/c").unwrap();
+        assert_eq!(
+            nested.split_leaf(),
+            Some((RootRelativePath::parse("a/b").unwrap(), "c"))
+        );
+        let top = RootRelativePath::parse("c").unwrap();
+        assert_eq!(top.split_leaf(), Some((RootRelativePath::Root, "c")));
+        assert_eq!(RootRelativePath::Root.split_leaf(), None);
+        assert_eq!(nested.segments().collect::<Vec<_>>(), ["a", "b", "c"]);
+        assert_eq!(RootRelativePath::Root.segments().count(), 0);
     }
 
     #[test]
