@@ -212,5 +212,13 @@
       "effort": "high",
       "verdict": "pass"
     }
+  ],
+  "amendments": [
+    {
+      "issue": "d4172016",
+      "by": "just-in-time-d5 (steward)",
+      "date": "2026-11-08",
+      "summary": "Git-less document history returns an empty list from the single core document_history (D-4, D-20); CLI behaviour changes from error to empty list; HTTP adapter maps nothing; real Git failures surface."
+    }
   ]
 }
