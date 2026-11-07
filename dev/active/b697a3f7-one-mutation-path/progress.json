@@ -328,5 +328,6 @@
    "issue": "bb596228",
    "decision": "Accept base-ratio premise difference (base R(8)/R(1)=16.6 because a single base reader waits behind the writer); README records it; tip verdict passes on the fixed thresholds."
   }
- ]
+ ],
+ "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10"
 }
