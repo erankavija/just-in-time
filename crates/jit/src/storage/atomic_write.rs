@@ -15,6 +15,7 @@
 //! lives in [`super::external_publish`], which reaches these primitives from
 //! inside `crate::storage`.
 
+use crate::domain::relative_path::RootRelativePath;
 use crate::repository_state::{FileMode, VirtualPath};
 use crate::storage::worktree_paths::WorktreePaths;
 use anyhow::{Context, Result};
@@ -22,7 +23,7 @@ use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, OpenOptions};
 use std::ffi::OsStr;
 use std::io::Read;
-use std::path::{Component, Path};
+use std::path::Path;
 
 /// How much of a publication's durability [`publish_file`] completes itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -195,10 +196,10 @@ fn open_git_control_parent<'t>(
 ) -> Result<(Dir, &'t OsStr)> {
     let beneath = |dir: &Path| {
         target.strip_prefix(dir).is_ok_and(|rest| {
-            rest.components().next().is_some()
-                && rest
-                    .components()
-                    .all(|component| matches!(component, Component::Normal(_)))
+            matches!(
+                RootRelativePath::parse(rest),
+                Ok(RootRelativePath::Descendant(_))
+            )
         })
     };
     let (Some(parent), Some(leaf)) = (target.parent(), target.file_name()) else {

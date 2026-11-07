@@ -609,29 +609,27 @@ pub(crate) fn read_repository_file_confined(
         return Err(CapabilityFsError::UnsafeTarget(root.display().to_string()));
     }
     let root_dir = open_absolute_dir_nofollow(root)?;
-    read_confined_relative(root, &root_dir, relative.as_path(), 0)
+    read_confined_relative(root, &root_dir, relative, 0)
 }
 
+/// Walk a descendant `relative` beneath `root`; a link resolves to a path that
+/// re-enters only as a [`RootRelativePath::Descendant`].
 fn read_confined_relative(
     root_path: &Path,
     root: &Dir,
-    relative: &Path,
+    relative: &RootRelativePath,
     symlink_depth: usize,
 ) -> Result<Option<Vec<u8>>, CapabilityFsError> {
+    let unsafe_target =
+        || CapabilityFsError::UnsafeTarget(relative.as_path().display().to_string());
     if symlink_depth >= 40 {
-        return Err(CapabilityFsError::UnsafeTarget(
-            relative.display().to_string(),
-        ));
+        return Err(unsafe_target());
     }
     let components = relative
-        .components()
-        .map(|component| match component {
-            Component::Normal(name) => Ok(name.to_os_string()),
-            _ => Err(CapabilityFsError::UnsafeTarget(
-                relative.display().to_string(),
-            )),
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+        .as_str()
+        .split('/')
+        .map(std::ffi::OsString::from)
+        .collect::<Vec<_>>();
     let mut current = root.try_clone()?;
     let mut traversed = PathBuf::new();
     for (index, component) in components.iter().enumerate() {
@@ -644,22 +642,26 @@ fn read_confined_relative(
             let target = current.read_link_contents(component)?;
             let resolved =
                 resolve_confined_symlink(root_path, &traversed, &target, &components[index + 1..])?;
+            let resolved = match RootRelativePath::parse(&resolved) {
+                Ok(descendant @ RootRelativePath::Descendant(_)) => descendant,
+                _ => {
+                    return Err(CapabilityFsError::UnsafeTarget(
+                        resolved.display().to_string(),
+                    ))
+                }
+            };
             return read_confined_relative(root_path, root, &resolved, symlink_depth + 1);
         }
         if index + 1 == components.len() {
-            return read_leaf_nofollow(&current, component, relative);
+            return read_leaf_nofollow(&current, component, relative.as_path());
         }
         if !metadata.is_dir() {
-            return Err(CapabilityFsError::UnsafeTarget(
-                relative.display().to_string(),
-            ));
+            return Err(unsafe_target());
         }
         current = open_child_dir_nofollow(&current, component)?;
         traversed.push(component);
     }
-    Err(CapabilityFsError::UnsafeTarget(
-        relative.display().to_string(),
-    ))
+    Err(unsafe_target())
 }
 
 fn resolve_confined_symlink(
@@ -835,6 +837,22 @@ mod tests {
                 CapabilityFsError::UnsafeTarget(path) if Path::new(&path) == relative.as_path()
             ));
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_repository_file_confined_refuses_a_link_resolving_to_a_non_canonical_path() {
+        use std::os::unix::ffi::OsStrExt as _;
+        use std::os::unix::fs::symlink;
+        let temp = TempDir::new().unwrap();
+        let non_utf8 = std::ffi::OsStr::from_bytes(b"record\xff");
+        std::fs::write(temp.path().join(non_utf8), b"bytes").unwrap();
+        symlink(non_utf8, temp.path().join("link")).unwrap();
+        let relative = RootRelativePath::parse("link").unwrap();
+
+        let error = read_repository_file_confined(temp.path(), &relative).unwrap_err();
+
+        assert!(matches!(error, CapabilityFsError::UnsafeTarget(_)));
     }
 
     #[cfg(unix)]
