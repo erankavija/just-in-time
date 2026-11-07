@@ -118,23 +118,26 @@ async fn test_get_document_diff_missing_issue() {
     response.assert_status_not_found();
 }
 
-/// The raw route serves the requested version's bytes unaltered, and the diff
-/// route compares the two requested versions.
-#[tokio::test]
-async fn test_document_routes_serve_selected_version_bytes_and_diff() {
+/// A Git repository committing `pinned` then `explicit` at `path`, leaving
+/// uncommitted working-tree bytes, served with one issue linking `path` at the
+/// first commit. Returns the repository guard, server, issue and both commits.
+fn serve_two_document_versions(
+    path: &str,
+    pinned: &[u8],
+    explicit: &[u8],
+) -> (
+    tempfile::TempDir,
+    TestServer,
+    jit::domain::identity::IssueId,
+    String,
+    String,
+) {
     let (repo, executor) =
         jit::test_utils::setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n")
             .unwrap();
     let git = jit::test_harness::git::GitRepository::init(repo.path());
-    let (path, notes) = ("artifact.dat", "notes.txt");
-    let pin = git
-        .write(path, b"pinned\0\xff\n")
-        .write(notes, "pinned\n")
-        .commit("Pinned version");
-    let at = git
-        .write(path, b"explicit\0\xfe\n")
-        .write(notes, "explicit\n")
-        .commit("Explicit version");
+    let pin = git.write(path, pinned).commit("Pinned version");
+    let at = git.write(path, explicit).commit("Explicit version");
     git.write(path, b"working\n");
     let paths =
         jit::storage::WorktreePaths::detect_for_data_root(&repo.path().join(".jit"), repo.path())
@@ -143,7 +146,7 @@ async fn test_document_routes_serve_selected_version_bytes_and_diff() {
     let id = executor
         .issues()
         .create_issue(
-            "Selected bytes".into(),
+            "Selected versions".into(),
             String::new(),
             Priority::Normal,
             vec![],
@@ -155,27 +158,42 @@ async fn test_document_routes_serve_selected_version_bytes_and_diff() {
         .unwrap()
         .issue
         .id;
-    for document in [path, notes] {
-        executor
-            .documents()
-            .add_document_reference(&id, document, Some(&pin), None, None, true)
-            .unwrap();
-    }
-    let server = serve(executor);
-    let base = format!("/issues/{id}/documents");
+    executor
+        .documents()
+        .add_document_reference(&id, path, Some(&pin), None, None, true)
+        .unwrap();
+    (repo, serve(executor), id, pin, at)
+}
+
+/// The raw route serves the requested version's bytes unaltered.
+#[tokio::test]
+async fn test_get_document_raw_serves_requested_version_bytes() {
+    let path = "artifact.dat";
+    let (_repo, server, id, _pin, at) =
+        serve_two_document_versions(path, b"pinned\0\xff\n", b"explicit\0\xfe\n");
 
     let raw = server
-        .get(&format!("{base}/{path}/raw"))
+        .get(&format!("/issues/{id}/documents/{path}/raw"))
         .add_query_param("commit", &at)
         .await;
+
     raw.assert_status_ok();
     assert_eq!(raw.as_bytes().as_ref(), b"explicit\0\xfe\n");
+}
+
+/// The diff route compares the two requested versions.
+#[tokio::test]
+async fn test_get_document_diff_compares_requested_versions() {
+    let path = "notes.txt";
+    let (_repo, server, id, pin, at) =
+        serve_two_document_versions(path, b"pinned\n", b"explicit\n");
 
     let diff = server
-        .get(&format!("{base}/{notes}/diff"))
+        .get(&format!("/issues/{id}/documents/{path}/diff"))
         .add_query_param("from", &pin)
         .add_query_param("to", &at)
         .await;
+
     diff.assert_status_ok();
     let diff: serde_json::Value = diff.json();
     let text = diff["diff"].as_str().unwrap();
