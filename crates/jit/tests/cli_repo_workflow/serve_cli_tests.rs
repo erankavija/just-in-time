@@ -582,25 +582,6 @@ fn kill_process_group(pgid: u32) -> nix::Result<()> {
     }
 }
 
-/// Reports whether any process still belongs to the group `pgid` leads.
-///
-/// Signal 0 performs the kernel's existence and permission checks without
-/// delivering anything: `ESRCH` is the answer that the group has no members
-/// left, while `EPERM` means it has members this test may not signal — still a
-/// surviving process.
-#[cfg(unix)]
-fn process_group_survives(pgid: u32) -> bool {
-    use nix::sys::signal::kill;
-    use nix::unistd::Pid;
-    match jit::process::process_group_target(pgid) {
-        Some(target) => !matches!(
-            kill(Pid::from_raw(target), None),
-            Err(nix::errno::Errno::ESRCH)
-        ),
-        None => false,
-    }
-}
-
 /// `jit serve --fg` must serve end to end even though the parent process holds
 /// the bootstrap → repository recovery lock. Foreground `serve` is classified
 /// as requiring pre-service recovery dispatch, so the parent acquires that lock
@@ -695,7 +676,7 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
     let killed = kill_process_group(pgid);
     let teardown_deadline = phase(FG_TEARDOWN_BUDGET);
     let reaped = exited_by(&mut child, teardown_deadline);
-    let drained = poll_until(teardown_deadline, || !process_group_survives(pgid));
+    let drained = poll_until(teardown_deadline, || !jit::process::is_group_alive(pgid));
 
     assert!(
         reaped,
