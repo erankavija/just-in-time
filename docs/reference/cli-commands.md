@@ -3639,7 +3639,7 @@ JSON uses the list envelope, with the query echoed back:
   "results": [
     {
       "issue_id": "003f9f83-4e8a-4a5f-8e48-44f6f48a7c17",
-      "path": "/path/to/repo/.jit/issues/003f9f83-4e8a-4a5f-8e48-44f6f48a7c17.json",
+      "path": "issues/003f9f83-4e8a-4a5f-8e48-44f6f48a7c17.json",
       "line_number": 12,
       "line_text": "  \"title\": \"Harden auth\",",
       "matches": [{ "text": "auth", "start": 22, "end": 26 }]
@@ -3649,9 +3649,9 @@ JSON uses the list envelope, with the query echoed back:
 }
 ```
 
-`path` is the file's path as the matcher reports it, and `issue_id` is the issue
-the file belongs to, or `null` for a file that is not an issue record. `matches`
-gives each match's byte offsets within `line_text`. Missing ripgrep and other
+`path` is the file's path relative to the `.jit/` data directory, and `issue_id`
+is the issue the file belongs to, or `null` for a file that is not an issue
+record. `matches` gives each match's byte offsets within `line_text`. Missing ripgrep and other
 matcher failures use `RIPGREP_NOT_FOUND` and `SEARCH_FAILED`, respectively; see
 the generated [error-code reference](error-codes.md) and
 [command-specific exit-code mappings](exit-codes.md#command-specific-mappings)

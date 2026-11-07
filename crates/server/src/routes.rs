@@ -2451,6 +2451,32 @@ unique = false
     }
 
     #[tokio::test]
+    async fn test_search_linked_document_match_path_loads_through_issue_document_content_route() {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let doc_rel = "notes/plan.md";
+        let doc_content = "linked-needle\n";
+        std::fs::create_dir_all(temp.path().join("notes")).unwrap();
+        std::fs::write(temp.path().join(doc_rel), doc_content).unwrap();
+        executor
+            .documents()
+            .add_document_reference(&id, doc_rel, None, None, None, true)
+            .unwrap();
+        let server = test_app(executor);
+        let hits = search_hits(&server, "linked-needle").await;
+        let hit = hits.first().expect("linked document match");
+        let url = format!(
+            "/issues/{id}/documents/{}/content",
+            percent_encode_segment(&hit.path)
+        );
+        let response = server.get(&url).await;
+        response.assert_status_ok();
+        let body: serde_json::Value = response.json();
+        assert_eq!(body["content"].as_str(), Some(doc_content));
+    }
+
+    #[tokio::test]
     async fn test_search_without_linked_documents_does_not_search_worktree() {
         let (temp, executor) =
             setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
