@@ -11,7 +11,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "e78ab449-d197-42eb-9f21-89475fd89ea8",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:26:35.497254255Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f98f2353-eec3-4473-8c83-811cdcdcea5f",
   "labels": [
     "type:task",
@@ -25,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Type-label extraction and process-group liveness each go through their one shared form",
-  "updated_at": "2026-11-07T23:16:05.829897150Z"
+  "updated_at": "2026-11-07T23:26:35.497254255Z"
 }
