@@ -171,7 +171,7 @@
     "cd0ac0f7": 1,
     "4538b071": 1,
     "6326532e": 3,
-    "d4172016": 1
+    "d4172016": 2
   },
   "started_at": "2026-11-04T23:10:18.497421+00:00",
   "note": "Session 2 (2026-11-08): d4172016 stale claim released and reclaimed; prior WIP preserved and rebased; opus worker dispatched.",
@@ -211,6 +211,22 @@
       "model": "gpt-5.6-terra",
       "effort": "high",
       "verdict": "pass"
+    },
+    {
+      "issue": "d4172016",
+      "gate": "cargo-ci",
+      "verdict": "pass",
+      "tree": "e736d46f0"
+    },
+    {
+      "issue": "d4172016",
+      "gate": "code-review",
+      "run": "f6a2b9dd-32eb-4743-a3cb-16ce1c8df50d",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "fail",
+      "finding": "split combined server test (@/inv/orthogonal-tests)"
     }
   ],
   "amendments": [

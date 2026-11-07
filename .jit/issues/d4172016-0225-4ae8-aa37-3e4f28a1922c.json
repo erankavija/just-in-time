@@ -22,6 +22,12 @@
       "status": "passed",
       "updated_at": "2026-11-07T23:23:04.285648082Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "f6a2b9dd-32eb-4743-a3cb-16ce1c8df50d",
+      "status": "failed",
+      "updated_at": "2026-11-07T23:25:43.580688746Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "d4172016-0225-4ae8-aa37-3e4f28a1922c",
@@ -36,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Converge document operation adapters",
-  "updated_at": "2026-11-07T23:23:04.285648082Z"
+  "updated_at": "2026-11-07T23:25:43.580688746Z"
 }
