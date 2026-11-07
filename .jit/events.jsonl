@@ -25765,3 +25765,6 @@
 {"gate_key":"doc-review","id":"ae365374-2f99-48c6-a6cb-04dd348c7f87","timestamp":"2026-11-07T23:09:37.254608891Z","type":"gate_definition_updated"}
 {"gate_key":"holistic-review","id":"382d8e2f-34ff-4797-acc8-b96fb22a7259","timestamp":"2026-11-07T23:09:37.311841700Z","type":"gate_definition_updated"}
 {"gate_key":"plan-review","id":"762a547f-24f8-4942-a706-fceffd784496","timestamp":"2026-11-07T23:09:37.368893078Z","type":"gate_definition_updated"}
+{"gate_key":"code-review","id":"fd2cf601-9889-428d-83da-67342ff6e45a","issue_id":"3a61ff16-9afb-4c7c-9583-8ce588581350","timestamp":"2026-11-07T23:11:26.246431213Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"ready","id":"7c38f4ae-75c9-4153-8efa-a34278c734cb","issue_id":"3a61ff16-9afb-4c7c-9583-8ce588581350","timestamp":"2026-11-07T23:11:45.481856811Z","to":"done","type":"issue_state_changed"}
+{"id":"a9371ad6-22a7-411f-86bf-983f509729a5","issue_id":"3a61ff16-9afb-4c7c-9583-8ce588581350","timestamp":"2026-11-07T23:11:45.481856811Z","type":"issue_completed"}
