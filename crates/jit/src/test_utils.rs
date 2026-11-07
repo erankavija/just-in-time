@@ -1555,6 +1555,14 @@ pub fn write_package_tree_at_model_limits(root: &Path) -> PathBuf {
     root.to_path_buf()
 }
 
+/// What `thread` returned, re-raising its panic in the joining thread so a
+/// failed assertion inside it keeps its message.
+pub fn join_reraising<T>(thread: std::thread::ScopedJoinHandle<'_, T>) -> T {
+    thread
+        .join()
+        .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+}
+
 /// Copy an on-disk profile package tree to `root`, creating it and every
 /// declared parent, and return `root`.
 ///

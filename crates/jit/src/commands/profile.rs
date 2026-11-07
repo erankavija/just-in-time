@@ -2725,19 +2725,37 @@ mod tests {
         // packages applied to it in turn, and the resolved one names only the
         // workflow package and receives the default as its declared
         // dependency. They start identical, so the configurations they end with
-        // may differ only by the route that reached them.
-        let (explicit_temp, explicit_executor) =
-            setup_test_repo_with_config(COMPOSITION_CONFIG).unwrap();
-        let explicit_default = shipped_package_in(explicit_temp.path(), "jit-default");
-        let explicit_dogfood = shipped_package_in(explicit_temp.path(), "jit-dogfood");
-        let (resolved_temp, resolved_executor) =
-            setup_test_repo_with_config(COMPOSITION_CONFIG).unwrap();
-        shipped_package_in(resolved_temp.path(), "jit-default");
-        let resolved_dogfood = shipped_package_in(resolved_temp.path(), "jit-dogfood");
-
-        let explicit_default_result = apply_package(&explicit_executor, &explicit_default);
-        let explicit_dogfood_result = apply_package(&explicit_executor, &explicit_dogfood);
-        let resolved_result = apply_package(&resolved_executor, &resolved_dogfood);
+        // may differ only by the route that reached them. The routes share
+        // nothing, so they run concurrently.
+        let (explicit, resolved) = std::thread::scope(|scope| {
+            let explicit = scope.spawn(|| {
+                let (temp, executor) = setup_test_repo_with_config(COMPOSITION_CONFIG).unwrap();
+                let default = shipped_package_in(temp.path(), "jit-default");
+                let dogfood = shipped_package_in(temp.path(), "jit-dogfood");
+                let default_result = apply_package(&executor, &default);
+                let dogfood_result = apply_package(&executor, &dogfood);
+                (temp, default, dogfood, default_result, dogfood_result)
+            });
+            let resolved = scope.spawn(|| {
+                let (temp, executor) = setup_test_repo_with_config(COMPOSITION_CONFIG).unwrap();
+                shipped_package_in(temp.path(), "jit-default");
+                let dogfood = shipped_package_in(temp.path(), "jit-dogfood");
+                let result = apply_package(&executor, &dogfood);
+                (temp, dogfood, result)
+            });
+            (
+                crate::test_utils::join_reraising(explicit),
+                crate::test_utils::join_reraising(resolved),
+            )
+        });
+        let (
+            explicit_temp,
+            explicit_default,
+            explicit_dogfood,
+            explicit_default_result,
+            explicit_dogfood_result,
+        ) = explicit;
+        let (resolved_temp, resolved_dogfood, resolved_result) = resolved;
 
         // A contribution restating an identity under another value is refused
         // as a conflict, so an application that answers at all reported none.

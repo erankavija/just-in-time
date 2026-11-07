@@ -31,9 +31,8 @@ pub(in crate::storage) enum Durability {
     Full,
     /// Sync the staged file; the caller syncs the parent directory.
     Deferred,
-    /// Sync nothing, for tests whose subject is coordination rather than
-    /// crash durability.
-    #[cfg(test)]
+    /// Sync nothing, for tests whose subject is not crash durability.
+    #[cfg(any(test, feature = "test-support"))]
     Unsynced,
 }
 
@@ -63,7 +62,7 @@ pub(in crate::storage) fn publish_file<E: From<std::io::Error>>(
     let stage = unique_stage_name();
     create_staged_file(parent, &stage, bytes, mode)
         .and_then(|file| match durability {
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             Durability::Unsynced => Ok(()),
             _ => file.sync_all(),
         })
@@ -80,7 +79,7 @@ pub(in crate::storage) fn publish_file<E: From<std::io::Error>>(
     match durability {
         Durability::Full => sync_capability_directory(parent).map_err(E::from),
         Durability::Deferred => Ok(()),
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-support"))]
         Durability::Unsynced => Ok(()),
     }
 }
@@ -257,7 +256,23 @@ pub(in crate::storage) fn write_staged_file(
     content: impl Read,
     mode: FileMode,
 ) -> std::io::Result<()> {
-    create_staged_file(parent, leaf, content, mode)?.sync_all()
+    write_staged_file_for(parent, leaf, content, mode, Durability::Full)
+}
+
+/// [`write_staged_file`], leaving the file unsynced for `Unsynced`.
+pub(in crate::storage) fn write_staged_file_for(
+    parent: &Dir,
+    leaf: impl AsRef<Path>,
+    content: impl Read,
+    mode: FileMode,
+    durability: Durability,
+) -> std::io::Result<()> {
+    let file = create_staged_file(parent, leaf, content, mode)?;
+    match durability {
+        #[cfg(any(test, feature = "test-support"))]
+        Durability::Unsynced => Ok(()),
+        _ => file.sync_all(),
+    }
 }
 
 /// Write `content` under `mode` as a new file named `leaf`, unsynced. Every
@@ -307,7 +322,7 @@ pub(in crate::storage) fn sync_directory_for(
     durability: Durability,
 ) -> std::io::Result<()> {
     match durability {
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-support"))]
         Durability::Unsynced => Ok(()),
         _ => sync_capability_directory(directory),
     }

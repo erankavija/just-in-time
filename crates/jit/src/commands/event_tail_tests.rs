@@ -126,9 +126,10 @@ impl Fixture {
     }
 }
 
+type Mutation = fn(&Fixture) -> Result<()>;
+
 #[test]
 fn test_mutations_append_over_unparseable_history_without_capturing_the_whole_log() {
-    type Mutation = fn(&Fixture) -> Result<()>;
     let cases: &[(&str, Mutation)] = &[
         ("issue", |f| {
             f.executor
@@ -194,50 +195,61 @@ fn test_mutations_append_over_unparseable_history_without_capturing_the_whole_lo
         ("init", |f| f.initialize(false)),
         ("profiled init", |f| f.initialize(true)),
     ];
-    let failures = cases
-        .iter()
-        .filter_map(|(name, mutate)| {
-            let run = || -> Result<()> {
-                let fixture = Fixture::new()?;
-                if *name == "profile refresh" {
-                    fixture.apply_profile()?;
-                    fs::remove_file(fixture.repo.path().join("docs/profile.txt"))?;
-                }
-                if *name == "init" {
-                    fs::remove_file(fixture.repo.path().join(".jit/invariants.toml"))?;
-                }
-                let path = fixture.repo.path().join(".jit/events.jsonl");
-                let previous = fs::read(&path)?;
-                let final_line = previous
-                    .split_inclusive(|byte| *byte == b'\n')
-                    .next_back()
-                    .unwrap();
-                // A sparse malformed line exceeds bounded captures without allocating history.
-                let mut log = File::create(&path)?;
-                log.set_len(super::CAPTURE_MAX_BYTES + 1)?;
-                log.seek(SeekFrom::End(0))?;
-                log.write_all(b"\n")?;
-                log.write_all(final_line)?;
-                let before = log.metadata()?.len();
-                drop(log);
-
-                mutate(&fixture)?;
-
-                let mut log = OpenOptions::new().read(true).open(path)?;
-                assert!(log.metadata()?.len() >= before, "{name} truncated history");
-                if *name != "init" {
-                    log.seek(SeekFrom::Start(before))?;
-                    let mut appended = Vec::new();
-                    log.read_to_end(&mut appended)?;
-                    assert!(
-                        !crate::domain::event_log::parse_known_events(&appended)?.is_empty(),
-                        "{name} did not append an event"
-                    );
-                }
-                Ok(())
-            };
-            run().err().map(|error| format!("{name}: {error:#}"))
-        })
-        .collect::<Vec<_>>();
+    // Each case owns its repository, so the cases run concurrently.
+    let outcomes = std::thread::scope(|scope| {
+        cases
+            .iter()
+            .map(|(name, mutate)| scope.spawn(move || run_case(name, *mutate)))
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(crate::test_utils::join_reraising)
+            .collect::<Vec<_>>()
+    });
+    let failures = outcomes.into_iter().flatten().collect::<Vec<_>>();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// One case's failure, if its mutation truncated the sparse history or appended
+/// no event past it.
+fn run_case(name: &str, mutate: Mutation) -> Option<String> {
+    let run = || -> Result<()> {
+        let fixture = Fixture::new()?;
+        if name == "profile refresh" {
+            fixture.apply_profile()?;
+            fs::remove_file(fixture.repo.path().join("docs/profile.txt"))?;
+        }
+        if name == "init" {
+            fs::remove_file(fixture.repo.path().join(".jit/invariants.toml"))?;
+        }
+        let path = fixture.repo.path().join(".jit/events.jsonl");
+        let previous = fs::read(&path)?;
+        let final_line = previous
+            .split_inclusive(|byte| *byte == b'\n')
+            .next_back()
+            .unwrap();
+        // A sparse malformed line exceeds bounded captures without allocating history.
+        let mut log = File::create(&path)?;
+        log.set_len(super::CAPTURE_MAX_BYTES + 1)?;
+        log.seek(SeekFrom::End(0))?;
+        log.write_all(b"\n")?;
+        log.write_all(final_line)?;
+        let before = log.metadata()?.len();
+        drop(log);
+
+        mutate(&fixture)?;
+
+        let mut log = OpenOptions::new().read(true).open(path)?;
+        assert!(log.metadata()?.len() >= before, "{name} truncated history");
+        if name != "init" {
+            log.seek(SeekFrom::Start(before))?;
+            let mut appended = Vec::new();
+            log.read_to_end(&mut appended)?;
+            assert!(
+                !crate::domain::event_log::parse_known_events(&appended)?.is_empty(),
+                "{name} did not append an event"
+            );
+        }
+        Ok(())
+    };
+    run().err().map(|error| format!("{name}: {error:#}"))
 }

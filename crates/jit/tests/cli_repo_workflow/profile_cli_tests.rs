@@ -1940,6 +1940,47 @@ fn test_profile_pack_external_dry_run_refuses_a_symlinked_parent_without_writing
     );
 }
 
+/// A package at the model limits packed from one repository and added to a
+/// second, returning the second's root and both answers.
+///
+/// The add goes through storage that publishes unsynced: these properties are
+/// about what the publication holds, a tree of thousands of directories whose
+/// syncs alone outlast the per-test limit, while which syncs a publication
+/// issues is `storage::redo_apply`'s own property.
+fn exchange_package_at_model_limits() -> (
+    TempDir,
+    jit::profile::ProfilePackEntry,
+    jit::profile::ProfileAddEntry,
+) {
+    let (source, _) = jit::test_utils::setup_test_repo().unwrap();
+    let (target, _) = jit::test_utils::setup_test_repo().unwrap();
+    let exchange = TempDir::new().unwrap();
+    jit::test_utils::write_package_tree_at_model_limits(&source.path().join("packages/bounded"));
+    let archive = exchange.path().join("bounded.tar");
+
+    let (mut packed, _) = jit::test_utils::file_executor(source.path())
+        .unwrap()
+        .profiles()
+        .pack_profile_package(source.path(), Path::new("packages/bounded"), &archive)
+        .unwrap();
+    assert!(
+        fs::metadata(&archive).unwrap().len()
+            <= jit::profile::MAX_PROFILE_PACKAGE_ARCHIVE_BYTES as u64,
+        "packing a package at the model limits wrote an archive past the bound the read admits"
+    );
+    let jit_root = target.path().join(".jit");
+    let mut added =
+        jit::commands::CommandExecutor::new(jit::storage::JsonFileStorage::unsynced(&jit_root))
+            .with_layout(
+                jit::storage::discover_repository_layout(target.path(), &jit_root).unwrap(),
+            )
+            .unwrap()
+            .profiles()
+            .add_profile_package(target.path(), &archive, Path::new("packages/bounded"))
+            .unwrap();
+    (target, packed.items.remove(0), added.items.remove(0))
+}
+
 /// A package at the limits the model permits survives the exchange whole.
 ///
 /// The round trip is where a bound that does not hold shows up as an archive
@@ -1951,63 +1992,17 @@ fn test_profile_pack_external_dry_run_refuses_a_symlinked_parent_without_writing
 /// where a small fixture leaves them slack.
 #[test]
 fn test_profile_pack_and_add_carry_a_package_at_the_model_limits() {
-    let source_repo = JitCli::uninitialised().unwrap();
-    let target_repo = JitCli::uninitialised().unwrap();
-    let exchange = TempDir::new().unwrap();
-    assert!(jit(&source_repo, &["init"]).status.success());
-    assert!(jit(&target_repo, &["init"]).status.success());
-    jit::test_utils::write_package_tree_at_model_limits(
-        &source_repo.root().join("packages/bounded"),
-    );
-    let archive = exchange.path().join("bounded.tar");
-    let archive = archive.to_str().unwrap();
+    let (target, packed, added) = exchange_package_at_model_limits();
 
-    let packed = jit(
-        &source_repo,
-        &[
-            "profile",
-            "pack",
-            "--source",
-            "packages/bounded",
-            "--output",
-            archive,
-            "--json",
-        ],
-    );
-    assert!(packed.status.success(), "{packed:?}");
-    let packed = json(&packed);
-    let packed = only_profile(&packed);
     assert_eq!(
-        packed["file_count"],
+        packed.file_count,
         jit::profile::MAX_PROFILE_PACKAGE_FILES,
         "the package under test must sit at the file bound"
     );
-    assert!(
-        fs::metadata(archive).unwrap().len()
-            <= jit::profile::MAX_PROFILE_PACKAGE_ARCHIVE_BYTES as u64,
-        "packing a package at the model limits wrote an archive past the bound the read admits"
-    );
-
-    let added = jit(
-        &target_repo,
-        &[
-            "profile",
-            "add",
-            "--archive",
-            archive,
-            "--destination",
-            "packages/bounded",
-            "--json",
-        ],
-    );
-
-    assert!(added.status.success(), "{added:?}");
-    let added = json(&added);
-    let added = only_profile(&added);
-    assert_eq!(added["package_hash"], packed["package_hash"]);
-    assert_eq!(added["file_count"], packed["file_count"]);
+    assert_eq!(added.package_hash, packed.package_hash);
+    assert_eq!(added.file_count, packed.file_count);
     assert_eq!(
-        worktree_files(&target_repo.root().join("packages/bounded")).len(),
+        worktree_files(&target.path().join("packages/bounded")).len(),
         jit::profile::MAX_PROFILE_PACKAGE_FILES,
         "the published tree does not hold every file the package carried"
     );
@@ -2023,71 +2018,26 @@ fn test_profile_pack_and_add_carry_a_package_at_the_model_limits() {
 /// its files — the shape the package model leaves unconstrained.
 #[test]
 fn test_profile_add_publishes_a_package_whose_directories_outnumber_its_files() {
-    let source_repo = JitCli::uninitialised().unwrap();
-    let target_repo = JitCli::uninitialised().unwrap();
-    let exchange = TempDir::new().unwrap();
-    assert!(jit(&source_repo, &["init"]).status.success());
-    assert!(jit(&target_repo, &["init"]).status.success());
-    jit::test_utils::write_package_tree_at_model_limits(
-        &source_repo.root().join("packages/bounded"),
-    );
-    let archive = exchange.path().join("bounded.tar");
-    let archive = archive.to_str().unwrap();
-
-    let packed = jit(
-        &source_repo,
-        &[
-            "profile",
-            "pack",
-            "--source",
-            "packages/bounded",
-            "--output",
-            archive,
-            "--json",
-        ],
-    );
-    assert!(packed.status.success(), "{packed:?}");
-    let packed = json(&packed);
-    let packed = only_profile(&packed);
+    let (target, packed, added) = exchange_package_at_model_limits();
 
     // The package under test binds every dimension the model constrains, so a
     // publication that survives it has no headroom left in any of them.
     assert_eq!(
-        packed["file_count"],
+        packed.file_count,
         jit::profile::MAX_PROFILE_PACKAGE_FILES,
         "the package under test must sit at the file bound"
     );
-    let byte_size = packed["byte_size"]
-        .as_u64()
-        .expect("a pack reports the package's byte size");
+    let budget = jit::profile::MAX_PROFILE_PACKAGE_BYTES;
     assert!(
-        byte_size <= jit::profile::MAX_PROFILE_PACKAGE_BYTES as u64
-            && byte_size
-                > (jit::profile::MAX_PROFILE_PACKAGE_BYTES
-                    - jit::profile::MAX_PROFILE_PACKAGE_BYTES / 8) as u64,
-        "the package under test must fill the byte budget, not sit well below it: {byte_size}"
+        packed.byte_size <= budget && packed.byte_size > budget - budget / 8,
+        "the package under test must fill the byte budget, not sit well below it: {}",
+        packed.byte_size
     );
-
-    let added = jit(
-        &target_repo,
-        &[
-            "profile",
-            "add",
-            "--archive",
-            archive,
-            "--destination",
-            "packages/bounded",
-            "--json",
-        ],
-    );
-    assert!(added.status.success(), "{added:?}");
-    let added = json(&added);
-    let added = only_profile(&added);
-    assert_eq!(added["package_hash"], packed["package_hash"]);
+    assert_eq!(added.package_hash, packed.package_hash);
 
     // The directories the publication had to enumerate outnumber the files it
     // published, which is the shape the model does not bound.
-    let published = target_repo.root().join("packages/bounded");
+    let published = target.path().join("packages/bounded");
     assert_eq!(
         worktree_files(&published).len(),
         jit::profile::MAX_PROFILE_PACKAGE_FILES,
