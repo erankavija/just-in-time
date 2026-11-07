@@ -14,7 +14,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "0238c917-7e1e-46fb-8a61-dcffa057dd6b",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:18:41.765161160Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c0775a83-0b83-4a90-883b-527876784a21",
   "labels": [
     "type:task",
@@ -30,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Archive candidates plan in one read-only session",
-  "updated_at": "2026-11-06T04:27:07.391662902Z"
+  "updated_at": "2026-11-07T23:18:41.765161160Z"
 }
