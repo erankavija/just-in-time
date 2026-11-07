@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "be302dc9c4929b1b369c1ae645bd8dc158da89a7",
+  "completed_at": "2026-11-07T23:12:02.395748415Z",
+  "duration_ms": 93676,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three hard criteria are satisfied; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b0dc019f-8504-488a-b6f7-d386d53bc8e0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a6082918-fc9d-49ca-bf74-eae67c2c1b41",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-07T23:10:28.719248975Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:b0dc019f` commits `607da54`, `eb42572`, `bf72f7b`, `20683b0`; uncommitted changes excluded.\nPolicy sources: `AGENTS.md` (sole applicable AGENTS.md); `.jit/config.toml`; `dev/TESTING.md`.\nResolved items: `@/issue/b0dc019f/requirement/REQ-01`, `@/issue/b0dc019f/requirement/REQ-02`, `@/issue/b0dc019f/requirement/REQ-03` → issue description; `@/issue/b697a3f7/requirement/REQ-18`, `@/issue/b697a3f7/requirement/REQ-20` → parent issue description; `@/charter/D-20` → `dev/vision/9db27a3a-charter.md`; `@/inv/architecture-dependency-direction`, `@/inv/convention-convergence`, `@/inv/orthogonal-tests`, `@/inv/essential-code-prose`, `@/inv/shared-test-contracts`, `@/inv/semantic-test-assertions` → `.jit/invariants.toml`; `@/gate/cargo-ci`, `@/gate/jit-validate` → `.jit/gates.toml`.\nGate evidence: `cargo-ci` passed, exit 0, 2026-11-07T23:06:14.089987299+00:00; supplied ancestry covers implementation and merge, excludes subsequent evidence-recording commit `20683b0`; `code-review` pending, exit none.\nTruncation recovery: Recovered relevant commit patches, configuration, extractor, and test ranges through narrower reads; unrelated other-parent merge differences and unrelated label tests excluded.\n\nAll three hard criteria are satisfied. No domain file names `repository_state`. The relocated conversion test preserves its assertions in `crates/jit/src/repository_state/path.rs:1290`. All four label readers use shared extractors, and no hand-written `type:` prefix checks or stripping remain outside `labels.rs`. Relationship claims are consistent with their targets.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three hard criteria are satisfied; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
