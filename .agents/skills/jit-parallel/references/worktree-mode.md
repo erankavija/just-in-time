@@ -15,8 +15,7 @@ Agent tool's `isolation: "worktree"` parameter: both skip the guards the script 
 Per issue, the script creates `.agents/worktrees/agent-<short-id>` on branch
 `worktree-agent-<short-id>`, anchored to `main`'s HEAD **SHA** rather than the branch
 name, then verifies each worktree's HEAD matches. It also snapshots `git status -uall`
-so the post-wave leak check has a baseline. Two guards, two documented incidents:
-worktrees branched from a stale ancestor, and workers writing into the parent checkout.
+so the post-wave leak check has a baseline.
 
 `jit init` has no place here. `.jit/` is tracked in git, so every worktree already
 carries the repository's issues, config, and gate registry. Running `jit init` inside
@@ -28,7 +27,7 @@ Prefix each agent's prompt with the header block the script emits. It names the
 worktree path, the branch, and the path-discipline rules. Never paste an absolute
 path from another machine or another session; take the path from the script's output.
 
-Dispatch with `subagent_type: "general-purpose"` and **no** `isolation` parameter.
+Dispatch with **no** `isolation` parameter.
 
 Claims are shared via `.git/jit/` (one control plane across all worktrees), so agents
 cannot double-claim the same issue. The `active_claims` column in `jit worktree list`

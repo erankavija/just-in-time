@@ -1,41 +1,33 @@
 # Rework Prompt Template
 
-Prepend this to the original agent dispatch prompt when sending work back for revision.
+Prepend this to the original dispatch prompt when sending work back for revision.
 
 ---
 
 ## Rework Required (attempt [N] of [MAX_REWORK_ATTEMPTS])
 
-Previous work on issue **[ISSUE_TITLE]** ([SHORT_ID]) failed the lead's quality review. The specific failures are listed below. Fix **only** the listed issues (plus anything surfaced by the mandatory pre-commit audit below). Do not refactor unrelated areas, do not change the overall approach unless the feedback specifically requires it.
+Previous work on issue **[ISSUE_TITLE]** ([SHORT_ID]) failed the lead's review. Fix the findings below and every finding the audit surfaces. Keep the approach unless a finding requires changing it, and leave unrelated areas alone.
 
-### Required pre-commit audit (attempt [N] must include this)
+### Audit before editing
 
-**Before editing any source**, run the following. The lead reruns it and cross-references the output against your resolution table; any omitted match is a rejection.
+The lead reruns these and checks your resolution table against them.
 
 ```bash
-# 1. Enumerate every prior code-review failure for this issue
-jit gate status [SHORT_ID] code-review --all --json | python3 -c 'import json,sys
-for record in json.load(sys.stdin)["results"]:
-    if record.get("status")=="failed":
-        for finding in (record.get("findings") or {}).get("findings",[]):
-            print("[{}] {}: {} ({}:{})".format(finding.get("severity","-"),finding.get("id","-"),finding.get("summary",""),finding.get("file","-"),finding.get("line","-")))'
+# 1. Every finding from every failed review run
+jit gate status [SHORT_ID] [REVIEW_GATE] --all --status failed --json \
+  | jq -r '.results[].findings.findings[] | "[\(.severity)] \(.id // "-"): \(.summary) (\(.file // "-"):\(.line // "-"))"'
 
-# 2. List every design doc the worker produced for this issue
-jit doc list [SHORT_ID]
-
-# 3. Grep each linked doc for deferred-item markers
-jit doc list [SHORT_ID]
-# Run this for each linked path printed above:
+# 2. Deferred-item markers in each linked doc (paths from `jit doc list [SHORT_ID]`)
 grep -inE '\b(deferred|todo|future work|open question|not (yet )?implemented|follow-?up|out of scope|won'\''t (do|fix)|stays (available|open).*generic|punt(ed)?)\b' [LINKED_PATH]
 ```
 
-**For every match** from steps 1 and 3, a row MUST appear in the resolution table below. Step 1 gives you every finding that has ever been raised, not just the latest round — you must show closure at HEAD for all of them. Step 3 gives you the worker's own deferred-item notes, which are silent scope gaps the reviewer will catch sooner or later.
+For each finding, also search the workspace for the same defect (`rg -n "<key phrase>" <source and doc roots>`) and fix every instance, not just the cited one.
 
 ### Review verdict
 
 [PASTE THE FULL REVIEW VERDICT FROM lead-review-protocol.md HERE]
 
-Cited concrete qualified addresses in the verdict and issue text are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained `jit item show` calls in one shell invocation resolve several at once. Do not invent example addresses that the repository has not declared.
+Qualified addresses (`@/…`) in the verdict and issue resolve with `jit item show`.
 
 ### What to fix
 
@@ -43,54 +35,30 @@ Cited concrete qualified addresses in the verdict and issue text are resolvable 
 
 **[N]. [Brief description of the problem]**
 - Location: [file path, section, or artifact reference]
-- What's wrong: [concrete description of the deficiency]
-- What's expected: [what the lead wants to see instead]
+- What's wrong: [concrete deficiency]
+- What's expected: [what the lead wants instead]
 
 ### Constraints
 
-- Fix only the listed issues. Unrelated changes will be flagged in re-review.
 - All gates on this issue must still pass after your changes.
-- If you believe a required change is incorrect or impossible, state why under Needs decision rather than silently ignoring it.
+- If a required change is incorrect or impossible, state why under Needs decision.
 
-### Resolution table (required — do not submit without completing)
+### Resolution table (required)
 
-The resolution table is the Outcome deliverable of your return, together with the commit SHA. Before submitting, produce one row per finding **across all rounds plus every match from the pre-commit audit**. Submissions with any empty row, or any finding from a prior round without a closure cite, are rejected without re-review.
+The resolution table and the commit SHA are the Outcome deliverables of your return. Give one row per finding from every round, every audit match, and every extra instance the workspace search found. A submission with an empty row is rejected without re-review.
 
-| # | Round | Source (reviewer / audit-step-1 / audit-step-3) | Finding (paste verbatim) | Resolution (file:line or commit SHA proving closure at HEAD) |
-|---|-------|--------------------------------------------------|--------------------------|---------------------------------------------------------------|
-| 1 | R1    | reviewer                                         | <paste finding>          | <file:line>                                                   |
-| 2 | R2    | reviewer                                         | <paste finding>          | <file:line>                                                   |
-| 3 | —     | audit-step-3 (design doc §N)                     | <paste deferred item>    | <either closure file:line OR "OUT-OF-SCOPE per issue Non-goals §…"> |
-| … |       |                                                  |                          |                                                               |
+| # | Round | Source (reviewer / audit-1 / audit-2 / search) | Finding (verbatim) | Resolution (file:line or commit SHA at HEAD) |
+|---|-------|------------------------------------------------|--------------------|----------------------------------------------|
+| 1 | R1    | reviewer                                       | <finding>          | <file:line>                                  |
+| 2 | —     | audit-2 (design doc §N)                        | <deferred item>    | <file:line, or "OUT-OF-SCOPE per issue Non-goals §…"> |
 
-A prior-round finding without a closure cite at HEAD = regression. A design-doc deferred-item without either a closure cite or an explicit "OUT-OF-SCOPE per issue Non-goals" citation = silent scope gap. Both are rejected.
-
-### Mandatory workspace-wide sweeps
-
-Reviewers commonly flag one instance of a problem that actually exists in several files. Before filling the resolution table, run each of the following searches. Fix **every** match — not just the one the reviewer cited.
-
-**Sweep 1 — Prior-findings cumulative.** Run the pre-commit audit block above. Every finding from every prior round must have a closure cite.
-
-**Sweep 2 — Design-doc deferred-items.** Run the grep from audit step 3. Every match must be categorized.
-
-**Sweep 3 — Per-finding workspace grep.** For each reviewer finding, run:
-```
-rg -n "<key phrase from the finding>"  <source roots>
-rg -n "<stale claim from the finding>" <docs/bench roots>
-
-Replace <source roots> and <docs/bench roots> with project-appropriate paths
-(e.g., crates/ benches/ dev/ docs/ for a Cargo workspace).
-```
-
-A finding is not resolved until sweeps 1, 2, and 3 all return zero unfixed matches. If sweeps surface additional instances the reviewer did not cite, add them to the resolution table as additional rows and fix them in the same submission.
+A prior-round finding without a closure cite at HEAD is a regression. A deferred item without a closure cite or a Non-goals citation is a scope gap. Both are rejected.
 
 ---
 
-## Usage Notes
+## Usage notes
 
-When filling this template:
-- Be specific. "Improve the tests" is not actionable. "Add a test for the empty-input edge case in [file]" is.
-- Reference concrete artifacts (file paths, function names, document sections) so the rework agent can find the problem quickly.
-- If the failure was in holistic coherence (naming mismatch with another agent's output), include the other agent's conventions so the rework agent knows what to align with.
-- Include the accumulated feedback from all prior attempts if this is attempt 2+, so the agent has the full picture.
-- The resolution-table and workspace-sweep sections are mandatory. They exist because "fix the cited instance, miss the identical issue in three other files" is the single most common cause of multi-cycle rework loops. Do not remove them when filling the template.
+- Make each required change actionable: name the file, function, or section, and the expected result.
+- For a coherence failure, include the conventions of the work it must align with.
+- From attempt 2 on, include the feedback from every prior attempt.
+- Keep the audit, workspace search, and resolution table when filling the template.

@@ -15,9 +15,9 @@ in order — each gate blocks the next step. Section numbers refer to the skill'
    Commit JIT state.
 
 2. **Produce the plan on `P`.** The plan is the spec for the decomposition. Use
-   the epic's design doc (Section 2) as `P`'s plan-doc; otherwise dispatch an
-   architect agent (Section 6, `design` classification) to author it at `P`'s
-   configured plan-doc location. Make it concrete enough to decompose and to
+   the epic's design doc (Section 2) as `P`'s plan-doc; otherwise dispatch a
+   worker (Section 6, design output) to author it at `P`'s configured plan-doc
+   location. Make it concrete enough to decompose and to
    judge coverage of `C`'s `[hard]` success criteria.
 
 3. **Pass `P`'s plan-quality gate — it BLOCKS breakdown.** Run the gate the

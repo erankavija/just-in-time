@@ -5,8 +5,8 @@ every **other** sub-strategic container already accepted under the same
 strategic-tier parent, and sweep the accepted containers' artifacts for
 forward-looking references the just-landed container has made stale. This is the
 one-tier-up analogue of `jit-execution-lead`'s per-issue review
-(`../../jit-execution-lead/references/lead-review-protocol.md`): its **Tier 3**
-(holistic cross-issue coherence) and its **Tier 2.5** (pre-close stale-narrative
+(`../../jit-execution-lead/references/lead-review-protocol.md`): its **check 5**
+(coherence across the epic) and its **check 4** (stale-narrative
 sweep), lifted from cross-issue to cross-container.
 
 It reviews containers that have already been dispatched and report completion.
@@ -109,8 +109,7 @@ Run these concrete checks, `K` against each `Ci` in `A`:
    ```
 
    FAIL if `K` calls a thing `X` and an accepted `Ci` calls the same thing `Y`
-   (the `user_profile` vs `account_data` split in `lead-review-protocol.md` Tier
-   3, one tier up). Also compare label namespaces and values, container and
+   (the naming check of `lead-review-protocol.md` check 5, one tier up). Also compare label namespaces and values, container and
    document titles, and command/flag names for the same drift.
 
 2. **Conventions and style.** Does `K` follow the same conventions as the
@@ -143,7 +142,7 @@ every check above cleared against every `Ci` in `A`.
 
 ## Tier C3: Cross-container stale forward-reference sweep (REQ-02)
 
-The one-tier-up analogue of `lead-review-protocol.md` Tier 2.5. When `K` lands,
+The one-tier-up analogue of `lead-review-protocol.md` check 4. When `K` lands,
 forward-looking narrative in the **already-accepted** containers' artifacts that
 pointed at `K`'s work ("planned", "future work", "once `K` lands") becomes false.
 Reviewers surface these one per cycle unless swept proactively.
@@ -151,7 +150,7 @@ Reviewers surface these one per cycle unless swept proactively.
 **Artifact scope:** the container-level artifacts of every accepted sibling in
 `A` **and** of `K` itself: the design docs, plan docs, and completion reports in
 each container's artifact set gathered in Tier C2. Interior issue-level artifacts
-are the dispatched lead's Tier 2.5 concern, not this sweep's.
+are the dispatched lead's check 4 concern, not this sweep's.
 
 **Sweep**, at minimum:
 
@@ -178,7 +177,7 @@ reference (to a container not yet accepted) is not stale; document each such
 match and why it stands.
 
 This tier is cheap (two greps) and removes the largest source of multi-cycle
-rework at the container tier, exactly as Tier 2.5 does per issue.
+rework at the container tier, exactly as check 4 does per issue.
 
 ## Stop condition (REQ-03)
 
@@ -243,7 +242,7 @@ containers cleared cross-container review.
 - Reviewing at the default `jit graph deps` depth 1. Transitive reduction hides
   siblings; enumerate the roster at `--depth 0`, as `wave-layering.md` requires.
 - Sweeping interior issue-level artifacts for stale references. That is the
-  dispatched lead's per-issue Tier 2.5; this sweep is container-level artifacts
+  dispatched lead's per-issue check 4; this sweep is container-level artifacts
   only.
 - Dispatching or driving `K` from this review. It reviews an already-completed
   container; execution belongs to `container-dispatch.md` and the dispatched lead.
