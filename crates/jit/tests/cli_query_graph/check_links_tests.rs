@@ -482,10 +482,10 @@ fn test_validate_reports_direct_directory_reference_as_unsupported_artifact_type
 
     let output = cli.command(["validate"]).output().unwrap();
     assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("unsupported artifact type"));
-    assert!(stderr.contains("dev/studies"));
-    assert!(!stderr.contains("not found"));
+    let report = String::from_utf8_lossy(&output.stdout);
+    assert!(report.contains("unsupported artifact type"));
+    assert!(report.contains("dev/studies"));
+    assert!(!report.contains("not found"));
 }
 
 #[test]
@@ -560,10 +560,10 @@ fn test_pinned_directory_reference_is_unsupported_at_its_commit() {
 
     let output = cli.command(["validate"]).output().unwrap();
     assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("unsupported artifact type"));
-    assert!(stderr.contains("dev/studies"));
-    assert!(!stderr.contains("not found"));
+    let report = String::from_utf8_lossy(&output.stdout);
+    assert!(report.contains("unsupported artifact type"));
+    assert!(report.contains("dev/studies"));
+    assert!(!report.contains("not found"));
 }
 
 #[cfg(unix)]

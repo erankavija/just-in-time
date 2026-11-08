@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Findings summaries stay on one stderr line.** Whole-repository `jit
+  validate` prints a repository-integrity error, such as multi-line
+  derived-state drift, in full in the stdout report and in
+  `error.details.integrity_error`; stderr, the JSON `error.message`, and the
+  report's `message` carry a one-line summary. A `jit gate preset apply` failure
+  escapes control characters in the preset name of its summary. See the
+  [failure contract](docs/reference/cli-commands.md#cli-json-contracts) and
+  [`jit validate`](docs/reference/cli-commands.md#jit-validate).
+
 - **`jit validate --branch-drift` and `--leases` print failed checks on
   stdout.** Human output lists every check's line or failure details on stdout
   and carries a one-line summary of the failed checks on stderr. With `--json`,

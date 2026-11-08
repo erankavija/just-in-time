@@ -319,7 +319,7 @@ fn preset_apply<S: HandlerStore>(
             ErrorCode::PresetError,
             format!(
                 "Failed to apply preset '{}' to {} issue(s)",
-                report.preset,
+                report.preset.escape_debug(),
                 report.errors.len()
             ),
             report,
@@ -904,6 +904,32 @@ mod tests {
         let envelope = classify(&error);
         assert_eq!(envelope.error.code, ErrorCode::InvalidArgument);
         assert_eq!(envelope.exit_code().code(), 2);
+    }
+
+    #[test]
+    fn test_dispatch_preset_apply_failure_escapes_a_multi_line_preset_name_to_one_stderr_line() {
+        let (executor, id) = requiring_manual_gate();
+        let ctx = CommandContext {
+            executor: &executor,
+            mode: OutputMode::default(),
+        };
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let command = GateCommands::Preset(PresetCommands::Apply {
+            name: "ci\nlint".to_owned(),
+            ids: vec![id.clone()],
+            timeout: None,
+            no_precheck: false,
+            no_postcheck: false,
+            except: Vec::new(),
+        });
+
+        let status = dispatch(command, &ctx, &mut out, &mut err).unwrap();
+
+        assert_eq!(status, ErrorCode::PresetError.exit_code().into());
+        assert!(String::from_utf8(out).unwrap().contains(&id));
+        let stderr = String::from_utf8(err).unwrap();
+        assert_eq!(stderr.lines().count(), 1, "{stderr:?}");
+        assert!(stderr.contains("ci\\nlint"), "{stderr:?}");
     }
 
     #[test]

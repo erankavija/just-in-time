@@ -55,7 +55,7 @@ fn flag<S: IssueStore>(
 ) -> HandlerResult<CountResponse> {
     Ok(Outcome::findings(
         FINDINGS_CODE,
-        format!("flagged because {reason}"),
+        format!("flagged because {}", reason.escape_debug()),
         FlagReport { reason },
     ))
 }

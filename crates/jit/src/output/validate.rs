@@ -204,6 +204,20 @@ pub struct RepositoryValidationResponse {
 }
 
 impl RepositoryValidationResponse {
+    /// The one-line `message`, also the findings stderr line; the integrity
+    /// error's details stay in `integrity_error`.
+    pub fn summary(error_count: usize, has_integrity_error: bool) -> String {
+        match (error_count, has_integrity_error) {
+            (0, false) => "Repository validation passed".to_owned(),
+            (0, true) => "Repository integrity validation failed".to_owned(),
+            (count, true) => format!(
+                "Repository validation failed: {count} rule error(s) and a \
+                 repository-integrity error"
+            ),
+            (count, false) => format!("Repository validation failed with {count} rule error(s)"),
+        }
+    }
+
     fn human_text(&self) -> String {
         let mut rendered: String = self
             .fix
@@ -259,22 +273,43 @@ mod tests {
         ValidationCheck::new(validation, false, message.to_owned())
     }
 
-    fn streams(response: ValidationChecksResponse) -> (String, String) {
+    fn emit(outcome: &Outcome<ValidateResponse>, json: bool) -> (String, String) {
         let (mut out, mut err) = (Vec::new(), Vec::new());
-        let mode = OutputMode {
-            json: false,
-            quiet: false,
-        };
-        let outcome: Outcome<ValidateResponse> = Outcome::findings(
-            ErrorCode::ValidationFailed,
-            response.failure_message(),
-            response,
-        );
-        emit_outcome(&outcome, mode, &mut out, &mut err).unwrap();
+        let mode = OutputMode { json, quiet: false };
+        emit_outcome(outcome, mode, &mut out, &mut err).unwrap();
         (
             String::from_utf8(out).unwrap(),
             String::from_utf8(err).unwrap(),
         )
+    }
+
+    fn streams(response: ValidationChecksResponse) -> (String, String) {
+        let message = response.failure_message();
+        emit(
+            &Outcome::findings(ErrorCode::ValidationFailed, message, response),
+            false,
+        )
+    }
+
+    const DRIFT: &str = "Invalid repository: derived-state drift (repair with \
+                         `jit validate --fix`):\n- .jit/rules.toml: stale\n- .jit/schemas/a.json: missing";
+
+    /// A failed whole-repository report findings outcome, as dispatch builds it.
+    fn repository_findings(error_count: usize) -> Outcome<ValidateResponse> {
+        let response = RepositoryValidationResponse {
+            valid: false,
+            integrity_error: Some(DRIFT.to_owned()),
+            validation_warnings: Vec::new(),
+            warning_count: 0,
+            membership_divergences: Vec::new(),
+            divergence_count: 0,
+            rule_findings: Vec::new(),
+            error_count,
+            message: RepositoryValidationResponse::summary(error_count, true),
+            fix: None,
+        };
+        let message = response.message.clone();
+        Outcome::findings(ErrorCode::ValidationFailed, message, response)
     }
 
     #[test]
@@ -312,5 +347,36 @@ mod tests {
         assert!(stdout.contains("diverged"));
         assert!(stdout.contains("All active leases are valid"));
         assert_eq!(stderr.lines().count(), 1, "{stderr:?}");
+    }
+
+    #[test]
+    fn test_repository_report_prints_drift_on_stdout_and_one_stderr_line() {
+        let (stdout, stderr) = emit(&repository_findings(0), false);
+
+        assert!(stdout.contains(DRIFT), "{stdout:?}");
+        assert_eq!(stderr.lines().count(), 1, "{stderr:?}");
+        assert!(stderr.ends_with('\n'));
+    }
+
+    #[test]
+    fn test_repository_report_prints_drift_beside_rule_errors_with_one_stderr_line() {
+        let (stdout, stderr) = emit(&repository_findings(2), false);
+
+        assert!(stdout.contains(DRIFT), "{stdout:?}");
+        assert!(stdout.contains("2 rule error(s)"), "{stdout:?}");
+        assert_eq!(stderr.lines().count(), 1, "{stderr:?}");
+        assert!(stderr.contains("2 rule error(s)"), "{stderr:?}");
+    }
+
+    #[test]
+    fn test_repository_report_json_keeps_drift_in_details_beside_one_line_message() {
+        let (stdout, _) = emit(&repository_findings(0), true);
+        let envelope: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        let error = &envelope["error"];
+
+        assert_eq!(error["details"]["integrity_error"], DRIFT);
+        let message = error["message"].as_str().unwrap();
+        assert_eq!(message.lines().count(), 1, "{message:?}");
+        assert_eq!(error["details"]["message"], message);
     }
 }
