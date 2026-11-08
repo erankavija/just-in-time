@@ -12,7 +12,10 @@ use tempfile::TempDir;
 
 // Helper to set up a test coordinator
 fn setup_coordinator(temp_dir: &TempDir) -> ClaimCoordinator {
-    let paths = crate::test_utils::primary_checkout_paths(temp_dir.path());
+    let mut paths = crate::test_utils::primary_checkout_paths(temp_dir.path());
+    // The directory is no checkout, so every acquisition's branch probe would
+    // fork git to learn there is none; no property here observes the branch.
+    paths.git_repository = false;
 
     // These properties exercise coordination, not crash durability.
     let coordinator = ClaimCoordinator::new(

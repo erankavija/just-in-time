@@ -2999,7 +2999,8 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
             taxonomy.config_fragment()
         );
-        let (_repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let (_repo, executor) =
+            crate::test_utils::setup_unsynced_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Evaluated", "Evaluated");
         let other_id = seed_gate_issue(
             &executor,
@@ -3243,7 +3244,8 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
             taxonomy.config_fragment()
         );
-        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let (repo, executor) =
+            crate::test_utils::setup_unsynced_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
         let image = validation_image(&executor);
         change(repo.path(), &issue_id);
@@ -3305,8 +3307,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             append_undecodable_event,
             add_dangling_dependency,
         ];
-        for (index, change) in changes.into_iter().enumerate() {
-            let (_, run) = judge_repository_after(change);
+        // Each judgment owns its repository, so they run concurrently.
+        let runs = std::thread::scope(|scope| {
+            changes
+                .map(|change| scope.spawn(move || judge_repository_after(change).1))
+                .map(crate::test_utils::join_reraising)
+        });
+        for (index, run) in runs.into_iter().enumerate() {
             assert_eq!(run.status, GateRunStatus::Failed, "change {index}");
             assert_eq!(run.exit_code, Some(4), "change {index}");
             let findings = run.findings.unwrap().findings;
