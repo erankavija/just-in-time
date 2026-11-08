@@ -1,0 +1,50 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0481f181b3d97ffccbd1428cb7113e32f6dbd114",
+  "completed_at": "2026-11-08T05:13:53.681361594Z",
+  "duration_ms": 273795,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/archive_advisory.rs",
+        "id": "F1",
+        "line": 124,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/dd95bd9d/requirement/REQ-02"
+        ],
+        "severity": "medium",
+        "summary": "The pre-execution citation overlay omits rewritten tracker files, so configured tracker roots produce different preview and execute advisories."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/archive.rs",
+        "id": "F2",
+        "line": 923,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "A post-commit advisory scan error discards the execution result despite completed archive mutations."
+      }
+    ],
+    "summary": "Citation parity remains incomplete for tracker roots, and advisory scan failures can hide committed archive execution.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "dd95bd9d-9a9b-44a9-8ecc-126574b3cb8a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b33701f2-16b7-4d33-a227-06627ce81bd4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T05:09:19.885553264Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11203 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1b98f-a043-7341-93a4-c84d6b871312\n--------\nuser\n--- 11190 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:dd95bd9d — 45ded1fc, efab0755, 5ebce93b, e6e4cb5f, 8f9d250d, 0cc25ddb; uncommitted changes excluded.\nPolicy sources: AGENTS.md; dev/TESTING.md; no subtree AGENTS.md.\nResolved items: @/issue/dd95bd9d/requirement/REQ-01, @/issue/dd95bd9d/requirement/REQ-02, @/issue/dd95bd9d/requirement/REQ-03, @/issue/dd95bd9d/requirement/REQ-04, @/issue/b697a3f7/requirement/REQ-06, @/issue/8e071e18/decision/D-8 → issue descriptions; @/charter/D-4, @/charter/D-9, @/charter/D-18, @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/inv/canonical-cutover, @/inv/convention-convergence, @/inv/orthogonal-tests, @/inv/essential-code-prose, @/inv/architecture-dependency-direction, @/inv/semantic-types, @/inv/shared-test-contracts, @/inv/semantic-test-assertions, @/inv/derived-state-coherence → .jit/invariants.toml; @/gate/jit-validate → .jit/gates.toml.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T05:07:23.581336876+00:00; supplied ancestry confirms run commit 0481f181 covers all six tagged commits; no rerun. Latest prior code-review failed, exit 1, run 031018ef; Markdown parser finding resolved, citation parity remains incomplete.\nTruncation recovery: narrower commit/path/line reads recovered relevant patches; historical stdout and unrelated sibling work excluded from current-behavior judgment.\n\n1. **F1 — Medium, blocking, issue-impact: the execution overlay omits rewritten tracker files.** At [archive_advisory.rs:124](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/archive_advisory.rs:124), `AppliedChanges` accounts only for archive publications and removed sources. With the supported configuration `citation_scan_roots = [\".jit/issues\"]`, preview detects a terminal issue’s JSON document reference to `fixtures/root.md`. Execution relinks that reference before scanning (`repository_state/archive.rs:192`), so the citation disappears from its advisory report. The overlay must also account for tracker writes within configured roots to satisfy REQ-02.\n\n2. **F2 — Medium, blocking, issue-impact: an advisory scan failure hides a committed execution.** At [commands/archive.rs:923](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/archive.rs:923), `advise(...)?` runs after `with_mutation_session` has applied the archive. A non-UTF-8 filename beneath an unrelated citation root deterministically causes `child_path` to return an error (`storage/artifact_inspection.rs:326`), discarding the execution result even though files, references, and events have changed. Previously this scan failed before publication. Preserve the committed result and surface the advisory failure separately.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Citation parity remains incomplete for tracker roots, and advisory scan failures can hide committed archive execution.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The pre-execution citation overlay omits rewritten tracker files, so configured tracker roots produce different preview and execute advisories.\",\"file\":\"crates/jit/src/domain/archive_advisory.rs\",\"line\":124,\"references\":[\"@/issue/dd95bd9d/requirement/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A post-commit advisory scan error discards the execution result despite completed archive mutations.\",\"file\":\"crates/jit/src/commands/archive.rs\",\"line\":923,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

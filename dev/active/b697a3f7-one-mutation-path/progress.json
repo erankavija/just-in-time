@@ -253,8 +253,8 @@
           "id": "dd95bd9d",
           "short_id": "dd95bd9d",
           "title": "Archive citation warnings are an advisory report beside the plan, from one index per command",
-          "status": "rework 2",
-          "note": "r1 landed 8c3307b0a (5ebce93b9); cargo-ci passed; code-review FAILED run 031018ef (F1 post-apply scan loses relocated citing files - lead instruction error; F2 parallel ](-parser). Fix-forward on fresh worktree from b28d41b18."
+          "status": "escalated",
+          "note": "r2 landed 0481f181b (0cc25ddba); cargo-ci passed; code-review FAILED run b33701f2 (post-apply overlay misses tracker rewrites; advisory error after commit hides result). Rework limit exceeded; escalated to invoker with options A (scan per attempt before publish, amend REQ-02) / B (pre-session read-only plan scan)."
         },
         {
           "id": "82f1647f",
@@ -377,6 +377,12 @@
       "detail": "code-review/holistic-review REVIEWER_AGENT pinned to gpt-5.6-terra in .jit/gates.toml; invoker asked for gpt-6.1-sol reviewers. Options: change gates.toml repo-wide, keep gate config and use sol for non-gate reviews, or hold.",
       "status": "resolved",
       "decision": "invoker (user): all five review gates use codex gpt-6.1-sol high, landed be302dc9c"
+    },
+    {
+      "issue": "dd95bd9d",
+      "reason": "rework limit exceeded; same defect class (post-apply citation scan)",
+      "to": "just-in-time-d5",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -674,6 +680,15 @@
       "effort": "high",
       "verdict": "fail (F1, F2 blocking)",
       "run": "81638c37"
+    },
+    {
+      "issue": "dd95bd9d",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "fail (F1, F2 blocking)",
+      "run": "b33701f2"
     }
   ]
 }

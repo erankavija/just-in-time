@@ -13,15 +13,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "0de3e36e-0b59-4f52-9cb7-beaefc683a2f",
+      "run_id": "cc49d3cb-ccb0-4cf6-b53d-13b9508e85b0",
       "status": "passed",
-      "updated_at": "2026-11-08T04:53:07.357475724Z",
+      "updated_at": "2026-11-08T05:09:19.777568222Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "031018ef-c555-45e4-b3ae-c7cdc40c7e8f",
+      "run_id": "b33701f2-16b7-4d33-a227-06627ce81bd4",
       "status": "failed",
-      "updated_at": "2026-11-08T04:56:06.703162027Z",
+      "updated_at": "2026-11-08T05:13:53.682991863Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Archive citation warnings are an advisory report beside the plan, from one index per command",
-  "updated_at": "2026-11-08T04:56:06.703162027Z"
+  "updated_at": "2026-11-08T05:13:53.682991863Z"
 }
