@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-08T13:24:27.016905199Z",
+  "dependencies": [
+    "86a183c2-2a26-42db-bf8a-84f17cd7a3aa"
+  ],
+  "description": "Make an exec gate evaluation reuse the issue documents it resolved during evidence capture, so each evaluation resolves them once per captured image.\n\n## Background\n\n- `crates/jit/src/commands/gate_check.rs`: evidence capture resolves the issue's documents (`captured_gate_evidence_sharing`, ~670), discards the set, and execution resolves them again from the same image (~1579). Automatic prechecks take the same path.\n- Story `d675102c` sol re-checkpoint review (commit `cea13616e`), finding 3. Steward ruling (just-in-time-d5, 2026-11-08): exec evaluation reuses the documents resolved at evidence capture. Sequenced after `86a183c2`, whose change also edits `gate_check.rs`.\n- Epic criterion: `b697a3f7` REQ-12 (each evaluation resolves its inputs once per captured image).\n\n## Success Criteria\n\n- [hard] REQ-01: An exec gate evaluation, manual or automatic precheck, resolves the issue's documents once per captured image; execution consumes the set resolved during evidence capture.\n- [hard] REQ-02: The existing owning test for one resolution per evaluation is extended to cover document resolution on the exec path; no per-command tests are added.\n- [hard] REQ-03: Gate verdicts and recorded evidence are unchanged.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-08T13:24:27.016905199Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "6b22ce6d-20cb-4f73-a0e9-fb2066f3154d",
+  "labels": [
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:configuration",
+    "component:core",
+    "per:@/charter/D-20",
+    "component:gates",
+    "satisfies:b697a3f7/REQ-12",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "An exec gate evaluation resolves its documents once per captured image",
+  "updated_at": "2026-11-08T13:24:37.324152488Z"
+}
