@@ -31,9 +31,6 @@ for try in 1 2; do
     others=$(print -r -- "$fails" | grep -avE 'TIMEOUT' | grep -c .)
     [[ -n $fails && $others == 0 ]] && env_only=1
     grep -aq 'No space left on device' $S/ci-$id.log && env_only=1
-    # D-56: only the suite-duration budget failed and the doctest step compiled cold (>15 s).
-    dms=$(grep -aoE 'doctest: [0-9]+ passed[^(]*\(([0-9]+) ms\)' $S/ci-$id.log | tail -1 | grep -oE '[0-9]+ ms' | grep -oE '[0-9]+')
-    if [[ -z $fails ]] && grep -aq 'test suite duration: observed' $S/ci-$id.log && (( ${dms:-0} > 15000 )); then env_only=1; fi
   fi
   [[ ($rc == 75 || $env_only == 1) && $try == 1 ]] || break
   echo "$id: branch CI environmental failure rc=$rc (try $try), retrying"; sleep 120

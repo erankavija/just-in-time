@@ -880,13 +880,17 @@ stale_expect_worker() { signature_worker "$1"; }
 # self-test itself runs inside a gate run that already holds that lock, and the
 # fixture is far too small to need it. These fixtures compile for real, so they
 # opt out of sccache: the host daemon's health is no part of their verdict.
+# No inherited NEXTEST_* setting applies, and every fixture's tests run at once:
+# nextest's default fail-fast stops scheduling at the first failure, so a fixture
+# whose tests outnumbered the slots would report only some of its results.
+readonly FIXTURE_TEST_THREADS=8
 run_gate_script() { # run_gate_script <script> <repo> <output-file> [VAR=value ...]
   local script="$1" repo="$2" out="$3"
   shift 3
   (
     cd "$repo" || exit 3
-    unset CARGO_TARGET_DIR
-    env CARGO_CI_NO_LOCK=1 CARGO_CI_NO_SCCACHE=1 "$@" "$script"
+    unset CARGO_TARGET_DIR "${!NEXTEST_@}"
+    env CARGO_CI_NO_LOCK=1 CARGO_CI_NO_SCCACHE=1 NEXTEST_TEST_THREADS="$FIXTURE_TEST_THREADS" "$@" "$script"
   ) >"$out" 2>&1
 }
 
