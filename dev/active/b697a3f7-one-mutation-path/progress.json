@@ -438,7 +438,8 @@
     "219b9df8": 1,
     "42046050": 2,
     "c31c2e57": 2,
-    "dd95bd9d": 3
+    "dd95bd9d": 3,
+    "6a19e93f": 1
   },
   "surfaced_pitfalls": [
     {
@@ -509,7 +510,8 @@
     "Coordination protocol with df129d9e (agreed 05:2x): each lead messages before a land and waits for the other OK; no merge onto main while the other lead has a gate judging main.",
     "If c31c2e57 review flags a captured gate-registry parse site, cite a869900b REQ-04 as owner; do not rework c31c2e57 (invoker).",
     "c31c2e57 lead review FAIL r1: validate --fix derive_fixes reparses (capture_validation drops discovery parse; validation_declarations_from_image again) - REQ-01 literal.",
-    "06:00-07:00 host held clear for df129d9e fba8d478 trials; c31c2e57 r1 and dd95bd9d r1 editing only, cargo held."
+    "06:00-07:00 host held clear for df129d9e fba8d478 trials; c31c2e57 r1 and dd95bd9d r1 editing only, cargo held.",
+    "6a19e93f r0 ed67e4a7c: smoke (a) 1.38 (base 4.34, load ~10). Lead review FAIL r1: IssueIndex dependents map parallel to e7635f2f reverse index (convergence). Graph-rule transition full-list read: ruling requested from invoker."
   ],
   "story_checkpoints": [
     {
