@@ -778,7 +778,10 @@
           "short_id": "fba8d478",
           "title": "Decide whether concurrent cargo-ci runs can drop the host lock",
           "classification": "implementation",
-          "status": "backlog"
+          "status": "done",
+          "landed": "ba3d2b076, 38670c86b",
+          "decision": "host lock removed: 3/3 concurrent trials pass, no TIMEOUT; quiet-host slowest 1.42 s unit, 4.1 s integration",
+          "gates": "cargo-ci, code-review passed"
         }
       ]
     },
@@ -844,7 +847,8 @@
           "short_id": "a08c4b38",
           "title": "Write the df129d9e completion report",
           "classification": "documentation",
-          "status": "backlog"
+          "status": "in_progress",
+          "model_tier": "opus"
         },
         {
           "key": "output-contract",

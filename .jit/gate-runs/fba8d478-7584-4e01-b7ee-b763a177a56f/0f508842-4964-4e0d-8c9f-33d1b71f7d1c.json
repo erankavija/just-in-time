@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "38670c86b63b1b1229e7b8169668844f71d7b5e5",
+  "completed_at": "2026-11-08T04:49:27.237964444Z",
+  "duration_ms": 108958,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied, the prior finding is resolved, and no unresolved findings remain.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fba8d478-7584-4e01-b7ee-b763a177a56f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0f508842-4964-4e0d-8c9f-33d1b71f7d1c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T04:47:38.278977621Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:fba8d478 — efab0755, 1fa9dd1f, 0247dd0f, cb825a88; individual patches inspected\nPolicy sources: AGENTS.md; no applicable subtree AGENTS.md\nResolved items: @/issue/fba8d478/decision/D-01 → issue description; @/gate/cargo-ci, @/gate/jit-validate → .jit/gates.toml; @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/bounded-rust-build-footprint, @/invariant/no-ignored-tests, @/invariant/single-source-prose, @/invariant/canonical-cutover → .jit/invariants.toml\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T04:47:19.640931431+00:00; run commit 38670c86 contains all four attributable commits\nTruncation recovery: none\n\nREQ-01–03 are satisfied. The committed benchmark note records three concurrent pairs, all passing without limit failures, with individual durations compared against the serial baseline. Its decision follows D-01.\n\nThe current script removes lock acquisition while retaining per-test enforcement. Its header and canonical gate description reflect that change, and the generated projection matches the registry. The prior stale-comment finding is resolved. No gates were rerun.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied, the prior finding is resolved, and no unresolved findings remain.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

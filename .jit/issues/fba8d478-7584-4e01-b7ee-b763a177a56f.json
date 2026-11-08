@@ -8,6 +8,7 @@
   ],
   "description": "`scripts/cargo-ci.sh` serialises runs under a host lock (`CARGO_CI_BUILD_LOCK`). With per-test limits and the host's shared cargo jobserver pool, two runs may coexist. This measures whether they do.\n\n## Background\n\nThe host runs a cargo jobserver pool (`cargo-pool-daemon`) that shares cores between concurrent cargo invocations. Today `scripts/cargo-ci.sh` takes a host-wide lock, so authoritative gate runs from several leads queue one after another.\n\n## Success Criteria\n\n- [hard] REQ-01: A committed benchmark note records at least three trials of two `cargo-ci` runs started together under the pool on different worktrees, with the per-test limits enforced and the lock bypassed. Each trial reports each run's verdict, any per-test limit failures, and both runs' wall-clock durations against a serial baseline.\n- [hard] REQ-02: The note states a decision with its evidence: the lock is removed, if every trial passes with no limit failure, or kept, naming the failure mode observed.\n- [hard] REQ-03: If the decision is to remove the lock, `scripts/cargo-ci.sh` no longer takes it, and its header and the `cargo-ci` gate description say so. If the decision is to keep it, nothing changes outside the note.\n\n## Decisions\n\n- D-01: If every trial passes with no per-test limit failure, `scripts/cargo-ci.sh` drops the host lock (user ruling, 2026-11-03), knowing the cargo jobserver pool exists only on this host.\n\n## Notes\n\nRun the trials when no lead's gates are queued.\n",
   "documents": [],
+  "done_at": "2026-11-08T04:49:39.801904008Z",
   "first_ready_at": "2026-11-03T22:39:27.728670362Z",
   "gates_required": [
     "cargo-ci",
@@ -15,15 +16,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "40c1a106-9933-42ef-a672-6186d661aa05",
+      "run_id": "e6adaa51-202c-412c-a2d1-03c7d55f01c1",
       "status": "passed",
-      "updated_at": "2026-11-08T04:44:14.528364809Z",
+      "updated_at": "2026-11-08T04:47:38.170357778Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "dad5942f-cb76-4447-a03b-5244a2538aeb",
+      "run_id": "0f508842-4964-4e0d-8c9f-33d1b71f7d1c",
       "status": "passed",
-      "updated_at": "2026-11-08T04:46:35.090010879Z",
+      "updated_at": "2026-11-08T04:49:27.239846414Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,7 +37,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Decide whether concurrent cargo-ci runs can drop the host lock",
-  "updated_at": "2026-11-08T04:46:35.090010879Z"
+  "updated_at": "2026-11-08T04:49:39.801904008Z"
 }
