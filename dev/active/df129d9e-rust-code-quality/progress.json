@@ -877,11 +877,11 @@
           "short_id": "75a90224",
           "title": "Validation checks report failures on stdout with a one-line stderr summary",
           "classification": "implementation",
-          "status": "rework",
+          "status": "done",
           "model_tier": "sonnet",
           "origin": "df129d9e holistic-review 2026-11-08: F1 blocking (D-03/REQ-09), F2 advisory (report wording)",
-          "landed": "7c29f386a",
-          "gates": "cargo-ci passed; code-review failed: F1 JSON error.message changed (REQ-02), F2 CLI stderr line-count duplicates unit ownership"
+          "landed": "7c29f386a, 1ee4aa9ae, fb266275f",
+          "gates": "cargo-ci, code-review passed (rework 2)"
         }
       ]
     }
@@ -1117,7 +1117,7 @@
     "f487aeef": 2,
     "0b35be66": 1,
     "afd2d573": 1,
-    "75a90224": 1
+    "75a90224": 2
   },
   "surfaced_pitfalls": [
     {

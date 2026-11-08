@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fb266275fb5ad0f59ecf42bde940c6eacfadb31b",
+  "completed_at": "2026-11-08T07:21:07.087654097Z",
+  "duration_ms": 106186,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are satisfied and the latest prior blocking finding is resolved; no unresolved findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "75a90224-e9dd-43d2-99c0-3d79d7f1284c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "91b73c63-cbff-42d9-b79f-121df8e74d77",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T07:19:20.901362415Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:75a90224` — 54aa28e, 77de09e, ca7252f, 76aa322, f43a875, 513c2d6, 57d3eff, 0abb5e2, 23b9c99; individual patches inspected.\nPolicy sources: `AGENTS.md`\nResolved items: @/issue/75a90224/requirement/REQ-01, @/issue/75a90224/requirement/REQ-02, @/issue/75a90224/requirement/REQ-03, @/issue/75a90224/requirement/REQ-04, @/issue/75a90224/decision/D-01 → issue description; @/issue/df129d9e/decision/D-03, @/issue/df129d9e/requirement/REQ-09 → epic description; @/invariant/convention-convergence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/single-source-prose → `.jit/invariants.toml`; @/charter/D-13, @/charter/D-18 → `dev/vision/9db27a3a-charter.md`; @/gate/cargo-ci, @/gate/jit-validate → `.jit/gates.toml`.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T07:19:03.866068494+00:00; wrapper ancestry confirms fb266275 covers all nine commits; latest prior code-review failed, exit 1, 2026-11-08T07:15:33.576294763Z.\nTruncation recovery: recovered omitted patches through narrower commit/path reads; embedded historical transcript omissions excluded as records of past runs.\n\nAll four hard criteria are satisfied. The renderer reports both failures and mixed results on stdout, while the shared emitter carries the single-line summary to stderr and JSON `error.message`. Serialization and exit-code behavior remain intact. Stream tests sit at the output layer, and the report change corrects only the requested wording.\n\nThe prior documentation finding is resolved: `docs/reference/worktree-validate.md:483` now links to the canonical contract at `docs/reference/cli-commands.md:3311`.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are satisfied and the latest prior blocking finding is resolved; no unresolved findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
