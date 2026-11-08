@@ -40,16 +40,30 @@ fn example_dir(name: &str) -> PathBuf {
         .join(name)
 }
 
-/// Load an example ruleset, resolving any `schemas/*.json` references relative to
-/// the example directory itself. (Minimal local replica of the helper in
-/// `example_rulesets_tests.rs`, kept here so this file owns its dependencies.)
+/// Load an example ruleset through the captured declaration parse, with the
+/// example's own `schemas/*.json`.
 fn load_example(name: &str) -> RuleSet {
-    let dir = example_dir(name);
-    jit::storage::ruleset_store::load_ruleset(
-        &jit::test_utils::repository_layout_for_data_root(&dir),
-        &toml::from_str::<jit::config::JitConfig>("").unwrap(),
+    let source = example_dir(name);
+    let repo = tempfile::TempDir::new().unwrap();
+    let schemas = repo.path().join(".jit/schemas");
+    std::fs::create_dir_all(&schemas).unwrap();
+    std::fs::copy(
+        source.join("rules.toml"),
+        repo.path().join(".jit/rules.toml"),
     )
-    .unwrap_or_else(|e| panic!("example '{name}' rules.toml must load cleanly: {e}"))
+    .unwrap();
+    if let Ok(entries) = std::fs::read_dir(source.join("schemas")) {
+        entries.map(Result::unwrap).for_each(|entry| {
+            std::fs::copy(entry.path(), schemas.join(entry.file_name())).unwrap();
+        });
+    }
+    jit::test_utils::file_executor(repo.path())
+        .unwrap()
+        .config()
+        .captured_declarations()
+        .unwrap_or_else(|e| panic!("example '{name}' rules.toml must load cleanly: {e}"))
+        .rules()
+        .clone()
 }
 
 /// The graph-scope rules of a set, as the slice [`evaluate_graph`] expects.

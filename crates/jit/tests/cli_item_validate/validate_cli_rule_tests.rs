@@ -100,13 +100,13 @@ fn test_config_writes_and_validate_fix_restore_defaults_in_custom_only_file() {
         cli.command(args).assert().success();
         let restored = fs::read_to_string(&rules_path).unwrap();
         assert!(restored.starts_with(EPIC_NEEDS_COMPONENT));
-        let layout = jit::test_utils::repository_layout_for_data_root(&cli.root().join(".jit"));
-        let config = jit::storage::configuration_store::load_configuration(&layout).unwrap();
-        assert!(jit::storage::ruleset_store::load_ruleset(&layout, &config)
-            .unwrap()
-            .rules
-            .iter()
-            .any(|r| r.name == "label-format" && r.origin.as_deref() == Some("default")));
+        assert!(
+            jit::declarations::rules::RuleSet::parse(&restored, None, std::iter::empty())
+                .unwrap()
+                .rules
+                .iter()
+                .any(|r| r.name == "label-format" && r.origin.as_deref() == Some("default"))
+        );
     }
 }
 
