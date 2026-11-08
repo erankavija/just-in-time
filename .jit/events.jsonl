@@ -25893,3 +25893,4 @@
 {"id":"46985fea-2cbc-49da-b708-af34fa954914","issue_id":"4e2bed35-53a5-487c-9063-b059b6dc8495","timestamp":"2026-11-08T03:08:11.134047164Z","type":"issue_completed"}
 {"from":"ready","id":"6efaf8ba-d1ac-419e-8760-52ce6d2a0b76","issue_id":"e73ad8bc-49f8-4b1c-88a3-80460e87eb40","timestamp":"2026-11-08T03:08:21.035692715Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"ec8380e3-ea4a-44e9-91c3-86de9a013884","issue_id":"e73ad8bc-49f8-4b1c-88a3-80460e87eb40","timestamp":"2026-11-08T03:08:21.035692715Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"3b8ca996-f88d-4fb8-a2df-7afabb6c64b7","issue_id":"afd2d573-6c56-471a-b8ac-84d5d4d3bb99","timestamp":"2026-11-08T03:11:06.166702765Z","type":"gate_failed","updated_by":"auto:executor"}

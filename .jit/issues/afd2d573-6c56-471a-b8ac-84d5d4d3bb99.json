@@ -11,7 +11,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3d062948-f475-4208-81a1-8ccbcc7216f8",
+      "status": "failed",
+      "updated_at": "2026-11-08T03:11:06.166702765Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "afd2d573-6c56-471a-b8ac-84d5d4d3bb99",
   "labels": [
     "epic:rust-code-quality",
@@ -23,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Bring the bootstrap audit-replay test under the unit limit",
-  "updated_at": "2026-11-08T02:32:08.532292096Z"
+  "updated_at": "2026-11-08T03:11:06.166702765Z"
 }
