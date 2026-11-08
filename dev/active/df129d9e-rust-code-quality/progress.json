@@ -685,11 +685,12 @@
           "short_id": "0b35be66",
           "title": "Bring the tests the enforced limits flagged under their per-test limits",
           "classification": "implementation",
-          "status": "awaiting-gates",
+          "status": "rework-margin",
           "model_tier": "opus",
           "tier_reason": "proptest/coverage-preserving cost cuts across five modules",
           "branch_head": "948212c82",
-          "production_delta": 100
+          "production_delta": 100,
+          "rework_note": "event_tail 1.694s and dogfood 1.715s cut below 1s; sent 04:32"
         },
         {
           "key": "bootstrap-over-limit",
@@ -697,7 +698,12 @@
           "short_id": "afd2d573",
           "title": "Bring the bootstrap audit-replay test under the unit limit",
           "classification": "implementation",
-          "status": "ready-to-dispatch-after-04:30"
+          "status": "in_progress",
+          "model_tier": "sonnet",
+          "tier_reason": "single-test cost cut reusing 0b35be66 mechanism",
+          "dispatched": "2026-11-08T04:33+02:00",
+          "worktree": ".agents/worktrees/agent-afd2d573",
+          "branch": "worktree-agent-afd2d573"
         }
       ]
     },
@@ -1044,7 +1050,8 @@
     "ab168296": 0,
     "755964b2": 1,
     "fe3ad1b0": 1,
-    "f487aeef": 1
+    "f487aeef": 1,
+    "0b35be66": 1
   },
   "surfaced_pitfalls": [
     {
