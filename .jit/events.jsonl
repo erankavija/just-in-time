@@ -26093,3 +26093,5 @@
 {"fields":["description"],"id":"070648b8-ed49-456b-a1a8-b58fc14efe06","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-08T13:24:49.287546458Z","type":"issue_updated","updated_by":"issue-update"}
 {"from":"ready","id":"a860f224-d621-4d72-924c-917c37f4ca4a","issue_id":"e5d7bc11-8da0-415b-8321-c75977d6909c","timestamp":"2026-11-08T13:24:55.526423653Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"ddc49bfe-d423-461d-aacd-ef5bcfe2bd19","issue_id":"e5d7bc11-8da0-415b-8321-c75977d6909c","timestamp":"2026-11-08T13:24:55.526423653Z","type":"issue_claimed"}
+{"id":"e62932b8-de5b-470e-9215-7f0759bdd406","issue_id":"3084a48f-f522-4045-86ba-b6ff0b7a4d90","priority":"low","timestamp":"2026-11-08T13:34:39.753370470Z","title":"Item queries read markdown-first sources from the captured image","type":"issue_created"}
+{"fields":["dependencies"],"id":"a7ca9e45-7cda-40c2-8cad-63bc2151a237","issue_id":"0735879a-ed40-450e-9959-5cfe80653745","timestamp":"2026-11-08T13:34:40.156235222Z","type":"issue_updated","updated_by":"dependency-add"}

@@ -1,0 +1,24 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-08T13:34:39.753370470Z",
+  "dependencies": [],
+  "description": "`jit item` resolves markdown-first item sources by reading the files live (`crates/jit/src/commands/item.rs:332`, via `IssueStore::read_repo_file`), while registry-first sources come from the captured image. A concurrent `jit project render`, which rewrites generated regions in those markdown files, can make one query combine a captured registry with markdown bytes from a different moment.\n\n## Background\n\nRegistry-first item kinds (gate, rule, invariant) read their TOML sources from the captured image as of commit `90862f758`. Markdown-first kinds still read live because the image capture does not include their source documents.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit item` show, list and search resolve markdown-first item sources from the same captured image as registry-first sources; no item query reads a source file outside its capture.\n- [hard] REQ-02: The capture includes exactly the markdown sources the configured item kinds declare, derived from `[item_kinds]` in repository configuration.\n- [hard] REQ-03: One test owns the property that an item query's markdown and registry content come from one captured image.\n\n## Notes\n\nSurfaced by the worker of the registry-first item-query task under the mutation-session epic; kept out of that epic because its criteria name declarations only. Relevant: @/charter/D-22, @/inv/convention-convergence.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-08T13:34:39.753370470Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "3084a48f-f522-4045-86ba-b6ff0b7a4d90",
+  "labels": [
+    "type:task",
+    "component:core",
+    "milestone:v1.1"
+  ],
+  "priority": "low",
+  "state": "ready",
+  "title": "Item queries read markdown-first sources from the captured image",
+  "updated_at": "2026-11-08T13:34:39.753370470Z"
+}
