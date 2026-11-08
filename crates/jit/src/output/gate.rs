@@ -315,7 +315,12 @@ impl HumanRender for GatePresetApplyResponse {
             }
         }
         if !self.errors.is_empty() {
-            let _ = writeln!(text, "\nErrors ({}):", self.errors.len());
+            let _ = writeln!(
+                text,
+                "\nErrors ({}) applying preset '{}':",
+                self.errors.len(),
+                self.preset
+            );
             for error in &self.errors {
                 let _ = writeln!(text, "  {} - {}", error.issue_id, error.error);
             }
@@ -720,6 +725,23 @@ mod tests {
     use crate::declarations::{GateMode, GateStage};
     use crate::gate_presets::GateTemplate;
     use serde_json::json;
+
+    #[test]
+    fn test_gate_preset_apply_response_names_the_preset_when_every_target_failed() {
+        let report = GatePresetApplyResponse {
+            preset: "rust-ci".to_owned(),
+            success: Vec::new(),
+            errors: vec![GatePresetError {
+                issue_id: "xyz999".to_owned(),
+                error: "Issue not found: xyz999".to_owned(),
+            }],
+        };
+
+        let text = report.render_human(OutputMode::default());
+
+        assert!(text.contains("'rust-ci'"), "{text:?}");
+        assert!(text.contains("Issue not found: xyz999"), "{text:?}");
+    }
 
     #[test]
     fn test_gate_definition_response_preserves_complete_declaration_payload() {

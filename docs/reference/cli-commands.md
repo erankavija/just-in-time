@@ -2321,7 +2321,7 @@ Applied preset 'rust-ci' to 2 issue(s):
   abc123 - gates added: tests, clippy, fmt, code-review
   def456 - gates added: tests, clippy, fmt, code-review
 
-Errors (1):
+Errors (1) applying preset 'rust-ci':
   xyz999 - Issue not found: xyz999
 ```
 
@@ -3310,11 +3310,10 @@ jit validate --branch-drift [--leases]
 | `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires the `git` executable on `PATH` and a Git repository ([Git Optional](../concepts/guarantees.md#git-optional)). |
 | `--leases` | Check lease records for expiry and references to missing worktrees or issues. Plain validation does not check leases. |
 
-Under `--branch-drift` and `--leases`, human output prints every check on
-stdout: a line for each passed check and the details of each failed check. Stderr
-carries one summary line naming the failed checks. With `--json`,
-`error.message` is that summary and `error.details.validations` keeps each
-check's `valid` and `message`.
+Under `--branch-drift` and `--leases`, the report prints a line for each passed
+check and the details of each failed check; `error.details.validations` keeps
+each check's `valid` and `message`, and the summary names the failed checks
+([failure contract](#cli-json-contracts)).
 
 The per-issue, `--rule`, `--explain`, and `--scope` modes are views: selections
 of the one whole-repository report, with rules evaluated over the whole
@@ -3363,9 +3362,10 @@ a whole-repository rule failure reports:
 }
 ```
 
-A whole-repository repository-integrity error, such as derived-state drift,
-prints in full in the human report and in `integrity_error`; the report's
-`message` is the one-line summary.
+A whole-repository repository-integrity error, such as derived-state drift or a
+malformed rules file, prints in full in the human report and in
+`integrity_error`; the report's `message` repeats the summary
+([failure contract](#cli-json-contracts)).
 
 Every `jit validate` mode reports error-severity findings, including
 whole-repository rule failures, and repository-integrity failures as
@@ -3378,13 +3378,16 @@ registered mapping, not a separate literal, determines the process status.
 advisory and never change the exit status; resolve them with `jit query
 divergence` when a membership label claims what the DAG does not back.
 
+A `--fix` repair that cannot run is a propagated error, not a findings report:
 `validate --fix --json` returns the standard error envelope and retains the
 failure's typed classification: an unsafe repair uses `VALIDATION_FAILED`, a
 permission failure uses `PERMISSION_DENIED`, and other failures keep the
 registered code selected by the shared classifier. That code determines the
 process status. Its `error.message` retains the complete actionable cause chain,
 including ambiguous managed-region delimiters.
-The human error reports the same cause, and no repair target is written.
+The human error reports the same cause, and no repair target is written. Findings
+that remain after the repairs, integrity errors included, report as plain
+`validate` does.
 
 ### `jit recover`
 
