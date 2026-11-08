@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "692bf622e0b7ae657bf78c3e6f417c2911678305",
+  "completed_at": "2026-11-08T03:51:26.394425075Z",
+  "duration_ms": 96598,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three hard criteria are satisfied; no issue-impact defects found. Recorded cargo-ci evidence covers both attributable commits.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "82f1647f-46af-46c1-818c-33d7c8396082",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "393e6166-8c54-4a58-94cd-b06dfa28ef00",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T03:49:49.795586261Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:82f1647f` — `45ded1fc5ae600f39b75a0200842eabbbdcdacf8`, `bc6361ef116ab4e431953c6f21c944c5ce1c9fc1`\nPolicy sources: `AGENTS.md`, `dev/TESTING.md`, `.jit/config.toml`, `.jit/invariants.toml`, `.jit/gates.toml`, `dev/vision/9db27a3a-charter.md`\nResolved items: `@/issue/b697a3f7/requirement/REQ-19` → issue description; `@/charter/D-20` → charter; `@/gate/jit-validate` → gate registry; `@/inv/orthogonal-tests`, `@/inv/essential-code-prose`, `@/inv/shared-test-contracts`, `@/inv/semantic-test-assertions`, `@/inv/architecture-dependency-direction`, `@/inv/semantic-types`, `@/inv/convention-convergence` → invariant registry\nGate evidence: `cargo-ci` passed, exit 0, 2026-11-08T03:46:00.962519590+00:00; wrapper confirms coverage of both tagged commits; current `code-review` pending, exit none\nTruncation recovery: narrower rereads recovered event patch, policy configuration, and epic criterion; unrelated epic background excluded from the impact cone\n\nNo findings. The shared reservation map protects every staged tracker path. One regression test checks historical document capture against captured declaration bytes and manifest hash. Exports without collisions retain their existing output behavior.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three hard criteria are satisfied; no issue-impact defects found. Recorded cargo-ci evidence covers both attributable commits.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

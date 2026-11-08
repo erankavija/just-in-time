@@ -260,8 +260,8 @@
           "id": "82f1647f",
           "short_id": "82f1647f",
           "title": "Snapshot export reserves the paths it stages from the captured image",
-          "status": "in_progress",
-          "note": "sonnet"
+          "status": "done",
+          "note": "landed 692bf622e (bc6361ef1); cargo-ci passed; code-review passed run 393e6166"
         }
       ]
     },
@@ -636,6 +636,15 @@
       "effort": "high",
       "verdict": "pass",
       "run": "4ec59685"
+    },
+    {
+      "issue": "82f1647f",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "393e6166"
     }
   ]
 }
