@@ -263,16 +263,21 @@ final plans, and looks each artifact up in the result. Only a relocating artifac
 text naming the moving path whole, so text naming a longer path that ends with
 it — the destination the relocation publishes, or an unrelated path — reports
 nothing, and repointing a citation to the destination removes it from the
-section. A Markdown link destination is also resolved from the citing file's
-directory, so a relative link such as `[plan](plan.md)` is a citation of the
-path it reaches. The section is advisory: the scan reads live files outside the
+section. The same text's Markdown links — inline, angle-bracket, or by
+reference — are also resolved from the citing file's directory, so a relative
+link such as `[plan](plan.md)` is a citation of the path it reaches, located
+where its destination is written; a link whose destination already spells the
+path whole is one citation. The section is advisory: the scan reads live files outside the
 plan's captured snapshot, so the plan never depends on it, and eligibility,
 `--execute`, and issue transitions all behave as they would with no citation
 present. Execution relocates bytes and relinks document records while rewriting
 no document content, so a citing file survives byte for byte and keeps a stale
 citation until an adopter edits it. Execution scans after its run, over the
-plan it applied, so it reports the stale citations the run leaves, and a citing
-file the run leaves in place reports the locations a preview reported.
+plan it applied, reading the citation roots as they stood before it: a citing
+file the run relocated is read at its destination under its source path, and a
+file the run created is skipped. Execution therefore reports the section a
+preview reports over the same live files, including the stale citations the
+run leaves.
 
 `jit archive candidates` is the read-only container report. It lists every
 effectively terminal issue — `Done`, `Rejected`, or `Archived` from one of those
@@ -2873,7 +2878,9 @@ The exit code carries the verdict per the
 [exit-code reference](exit-codes.md#command-specific-mappings): `0` unless a link is
 broken, which exits `4` (`VALIDATION_FAILED`); warnings are reported in the output and the JSON
 result but never change the exit status. JSON reports `valid`, `errors`, `link_warnings`, and a `summary`;
-with a broken link they arrive as the failure envelope's `error.details`.
+each link error and warning carries the 1-based `line` where the link's
+destination is written, which for a reference link is its definition. With a
+broken link, the report arrives as the failure envelope's `error.details`.
 
 An external URL asset is probed with one HTTP `HEAD` request per distinct URL,
 however many documents cite it. A success or redirect status counts as

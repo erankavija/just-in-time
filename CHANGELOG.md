@@ -13,9 +13,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   candidates` report the in-content citations a relocation would break in an
   `advisory` section beside the plan, scanned once per command, instead of as
   `moving-path-citation` plan warnings. A plan now derives only from its
-  captured snapshot, so a preview equals the plan execution applies. A relative
-  Markdown link destination now cites the path it resolves to. See
+  captured snapshot, so a preview equals the plan execution applies. A
+  Markdown link, inline, angle-bracket or by reference, now cites the path it
+  resolves to. See
   [Archive planning and execution](docs/reference/cli-commands.md#archive-planning-and-execution).
+
+- **`jit doc check-links` reports real link lines.** Each link error and
+  warning's `line` is the 1-based line where the link's destination is
+  written, instead of `0`. See
+  [`jit doc check-links`](docs/reference/cli-commands.md#jit-doc-check-links).
 
 - **Search result paths are relative to the search root.** Each `jit search`
   result's `path` is relative to the `.jit/` data directory, and each
