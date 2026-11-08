@@ -877,9 +877,11 @@
           "short_id": "75a90224",
           "title": "Validation checks report failures on stdout with a one-line stderr summary",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "rework",
           "model_tier": "sonnet",
-          "origin": "df129d9e holistic-review 2026-11-08: F1 blocking (D-03/REQ-09), F2 advisory (report wording)"
+          "origin": "df129d9e holistic-review 2026-11-08: F1 blocking (D-03/REQ-09), F2 advisory (report wording)",
+          "landed": "7c29f386a",
+          "gates": "cargo-ci passed; code-review failed: F1 JSON error.message changed (REQ-02), F2 CLI stderr line-count duplicates unit ownership"
         }
       ]
     }
@@ -1052,6 +1054,14 @@
       "subject": "near-limit margin tasks",
       "ruling": "7909527f is the last margin task; the bound is the declared 2 s/6 s limit. Only a test over its limit on a quiet host (1-min load < 1) gets a refactor task, measured in fba8d478's quiet trials. Loaded-host noise is handled solely by cargo-ci exit 75 (D-18).",
       "status": "resolved"
+    },
+    {
+      "date": "2026-11-08",
+      "to": "just-in-time-d5",
+      "subject": "75a90224 REQ-02 vs D-03: JSON error.message becomes the one-line summary",
+      "options": "A amend REQ-02 (recommended) / B new emitter mechanism or dispatch mode branch",
+      "status": "resolved",
+      "ruling": "A: REQ-02 amended (steward D-01 on 75a90224); update docs/schema examples of old error.message, CHANGELOG line if JSON-visible changes are recorded; fix F2"
     }
   ],
   "rework_counts": {
@@ -1106,7 +1116,8 @@
     "fe3ad1b0": 1,
     "f487aeef": 2,
     "0b35be66": 1,
-    "afd2d573": 1
+    "afd2d573": 1,
+    "75a90224": 1
   },
   "surfaced_pitfalls": [
     {
