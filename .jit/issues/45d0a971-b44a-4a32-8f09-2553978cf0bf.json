@@ -4,8 +4,11 @@
   "context": {},
   "created_at": "2026-10-24T21:22:37.717854234Z",
   "dependencies": [
+    "2add77bc-aaf6-4849-bb8a-d1ef63d59eb2",
     "4d834432-bb39-4ffc-9683-7dba55c3d06e",
+    "6a19e93f-77da-4bf6-b3c2-a6de6929309b",
     "850eaad3-53a3-4d50-bd02-6a51a0c84208",
+    "86a183c2-2a26-42db-bf8a-84f17cd7a3aa",
     "c0775a83-0b83-4a90-883b-527876784a21",
     "dd95bd9d-9a9b-44a9-8ecc-126574b3cb8a"
   ],
@@ -31,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Cost evidence: the epic's four cost reductions against the base binary",
-  "updated_at": "2026-11-08T05:34:43.940567327Z"
+  "updated_at": "2026-11-08T05:51:08.739868728Z"
 }
