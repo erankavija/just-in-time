@@ -432,7 +432,7 @@
       "to": "just-in-time-d5",
       "issue": "d675102c",
       "subject": "checkpoint r2 remediation scope: fold F2 into 86a183c2, new tasks for F1 and F3",
-      "status": "open"
+      "status": "resolved: proposal approved"
     }
   ],
   "rework_counts": {
@@ -531,7 +531,9 @@
     "11:45-11:56 A/B quiet runs, alternating, 5 samples: be754ee04 tip 0.796 / 0.857 pass; fb38ed248 tip 1.328 / 1.133 pass (base ~3.75). Earlier be754ee04 1.71/1.72 = variance; per-match instructions/syscalls/cycles identical (worker profile). Metric spread for new binary 0.80-1.72 across quiet runs: near-threshold risk for 45d0a971 tip record.",
     "Process (d5, after a869900b and df129d9e stalls on lost worker notifications): every worker dispatch gets a fallback deadline of expected duration + 30 min, implemented as a background `sleep` timer; when it fires, inspect the worktree commits and status directly instead of waiting.",
     "a869900b landed 34b33911e, cargo-ci + code-review passed, closed. d675102c re-checkpoint (sol gpt-6.1-sol, effort high, read-only) dispatched on bb9a8795f. 86a183c2 dispatched (opus) on bb9a8795f with fallback deadline 2h30m.",
-    "86a183c2 lead review FAIL on 16450a564: REQ-02 fresh DeclarationMemo in load_configuration (claim, config show) and capture_initialized (config at_data_root); expect() panic in memo.rs. Rework 1 dispatched. Smoke run of scenario (c) on 16450a564 running as early signal; REQ-04 is recorded on the final commit."
+    "86a183c2 lead review FAIL on 16450a564: REQ-02 fresh DeclarationMemo in load_configuration (claim, config show) and capture_initialized (config at_data_root); expect() panic in memo.rs. Rework 1 dispatched. Smoke run of scenario (c) on 16450a564 running as early signal; REQ-04 is recorded on the final commit.",
+    "86a183c2 smoke (early signal, 16450a564, harness defaults, raw in lead scratch, load ~1.7): dep tip D 14.39 ms, ratio 0.753 FAIL (≤0.7); bulk slope 1.14 pass. REQ-04 is recorded on the final commit.",
+    "d5 ruling applied: e5d7bc11 (F1, item.rs) dispatched on sonnet; 6b22ce6d (F3) after 86a183c2; 86a183c2 REQ-01/02 amended (gates.toml, handoffs, one memo)."
   ],
   "story_checkpoints": [
     {
