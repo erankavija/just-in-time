@@ -12,7 +12,7 @@ use crate::domain::{
 };
 use crate::graph::{DependencyGraph, Direction};
 use std::cmp::Reverse;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// Optional restrictions on all issues; every supplied filter must match.
 #[derive(Debug, Default, Clone)]
@@ -160,7 +160,7 @@ impl<'a> IssueIndex<'a> {
 
     /// Every issue: the captured ones in capture order, then the added ones.
     pub fn issues(&self) -> impl Iterator<Item = &Issue> + '_ {
-        note_index_scan();
+        note_repository_pass(self.captured.len() + self.added.len());
         self.captured
             .iter()
             .map(|issue| self.replaced.get(&issue.id).unwrap_or(issue))
@@ -334,8 +334,8 @@ impl<'a> IssueView<'a> {
             .chain(
                 self.replaced
                     .iter()
-                    .filter(|issue| depends(issue))
-                    .map(|issue| &issue.id),
+                    .map(|issue| &issue.id)
+                    .filter(|replaced| view.get(replaced).is_some_and(depends)),
             )
             .collect()
     }
@@ -383,28 +383,21 @@ impl<'a> IssueView<'a> {
     where
         'a: 's,
     {
-        let neighbours = |id: &IssueId| -> Vec<&'a IssueId> {
-            match direction {
-                Direction::Dependencies => self
-                    .get(id)
-                    .map(|issue| issue.dependencies.iter().collect())
-                    .unwrap_or_default(),
-                Direction::Dependents => self.dependents(id).into_iter().collect(),
-            }
-        };
-        let mut visited = HashSet::<&'s IssueId>::from([start]);
-        let mut stack = neighbours(start);
-        let mut reached = Vec::new();
-        while let Some(id) = stack.pop() {
-            if !visited.insert(id) {
-                continue;
-            }
-            if let Some(issue) = self.get(id).filter(|issue| admits(issue)) {
-                reached.push(issue);
-                stack.extend(neighbours(id));
-            }
-        }
-        reached
+        crate::graph::traverse_with(
+            start,
+            0,
+            |id| -> Vec<&'s IssueId> {
+                match direction {
+                    Direction::Dependencies => self
+                        .get(id)
+                        .map(|issue| issue.dependencies.iter().collect())
+                        .unwrap_or_default(),
+                    Direction::Dependents => self.dependents(id).into_iter().collect(),
+                }
+            },
+            |id| self.get(id),
+            |issue| admits(issue),
+        )
     }
 
     /// The issues carrying `namespace:value`, or any label in `namespace` when
@@ -441,55 +434,64 @@ impl<'a> IssueView<'a> {
     }
 }
 
-/// [`IssueIndex`] reads on the current thread: keyed lookups, and passes over
-/// every indexed issue.
+/// Repository reads on the current thread: keyed [`IssueIndex`] lookups, and
+/// the records visited by passes over the repository, parsed issue records
+/// included.
 #[cfg(test)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(crate) struct IndexReads {
+pub(crate) struct RepositoryReads {
     pub(crate) lookups: usize,
-    pub(crate) scans: usize,
+    pub(crate) scanned: usize,
+}
+
+#[cfg(test)]
+impl std::ops::Sub for RepositoryReads {
+    type Output = Self;
+
+    fn sub(self, earlier: Self) -> Self {
+        Self {
+            lookups: self.lookups - earlier.lookups,
+            scanned: self.scanned - earlier.scanned,
+        }
+    }
 }
 
 #[cfg(test)]
 thread_local! {
-    static INDEX_READS: std::cell::Cell<IndexReads> = const {
-        std::cell::Cell::new(IndexReads { lookups: 0, scans: 0 })
+    static REPOSITORY_READS: std::cell::Cell<RepositoryReads> = const {
+        std::cell::Cell::new(RepositoryReads { lookups: 0, scanned: 0 })
     };
 }
 
-/// `run`'s result and the [`IssueIndex`] reads it made on this thread.
+/// `run`'s result and the repository reads it made on this thread.
 #[cfg(test)]
-pub(crate) fn count_index_reads<T>(run: impl FnOnce() -> T) -> (T, IndexReads) {
-    let before = INDEX_READS.with(std::cell::Cell::get);
+pub(crate) fn count_repository_reads<T>(run: impl FnOnce() -> T) -> (T, RepositoryReads) {
+    let before = REPOSITORY_READS.with(std::cell::Cell::get);
     let value = run();
-    let after = INDEX_READS.with(std::cell::Cell::get);
-    (
-        value,
-        IndexReads {
-            lookups: after.lookups - before.lookups,
-            scans: after.scans - before.scans,
-        },
-    )
+    (value, REPOSITORY_READS.with(std::cell::Cell::get) - before)
 }
 
 fn note_index_lookup() {
     #[cfg(test)]
-    INDEX_READS.with(|reads| {
-        reads.set(IndexReads {
+    REPOSITORY_READS.with(|reads| {
+        reads.set(RepositoryReads {
             lookups: reads.get().lookups + 1,
             ..reads.get()
         })
     });
 }
 
-fn note_index_scan() {
+/// Note a pass visiting `records` records of the repository.
+pub(crate) fn note_repository_pass(records: usize) {
     #[cfg(test)]
-    INDEX_READS.with(|reads| {
-        reads.set(IndexReads {
-            scans: reads.get().scans + 1,
+    REPOSITORY_READS.with(|reads| {
+        reads.set(RepositoryReads {
+            scanned: reads.get().scanned + records,
             ..reads.get()
         })
     });
+    #[cfg(not(test))]
+    let _ = records;
 }
 
 /// The issues [`derive_readiness_corrections`] re-derives.
@@ -2055,15 +2057,33 @@ mod tests {
                 .filter(|issue| prior.get(&issue.id) != Some(issue))
                 .cloned()
                 .collect::<Vec<_>>();
+            // Each replaced id first takes a stale record, depending on every
+            // other issue and carrying another label, that its final record
+            // supersedes.
+            let history = replaced
+                .iter()
+                .flat_map(|issue| {
+                    let stale = Issue {
+                        dependencies: before
+                            .iter()
+                            .map(|other| other.id.clone())
+                            .filter(|id| id != &issue.id)
+                            .collect(),
+                        labels: vec![label(5)],
+                        ..issue.clone()
+                    };
+                    [stale, issue.clone()]
+                })
+                .collect::<Vec<_>>();
             let base = IssueIndex::new(&before);
             let mut owned = IssueIndex::new(&before);
-            replaced
+            history
                 .iter()
                 .for_each(|issue| owned.replace(issue.clone()));
             let expected =
                 derive_readiness_corrections(&before, &after, ReadinessScope::Affected);
 
-            for view in [base.with(&replaced), owned.view()] {
+            for view in [base.with(&history), owned.view()] {
                 prop_assert_eq!(view.issues().collect::<Vec<_>>(), after.iter().collect::<Vec<_>>());
                 for target in &before {
                     let dependents = after

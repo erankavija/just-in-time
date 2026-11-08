@@ -1117,6 +1117,10 @@ struct PrecheckPreflight {
     image: crate::repository_state::RepositoryImage,
     /// The configuration assembled from `image`.
     config: crate::config::JitConfig,
+    /// The active issues of `image`, parsed once for every preflight over it.
+    issues: std::sync::Arc<Vec<Issue>>,
+    /// The validation report of `image` its built-in prechecks share.
+    validation: std::sync::Arc<gate_check::SharedValidation>,
     issue: Issue,
     registry: crate::declarations::GateRegistry,
 }
@@ -1185,11 +1189,11 @@ impl RecordedPrechecks {
 
 /// Record `cached`'s precheck runs for `planned`, the captured issue as the
 /// change leaves it, marking each run moved when its inputs changed in
-/// `image` since the preflight.
+/// `comparison`'s image since the preflight.
 fn record_captured_prechecks(
     cached: Option<&CachedPrecheckExecution>,
     expected: Option<&gate_check::CapturedGateEvidence>,
-    image: &crate::repository_state::RepositoryImage,
+    comparison: &gate_check::EvidenceComparison<'_>,
     planned: &Issue,
     registry: &crate::declarations::GateRegistry,
 ) -> Result<RecordedPrechecks> {
@@ -1198,9 +1202,10 @@ fn record_captured_prechecks(
     };
     let inputs_moved = expected.evidence != cached.evidence
         || if cached.evidence.is_broad() {
-            !cached.evidence.matches(image)?
+            !cached.evidence.matches(comparison)?
         } else {
-            captured_precheck_evidence(image, planned, registry)?.evidence != cached.evidence
+            captured_precheck_evidence(comparison.image(), planned, registry)?.evidence
+                != cached.evidence
         };
     let runs = cached
         .execution
@@ -3129,13 +3134,23 @@ impl<S: IssueStore> CommandExecutor<S> {
                 None => return Ok(None),
             },
         };
+        let issues = std::sync::Arc::new(captured_active_issues(&image)?);
+        let repository = std::cell::OnceCell::new();
+        let validation = std::sync::Arc::new(gate_check::SharedValidation::default());
         planned
             .into_iter()
             .map(|issue| {
                 Ok(PrecheckPreflight {
-                    captured: captured_precheck_evidence(&image, &issue, registry)?,
+                    captured: gate_check::captured_gate_evidence_sharing(
+                        &image,
+                        &issue,
+                        &precheck_gates(&issue, registry),
+                        &repository,
+                    )?,
                     image: image.clone(),
                     config: config.clone(),
+                    issues: std::sync::Arc::clone(&issues),
+                    validation: std::sync::Arc::clone(&validation),
                     issue,
                     registry: registry.clone(),
                 })
@@ -3328,7 +3343,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let recorded = record_captured_prechecks(
                 cached_precheck.as_ref(),
                 precheck.map(|precheck| &precheck.captured),
-                image,
+                &gate_check::EvidenceComparison::new(image),
                 &projected.issue,
                 &graph.declarations.gates,
             )?;
@@ -3497,7 +3512,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let recorded = record_captured_prechecks(
                 cached_precheck.as_ref(),
                 precheck.as_ref().map(|precheck| &precheck.captured),
-                image,
+                &gate_check::EvidenceComparison::new(image),
                 &issue,
                 &declarations.gates,
             )?;
