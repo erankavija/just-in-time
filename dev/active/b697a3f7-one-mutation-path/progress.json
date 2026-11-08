@@ -577,6 +577,11 @@
       "at": "08:0x",
       "decision": "45d0a971 smoke: all four tip verdicts fail. Remediation under 0672b087: e7635f2f (graph reverse index once, satisfies 16c53cc2/REQ-06), 6a19e93f (bulk per-match, after e7635f2f, 16c53cc2/REQ-07 if profiled cause), 86a183c2 (one parse per distinct config source per command, after a869900b), 2add77bc (redo walk anchored at worktree root). (d) verdict literal all-dir openat. 45d0a971 base record next quiet window; tip after all four.",
       "by": "invoker just-in-time-d5"
+    },
+    {
+      "at": "09:2x",
+      "decision": "2add77bc option A: validate root once, held handle (identity binding); amend 5046408a design.md:40; conditions: external data root own validated handle, mid-replay replacement test",
+      "by": "invoker just-in-time-d5"
     }
   ],
   "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",
