@@ -104,7 +104,7 @@
     "per:@/charter/D-18"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Dispatch layering, executor surface, and build hygiene in crates/jit",
-  "updated_at": "2026-11-05T02:02:44.908284413Z"
+  "updated_at": "2026-11-08T06:45:58.985511035Z"
 }

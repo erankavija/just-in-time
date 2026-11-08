@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2f755284308b5e033fc6dbd42e76ac9bce061bcc",
+  "completed_at": "2026-11-08T06:41:17.526475119Z",
+  "duration_ms": 224376,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard success criteria are satisfied; production counts, merge deltas, attribution, and recorded budget evidence support completion.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a08c4b38-f5c2-4589-a195-a5ba1a8e6324",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "474cc5af-86b4-4778-ab3a-a4751227e78b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T06:37:33.150325580Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:a08c4b38 — ce7da387c, 0c2cb9b38; individual patches inspected.\nPolicy sources: AGENTS.md; no applicable subtree AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/active/df129d9e-rust-code-quality/plan.md.\nResolved items: @/issue/a08c4b38/requirement/REQ-01, @/issue/a08c4b38/requirement/REQ-02, @/issue/a08c4b38/requirement/REQ-03, @/issue/a08c4b38/requirement/REQ-04 → context issue description; @/issue/df129d9e/requirement/REQ-07, @/issue/df129d9e/requirement/REQ-10, @/issue/df129d9e/decision/D-01, @/issue/df129d9e/decision/D-02 → epic issue description; @/invariant/bounded-rust-build-footprint, @/invariant/essential-code-prose, @/invariant/single-source-prose → .jit/invariants.toml.\nGate evidence: none in supplied context; live code-review pending, exit code none; ancestry unavailable.\nTruncation recovery: narrower policy, report, and patch reads; complete ledger parsed and checked; unrelated historical rows and later Rust changes excluded.\n\nAll four hard criteria are satisfied. Both counting modes reproduce. Every reported epic merge delta matches the canonical counting logic: 125 merges total +306, within the +375 ceiling. Module attribution reconciles, and the report records the required budget fields at its named final commit. No gates were rerun.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard success criteria are satisfied; production counts, merge deltas, attribution, and recorded budget evidence support completion.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

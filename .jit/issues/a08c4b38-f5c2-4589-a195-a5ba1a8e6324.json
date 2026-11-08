@@ -12,12 +12,46 @@
     "fba8d478-7584-4e01-b7ee-b763a177a56f"
   ],
   "description": "Close the epic with a measured report: production lines of `crates/jit/src` before and after, per module, and the build-footprint budgets re-measured after the harness change.\n\n## Background\n\n`dev/active/df129d9e-rust-code-quality/line-count-baseline.md` records the before figures, their commit and the `scripts/production-lines.py` commands, in the default (survey-described) mode with the flagged mode beside it. Line-count reduction is evidence for this epic, not its pass condition: where a boundary fix and a smaller count disagree, the boundary wins, and the report records the delta. The integration harness moved into `jit`'s `test-support` surface, so the `bounded-rust-build-footprint` budgets (integration targets and active test-executable bytes, on the `rust-build-budget:` line of `scripts/rust-build-budget.sh`) must be re-measured. The last line before the change read `integration-targets=10/12 active-executables=14 bytes=1743471112/2147483648`.\n\n## Success Criteria\n\n- [hard] REQ-01: `dev/active/df129d9e-rust-code-quality/completion-report.md` tabulates production lines per top-level module of `crates/jit/src` at the baseline commit and at a named final commit, with per-module and total deltas, in the default mode as the REQ-10 evidence and the flagged mode beside it, produced by the same counter and commands as the baseline.\n- [hard] REQ-02: The report quotes a `rust-build-budget:` success line measured at the final commit, including the integration-target count, active-executable bytes and the `main.rs` line field, beside the pre-change line.\n- [hard] REQ-03: The report attributes the largest module deltas to this epic's work or to named concurrent issues.\n- [hard] REQ-04: The report lists the first-parent production-line delta of every df129d9e merge on `main` against baseline dc2ea8706, in default mode, and their sum. The sum is at or below +375 (epic REQ-10, plan D-54), and the crate total at the final commit is reported beside it.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "907eb0dd1a68642ca5e2e63d5a1130bd97976ab48a89eb86af30ce31a90476d8",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "line-count-baseline.md",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/line-count-baseline.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "723c94a1b184f96b951dbe4fd95bfcec33eb20f90c04742b02b257c1a711c8f6",
+          "is_shared": false,
+          "mime_type": "text/plain",
+          "original_path": "ledger-final.txt",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/ledger-final.txt"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/df129d9e-rust-code-quality/completion-report.md"
+    }
+  ],
+  "done_at": "2026-11-08T06:41:29.561288046Z",
   "first_ready_at": "2026-11-08T04:49:39.801904008Z",
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "474cc5af-86b4-4778-ab3a-a4751227e78b",
+      "status": "passed",
+      "updated_at": "2026-11-08T06:41:17.528093948Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a08c4b38-f5c2-4589-a195-a5ba1a8e6324",
   "labels": [
     "type:task",
@@ -29,7 +63,7 @@
     "satisfies:df129d9e/REQ-10"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Write the df129d9e completion report",
-  "updated_at": "2026-11-08T04:50:27.635829464Z"
+  "updated_at": "2026-11-08T06:41:29.587980905Z"
 }
