@@ -30,7 +30,8 @@ THRESHOLDS = {
     "profile_tip_dir_opens_over_base_max": 0.6,
     "bulk_base_slope_ratio_min": 2.5,
 }
-SLOPE_SPAN = 30  # 40 - 10 matches or candidates
+BULK_MATCHES = (10, 160)
+ARCHIVE_CANDIDATES = (10, 40)
 
 
 def load(path: Path) -> object:
@@ -81,13 +82,17 @@ def derive(raw: Path) -> dict[str, object]:
     def count(binary: str, point: str, key: str) -> float:
         return statistics.median(c[key] for c in counted[binary, point])
 
-    def slope(binary: str, low: str, high: str) -> float:
-        return round((ms(binary, high) - ms(binary, low)) / SLOPE_SPAN, 4)
+    def slope(binary: str, low: str, high: str, span: int) -> float:
+        return round((ms(binary, high) - ms(binary, low)) / span, 4)
+
+    bulk_low, bulk_high = BULK_MATCHES
+    bulk_span = bulk_high - bulk_low
+    archive_low, archive_high = ARCHIVE_CANDIDATES
 
     metrics = {}
     for b in binaries:
-        s500 = slope(b, "bulk/N500-M10", "bulk/N500-M40")
-        s2000 = slope(b, "bulk/N2000-M10", "bulk/N2000-M40")
+        s500 = slope(b, f"bulk/N500-M{bulk_low}", f"bulk/N500-M{bulk_high}", bulk_span)
+        s2000 = slope(b, f"bulk/N2000-M{bulk_low}", f"bulk/N2000-M{bulk_high}", bulk_span)
         profile = {key: count(b, "profile/package48", key) for key in (
             "dir_opens", "dir_opens_inside", "dir_opens_outside",
             "fsyncs", "fsyncs_dir", "fsyncs_file")}
@@ -96,7 +101,8 @@ def derive(raw: Path) -> dict[str, object]:
                           if binary == b},
             "bulk": {"s500_ms": s500, "s2000_ms": s2000, "slope_ratio": ratio(s2000, s500)},
             "archive": {
-                "per_candidate_ms": slope(b, "archive/C10", "archive/C40"),
+                "per_candidate_ms": slope(b, f"archive/C{archive_low}", f"archive/C{archive_high}",
+                                      archive_high - archive_low),
                 "config_opens_c10": count(b, "archive/C10", "config_opens"),
                 "config_opens_c40": count(b, "archive/C40", "config_opens"),
             },

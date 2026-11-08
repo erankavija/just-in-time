@@ -18,7 +18,7 @@ set -euo pipefail
 #     runs every point below once per binary, alternating which binary goes first,
 #     each run on a fresh copy of the point's pristine fixture at one fixed path:
 #       bulk     timed `jit issue update --filter label:bench:match
-#                --state in_progress --json`, M in {10, 40} matches among N in
+#                --state in_progress --json`, M in {10, 160} matches among N in
 #                {500, 2000} ready issues
 #       archive  timed `jit archive candidates --json` over C in {10, 40} done
 #                epics, each over one done task, beside 30 open epics of 50 tasks,
@@ -136,7 +136,7 @@ bins = {b: work / "bin" / f"jit-{b}" for b in binaries}
 env = {"PATH": os.environ["PATH"], "HOME": os.environ["HOME"], "LC_ALL": "C"}
 run_dir = work / "run"
 
-BULK = [(n, m) for n in (500, 2000) for m in (10, 40)]
+BULK = [(n, m) for n in (500, 2000) for m in (10, 160)]
 ARCHIVE = (10, 40)
 ARCHIVE_OPEN_EPICS, ARCHIVE_TASKS_PER_OPEN_EPIC = 30, 50
 EVENT_LINES, EVENT_ISSUES = 18482, 1589
