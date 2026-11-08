@@ -404,6 +404,14 @@ pub enum ArtifactEvidenceError {
     InvalidMarker { path: String },
 }
 
+/// File name of the marker that binds an archive destination to its container.
+const CONTAINER_MARKER_FILE: &str = ".jit-container";
+
+/// Path of the container marker under `root`.
+pub fn container_marker_path(root: &str) -> String {
+    format!("{root}/{CONTAINER_MARKER_FILE}")
+}
+
 /// Resolve marker ownership, legacy fallback, and preferred placement from closed evidence.
 pub fn resolve_container_destination(
     preferred_root: &str,
@@ -441,7 +449,7 @@ pub fn resolve_container_destination(
             required_resolution_evidence(evidence, child)?,
             ArtifactEvidence::Directory { .. }
         ) {
-            let marker = format!("{child}/.jit-container");
+            let marker = container_marker_path(child);
             if matches!(
                 required_resolution_evidence(evidence, &marker)?,
                 ArtifactEvidence::File(owner) if owner.trim_ascii() == container_id.as_str().as_bytes()
@@ -583,7 +591,7 @@ fn container_destination_from_evidence(
             entries
         }
     };
-    let marker_path = format!("{destination_root}/.jit-container");
+    let marker_path = container_marker_path(destination_root);
     match required_resolution_evidence(evidence, &marker_path)? {
         ArtifactEvidence::Symlink => return Ok(ContainerDestinationState::Symlink),
         ArtifactEvidence::File(owner) => {
@@ -2457,7 +2465,7 @@ mod tests {
             });
             markers.into_iter().for_each(|(root, owner)| {
                 evidence.insert(
-                    format!("{root}/.jit-container"),
+                    container_marker_path(root),
                     ArtifactEvidence::File(owner.into_bytes()),
                 );
             });
@@ -2509,10 +2517,7 @@ mod tests {
                 legacy.clone(),
                 directory(ArtifactListingScope::MetadataOnly, &[]),
             ),
-            (
-                format!("{legacy}/.jit-container"),
-                ArtifactEvidence::Missing,
-            ),
+            (container_marker_path(&legacy), ArtifactEvidence::Missing),
         ]);
         let adopted =
             resolve_container_destination(&preferred, &legacy, &issue.id, &occupied).unwrap();
@@ -2590,7 +2595,7 @@ mod tests {
                 &evidence,
             ),
             Err(ArtifactEvidenceError::IncompleteEvidence {
-                path: "archive/unmarked/.jit-container".into(),
+                path: container_marker_path("archive/unmarked"),
             })
         );
     }
@@ -2660,7 +2665,7 @@ mod tests {
                     "archive".into(),
                     directory(ArtifactListingScope::RecursiveFiles, &entries),
                 ),
-                ("archive/.jit-container".into(), ArtifactEvidence::Missing),
+                (container_marker_path("archive"), ArtifactEvidence::Missing),
             ]);
             let facts = classification_facts_from_evidence(
                 &PlanTarget::Container {
@@ -2734,7 +2739,7 @@ mod tests {
                 ("archive".into(), root),
             ]);
             if let Some(marker) = marker {
-                evidence.insert("archive/.jit-container".into(), marker);
+                evidence.insert(container_marker_path("archive"), marker);
             }
             let facts = classification_facts_from_evidence(
                 &PlanTarget::Container {

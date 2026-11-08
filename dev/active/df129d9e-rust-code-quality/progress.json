@@ -699,13 +699,14 @@
           "short_id": "afd2d573",
           "title": "Bring the bootstrap audit-replay test under the unit limit",
           "classification": "implementation",
-          "status": "review",
+          "status": "rework",
           "model_tier": "sonnet",
           "tier_reason": "single-test cost cut reusing 0b35be66 mechanism",
           "dispatched": "2026-11-08T04:33+02:00",
           "worktree": ".agents/worktrees/agent-afd2d573",
           "branch": "worktree-agent-afd2d573",
-          "branch_head": "f89fe20ba"
+          "branch_head": "f89fe20ba",
+          "rework_note": "join through test_utils::join_reraising after merging main"
         },
         {
           "key": "near-limit-tests",
@@ -713,7 +714,10 @@
           "short_id": "7909527f",
           "title": "Bring the three near-limit unit tests under 1.5 s",
           "classification": "implementation",
-          "status": "ready"
+          "status": "in_progress",
+          "model_tier": "sonnet",
+          "dispatched": "2026-11-08T05:04+02:00",
+          "branch": "worktree-agent-7909527f"
         }
       ]
     },
@@ -1066,7 +1070,8 @@
     "755964b2": 1,
     "fe3ad1b0": 1,
     "f487aeef": 1,
-    "0b35be66": 1
+    "0b35be66": 1,
+    "afd2d573": 1
   },
   "surfaced_pitfalls": [
     {

@@ -23,7 +23,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Bring the three near-limit unit tests under 1.5 s",
-  "updated_at": "2026-11-08T03:03:25.868537688Z"
+  "updated_at": "2026-11-08T03:03:39.911811046Z"
 }
