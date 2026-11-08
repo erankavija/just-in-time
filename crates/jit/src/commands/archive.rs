@@ -3,7 +3,7 @@
 use super::CommandExecutor;
 use super::{capture_or_retry, with_mutation_session, with_read_session, SessionStep};
 use crate::domain::archive_advisory::{
-    planned_sources, ArchiveAdvisory, ArchiveExecutionReport, ArchivePreview,
+    planned_sources, AppliedChanges, ArchiveAdvisory, ArchiveExecutionReport, ArchivePreview,
 };
 use crate::domain::artifact_classifier::{
     classification_facts_from_evidence, classify_artifacts, container_marker_path,
@@ -479,7 +479,11 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                 Ok(Some((plans, base.documentation.citation_scan_roots())))
             },
         )?;
-        let advisory = self.advise(&roots, &plans.iter().collect::<Vec<_>>())?;
+        let advisory = self.advise(
+            &roots,
+            &plans.iter().collect::<Vec<_>>(),
+            &AppliedChanges::default(),
+        )?;
         Ok(ArchiveCandidates::new(plans, advisory))
     }
 
@@ -506,20 +510,26 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                     .plan_archive_target(session, &base, image, target)?
                     .map(|(_, plan, _)| (plan, base.documentation.citation_scan_roots())))
             })?;
-        let advisory = self.advise(&roots, &[&plan])?;
+        let advisory = self.advise(&roots, &[&plan], &AppliedChanges::default())?;
         Ok(ArchivePreview { plan, advisory })
     }
 
     /// The advisory report for `plans`, the command's final admitted plans,
-    /// from one scan of `roots` over their artifact sources. The scan runs once
-    /// per command, after planning settles, and reads live files outside the
-    /// guarded image and its capture budget, because nothing the command
-    /// writes derives from it.
-    fn advise(&self, roots: &[String], plans: &[&ArtifactPlan]) -> Result<ArchiveAdvisory> {
+    /// from one scan of `roots` over their artifact sources, read as they
+    /// stood before `applied`. The scan runs once per command, after planning
+    /// settles, and reads live files outside the guarded image and its capture
+    /// budget, because nothing the command writes derives from it.
+    fn advise(
+        &self,
+        roots: &[String],
+        plans: &[&ArtifactPlan],
+        applied: &AppliedChanges,
+    ) -> Result<ArchiveAdvisory> {
         let index = scan_citation_index(
             &self.exec.storage,
             roots,
             planned_sources(plans.iter().copied()),
+            applied,
         )?;
         Ok(index.advise(plans.iter().copied()))
     }
@@ -863,7 +873,8 @@ impl ArchiveOps<'_, JsonFileStorage> {
     }
 
     /// The advisory citations come from one scan over the plan the committed
-    /// attempt applied, after it applied.
+    /// attempt applied, after it applied, reading the citation roots as they
+    /// stood before it.
     fn execute_archive_target(&self, target: ArchiveTarget<'_>) -> Result<ArchiveExecutionReport> {
         let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
@@ -908,7 +919,8 @@ impl ArchiveOps<'_, JsonFileStorage> {
                 Ok(SessionStep::Apply(materialization, applied))
             },
         )?;
-        let advisory = self.advise(&roots, &[&plan])?;
+        let applied = AppliedChanges::of(&plan, &result);
+        let advisory = self.advise(&roots, &[&plan], &applied)?;
         Ok(ArchiveExecutionReport { result, advisory })
     }
 }
@@ -1593,17 +1605,23 @@ mod tests {
         );
     }
 
-    /// A repository whose one managed document `fixtures/root.md` is cited
-    /// in `notes/cite.md`, the declared citation scan root.
+    /// A repository whose managed document `fixtures/root.md` is cited in
+    /// `notes/cite.md` and itself cites `fixtures/appendix.md`, its relocating
+    /// bundle member; both directories are declared citation scan roots.
     fn cited_document_repository() -> (tempfile::TempDir, CommandExecutor<JsonFileStorage>) {
         let config = format!(
-            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\ncitation_scan_roots = [\"notes\"]\n",
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\ncitation_scan_roots = [\"notes\", \"fixtures\"]\n",
             test_taxonomy().config_fragment()
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
         fs::create_dir_all(repo.path().join("fixtures")).unwrap();
         fs::create_dir_all(repo.path().join("notes")).unwrap();
-        fs::write(repo.path().join("fixtures/root.md"), "# Root\n").unwrap();
+        fs::write(
+            repo.path().join("fixtures/root.md"),
+            "# Root\nSee [the appendix](appendix.md), `fixtures/appendix.md`.\n",
+        )
+        .unwrap();
+        fs::write(repo.path().join("fixtures/appendix.md"), "# Appendix\n").unwrap();
         fs::write(
             repo.path().join("notes/cite.md"),
             "See `fixtures/root.md`.\n",
@@ -1643,7 +1661,8 @@ mod tests {
     }
 
     #[test]
-    fn test_execute_reports_the_preview_advisory_without_capturing_the_citing_file() {
+    fn test_execute_reports_the_preview_advisory_for_relocating_citing_files_without_capturing_them(
+    ) {
         let (_repo, executor) = cited_document_repository();
 
         let preview = executor
@@ -1657,8 +1676,14 @@ mod tests {
             "the citing file stays out of the guarded image and its budget"
         );
         assert!(
-            !preview.advisory.citations.is_empty(),
-            "the fixture cites the moving source"
+            preview
+                .advisory
+                .citations
+                .iter()
+                .flat_map(|citations| &citations.locations)
+                .any(|location| location.citing == "fixtures/root.md"),
+            "a relocating file cites a relocating artifact: {:?}",
+            preview.advisory
         );
         let executed = executor
             .archive()

@@ -1,7 +1,7 @@
 //! No-follow inspection of repository paths, and the advisory citation scan
 //! built on it.
 
-use crate::domain::archive_advisory::{CitationIndex, CitationScanner};
+use crate::domain::archive_advisory::{AppliedChanges, CitationIndex, CitationScanner};
 use crate::domain::artifact_classifier::contains_path;
 use crate::domain::artifact_discovery::{ArtifactEvidence, ArtifactListingScope};
 use crate::domain::artifact_plan::normalize_artifact_path;
@@ -29,6 +29,11 @@ use std::io::{ErrorKind, Read};
 /// contributes that file; a root naming a directory contributes every readable
 /// file beneath it; a root nested in another declared root is walked once.
 ///
+/// `applied` names what an execution changed before the scan, so the roots are
+/// read as they stood before it: a file the execution created is skipped, and
+/// a removed source within a root is read at its destination under its source
+/// path.
+///
 /// The walk is [`inspect_artifact_evidence`]'s recursive listing, which opens
 /// every component with no-follow directory handles, so the scan escapes the
 /// repository through no symbolic link and starts no external process.
@@ -36,6 +41,7 @@ pub(crate) fn scan_citation_index<S: IssueStore>(
     storage: &S,
     roots: &[String],
     sources: impl IntoIterator<Item = String>,
+    applied: &AppliedChanges,
 ) -> Result<CitationIndex, PathReadError> {
     let scanner = CitationScanner::new(sources).map_err(other)?;
     let roots = roots
@@ -44,7 +50,11 @@ pub(crate) fn scan_citation_index<S: IssueStore>(
         .filter(|root| !root.is_empty())
         .collect::<BTreeSet<_>>();
     let mut index = CitationIndex::default();
-    let mut record = |path: &str, bytes: &[u8]| scanner.scan(path, bytes, &mut index);
+    let mut record = |path: &str, bytes: &[u8]| {
+        if !applied.is_created(path) {
+            scanner.scan(path, bytes, &mut index);
+        }
+    };
     for root in roots.iter().filter(|root| {
         !roots
             .iter()
@@ -65,6 +75,14 @@ pub(crate) fn scan_citation_index<S: IssueStore>(
                 }
             }
             _ => {}
+        }
+    }
+    for (source, destination) in applied
+        .moved()
+        .filter(|(source, _)| roots.iter().any(|root| contains_path(root, source)))
+    {
+        if let Some((_, bytes)) = read_scanned_file(storage, destination.to_string())? {
+            scanner.scan(source, &bytes, &mut index);
         }
     }
     Ok(index)
@@ -354,11 +372,16 @@ mod tests {
             .iter()
             .map(|root| (*root).to_string())
             .collect::<Vec<_>>();
-        scan_citation_index(storage, &roots, [CITED_SOURCE.to_string()])
-            .unwrap()
-            .citations(CITED_SOURCE)
-            .map(|location| location.citing.clone())
-            .collect()
+        scan_citation_index(
+            storage,
+            &roots,
+            [CITED_SOURCE.to_string()],
+            &AppliedChanges::default(),
+        )
+        .unwrap()
+        .citations(CITED_SOURCE)
+        .map(|location| location.citing.clone())
+        .collect()
     }
 
     fn paths(paths: &[&str]) -> BTreeSet<String> {
@@ -543,5 +566,71 @@ mod tests {
         // The undecodable file carries the cited path in its bytes, so a lossy
         // read would report it; only the text file is.
         assert_eq!(citing, paths(&["scripts/real.sh"]));
+    }
+
+    #[test]
+    fn test_scan_citation_index_after_an_execution_reads_the_roots_as_they_stood_before_it() {
+        use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
+        use crate::domain::artifact_plan::{
+            ArtifactAction, ArtifactPlan, ArtifactPlanEntry, ArtifactVersion, ContentIdentity,
+            PlanTarget, PolicyStatus,
+        };
+        let (repo, storage) = repository();
+        let (moved, destination, created) = (
+            "scripts/moved.sh",
+            "archive/scripts/moved.sh",
+            "scripts/created.sh",
+        );
+        write(&repo, moved, citation());
+        write(&repo, "scripts/stays.sh", citation());
+        let roots = ["scripts".to_string()];
+        let scan = |applied: &AppliedChanges| {
+            scan_citation_index(&storage, &roots, [CITED_SOURCE.to_string()], applied).unwrap()
+        };
+        let before = scan(&AppliedChanges::default());
+
+        // The execution relocates one citing file out of the root, byte for
+        // byte, and creates another citing file inside it.
+        fs::create_dir_all(repo.path().join("archive/scripts")).unwrap();
+        fs::rename(repo.path().join(moved), repo.path().join(destination)).unwrap();
+        write(&repo, created, citation());
+        let identity = ContentIdentity::from_bytes(citation().as_bytes());
+        let plan = ArtifactPlan::new(
+            PlanTarget::Document { path: moved.into() },
+            "archive",
+            PolicyStatus::Configured,
+            vec![
+                ArtifactPlanEntry::new(moved, ArtifactVersion::WorkingTree, ArtifactAction::Move)
+                    .with_destination(destination)
+                    .with_content_identity(identity.clone()),
+            ],
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap();
+        let publication = |source: Option<&str>, destination: &str| ArchivePublication {
+            source: source.map(str::to_string),
+            destination: destination.to_string(),
+            content_identity: identity.clone(),
+            adopted: false,
+        };
+        let result = ArchiveExecutionResult {
+            schema_version: 1,
+            target: plan.target().clone(),
+            destination_root: "archive".into(),
+            publications: vec![
+                publication(Some(moved), destination),
+                publication(None, created),
+            ],
+            reference_changes: Vec::new(),
+            planned_deletions: Vec::new(),
+            deleted_sources: vec![moved.to_string()],
+            plan_warnings: Vec::new(),
+            event_appended: true,
+            reconciling: false,
+        };
+
+        assert_eq!(before.citations(CITED_SOURCE).count(), 2);
+        assert_eq!(scan(&AppliedChanges::of(&plan, &result)), before);
     }
 }

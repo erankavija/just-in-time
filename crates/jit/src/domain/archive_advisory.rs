@@ -2,7 +2,7 @@
 //! relocating artifact. The report reads files outside the plan's captured
 //! image, so no plan or write derives from it.
 
-use crate::document::{classify_link_target, LinkTarget};
+use crate::document::{LinkType, LinkValidator};
 use crate::domain::artifact_execution::ArchiveExecutionResult;
 use crate::domain::artifact_plan::{ArtifactAction, ArtifactPlan};
 use crate::domain::relative_path::RootRelativePath;
@@ -105,6 +105,57 @@ impl CitationIndex {
     }
 }
 
+/// What an applied archive execution changed among repository files, so a
+/// scan after it reads the citation roots as they stood before it.
+///
+/// Execution rewrites no content, so a removed source survives byte for byte
+/// at its destination.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AppliedChanges {
+    /// Destinations this execution created.
+    created: BTreeSet<String>,
+    /// Each source this execution removed, with the destination holding its bytes.
+    moved: BTreeMap<String, String>,
+}
+
+impl AppliedChanges {
+    /// The changes `result` reports for the execution of `plan`. A
+    /// publication adopting identical content creates nothing.
+    pub fn of(plan: &ArtifactPlan, result: &ArchiveExecutionResult) -> Self {
+        Self {
+            created: result
+                .publications
+                .iter()
+                .filter(|publication| !publication.adopted)
+                .map(|publication| publication.destination.clone())
+                .collect(),
+            moved: result
+                .deleted_sources
+                .iter()
+                .filter_map(|source| {
+                    plan.artifacts()
+                        .iter()
+                        .find(|artifact| artifact.source() == source)
+                        .and_then(|artifact| artifact.destination())
+                        .map(|destination| (source.clone(), destination.to_string()))
+                })
+                .collect(),
+        }
+    }
+
+    /// Whether `path` did not exist before the execution.
+    pub fn is_created(&self, path: &str) -> bool {
+        self.created.contains(path)
+    }
+
+    /// Each removed source with the destination now holding its bytes.
+    pub fn moved(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.moved
+            .iter()
+            .map(|(source, destination)| (source.as_str(), destination.as_str()))
+    }
+}
+
 /// Every artifact source of `plans`: the pattern set one index scan covers.
 pub fn planned_sources<'a>(plans: impl IntoIterator<Item = &'a ArtifactPlan>) -> BTreeSet<String> {
     plans
@@ -117,25 +168,23 @@ pub fn planned_sources<'a>(plans: impl IntoIterator<Item = &'a ArtifactPlan>) ->
 /// Finds citations of a fixed set of candidate sources one file at a time, so
 /// a scan holds only the file it is reading.
 ///
-/// One overlapping multi-pattern search per file finds every occurrence of
-/// every source, plus every Markdown link opener `](`. A source occurrence is
-/// judged on its own line by `is_whole_path_citation`. Per pattern,
-/// occurrences are examined left to right, resuming past the end of each one
-/// examined. That loses no citation: an occurrence starting inside another is
-/// preceded by the cited path's own opening characters, which name path
-/// content, so `is_whole_path_citation` rejects it. A link destination is
-/// resolved from the citing file's directory through
-/// [`RootRelativePath::resolve_link`], which finds a relative link such as
-/// `[plan](plan.md)` that never spells the source; a destination the
-/// whole-path judgement already cites is recorded once. Columns are counted in
-/// characters, so text in any script is located where its reader sees it.
+/// Each file's text is read once and searched two ways. One overlapping
+/// multi-pattern search finds every occurrence of every source, each judged on
+/// its own line by `is_whole_path_citation`. Per source, occurrences are
+/// examined left to right, resuming past the end of each one examined. That
+/// loses no citation: an occurrence starting inside another is preceded by the
+/// cited path's own opening characters, which name path content, so
+/// `is_whole_path_citation` rejects it. The text's Markdown links, from
+/// [`LinkValidator::scan_links`], are resolved from the citing file's
+/// directory through [`RootRelativePath::resolve_link`], which finds a link
+/// such as `[plan](plan.md)` that never spells the source; a link whose
+/// destination text already holds a whole-path citation of the source it
+/// resolves to is not counted again. Columns are counted in characters, so
+/// text in any script is located where its reader sees it.
 pub struct CitationScanner {
     sources: Vec<String>,
     automaton: aho_corasick::AhoCorasick,
 }
-
-/// The pattern opening a Markdown inline link destination.
-const LINK_OPENER: &str = "](";
 
 impl CitationScanner {
     /// A scanner for `sources`; an empty source cites nothing and is dropped.
@@ -149,9 +198,7 @@ impl CitationScanner {
             .into_iter()
             .collect::<Vec<_>>();
         Ok(Self {
-            automaton: aho_corasick::AhoCorasick::new(
-                sources.iter().map(String::as_str).chain([LINK_OPENER]),
-            )?,
+            automaton: aho_corasick::AhoCorasick::new(&sources)?,
             sources,
         })
     }
@@ -163,86 +210,76 @@ impl CitationScanner {
         let Ok(text) = std::str::from_utf8(bytes) else {
             return;
         };
+        let whole_paths = self.whole_path_citations(text);
         let directory = RootRelativePath::parse(citing)
             .ok()
             .and_then(|path| path.split_leaf().map(|(parent, _)| parent))
             .unwrap_or(RootRelativePath::Root);
+        let linked = LinkValidator::scan_links(text)
+            .into_iter()
+            .filter_map(|link| {
+                let resolved = match link.link_type {
+                    LinkType::RootRelative => RootRelativePath::Root.resolve_link(&link.target),
+                    LinkType::Relative => directory.resolve_link(&link.target),
+                    LinkType::Anchor => None,
+                }?;
+                let source = self.sources.binary_search(&resolved).ok()?;
+                (!whole_paths
+                    .iter()
+                    .any(|(cited, offset, ..)| *cited == source && link.span.contains(offset)))
+                .then_some((source, link.line_number, link.column))
+            })
+            .collect::<Vec<_>>();
+        whole_paths
+            .iter()
+            .map(|(source, _, line, column)| (*source, *line, *column))
+            .chain(linked)
+            .for_each(|(source, line, column)| {
+                index
+                    .0
+                    .entry(self.sources[source].clone())
+                    .or_default()
+                    .insert(CitationLocation {
+                        citing: citing.to_string(),
+                        line,
+                        column,
+                    });
+            });
+    }
+
+    /// Every whole-path citation in `text`, as its source's index, byte offset,
+    /// 1-based line and character column.
+    fn whole_path_citations(&self, text: &str) -> Vec<(usize, usize, usize, usize)> {
         let mut occurrences = self
             .automaton
             .find_overlapping_iter(text)
             .map(|found| (found.start(), found.pattern().as_usize()))
             .collect::<Vec<_>>();
         occurrences.sort_unstable();
-        let mut examined_until = vec![0; self.sources.len() + 1];
+        let mut examined_until = vec![0; self.sources.len()];
         let mut line = TextLine::default();
-        for (offset, index_of) in occurrences {
-            let pattern = self
-                .sources
-                .get(index_of)
-                .map_or(LINK_OPENER, String::as_str);
-            if offset < examined_until[index_of] {
+        let mut citations = Vec::new();
+        for (offset, index) in occurrences {
+            let source = &self.sources[index];
+            if offset < examined_until[index] {
                 continue;
             }
-            examined_until[index_of] = offset + pattern.len();
+            examined_until[index] = offset + source.len();
             line.advance_to(text, offset);
             let content = line.content(text);
             let within = offset - line.start;
-            if within + pattern.len() > content.len() {
-                continue;
-            }
-            let cited = match self.sources.get(index_of) {
-                Some(source) => {
-                    is_whole_path_citation(content, within, source).then_some((source, within))
-                }
-                None => self.linked_source(&directory, content, within + LINK_OPENER.len()),
-            };
-            if let Some((source, start)) = cited {
-                index
-                    .0
-                    .entry(source.clone())
-                    .or_default()
-                    .insert(CitationLocation {
-                        citing: citing.to_string(),
-                        line: line.number,
-                        column: content[..start].chars().count() + 1,
-                    });
+            if within + source.len() <= content.len()
+                && is_whole_path_citation(content, within, source)
+            {
+                citations.push((
+                    index,
+                    offset,
+                    line.number,
+                    content[..within].chars().count() + 1,
+                ));
             }
         }
-    }
-
-    /// The candidate source the link destination starting at byte `start` of
-    /// `line` resolves to from `directory`, with that start, unless the
-    /// whole-path judgement already cites the source the destination ends with.
-    fn linked_source(
-        &self,
-        directory: &RootRelativePath,
-        line: &str,
-        start: usize,
-    ) -> Option<(&String, usize)> {
-        let rest = &line[start..];
-        let destination = &rest[..rest
-            .find(|character: char| character == ')' || character.is_whitespace())
-            .unwrap_or(rest.len())];
-        let Some(LinkTarget::Local(path)) = classify_link_target(destination) else {
-            return None;
-        };
-        let resolved = match path.strip_prefix('/') {
-            Some(rooted) => RootRelativePath::Root.resolve_link(rooted),
-            None => directory.resolve_link(path),
-        }?;
-        self.sources
-            .binary_search(&resolved)
-            .ok()
-            .map(|found| &self.sources[found])
-            .filter(|source| {
-                !(destination.ends_with(source.as_str())
-                    && is_whole_path_citation(
-                        line,
-                        start + destination.len() - source.len(),
-                        source,
-                    ))
-            })
-            .map(|source| (source, start))
+        citations
     }
 }
 
@@ -675,42 +712,62 @@ mod tests {
     }
 
     #[test]
-    fn test_citation_scanner_scan_resolves_relative_and_root_relative_markdown_link_destinations() {
-        let files = [
+    fn test_citation_scanner_scan_records_each_markdown_link_resolving_to_a_source_once() {
+        // Links that never spell the source whole, one per file, each recorded
+        // where the link's destination is written.
+        let linked = [
             ("dev/active/sibling.md", "See [the plan](plan.md#goal).\n"),
-            ("dev/notes/nested.md", "See [the plan](../active/./plan.md).\n"),
-            ("notes/rooted.md", "See [the plan](/dev/active/plan.md).\n"),
-            ("notes/spelled.md", "See [the plan](dev/active/plan.md).\n"),
             (
-                "notes/unresolved.md",
-                "[up](../../escape.md) [web](https://example.com/plan.md) [here](#plan) [other](plan.md)\n",
+                "dev/notes/nested.md",
+                "See [the plan](../active/./plan.md).\n",
+            ),
+            (
+                "dev/notes/angle.md",
+                "See [the plan](<../active/plan.md>).\n",
+            ),
+            ("notes/rooted.md", "See [the plan](/dev/active/plan.md).\n"),
+            (
+                "dev/notes/reference.md",
+                "See [the plan][p] and [again][p].\n\n[p]: ../active/plan.md\n",
             ),
         ];
+        // A link the whole-path search already cites, and links resolving
+        // elsewhere.
+        let spelled = ("notes/both.md", "See [the plan](../dev/active/plan.md).\n");
+        let elsewhere = (
+            "notes/unresolved.md",
+            "[up](../../escape.md) [web](https://example.com/plan.md) [here](#plan) [other](plan.md)\n",
+        );
+        let files = linked
+            .iter()
+            .copied()
+            .chain([spelled, elsewhere])
+            .collect::<Vec<_>>();
 
         let located = cited_located(&[CITED_SOURCE], &files);
 
-        // Each link resolving to the source is one location at its destination;
-        // a destination spelling the source whole is not counted twice, and
-        // links resolving elsewhere record nothing.
-        let citing = located
-            .iter()
-            .map(|(citing, ..)| citing.as_str())
-            .collect::<Vec<_>>();
-        assert_eq!(
-            citing,
-            [
-                "dev/active/sibling.md",
-                "dev/notes/nested.md",
-                "notes/rooted.md",
-                "notes/spelled.md",
-            ]
-        );
-        for location in &located {
-            let destination_start = cited_line(&files, location)
-                .find("](")
-                .map(|offset| offset + 3);
-            assert_eq!(Some(location.2), destination_start, "{location:?}");
+        for (citing, _) in linked {
+            let at = located
+                .iter()
+                .filter(|(cited, ..)| cited == citing)
+                .collect::<Vec<_>>();
+            assert_eq!(at.len(), 1, "{citing} cites the source once: {at:?}");
+            let from = cited_line(&files, at[0])
+                .chars()
+                .skip(at[0].2 - 1)
+                .collect::<String>();
+            assert!(
+                from.starts_with('['),
+                "{citing} is located at its link: {from}"
+            );
         }
+        let both = located
+            .iter()
+            .filter(|(cited, ..)| cited == spelled.0)
+            .collect::<Vec<_>>();
+        assert_eq!(both.len(), 1, "a spelled link is one citation: {both:?}");
+        assert!(reads_back(&files, both[0], CITED_SOURCE));
+        assert!(located.iter().all(|(cited, ..)| cited != elsewhere.0));
     }
 
     /// Whether the one occurrence of the cited path in `line` cites it.
