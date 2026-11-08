@@ -30,7 +30,7 @@ set -euo pipefail
 #  75 — infrastructure fault (EX_TEMPFAIL): a compiler wrapper Cargo would use
 #       cannot run, so no step ran; or every failing step is
 #       environment-sensitive and either a step ran out of disk space (ENOSPC)
-#       or the host was loaded while the suite ran
+#       or the host was loaded while the tests ran
 #
 # Exit 75 is the exec-checker convention that records an `error` gate run
 # instead of `failed`. An `error` run never passes and is never reused through
@@ -41,18 +41,17 @@ set -euo pipefail
 #     own output, no compiler error, rustfmt diff or budget violation beyond
 #     the ENOSPC line. ENOSPC makes the run exit 75 whatever the load baseline,
 #   - `test` with at least one nextest TIMEOUT result and no FAIL or ABORT
-#     result, or
-#   - `budget` whose only violation is the suite-duration budget.
+#     result: a test over its layer's per-test limit (.config/nextest.toml).
 # Any other failing step (fmt, clippy, doctest, excluded-tests, a test FAIL, a
-# footprint budget violation, a reporter failure) makes the run a verdict.
-# The load rule below applies to the TIMEOUT and duration cases only.
+# budget violation, a reporter failure) makes the run a verdict.
+# The load rule below applies to the TIMEOUT case only.
 # "Loaded" means the 1-minute load average from /proc/loadavg, sampled before
 # the run's first step, is at least LOAD_THRESHOLD_PER_CPU x `nproc`. The
 # baseline predates the run's own fmt, clippy and build fan-out, so it measures
 # the host alone; a later sample would measure this run. The threshold is the
-# steward's quiet-host bound (load below about 4 on 24 CPUs). A suite-duration
-# overrun or test timeout on a quiet host is a real regression against the
-# change that crossed it and exits 1. The classification line names the
+# steward's quiet-host bound (load below about 4 on 24 CPUs). A test timeout
+# on a quiet host is a real regression against the change that crossed it and
+# exits 1. The classification line names the
 # baseline sample, the threshold and the classification either way.
 #
 # `./scripts/cargo-ci.sh --classify <work-dir> <load1> <cpus> [failed-step...]`
@@ -67,8 +66,7 @@ set -euo pipefail
 #
 # `./scripts/cargo-ci.sh --suite` runs only the suite steps: pinned nextest,
 # doctests, and the excluded-tests check. CI uses it so CI and the gate share one
-# definition of the suite. CI's runners are not the quiet host the suite-duration
-# budget is measured on, so CI does not run the budget step.
+# definition of the suite.
 
 readonly LOAD_THRESHOLD_PER_CPU="0.17"
 
@@ -144,12 +142,6 @@ test_failed_only_by_timeout() {
     ! grep -qE '^[[:space:]]*(FAIL|ABORT) \[' "$1"
 }
 
-# The budget checker listed exactly one violation and it is the suite duration.
-budget_failed_only_by_duration() {
-  [ "$(grep -c '^  - ' "$1" || true)" -eq 1 ] &&
-    grep -q '^  - test suite duration:' "$1"
-}
-
 # Judges the failed steps in $failed_steps against the outputs in $WORK and the
 # baseline load in $baseline_load1 over $cpu_count CPUs; prints the diagnosis and returns
 # the exit status the run takes: 75 for an infrastructure fault, 1 for a verdict.
@@ -164,7 +156,6 @@ classify_failure() {
     fi
     case "$step" in
       test) test_failed_only_by_timeout "$WORK/test.out" ;;
-      budget) budget_failed_only_by_duration "$WORK/budget.out" ;;
       *) false ;;
     esac || {
       echo "cargo-ci: verdict (exit 1): step '$step' failed on repository content"
@@ -249,9 +240,6 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 export TMPDIR="$WORK/tmp"
 mkdir "$TMPDIR"
-
-BUSY_HOST_OVERRIDE_FOR_BUDGET="${BUSY_HOST_OVERRIDE:-}"
-unset BUSY_HOST_OVERRIDE
 
 # Resolve the real cargo binary. Some local setups place a debugging shim at
 # ~/.cargo/bin/cargo that exits 0 for every invocation; without this guard each
@@ -420,8 +408,8 @@ summarize_pass() {
         | tail -1 | sed 's/^rust-build-budget: //'
       ;;
     suite-build | excluded-tests)
-      # These steps end their output with the one observation they made — what
-      # was built and warmed, what the run held out of the default suite. The
+      # These steps end their output with the one observation they made — how
+      # long the build took, what the run held out of the default suite. The
       # persisted summary carries that observation rather than a bare "ok", so
       # gate evidence records the measurement and not just the verdict
       # (jit:0708d692).
@@ -456,15 +444,6 @@ summarize_fail() {
     budget)
       echo "--- $name diagnostics ---"
       tail -40 "$WORK/$name.out"
-      # REQ-05 (jit:0708d692): name the span the failing measurement was taken
-      # over. The costs a cold target pays are compilation and first-touch
-      # executable I/O; the suite-build step pays both before the clock starts
-      # and reports what it did, so quoting that report here lets a reader
-      # separate a slower suite from a colder machine without re-running the
-      # gate and comparing numbers.
-      echo "--- suite-clock scope ---"
-      echo "suite-clock ${suite_clock_ms:-unmeasured} ms spans the test and doctest substeps only."
-      echo "Excluded, and reported by the suite-build step: $(tail -1 "$WORK/suite-build.out")."
       ;;
     clippy)
       echo "--- $name diagnostics ---"
@@ -528,10 +507,12 @@ gate_workspace_root() {
 # authoritative measurement because they describe what this run actually
 # skipped; searching Rust sources would only be a proxy and would also match
 # attributes or fences that do not hold a test out of the default run.
+# nextest decides what it skips when it lists the tests, so a run fail-fast
+# stopped ("N/M tests run") still reports the skipped count.
 check_no_excluded_tests() {
   local reporter skipped ignored
 
-  reporter=$(grep -E 'Summary .* [0-9]+ tests run:' "$WORK/test.out" | tail -1 || true)
+  reporter=$(grep -E 'Summary .* [0-9]+(/[0-9]+)? tests run:' "$WORK/test.out" | tail -1 || true)
   skipped=$(grep -oP '\K[0-9]+(?= skipped)' <<<"$reporter" | tail -1 || true)
   if [ -z "$reporter" ] || ! grep -qP '[0-9]+ passed' <<<"$reporter"; then
     echo "cargo-ci: reporter-contract failure: could not parse pinned nextest success summary for excluded-test measurement" >&2
@@ -583,94 +564,23 @@ if [ "${1:-}" != "--suite" ]; then
   run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D warnings
 fi
 
-# Put the measured suite into the state the clock assumes, before the clock
-# starts (jit:94d85bf1, jit:0708d692): compiled, and read into the page cache.
-#
-# The budget enforced below is defined over an already-built target, so
-# compilation paid inside the clock would fail the gate on every cold one —
-# every fresh clone and every CI runner — with nothing wrong in the tree. The
-# recorded cargo-ci run for jit:6d10e5d4 at commit e2da055a reports a 239,771 ms
-# suite-clock on a tree whose warm clock is an order of magnitude smaller
-# (dev/archive/4b7c06d0-test-suite-performance/benchmarks/provenance-removal-355565c2/README.md), because a
-# dependency-profile change had invalidated every artifact.
-#
-# Compiling here was not enough on its own: measured at one commit on one host,
-# the same passing suite clocked 57,019 ms on a fresh target against 22,541 ms
-# on a warm one, failing and passing one budget for a reason the tree had no
-# part in (dev/benchmarks/cold-warm-verdict-0708d692/README.md). Most of that
-# was compilation this step had not covered, because the suite compiled from
-# inside its own clock.
-#
-# What remains here is the artifacts themselves: nothing has read the
-# executables this step links, so the `test` substep would fault them in while
-# the clock runs. Reading them back costs this step what the page cache no
-# longer holds — 3,430 ms with those executables evicted, 70 ms when the build
-# above just wrote them — and keeps that cost out of the measured span.
-# Reporting it as this step's own also makes the machine's state legible in gate
-# evidence: the warm figure says whether this run found a resident target or a
-# stale one.
-#
-# `cargo nextest run --no-run` links every test binary the `test` substep then
-# executes, and with it the library rlibs and dependencies `cargo test --doc`
-# links against: measured on this workspace, the doctest substep compiles
-# nothing after this step, and repeating this step on a warm target is a no-op.
-# Cargo rejects `cargo test --doc --no-run` ("can't skip running doc tests with
-# --no-run") and exposes no stable way to precompile doctests, so rustdoc's own
-# compilation of each doc fence has no prebuild and stays inside the clock,
-# measured as part of the doctest substep. The same cold/warm measurement shows
-# that substep pays no first-touch cost of its own (4,555 ms cold against
-# 4,552 ms warm), so what this step warms is the executables the `test` substep
-# runs, not every artifact on the way to them.
-#
-# The stream naming those executables is the one the budget step below needs
-# anyway; it is captured once here and handed to that step as --artifacts-json,
-# so one Cargo invocation produces one description of what this run built and
-# both steps read it. That invocation also links the targets `cargo test` builds
-# and `cargo nextest run --no-run` does not, keeping their compilation outside
-# the clock too.
-prepare_measured_suite() {
-  local -a executables=() readable=()
-  local exe size bytes=0 built_ms warm_started_ms
+# Build the product binaries the budget checker inspects and capture the Cargo
+# artifact stream naming this run's test executables, so the budget step judges
+# what this run built rather than what it found on the machine.
+build_suite_artifacts() {
+  local built_ms
   built_ms=$(epoch_milliseconds)
-  # The budget checker inspects the normal product binaries, which test
-  # harness compilation does not guarantee to leave at target/debug/<name>.
   "${NICE_PREFIX[@]}" cargo build --workspace --bins || return 1
-  "${NICE_PREFIX[@]}" cargo nextest run --workspace --no-run || return 1
   "${NICE_PREFIX[@]}" cargo test --workspace --no-run --message-format=json \
     >"$SUITE_ARTIFACTS_JSON" || return 1
-  built_ms=$(( $(epoch_milliseconds) - built_ms ))
-
-  warm_started_ms=$(epoch_milliseconds)
-  mapfile -t executables < <(
-    jq -r 'select(.reason == "compiler-artifact" and .executable != null) | .executable' \
-      "$SUITE_ARTIFACTS_JSON" | LC_ALL=C sort -u
-  )
-  for exe in "${executables[@]}"; do
-    size=$(stat -c %s "$exe" 2>/dev/null) || continue
-    readable+=("$exe")
-    bytes=$((bytes + size))
-  done
-  if [ "${#readable[@]}" -eq 0 ]; then
-    echo "no readable executables in this run's Cargo artifact stream (expected at least one to warm)" >&2
-    return 1
-  fi
-  "${NICE_PREFIX[@]}" cat -- "${readable[@]}" >/dev/null || return 1
-
-  echo "built in ${built_ms} ms, warmed ${#readable[@]} executables (${bytes} bytes) in $(( $(epoch_milliseconds) - warm_started_ms )) ms"
+  echo "built in $(( $(epoch_milliseconds) - built_ms )) ms"
 }
 if [ "${1:-}" != "--suite" ]; then
-  run_step suite-build prepare_measured_suite
+  run_step suite-build build_suite_artifacts
 fi
 
-# The named suite clock is deliberately narrower than the gate duration. It
-# starts immediately before the pinned workspace suite and ends after the
-# separately reported doctest substep, leaving lock acquisition, preflight,
-# formatting, linting, and the suite build above outside it.
-suite_clock_started_ms=$(epoch_milliseconds)
 run_step test    "${NICE_PREFIX[@]}" cargo nextest run --workspace
 run_step doctest "${NICE_PREFIX[@]}" cargo test --doc --workspace
-suite_clock_ms=$(( $(epoch_milliseconds) - suite_clock_started_ms ))
-summary+="  ✓ suite-clock: ${suite_clock_ms} ms"$'\n'
 
 # This judges the run's own skipped/ignored counts, because those reporter
 # measurements answer what the suite actually held out rather than what a
@@ -682,19 +592,12 @@ run_step excluded-tests check_no_excluded_tests
 # integration-target count from `cargo metadata` (which performs no build) and
 # the unique active-executable bytes from the artifact stream the suite-build
 # step captured, handed over as --artifacts-json: the budget then describes
-# exactly the executables this run built, warmed, and ran, and no second Cargo
+# exactly the executables this run built and ran, and no second Cargo
 # build is provoked here at all. It asserts the debug-profile and
 # dependency-feature policies against the committed manifests. It is pointed at
 # the workspace this run compiled rather than left to
 # self-locate from its own path, so the budget verdict describes the same tree
 # the steps above judged.
-#
-# The same step enforces the suite budget (jit:94d85bf1) by handing the checker
-# the suite clock measured above as `--test-suite-ms`. The threshold itself is
-# the checker's own MAX_TEST_SUITE_SECONDS, declared once beside the artifact
-# budgets; this script supplies the measurement, never a second copy of the
-# limit. Without the argument the checker skips its duration check, so the
-# budget would be declared and never enforced.
 CARGO_CI_SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 run_budget_check() {
   local root
@@ -703,9 +606,8 @@ run_budget_check() {
     echo "could not resolve this run's Cargo workspace root" >&2
     return 1
   fi
-  BUSY_HOST_OVERRIDE="$BUSY_HOST_OVERRIDE_FOR_BUDGET" \
-    "${NICE_PREFIX[@]}" "$CARGO_CI_SCRIPT_DIR/rust-build-budget.sh" \
-    --root "$root" --artifacts-json "$SUITE_ARTIFACTS_JSON" --test-suite-ms "$suite_clock_ms"
+  "${NICE_PREFIX[@]}" "$CARGO_CI_SCRIPT_DIR/rust-build-budget.sh" \
+    --root "$root" --artifacts-json "$SUITE_ARTIFACTS_JSON"
 }
 if [ "${1:-}" != "--suite" ]; then
   run_step budget run_budget_check

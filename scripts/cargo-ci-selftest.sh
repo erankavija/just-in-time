@@ -29,6 +29,7 @@ set -uo pipefail
 #                asserts the pre-merge value                    -> step fails
 #   ignored-test a merge holding out a test with #[ignore]       -> excluded-tests fails
 #   ignored-doctest a merge holding out an ```ignore``` doctest  -> excluded-tests fails
+#   over-limit   a test over its layer's per-test limit       -> step fails
 #
 # The exit-status classifier (0/1/75) is driven through `cargo-ci.sh --classify`
 # over synthetic step output and load samples, one assertion per exit path. A
@@ -106,50 +107,9 @@ step_failed() { grep -qF "$STEP_FAILED$2:" "$1"; }
 # avoids fixed-duration expectations.
 all_step_summaries_have_integer_milliseconds() {
   local summaries
-  summaries=$(grep -E '^  [✓✗] [a-z-]+: ' "$1" | awk '$2 != "suite-clock:"')
+  summaries=$(grep -E '^  [✓✗] [a-z-]+: ' "$1")
   [ -n "$summaries" ] &&
     ! grep -Ev '^  [✓✗] [a-z-]+: .+ \([0-9]+ ms\)$' <<<"$summaries"
-}
-
-suite_clock_is_reported() {
-  grep -Eq '^  ✓ suite-clock: [0-9]+ ms$' "$1"
-}
-
-# jit:0708d692: the step that prepares the measured suite keeps the costs of
-# getting there out of the clock — compiling the suite, and reading the
-# executables it linked back into the page cache — and reports both. A run that
-# warmed nothing is the regression this predicate catches; the counts come from
-# the gate's own report of what it did, not from a fixed expectation about a
-# fixture's size.
-suite_preparation_warms_the_linked_executables() {
-  local report warmed bytes
-  report=$(grep -E '^  ✓ suite-build: ' "$1" | tail -1)
-  warmed=$(grep -oP 'warmed \K[0-9]+(?= executables)' <<<"$report")
-  bytes=$(grep -oP 'warmed [0-9]+ executables \(\K[0-9]+' <<<"$report")
-  [ -n "$warmed" ] && [ -n "$bytes" ] && [ "$warmed" -gt 0 ] && [ "$bytes" -gt 0 ]
-}
-
-# Those costs must be paid before the clock starts, which the reported order of
-# the summary lines records: the summary is accumulated step by step.
-suite_preparation_precedes_the_clock() {
-  awk '
-    /^  ✓ suite-build: built in [0-9]+ ms.*warmed [0-9]+ executables/ { prepared = NR }
-    /^  ✓ suite-clock: [0-9]+ ms$/ { clock = NR }
-    END { exit !(prepared && clock && prepared < clock) }
-  ' "$1"
-}
-
-# The scope is a source-order contract rather than an elapsed-time assertion:
-# the timer must bracket the two independently reported suite substeps and
-# close immediately after them. This remains deterministic on loaded hosts.
-suite_clock_has_exact_substep_scope() {
-  awk '
-    /suite_clock_started_ms=\$\(epoch_milliseconds\)/ { start = NR }
-    /run_step test .*cargo nextest run --workspace/ { nextest = NR }
-    /run_step doctest .*cargo test --doc --workspace/ { doctest = NR }
-    /suite_clock_ms=\$\(\(.*suite_clock_started_ms/ { stop = NR }
-    END { exit !(start < nextest && nextest < doctest && doctest < stop) }
-  ' "$gate"
 }
 
 # Real reporter evidence, not just the stable step prefix. The healthy fixture
@@ -216,13 +176,15 @@ EOF
     test ! -e "$unexpected"
 }
 
-# CI's entry point runs the gate's suite steps and nothing else, and a failing
-# suite fails it.
-test_suite_mode_runs_only_the_suite_steps() {
-  local fixture="$scratch/suite-mode" log="$scratch/suite-mode/cargo.log"
-  local out="$scratch/suite-mode/out" rc
-  mkdir -p "$fixture/bin" "$fixture/repo"
-  cat >"$fixture/bin/cargo" <<'EOF'
+# Runs the gate in --suite mode under a Cargo shim whose nextest run prints
+# SELFTEST_SUITE_OUTPUT and exits with the given status; sets rc, and leaves
+# the gate output in $suite_out and the Cargo commands it ran in $suite_log.
+suite_gate() { # suite_gate <nextest status> [nextest output]
+  local fixture="$scratch/suite-mode"
+  suite_log="$fixture/cargo.log" suite_out="$fixture/out"
+  if [ ! -x "$fixture/bin/cargo" ]; then
+    mkdir -p "$fixture/bin" "$fixture/repo"
+    cat >"$fixture/bin/cargo" <<'EOF2'
 #!/usr/bin/env bash
 case "$*" in
   --version) echo "$SELFTEST_CARGO_VERSION" ;;
@@ -230,7 +192,7 @@ case "$*" in
   check*) ;;
   "nextest run --workspace")
     echo "$*" >>"$SELFTEST_CARGO_LOG"
-    echo "Summary [1s] 1 tests run: 1 passed, 0 skipped"
+    printf '%s\n' "$SELFTEST_SUITE_OUTPUT"
     exit "$SELFTEST_SUITE_STATUS"
     ;;
   *)
@@ -238,32 +200,50 @@ case "$*" in
     echo "test result: ok. 1 passed; 0 failed; 0 ignored"
     ;;
 esac
-EOF
-  chmod +x "$fixture/bin/cargo"
-  suite_gate() { # suite_gate <nextest status>; sets rc
-    : >"$log"
-    (
-      cd "$fixture/repo" || exit 3
-      PATH="$fixture/bin:$PATH" \
-        SELFTEST_CARGO_VERSION="$real_cargo_version" \
-        SELFTEST_CARGO_LOG="$log" \
-        SELFTEST_SUITE_STATUS="$1" \
-        CARGO_CI_NO_LOCK=1 \
-        CARGO_CI_NO_SCCACHE=1 \
-        "$gate" --suite
-    ) >"$out" 2>&1
-    rc=$?
-  }
+EOF2
+    chmod +x "$fixture/bin/cargo"
+  fi
+  : >"$suite_log"
+  (
+    cd "$fixture/repo" || exit 3
+    PATH="$fixture/bin:$PATH" \
+      SELFTEST_CARGO_VERSION="$real_cargo_version" \
+      SELFTEST_CARGO_LOG="$suite_log" \
+      SELFTEST_SUITE_STATUS="$1" \
+      SELFTEST_SUITE_OUTPUT="${2:-Summary [1s] 1 tests run: 1 passed, 0 skipped}" \
+      CARGO_CI_NO_LOCK=1 \
+      CARGO_CI_NO_SCCACHE=1 \
+      "$gate" --suite
+  ) >"$suite_out" 2>&1
+  rc=$?
+}
 
+# CI's entry point runs the gate's suite steps and nothing else, and a failing
+# suite fails it.
+test_suite_mode_runs_only_the_suite_steps() {
+  local rc
   suite_gate 0
   check "suite mode: a passing suite exits 0" test "$rc" -eq 0
   check "suite mode: Cargo runs the pinned suite and the doctests, nothing else" \
-    test "$(cat "$log")" = "nextest run --workspace"$'\n'"test --doc --workspace"
+    test "$(cat "$suite_log")" = "nextest run --workspace"$'\n'"test --doc --workspace"
   check "suite mode: the excluded-tests step judges the run" \
-    grep -qF "✓ excluded-tests:" "$out"
+    grep -qF "✓ excluded-tests:" "$suite_out"
 
   suite_gate 1
   check "suite mode: a failing suite fails the run" test "$rc" -eq 1
+}
+
+# Fail-fast stops nextest at its first TIMEOUT and reports a partial count
+# ("N/M tests run"). The timeout is then the run's only failing step, so the
+# classifier judges it by load; excluded-tests still reads the skipped count.
+test_fail_fast_timeout_fails_only_the_test_step() {
+  local rc
+  suite_gate 100 "$TIMEOUT_LINE"$'\n''     Summary [   4.496s] 395/5179 tests run: 393 passed, 2 timed out, 0 skipped'
+  check "fail-fast timeout: the test step fails" step_failed "$suite_out" test
+  check "fail-fast timeout: the excluded-tests step reads the partial run's skipped count" \
+    step_passed "$suite_out" excluded-tests
+  check "fail-fast timeout: the classifier judges the test step alone" \
+    grep -qF "failing steps (test)" "$suite_out"
 }
 
 # The real wrapper must distinguish lock acquisition from every child status.
@@ -956,14 +936,6 @@ run_scenario() { # run_scenario <name> <main-fn> <worker-fn> <pass|fail> [build-
         step_passed "$out" doctest
       check "$name: the gate reports its excluded-tests step passing" \
         step_passed "$out" excluded-tests
-      check "$name: the gate reports the named suite clock" \
-        suite_clock_is_reported "$out"
-      check "$name: the suite clock brackets only nextest and doctests" \
-        suite_clock_has_exact_substep_scope
-      check "$name: the suite preparation reads the executables it linked into the page cache" \
-        suite_preparation_warms_the_linked_executables "$out"
-      check "$name: the suite is compiled and warmed before the clock starts" \
-        suite_preparation_precedes_the_clock "$out"
       ;;
     fail)
       check "$name: the gate reports its build-and-test step failing" \
@@ -1025,11 +997,96 @@ test_ignored_doctest_is_rejected() {
     grep -qF "ignored_doctest_is_named" "$out"
 }
 
+# --- the per-test limits -----------------------------------------------------
+# The shipped .config/nextest.toml, copied verbatim into a fixture holding one
+# unit and one integration test that never finish, must terminate each at its
+# own layer's limit and fail the run naming it. The limits are read from the
+# shipped configuration, so the assertions follow it rather than copy it.
+over_limit_worker() {
+  local repo="$1"
+  mkdir -p "$repo/.config" "$repo/tests"
+  cp "$here/../.config/nextest.toml" "$repo/.config/nextest.toml"
+  cat >"$repo/src/omega.rs" <<'EOF'
+pub fn label() -> &'static str {
+    "omega"
+}
+
+pub fn wait_forever() {
+    loop {
+        std::thread::park();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_unit_layer_test_never_finishes() {
+        super::wait_forever();
+    }
+}
+EOF
+  cat >"$repo/tests/over_limit.rs" <<'EOF'
+#[test]
+fn test_integration_layer_test_never_finishes() {
+    merge_gate_fixture::omega::wait_forever();
+}
+EOF
+}
+
+# Seconds nextest reported on the TIMEOUT line naming test <name>.
+timeout_seconds() { # timeout_seconds <output-file> <name>
+  grep -E "^[[:space:]]*TIMEOUT \[" "$1" | grep -F "$2" | head -1 |
+    sed -E 's/^[[:space:]]*TIMEOUT \[[[:space:]]*([0-9.]+)s\].*/\1/'
+}
+
+# The shipped limit in seconds for the unit layer (profile default) or the
+# integration layer (the `kind(test)` override).
+shipped_limit_seconds() { # shipped_limit_seconds unit|integration
+  python3 -I - "$here/../.config/nextest.toml" "$1" <<'EOF'
+import sys, tomllib
+profile = tomllib.load(open(sys.argv[1], "rb"))["profile"]["default"]
+timeout = profile["slow-timeout"]
+if sys.argv[2] == "integration":
+    timeout = next(o["slow-timeout"] for o in profile["overrides"] if o["filter"] == "kind(test)")
+period = timeout["period"]
+assert period.endswith("s") and period[:-1].isdigit(), period
+print(int(period[:-1]) * timeout["terminate-after"])
+EOF
+}
+
+# lower <= value < upper, for decimal seconds.
+seconds_within() { # seconds_within <value> <lower> <upper>
+  [ -n "$1" ] && awk -v v="$1" -v lo="$2" -v hi="$3" 'BEGIN { exit !(v >= lo && v < hi) }'
+}
+
+test_test_over_its_layer_limit_fails_the_run() {
+  local name="over-limit" repo="$scratch/over-limit" out="$scratch/over-limit.gate.out" rc
+  local unit_limit integration_limit unit_s integration_s
+
+  echo
+  echo "== $name: a test over its layer's per-test limit must fail the test step =="
+  seed_base "$repo" || return 1
+  over_limit_worker "$repo"
+  unit_limit=$(shipped_limit_seconds unit) || return 1
+  integration_limit=$(shipped_limit_seconds integration) || return 1
+  run_gate "$repo" "$out"
+  rc=$?
+  unit_s=$(timeout_seconds "$out" test_unit_layer_test_never_finishes)
+  integration_s=$(timeout_seconds "$out" test_integration_layer_test_never_finishes)
+
+  check "$name: the test step fails" step_failed "$out" test
+  check "$name: the gate exits nonzero" test "$rc" -ne 0
+  check "$name: the unit test is named TIMEOUT at the unit limit, before the integration limit" \
+    seconds_within "$unit_s" "$unit_limit" "$integration_limit"
+  check "$name: the integration test is named TIMEOUT at the integration limit" \
+    seconds_within "$integration_s" "$integration_limit" "$((integration_limit * 2))"
+}
+
 # --- the exit-status classifier ----------------------------------------------
 # A failure is an infrastructure fault (75) only when every failing step ran out
 # of disk space (ENOSPC, whatever the load), or is a test TIMEOUT with no FAIL
-# or a suite-duration-only budget violation on a host that was loaded before
-# the run started; everything else is a verdict (1). Synthetic nextest and
+# on a host that was loaded before the run started; everything else is a
+# verdict (1). Synthetic nextest and
 # budget output stand in for the steps, so no suite runs.
 readonly LOADED_LOAD1=9.00 QUIET_LOAD1=0.50 FIXTURE_CPUS=4
 # Baselines on each side of the 0.17 x FIXTURE_CPUS = 0.68 threshold.
@@ -1056,7 +1113,6 @@ assertion left == right failed
  right: InputsMoved
 note: run with RUST_BACKTRACE=1 environment variable to display a backtrace
 log: later No space left on device'
-readonly DURATION_VIOLATION='  - test suite duration: observed 41000 ms, threshold 30000 ms (must be below threshold).'
 readonly FOOTPRINT_VIOLATION='  - integration-test targets: observed 99, limit 10.'
 
 classify() { # classify <load1> <test-output> <budget-output> <failed-step...>
@@ -1086,18 +1142,14 @@ expect_classification() { # expect_classification <message> <exit> <load1> <test
 
 test_classifier_exit_paths() {
   echo
-  echo "== classifier: only a loaded-host timeout or duration overrun exits 75 =="
+  echo "== classifier: only a loaded-host timeout exits 75 =="
   expect_classification "loaded timeout without FAIL" 75 "$LOADED_LOAD1" "$TIMEOUT_LINE" "" test
-  expect_classification "loaded duration-only overrun" 75 "$LOADED_LOAD1" "" "$DURATION_VIOLATION" budget
-  expect_classification "loaded timeout plus duration overrun" 75 "$LOADED_LOAD1" "$TIMEOUT_LINE" "$DURATION_VIOLATION" test budget
-  expect_classification "quiet duration-only overrun" 1 "$QUIET_LOAD1" "" "$DURATION_VIOLATION" budget
   expect_classification "quiet timeout" 1 "$QUIET_LOAD1" "$TIMEOUT_LINE" "" test
   expect_classification "loaded timeout with a failing test" 1 "$LOADED_LOAD1" "$TIMEOUT_LINE"$'\n'"$FAIL_LINE" "" test
   expect_classification "loaded fmt failure" 1 "$LOADED_LOAD1" "" "" fmt
   expect_classification "loaded clippy failure" 1 "$LOADED_LOAD1" "" "" clippy
   expect_classification "loaded doctest failure" 1 "$LOADED_LOAD1" "" "" doctest
   expect_classification "loaded footprint budget failure" 1 "$LOADED_LOAD1" "" "$FOOTPRINT_VIOLATION" budget
-  expect_classification "loaded duration overrun beside a footprint failure" 1 "$LOADED_LOAD1" "" "$DURATION_VIOLATION"$'\n'"$FOOTPRINT_VIOLATION" budget
   expect_classification "loaded timeout beside a clippy failure" 1 "$LOADED_LOAD1" "$TIMEOUT_LINE" "" test clippy
   expect_classification "loaded test step failing without any TIMEOUT result" 1 "$LOADED_LOAD1" "error: could not compile" "" test
   expect_classification "timeout with a baseline just below the threshold" 1 "$JUST_BELOW_LOAD1" "$TIMEOUT_LINE" "" test
@@ -1150,6 +1202,7 @@ echo
 echo "== wrong-nextest-version: the gate must fail before its first step =="
 run_test test_wrong_nextest_version_fails_fast
 run_test test_suite_mode_runs_only_the_suite_steps
+run_test test_fail_fast_timeout_fails_only_the_test_step
 run_test test_classifier_exit_paths
 run_test test_classifier_enospc_exit_paths
 run_test test_build_lock_status_propagation
@@ -1163,6 +1216,7 @@ run_test run_scenario signature "signature_mainline" "signature_worker" fail bui
 run_test run_scenario stale-expect "stale_expect_mainline" "stale_expect_worker" fail build-only-passes runtime-reporter
 run_test test_ignored_test_is_rejected
 run_test test_ignored_doctest_is_rejected
+run_test test_test_over_its_layer_limit_fails_the_run
 
 echo
 if [ "$fail" -eq 0 ]; then

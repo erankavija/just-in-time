@@ -1,8 +1,8 @@
 # Rust build budgets: what the enforced constants rest on (jit:75b46be9, jit:0708d692)
 
 `scripts/rust-build-budget.sh` checks `cargo-ci` budgets for the
-number of integration-test targets, the bytes of active test executables, the
-measured suite clock, and the production lines of `crates/jit/src/main.rs`. This
+number of integration-test targets, the bytes of active test executables, and
+the production lines of `crates/jit/src/main.rs`. This
 document is where those limits come from —
 a measurement of the tree they are enforced against, and the rule that turns a
 measurement into a limit. The limits themselves are declared once, in that
@@ -26,13 +26,14 @@ host. 24 cores, 31 GiB RAM, `sccache` on PATH, `TMPDIR` on tmpfs; durations in m
 
 Every number below is produced by the code that enforces it rather than by a
 reconstruction of it. One `./scripts/cargo-ci.sh` run reports each budget on its
-`budget` line; the commands below isolate one quantity each.
+`budget` line and each test over its limit on a `TIMEOUT` line; the commands below
+isolate one quantity each.
 
 | quantity | command |
 | --- | --- |
 | integration-test targets | `cargo metadata --no-deps --format-version=1 \| jq '[.packages[].targets[] \| select(.kind[] == "test")] \| length'` |
 | active test-executable bytes | `cargo test --workspace --no-run --message-format=json \| jq -r 'select(.reason == "compiler-artifact" and .profile.test == true and .executable != null) \| .executable' \| sort -u \| xargs stat -c %s \| awk '{s+=$1} END {print s}'` |
-| suite clock | `./scripts/cargo-ci.sh`, `suite-clock` line |
+| per-test limits | `.config/nextest.toml` terminates a test at its layer's limit and `./scripts/cargo-ci.sh` names it on a `TIMEOUT` line; derivation in [../per-test-durations-1eb949a5/README.md](../per-test-durations-1eb949a5/README.md) |
 | main.rs production lines | `python3 scripts/production-lines.py --file crates/jit/src/main.rs` |
 
 The second command inherits the workspace test-profile policy, as every gate
@@ -230,6 +231,9 @@ selects the `cli` target and `cli_repo_workflow::profile_acceptance_tests::`.
 
 ## Historical gate measurements (2026-10-01)
 
+The suite clock and `MAX_TEST_SUITE_SECONDS` were retired in favour of the per-test
+limits (jit:f487aeef); their figures here are history.
+
 | quantity | measured | constant then | used |
 | --- | --- | --- | --- |
 | integration-test targets | 10 | 12 | 83% |
@@ -290,7 +294,7 @@ makes without a deliberate topology change, while still failing the regression
   state-dependent cost the suite carries, which is what lets a fresh target
   directory and a warm one reach the same verdict.
 
-## Cold margin
+## Historical cold margin
 
 Accepted by the owner on 2026-08-13: the fresh-target margin of 3,168 ms, of which
 about 4.3 s is first-run fixture construction paid inside the clock. Moving that
