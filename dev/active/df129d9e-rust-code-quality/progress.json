@@ -685,9 +685,19 @@
           "short_id": "0b35be66",
           "title": "Bring the tests the enforced limits flagged under their per-test limits",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "awaiting-gates",
           "model_tier": "opus",
-          "tier_reason": "proptest/coverage-preserving cost cuts across five modules"
+          "tier_reason": "proptest/coverage-preserving cost cuts across five modules",
+          "branch_head": "948212c82",
+          "production_delta": 100
+        },
+        {
+          "key": "bootstrap-over-limit",
+          "id": "afd2d573-6c56-471a-b8ac-84d5d4d3bb99",
+          "short_id": "afd2d573",
+          "title": "Bring the bootstrap audit-replay test under the unit limit",
+          "classification": "implementation",
+          "status": "ready-to-dispatch-after-04:30"
         }
       ]
     },
@@ -862,6 +872,11 @@
     {
       "id": "0b35be66",
       "reason": "f487aeef enforcement flagged 10 tests over 2s/6s limits on a quiet host; blocks f487aeef",
+      "date": "2026-11-08"
+    },
+    {
+      "id": "afd2d573",
+      "reason": "0b35be66 after2 run: bootstrap audit-replay test 3.443 s > 2 s; blocks f487aeef",
       "date": "2026-11-08"
     }
   ],
@@ -2336,5 +2351,13 @@
       "fe3ad1b0",
       "46fe7593"
     ]
-  }
+  },
+  "open_items": [
+    {
+      "item": "0b35be66 margin: event_tail 1.694s, dogfood 1.715s at load 2.13; cut further after 04:30"
+    },
+    {
+      "item": "d5 ruling pending: redo_conformance FileBackend Unsynced vs driver-level knob"
+    }
+  ]
 }
