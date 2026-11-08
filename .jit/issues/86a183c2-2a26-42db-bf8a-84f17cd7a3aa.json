@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-08T11:25:23.273941123Z",
   "context": {},
   "created_at": "2026-11-08T05:50:57.759760542Z",
   "dependencies": [
@@ -26,7 +27,7 @@
     "per:@/charter/D-19"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "A command parses each distinct configuration source once across its captures",
-  "updated_at": "2026-11-08T05:51:09.119518227Z"
+  "updated_at": "2026-11-08T11:25:23.273941123Z"
 }
