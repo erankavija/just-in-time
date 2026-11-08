@@ -438,13 +438,15 @@
       "to": "just-in-time-d5",
       "issue": "e5d7bc11",
       "subject": "rework limit reached; REQ-03 symlink/directory findings; propose extending a869900b non-regular-file ruling",
-      "status": "open"
+      "status": "resolved",
+      "decision": "d5: stated deviation from REQ-03 per a869900b; file_bytes semantics (no symlink follow, non-regular reads absent); no local item.rs fix; v1.1 follow-up 74657d61; rerun code-review"
     },
     {
       "to": "just-in-time-d5",
       "issue": "86a183c2",
       "subject": "final rework scope; F3 memo lifetime design: per-command unbounded memo",
-      "status": "open"
+      "status": "resolved",
+      "decision": "d5: option (a) final attempt on opus: per-command unbounded memo handle, fresh per server request, plus F1/F2 routing; one owning parse-once test, one server two-request test; on code-review failure stop and send findings"
     }
   ],
   "rework_counts": {
@@ -464,7 +466,7 @@
     "c31c2e57": 2,
     "dd95bd9d": 3,
     "6a19e93f": 3,
-    "86a183c2": 1,
+    "86a183c2": 2,
     "e5d7bc11": 2
   },
   "surfaced_pitfalls": [
@@ -545,14 +547,14 @@
     "Process (d5, after a869900b and df129d9e stalls on lost worker notifications): every worker dispatch gets a fallback deadline of expected duration + 30 min, implemented as a background `sleep` timer; when it fires, inspect the worktree commits and status directly instead of waiting.",
     "a869900b landed 34b33911e, cargo-ci + code-review passed, closed. d675102c re-checkpoint (sol gpt-6.1-sol, effort high, read-only) dispatched on bb9a8795f. 86a183c2 dispatched (opus) on bb9a8795f with fallback deadline 2h30m.",
     "86a183c2 lead review FAIL on 16450a564: REQ-02 fresh DeclarationMemo in load_configuration (claim, config show) and capture_initialized (config at_data_root); expect() panic in memo.rs. Rework 1 dispatched. Smoke run of scenario (c) on 16450a564 running as early signal; REQ-04 is recorded on the final commit.",
-    "86a183c2 smoke (early signal, 16450a564, harness defaults, raw in lead scratch, load ~1.7): dep tip D 14.39 ms, ratio 0.753 FAIL (≤0.7); bulk slope 1.14 pass. REQ-04 is recorded on the final commit.",
+    "86a183c2 smoke (early signal, 16450a564, harness defaults, raw in lead scratch, load ~1.7): dep tip D 14.39 ms, ratio 0.753 FAIL (\u22640.7); bulk slope 1.14 pass. REQ-04 is recorded on the final commit.",
     "d5 ruling applied: e5d7bc11 (F1, item.rs) dispatched on sonnet; 6b22ce6d (F3) after 86a183c2; 86a183c2 REQ-01/02 amended (gates.toml, handoffs, one memo).",
     "e5d7bc11 landed 90862f758; cargo-ci passed; code-review FAILED (captured_declarations_with parses the bundle twice, mod.rs:2798/2804). Fix-forward rework 1 dispatched on a fresh worktree from 2b3ee3f19.",
     "86a183c2 rework 1 at dea774533 (gates.toml memo, handoffs, no fresh memos, no panic); local tip D still ~14.5 ms. Lead decision: REQ-04 requires closing the gap inside this task; derived values (default schema names, namespaces) are computed once per memo entry. No scope change.",
     "e5d7bc11 fix-forward d59abe232 landed a91c78f4c; cargo-ci passed; code-review FAILED (discovery round clears parsed bundle; custom-source growth still reparses). Rework 2 (final) dispatched with the required closure shape.",
     "e5d7bc11 worker committed 803a8f28a (local bundle reuse) before the stop reached it; NOT landed per d5 ruling. Branch worktree-agent-e5d7bc11 parked unmerged (no -D); worktree reclaimed. Superseded by 86a183c2 memo threading.",
-    "86a183c2 official smoke on a23f33134 (binary sha256 8f0caa46…, harness defaults, 5 samples, raw in lead scratch smoke-86a1-r2-raw, load 5.58 at end): dep base D 20.355 ms, tip D 13.082 ms, ratio 0.643 PASS; bulk 1.393 pass; archive 0.195 pass; profile pass. Rerun on the final commit after the captured_declarations_with bundle removal.",
-    "86a183c2 REQ-04 smoke on final 6c75253c3 (binary sha256 a3390ff2…, harness defaults, load 1.26 at end): dep base D 18.57 ms, tip D 12.864 ms, ratio 0.693 PASS. Same run bulk 2.377 (fail). A/B quiet reruns: a23f33134 bulk 1.05/1.35, dep 0.644/0.644; 6c75253c3 bulk 2.10/1.09, dep 0.647/0.621. Bulk is variance (diff a23→6c75 is 12 lines in captured_declarations_with, off the bulk path); dep stable 0.62–0.69.",
+    "86a183c2 official smoke on a23f33134 (binary sha256 8f0caa46\u2026, harness defaults, 5 samples, raw in lead scratch smoke-86a1-r2-raw, load 5.58 at end): dep base D 20.355 ms, tip D 13.082 ms, ratio 0.643 PASS; bulk 1.393 pass; archive 0.195 pass; profile pass. Rerun on the final commit after the captured_declarations_with bundle removal.",
+    "86a183c2 REQ-04 smoke on final 6c75253c3 (binary sha256 a3390ff2\u2026, harness defaults, load 1.26 at end): dep base D 18.57 ms, tip D 12.864 ms, ratio 0.693 PASS. Same run bulk 2.377 (fail). A/B quiet reruns: a23f33134 bulk 1.05/1.35, dep 0.644/0.644; 6c75253c3 bulk 2.10/1.09, dep 0.647/0.621. Bulk is variance (diff a23\u21926c75 is 12 lines in captured_declarations_with, off the bulk path); dep stable 0.62\u20130.69.",
     "86a183c2 cargo-ci passed; code-review FAILED (F1 bootstrap retry fresh memo; F2 direct assembly bypasses in config edit/init/initialize/profile_apply; F3 memo eviction at 4). e5d7bc11 code-review rerun FAILED on REQ-03 (symlink sources rejected; directory occupant silently omitted)."
   ],
   "story_checkpoints": [
@@ -596,7 +598,7 @@
     },
     {
       "at": "05:3x",
-      "decision": "Five private captured-gate-registry parses (gate_check.rs, gate.rs, mod.rs, template.rs, validate.rs) folded into a869900b as REQ-04, with a Rulings note on non-regular-file behaviour; dep a869900b→c31c2e57 added with --reduce (dropped d675102c→c31c2e57)",
+      "decision": "Five private captured-gate-registry parses (gate_check.rs, gate.rs, mod.rs, template.rs, validate.rs) folded into a869900b as REQ-04, with a Rulings note on non-regular-file behaviour; dep a869900b\u2192c31c2e57 added with --reduce (dropped d675102c\u2192c31c2e57)",
       "by": "invoker just-in-time-d5"
     },
     {
@@ -637,6 +639,13 @@
     {
       "subject": "markdown-first item sources read outside capture (item.rs:332)",
       "ruling": "d5: out of e5d7bc11/d675102c scope; filed 3084a48f under v1.1; cite it if a reviewer raises it"
+    },
+    {
+      "issue": "45d0a971",
+      "by": "user via just-in-time-d5",
+      "date": "2026-11-09",
+      "decision": "REQ-01(a) M in {10,160}, s(N)=(t(160)-t(10))/150; N and 1.5 threshold unchanged; re-record base (must reproduce >=2.5), then one tip run whose verdict stands",
+      "reason": "0.2 ms per-match slope below timing noise; instruction and syscall counts flat"
     }
   ],
   "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",
