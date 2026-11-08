@@ -985,6 +985,13 @@
       "issue": "f487aeef",
       "summary": "user lifted timing hold (session 15)",
       "status": "resolved: run chain"
+    },
+    {
+      "date": "2026-11-08",
+      "kind": "guard-interpretation",
+      "issue": "0b35be66",
+      "summary": "redo_conformance FileBackend Unsynced adapter setting",
+      "status": "resolved by d5: accept adapter-level setting; condition (redo_apply Full-durability sync assertions) verified at 948212c82: test_redo_applier_apply_syncs_a_parent_its_puts_share_once uses RedoApplier::new (Full)"
     }
   ],
   "rework_counts": {
@@ -2355,9 +2362,6 @@
   "open_items": [
     {
       "item": "0b35be66 margin: event_tail 1.694s, dogfood 1.715s at load 2.13; cut further after 04:30"
-    },
-    {
-      "item": "d5 ruling pending: redo_conformance FileBackend Unsynced vs driver-level knob"
     }
   ]
 }
