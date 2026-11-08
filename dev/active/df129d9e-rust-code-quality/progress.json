@@ -847,7 +847,7 @@
           "short_id": "a08c4b38",
           "title": "Write the df129d9e completion report",
           "classification": "documentation",
-          "status": "in_progress",
+          "status": "done",
           "model_tier": "opus"
         },
         {
@@ -869,7 +869,17 @@
           "short_id": "fb2dc5c3",
           "title": "Build hygiene and measured completion for crates/jit",
           "classification": "story",
-          "status": "backlog"
+          "status": "done"
+        },
+        {
+          "key": "validate-streams",
+          "id": "75a90224-e9dd-43d2-99c0-3d79d7f1284c",
+          "short_id": "75a90224",
+          "title": "Validation checks report failures on stdout with a one-line stderr summary",
+          "classification": "implementation",
+          "status": "in_progress",
+          "model_tier": "sonnet",
+          "origin": "df129d9e holistic-review 2026-11-08: F1 blocking (D-03/REQ-09), F2 advisory (report wording)"
         }
       ]
     }
@@ -914,6 +924,11 @@
     {
       "id": "7909527f",
       "reason": "0b35be66 after3 put three unit tests at 1.62-1.74 s against the 2 s limit; f487aeef depends on it",
+      "date": "2026-11-08"
+    },
+    {
+      "id": "75a90224",
+      "reason": "epic holistic-review F1 (validate stream contract, D-03) + F2 (report wording)",
       "date": "2026-11-08"
     }
   ],
@@ -2412,5 +2427,11 @@
       "46fe7593"
     ]
   },
-  "open_items": []
+  "open_items": [],
+  "epic_gates": {
+    "2026-11-08": {
+      "repo-validate": "passed",
+      "holistic-review": "failed: F1 blocking validate stderr/stdout contract; F2 advisory report wording -> 75a90224"
+    }
+  }
 }
