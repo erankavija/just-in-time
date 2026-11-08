@@ -149,30 +149,63 @@ pub enum ConfigurationAssemblyError {
 mod tests {
     use super::*;
 
+    /// Each sibling registry assembles from its own file whether or not
+    /// `config.toml` is present, and an absent file contributes an empty one.
     #[test]
-    fn test_assemble_configuration_absent_config_is_empty_configuration() {
-        let config = assemble_configuration(
-            None,
-            Some(b"[[template]]\nname = \"t\"\napplies_to = [\"any\"]\n"),
-            Some(b"[[invariants]]\nid = \"i\"\nstatement = \"s\"\nkind = \"advisory\"\n"),
-        )
-        .unwrap();
-        assert!(config.type_hierarchy.is_none());
-        assert!(config.item_kinds.is_none());
-        assert!(config.templates.get("t").is_some());
-        assert_eq!(config.invariants.invariants.len(), 1);
+    fn test_assemble_configuration_reads_each_source_independently_of_the_others() {
+        let config: &[u8] = b"[type_hierarchy]\ntypes = { task = 1 }\n";
+        let templates: &[u8] = b"[[template]]\nname = \"t\"\napplies_to = [\"task\"]\n";
+        let invariants: &[u8] =
+            b"[[invariants]]\nid = \"i\"\nstatement = \"s\"\nkind = \"advisory\"\n";
+        [None, Some(config)]
+            .into_iter()
+            .flat_map(|config| {
+                [None, Some(templates)]
+                    .into_iter()
+                    .flat_map(move |templates| {
+                        [None, Some(invariants)]
+                            .into_iter()
+                            .map(move |invariants| (config, templates, invariants))
+                    })
+            })
+            .for_each(|(config, templates, invariants)| {
+                let assembled = assemble_configuration(config, templates, invariants).unwrap();
+                let case = (config.is_some(), templates.is_some(), invariants.is_some());
+                assert_eq!(
+                    assembled.type_hierarchy.is_some(),
+                    config.is_some(),
+                    "{case:?}"
+                );
+                assert!(assembled.item_kinds.is_none(), "{case:?}");
+                assert_eq!(
+                    assembled.templates.get("t").is_some(),
+                    templates.is_some(),
+                    "{case:?}"
+                );
+                if templates.is_none() {
+                    assert_eq!(assembled.templates, TemplateRegistry::empty(), "{case:?}");
+                }
+                assert_eq!(
+                    assembled.invariants.invariants.len(),
+                    usize::from(invariants.is_some()),
+                    "{case:?}"
+                );
+                if invariants.is_none() {
+                    assert_eq!(assembled.invariants, InvariantRegistry::empty(), "{case:?}");
+                }
+            });
     }
 
     #[test]
-    fn test_assemble_configuration_absent_templates_and_invariants_are_empty_registries() {
-        let config = assemble_configuration(
-            Some(b"[type_hierarchy]\ntypes = { task = 1 }\n"),
+    fn test_assemble_configuration_names_invariants_toml_for_a_malformed_invariant() {
+        let error = assemble_configuration(
             None,
             None,
+            Some(b"[[invariants]]\nid = \"i\"\nkind = \"advisory\"\n"),
         )
-        .unwrap();
-        assert_eq!(config.templates, TemplateRegistry::empty());
-        assert_eq!(config.invariants, InvariantRegistry::empty());
+        .unwrap_err();
+        assert!(matches!(error, ConfigurationAssemblyError::Invariants(_)));
+        assert!(error.to_string().contains("invariants.toml"), "{error}");
     }
 
     #[test]
@@ -207,6 +240,10 @@ mod tests {
     fn test_assemble_configuration_rejects_unknown_config_key() {
         let error = assemble_configuration(Some(b"undeclared_key = 1\n"), None, None).unwrap_err();
         assert!(matches!(error, ConfigurationAssemblyError::Config(_)));
+        assert!(
+            error.to_string().contains("unknown field `undeclared_key`"),
+            "the top-level message carries the TOML message: {error}"
+        );
     }
     #[test]
     fn test_configuration_projection_ignores_unconsumed_fields_but_full_view_rejects_them() {
