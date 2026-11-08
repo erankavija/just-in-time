@@ -1,0 +1,24 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-08T22:46:40.501454128Z",
+  "dependencies": [],
+  "description": "`RepositoryImage::file_bytes` returns the same `None` for an absent path and for a directory occupying it, so every consumer silently treats a misplaced directory as \"no file\". A declaration or item source replaced by a directory then disappears from results instead of failing.\n\n## Background\n\nCaptured reads of repository declaration sources (`gates.toml`, `rules.toml`, `invariants.toml`, item registries) go through `file_bytes`. Before captured reads, the per-file readers reported a non-regular occupant as an error. Two issues under the mutation-session epic recorded the silent behaviour as a stated deviation pending this fix.\n\n## Success Criteria\n\n- [hard] REQ-01: The captured image distinguishes an absent path from a non-regular occupant, and `file_bytes` (or its replacement) reports a non-regular occupant as a typed error to every consumer.\n- [hard] REQ-02: Every declaration and item source consumer surfaces that error; none treats a directory at a source path as an absent source.\n- [hard] REQ-03: One test at the image layer owns the absent-versus-occupied distinction; consumers prove only that they propagate it.\n\n## Notes\n\nSymlinked sources stay unfollowed by capture (no-follow capability layer); this issue covers non-regular occupants only.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-08T22:46:40.501454128Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "74657d61-6c4f-4544-8b76-433f03e9f50e",
+  "labels": [
+    "type:task",
+    "component:core",
+    "milestone:v1.1"
+  ],
+  "priority": "low",
+  "state": "ready",
+  "title": "Captured reads report a non-regular occupant instead of treating it as absent",
+  "updated_at": "2026-11-08T22:46:40.501454128Z"
+}
