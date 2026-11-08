@@ -5,7 +5,9 @@ use crate::domain::{
     Priority,
 };
 use crate::storage::JsonFileStorage;
-use crate::test_utils::{file_executor, profile_package_fixture, setup_test_repo_with_taxonomy};
+use crate::test_utils::{
+    profile_package_fixture, setup_unsynced_test_repo_with_config, unsynced_file_executor,
+};
 use anyhow::Result;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -21,8 +23,9 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Result<Self> {
-        let (repo, _, taxonomy) = setup_test_repo_with_taxonomy()?;
-        let executor = file_executor(repo.path())?;
+        // The property is what a mutation appends, not crash durability.
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let (repo, executor) = setup_unsynced_test_repo_with_config(&taxonomy.config_fragment())?;
         let issue = executor
             .issues()
             .create_issue(
@@ -111,7 +114,7 @@ impl Fixture {
     }
 
     fn initialize(&self, profiled: bool) -> Result<()> {
-        let executor = file_executor(self.repo.path())?;
+        let executor = unsynced_file_executor(self.repo.path())?;
         let selection = profiled
             .then(|| {
                 executor

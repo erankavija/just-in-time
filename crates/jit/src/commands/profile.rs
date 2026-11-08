@@ -1514,7 +1514,7 @@ mod tests {
     };
     use crate::test_utils::{
         apply_package, apply_selected_packages, file_executor, selected_closure, setup_test_repo,
-        setup_test_repo_with_config,
+        setup_unsynced_test_repo_with_config,
     };
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
@@ -2726,10 +2726,12 @@ mod tests {
         // workflow package and receives the default as its declared
         // dependency. They start identical, so the configurations they end with
         // may differ only by the route that reached them. The routes share
-        // nothing, so they run concurrently.
+        // nothing, so they run concurrently, and publish unsynced: the property
+        // is the composition, not crash durability.
         let (explicit, resolved) = std::thread::scope(|scope| {
             let explicit = scope.spawn(|| {
-                let (temp, executor) = setup_test_repo_with_config(COMPOSITION_CONFIG).unwrap();
+                let (temp, executor) =
+                    setup_unsynced_test_repo_with_config(COMPOSITION_CONFIG).unwrap();
                 let default = shipped_package_in(temp.path(), "jit-default");
                 let dogfood = shipped_package_in(temp.path(), "jit-dogfood");
                 let default_result = apply_package(&executor, &default);
@@ -2737,7 +2739,8 @@ mod tests {
                 (temp, default, dogfood, default_result, dogfood_result)
             });
             let resolved = scope.spawn(|| {
-                let (temp, executor) = setup_test_repo_with_config(COMPOSITION_CONFIG).unwrap();
+                let (temp, executor) =
+                    setup_unsynced_test_repo_with_config(COMPOSITION_CONFIG).unwrap();
                 shipped_package_in(temp.path(), "jit-default");
                 let dogfood = shipped_package_in(temp.path(), "jit-dogfood");
                 let result = apply_package(&executor, &dogfood);
