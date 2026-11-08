@@ -882,6 +882,16 @@
           "origin": "df129d9e holistic-review 2026-11-08: F1 blocking (D-03/REQ-09), F2 advisory (report wording)",
           "landed": "7c29f386a, 1ee4aa9ae, fb266275f",
           "gates": "cargo-ci, code-review passed (rework 2)"
+        },
+        {
+          "key": "findings-oneline",
+          "id": "4ccea59b-6898-4764-982e-8c7d2ba02167",
+          "short_id": "4ccea59b",
+          "title": "Every findings outcome prints a one-line stderr summary",
+          "classification": "implementation",
+          "status": "in_progress",
+          "model_tier": "opus",
+          "origin": "epic holistic-review run 2, F1 (dispatch/validate.rs:212 integrity error multiline)"
         }
       ]
     }
@@ -931,6 +941,11 @@
     {
       "id": "75a90224",
       "reason": "epic holistic-review F1 (validate stream contract, D-03) + F2 (report wording)",
+      "date": "2026-11-08"
+    },
+    {
+      "id": "4ccea59b",
+      "reason": "epic holistic-review run 2 F1: whole-repo validate integrity error multiline on stderr (D-03); sweep all Outcome::findings sites",
       "date": "2026-11-08"
     }
   ],
@@ -2443,6 +2458,10 @@
     "2026-11-08": {
       "repo-validate": "passed",
       "holistic-review": "failed: F1 blocking validate stderr/stdout contract; F2 advisory report wording -> 75a90224"
+    },
+    "2026-11-08 run 2": {
+      "repo-validate": "passed",
+      "holistic-review": "failed: F1 whole-repo validate multiline integrity summary -> 4ccea59b"
     }
   }
 }

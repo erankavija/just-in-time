@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "97057ae37a004e550a92f11f3e0a90aa462bec78",
+  "completed_at": "2026-11-08T07:28:16.222911914Z",
+  "duration_ms": 371062,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/dispatch/validate.rs",
+        "id": "F1",
+        "line": 212,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/df129d9e/decision/D-03",
+          "@/issue/df129d9e/requirement/REQ-09"
+        ],
+        "severity": "medium",
+        "summary": "Whole-repository validation interpolates multiline structural-error details into the findings stderr summary."
+      }
+    ],
+    "summary": "Previous findings are resolved, but whole-repository structural-validation findings still violate the one-line stderr summary contract.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "df129d9e-c795-4d92-9ee5-ffd776339252",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d6e38705-9705-4162-97c0-56fdee0ad912",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T07:22:05.160201949Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 24930 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1ba09-2c54-79c2-b47d-3745d00d19e2\n--------\nuser\n--- 24917 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Reviewed `97057ae37` and its 378-dependency closure, read-only. Both previous findings are resolved.\n\n| Criteria | Verified artifacts |\n|---|---|\n| REQ-01–03, 19 | Thin entry point, library dispatch, family capability types, command-owned operations |\n| REQ-04, 18 | Generic `ListEnvelope`, shared success emitter, envelope census |\n| REQ-05, 17, 20 | Schema derivation, typed handler registry, parser-level hints |\n| REQ-06–08 | Inherited manifest lints, shared test harness, build-budget checker |\n| REQ-10 | Recomputed module totals, ledger membership and all 126 recorded deltas |\n| REQ-11–14 | Library classifier, outcome emitter, single exit site, server status projection |\n| REQ-15–16 | Global JSON flag and flattened filter arguments |\n| REQ-09, 21 | Shared renderers and contract tests; remaining exception below |\n\nRecorded Cargo evidence covers the current Rust tree: 5,161 tests and 25 doctests passed, with formatting, Clippy and build budgets passing. Tests were not rerun. The current attributed production-line delta is **+310**, or **+348** including the ambiguous merge, below the approved +375 ceiling.\n\n1. **F1 — Medium, blocking: whole-repository validation still emits multiline findings summaries.** [dispatch/validate.rs:212](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/dispatch/validate.rs:212) interpolates the complete structural error into the findings message. A stale or missing derived projection produces explicitly multiline details at [validation/repository.rs:839](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/repository.rs:839). That message reaches `Outcome::findings` and the shared emitter unchanged, so ordinary `jit validate` writes multiple stderr lines. This violates `@/issue/df129d9e/decision/D-03` and REQ-09. Keep the detailed error in the stdout report and JSON details, use a one-line findings summary, and cover this structural-error path with a regression test.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Previous findings are resolved, but whole-repository structural-validation findings still violate the one-line stderr summary contract.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Whole-repository validation interpolates multiline structural-error details into the findings stderr summary.\",\"file\":\"crates/jit/src/dispatch/validate.rs\",\"line\":212,\"references\":[\"@/issue/df129d9e/decision/D-03\",\"@/issue/df129d9e/requirement/REQ-09\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

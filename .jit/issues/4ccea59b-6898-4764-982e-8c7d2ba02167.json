@@ -1,0 +1,26 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-08T07:28:56.017300984Z",
+  "context": {},
+  "created_at": "2026-11-08T07:28:47.569085320Z",
+  "dependencies": [],
+  "description": "The df129d9e holistic review on 2026-11-08 (second run) found that whole-repository `jit validate` still breaks @/issue/df129d9e/decision/D-03, the findings-stderr rule that REQ-09's output contract relies on. `crates/jit/src/dispatch/validate.rs` puts the full repository-integrity error into the findings message. For derived-state drift, `crates/jit/src/validation/repository.rs` builds that error as a multi-line list. The shared emitter then writes every line of it to stderr. 75a90224 fixed the same defect for `--branch-drift` and `--leases`, and its D-01 records that `error.message` is the one-line summary, while the details live in the report and in `error.details`.\n\n## Success Criteria\n\n- [hard] REQ-01: When whole-repository `jit validate` finds a repository-integrity error, including derived-state drift alone or together with rule errors, human mode prints the error's full details in the stdout report and exactly one summary line on stderr. Under `--json`, `error.details` carries the full integrity error, `error.message` is the one-line summary, and the exit code is unchanged.\n- [hard] REQ-02: Every `Outcome::findings` call site under `crates/jit/src/dispatch/` passes a message that cannot contain a newline. A site whose message could carry multi-line content moves that content into its report, which renders on stdout and serializes under `--json`. The return lists each site with its verdict.\n- [hard] REQ-03: Each path this issue changes has a test of its streams at the cheapest layer that observes them, including the drift path. No assertion is weakened, and no property owned elsewhere is re-proved.\n- [hard] REQ-04: Docs and the CHANGELOG describe any JSON- or human-visible change, with each fact in its one canonical home (@/charter/D-13).\n",
+  "documents": [],
+  "first_ready_at": "2026-11-08T07:28:47.569085320Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "4ccea59b-6898-4764-982e-8c7d2ba02167",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "in_progress",
+  "title": "Every findings outcome prints a one-line stderr summary",
+  "updated_at": "2026-11-08T07:28:56.017300984Z"
+}

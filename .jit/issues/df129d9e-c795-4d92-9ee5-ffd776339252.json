@@ -5,6 +5,7 @@
   "created_at": "2026-07-27T20:07:37.084018691Z",
   "dependencies": [
     "46fe7593-a860-4767-8a6e-fc631ca1fd81",
+    "4ccea59b-6898-4764-982e-8c7d2ba02167",
     "755964b2-ee96-4fee-aa80-8f782c94dd47",
     "75a90224-e9dd-43d2-99c0-3d79d7f1284c",
     "c06daf50-c151-402a-851a-fa71a9e6d764",
@@ -95,15 +96,15 @@
   ],
   "gates_status": {
     "holistic-review": {
-      "run_id": "ff180099-4035-4866-bcac-a9358a40fff6",
+      "run_id": "d6e38705-9705-4162-97c0-56fdee0ad912",
       "status": "failed",
-      "updated_at": "2026-11-08T06:52:04.261383855Z",
+      "updated_at": "2026-11-08T07:28:16.226539685Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
-      "run_id": "dfa3e8e1-11db-4854-b5e5-be9e977e4016",
+      "run_id": "de9b9abe-e5fc-4e1d-a364-f1e1ac375cb0",
       "status": "passed",
-      "updated_at": "2026-11-08T06:46:09.599068509Z",
+      "updated_at": "2026-11-08T07:22:05.140965602Z",
       "updated_by": "auto:executor"
     }
   },
@@ -120,5 +121,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Dispatch layering, executor surface, and build hygiene in crates/jit",
-  "updated_at": "2026-11-08T06:52:46.171577813Z"
+  "updated_at": "2026-11-08T07:28:55.827690458Z"
 }
