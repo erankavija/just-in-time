@@ -13,7 +13,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "daf4db95-eea5-48d0-b32b-6ecb97201e8a",
+      "status": "passed",
+      "updated_at": "2026-11-08T03:06:05.979764037Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "187dd597-a9df-43ae-a457-6aa6a09803fb",
+      "status": "passed",
+      "updated_at": "2026-11-08T03:08:00.405626727Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4e2bed35-53a5-487c-9063-b059b6dc8495",
   "labels": [
     "type:task",
@@ -27,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Container marker and destination evidence are declared once",
-  "updated_at": "2026-11-07T23:23:14.790128310Z"
+  "updated_at": "2026-11-08T03:08:00.405626727Z"
 }
