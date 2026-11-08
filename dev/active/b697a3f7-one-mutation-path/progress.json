@@ -253,8 +253,8 @@
           "id": "dd95bd9d",
           "short_id": "dd95bd9d",
           "title": "Archive citation warnings are an advisory report beside the plan, from one index per command",
-          "status": "escalated",
-          "note": "r2 landed 0481f181b (0cc25ddba); cargo-ci passed; code-review FAILED run b33701f2 (post-apply overlay misses tracker rewrites; advisory error after commit hides result). Rework limit exceeded; escalated to invoker with options A (scan per attempt before publish, amend REQ-02) / B (pre-session read-only plan scan)."
+          "status": "done",
+          "note": "r3 landed 37fab84fd (0867de482); cargo-ci passed; code-review passed run 5ed707c5"
         },
         {
           "id": "82f1647f",
@@ -382,7 +382,7 @@
       "issue": "dd95bd9d",
       "reason": "rework limit exceeded; same defect class (post-apply citation scan)",
       "to": "just-in-time-d5",
-      "status": "resolved: option A; one extra attempt authorized; REQ-02 amended; stop and report on further failure"
+      "status": "closed: r3 passed"
     }
   ],
   "rework_counts": {
@@ -703,6 +703,15 @@
       "effort": "high",
       "verdict": "pass",
       "run": "5f86b8ae"
+    },
+    {
+      "issue": "dd95bd9d",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "5ed707c5"
     }
   ]
 }

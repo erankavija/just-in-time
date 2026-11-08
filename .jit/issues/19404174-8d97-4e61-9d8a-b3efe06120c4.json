@@ -25,7 +25,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Archive planning and snapshot export read through the execute session",
-  "updated_at": "2026-11-08T03:27:44.027229620Z"
+  "updated_at": "2026-11-08T05:33:34.008598269Z"
 }
