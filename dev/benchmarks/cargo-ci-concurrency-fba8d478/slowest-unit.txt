@@ -1,0 +1,6 @@
+{'jit::cli', 'jit-server', 'jit::contracts', 'jit', 'jit-server::server_integration'}
+1.419 jit commands::gate_check::tests::test_check_gate_executes_again_after_declared_inputs_change
+1.369 jit test_utils::tests::test_profiled_repository_fixture_memory_build_writes_the_tree_a_file_build_writes
+1.358 jit commands::gate_check::tests::test_check_gate_classifies_named_run_drift_but_not_unrelated_run
+1.340 jit commands::gate_check::tests::test_check_gate_records_pre_run_verdict_when_gate_registry_changes_during_checker
+1.294 jit profile::repository_package::tests::test_profile_applies_to_neutral_repo_and_ordinary_renderers_consume_config

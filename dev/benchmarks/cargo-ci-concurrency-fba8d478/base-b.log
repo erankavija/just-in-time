@@ -1,0 +1,8 @@
+  ✓ fmt: ok (1646 ms)
+  ✓ clippy: ok (215 ms)
+  ✓ suite-build: built in 310 ms (312 ms)
+  ✓ test: 5159 passed, 0 failed, 0 skipped (27689 ms)
+  ✓ doctest: 25 passed, 0 failed, 0 ignored (2896 ms)
+  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)
+  ✓ budget: integration-targets=3/3 active-executables=7 bytes=644445096/740294656 profile=line-tables-only dep-features=pruned dynamic-dependencies=checked main-rs-lines=37/40 (142 ms)
+

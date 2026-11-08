@@ -14,7 +14,7 @@ set -euo pipefail
 # Environment:
 #   PROFILE_TEST_SUITE_OUTPUT  Artifact path (default:
 #                              dev/benchmarks/suite-profile.json)
-#   CARGO_CI_BUILD_LOCK        Host-wide build lock shared with cargo-ci.sh
+#   CARGO_CI_BUILD_LOCK        Host-wide build lock shared with the benchmark scripts
 #   CARGO_CI_LOCK_TIMEOUT      Seconds to wait for that lock (default 1800)
 #
 # The result contract is schema_version 1. Consumers select overrides from
@@ -315,7 +315,7 @@ PYEOF
 )
 
 # Keep the warmup and measured run together behind the same host-wide lock as
-# cargo-ci.sh. The profile is only meaningful without a competing repository
+# the benchmark scripts. The profile is only meaningful without a competing repository
 # build consuming CPU or filesystem cache. The parent holds the descriptor and
 # closes it in the child so Cargo descendants cannot retain the lock; the wait
 # is bounded and its status is separate from the child's.

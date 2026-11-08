@@ -345,13 +345,15 @@ harness that produces both.
   so a daemon it starts outlives the run's temporary directory. Set `CARGO_CI_NO_SCCACHE=1` for a
   diagnostic run that must bypass the cache. Opting an existing target directory into a wrapper
   changes Cargo fingerprints, so remove its stale artifacts first if disk headroom is limited.
-- **Host-wide serialization** — gate and benchmark builds default to the shared
-  `${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock`, allowing Cargo-heavy work in adjacent repositories
-  to queue instead of competing for CPU and causing timeout-sensitive tests to become noisy.
-  `CARGO_CI_BUILD_LOCK` overrides the path when an isolated host needs a different convention.
-  Run compilation-heavy focused checks as `./scripts/cargo-ci.sh --cargo test ...` (or
-  `--cargo clippy ...`) so they reuse the lock and cache without running the broad gate. Invoke
-  `./scripts/cargo-ci.sh` without arguments only when the complete gate is intended.
+- **Concurrent gates** — `scripts/cargo-ci.sh` takes no host lock: concurrent runs on different
+  worktrees share the host's cargo jobserver pool and stay within the per-test limits, measured in
+  [dev/benchmarks/cargo-ci-concurrency-fba8d478/README.md](benchmarks/cargo-ci-concurrency-fba8d478/README.md).
+  The pool exists only on this host. Benchmark and profiling scripts still queue on
+  `${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock` (`CARGO_CI_BUILD_LOCK` overrides the path) so their
+  timings run alone. Run compilation-heavy focused checks as
+  `./scripts/cargo-ci.sh --cargo test ...` (or `--cargo clippy ...`) so they reuse the cache setup
+  without running the broad gate. Invoke `./scripts/cargo-ci.sh` without arguments only when the
+  complete gate is intended.
 - **Dependency features** — `jsonschema` (`crates/jit/Cargo.toml`) sets
   `default-features = false`: repository schemas only use local fragment refs
   (`#/types/Priority`, `#/types/State`), so the crate's remote `$ref`-resolution

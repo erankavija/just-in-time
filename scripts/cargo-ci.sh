@@ -23,6 +23,11 @@ set -euo pipefail
 # exit, including a trapped INT, TERM or HUP. A compiler-wrapper daemon the
 # run starts keeps the caller's TMPDIR (scripts/caller-tmpdir-wrapper.sh).
 #
+# The run takes no host-wide lock: concurrent runs on different worktrees share
+# the host's cargo jobserver pool and keep every test within its per-test limit
+# (dev/benchmarks/cargo-ci-concurrency-fba8d478/README.md). The pool exists only
+# on this host; a host without it runs concurrent gates at its own risk.
+#
 # Exit codes:
 #   0 — all steps passed
 #   1 — one or more steps failed on repository content (a verdict)
@@ -59,8 +64,8 @@ set -euo pipefail
 # files and prints its diagnosis; scripts/cargo-ci-selftest.sh drives every exit
 # path through it.
 #
-# `./scripts/cargo-ci.sh --cargo <args...>` applies the same host lock, real
-# Cargo selection, and guarded sccache setup, then runs only that focused Cargo
+# `./scripts/cargo-ci.sh --cargo <args...>` applies the same real Cargo
+# selection and guarded sccache setup, then runs only that focused Cargo
 # command. Use this mode for compilation-heavy targeted checks; invoke the
 # script without arguments only when the complete gate is intended.
 #
@@ -185,47 +190,6 @@ if [ "${1:-}" = "--classify" ]; then
   rc=0
   classify_failure || rc=$?
   exit "$rc"
-fi
-
-# Serialize builds across the host with a bounded wait. The parent holds the
-# descriptor and closes it in the child, so daemon descendants cannot retain
-# the lock. Acquisition and child execution have separate statuses: no child
-# exit code can be mistaken for a lock timeout.
-# CARGO_CI_LOCKED prevents re-entry; CARGO_CI_NO_LOCK disables serialization.
-# CARGO_CI_BUILD_LOCK and CARGO_CI_LOCK_TIMEOUT override the path and wait.
-report_build_lock_holders() {
-  local lock="$1"
-  if command -v lslocks >/dev/null 2>&1; then
-    lslocks -o COMMAND,PID,MODE,PATH 2>/dev/null | awk -v lock="$lock" 'NR==1 || $NF==lock'
-  elif command -v fuser >/dev/null 2>&1; then
-    fuser -v "$lock" 2>&1
-  fi
-}
-
-if [ -z "${CARGO_CI_NO_LOCK:-}" ] && [ -z "${CARGO_CI_LOCKED:-}" ]; then
-  BUILD_LOCK="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock}"
-  LOCK_TIMEOUT="${CARGO_CI_LOCK_TIMEOUT:-1800}"
-  if command -v flock >/dev/null 2>&1; then
-    lock_status=0
-    exec {build_lock_fd}>"$BUILD_LOCK"
-    if ! flock -n "$build_lock_fd" 2>/dev/null; then
-      echo "cargo-ci: another build holds $BUILD_LOCK; waiting up to ${LOCK_TIMEOUT}s" >&2
-      report_build_lock_holders "$BUILD_LOCK" >&2
-      flock -w "$LOCK_TIMEOUT" -E 75 "$build_lock_fd" || lock_status=$?
-    fi
-    if [ "$lock_status" -eq 75 ]; then
-      echo "ERROR: cargo-ci: timed out after ${LOCK_TIMEOUT}s waiting for $BUILD_LOCK" >&2
-      report_build_lock_holders "$BUILD_LOCK" >&2
-      echo "       A holder with PPID 1 and no live cargo/rustc is a leaked daemon," >&2
-      echo "       not a running build; stop it (e.g. sccache --stop-server) and retry." >&2
-      exit 2
-    fi
-    [ "$lock_status" -eq 0 ] || exit "$lock_status"
-    child_status=0
-    env CARGO_CI_LOCKED=1 "$0" "$@" {build_lock_fd}>&- || child_status=$?
-    exit "$child_status"
-  fi
-  echo "cargo-ci: flock not found; running without host-wide build lock" >&2
 fi
 
 # The run owns one directory inside the caller's temporary directory and every

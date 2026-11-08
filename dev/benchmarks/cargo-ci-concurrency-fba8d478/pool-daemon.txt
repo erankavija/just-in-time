@@ -1,0 +1,1 @@
+81426 python3 /home/vkaskivuo/.dotfiles/bin/cargo-pool-daemon

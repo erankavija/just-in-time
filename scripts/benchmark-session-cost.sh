@@ -62,7 +62,7 @@ set -euo pipefail
 #                               target issue id on stdout, and exit without
 #                               timing or writing an artifact. Other harnesses
 #                               share the generator through this mode.
-#   CARGO_CI_BUILD_LOCK         build lock shared with cargo-ci.sh (default
+#   CARGO_CI_BUILD_LOCK         build lock shared with the benchmark scripts (default
 #                               ${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock); held
 #                               only around the release build.
 #   CARGO_CI_LOCK_TIMEOUT       seconds to wait for that lock (default 1800);
@@ -195,7 +195,7 @@ else
   echo "[session-bench] building release jit (commit $JIT_COMMIT, dirty=$JIT_DIRTY)" >&2
 
   # Hold the shared Cargo build lock around the release build only, so we queue
-  # behind (never contend with) a concurrent gate build.
+  # behind (never contend with) another benchmark or profiling build.
   command -v flock >/dev/null 2>&1 || {
     echo "ERROR: 'flock' is required to keep benchmark build timing isolated." >&2
     exit 2

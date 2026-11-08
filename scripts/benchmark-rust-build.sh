@@ -17,13 +17,13 @@ set -euo pipefail
 #     content.
 #   - Wall time, maximum resident set size, and exit status are recorded for
 #     every timed command (see run_measured below).
-#   - Builds serialize against other repository Cargo builds via the same
-#     CARGO_CI_BUILD_LOCK convention as scripts/cargo-ci.sh: a benchmark
-#     sample's cargo invocations hold a blocking host-wide flock, so they queue
-#     behind (never overlap) a concurrent gate build, and vice versa. The
+#   - Builds serialize against other benchmark and profiling runs via the same
+#     CARGO_CI_BUILD_LOCK convention as the other benchmark and profiling
+#     scripts: a benchmark sample's cargo invocations hold a blocking host-wide
+#     flock, so they queue behind (never overlap) another such script's build. The
 #     isolated per-sample CARGO_TARGET_DIR already makes concurrent builds safe
 #     from a correctness standpoint; the lock exists purely to keep sample
-#     timings free of contention from another build competing for the same CPUs.
+#     timings free of contention from another such run; gate builds take no lock.
 #   - Each sample's CARGO_TARGET_DIR is removed immediately after its
 #     measurements are recorded, before the next sample starts.
 #   - Every clean sample derives its own integration-test target count and
@@ -62,7 +62,7 @@ set -euo pipefail
 #                           inventory (default 1)
 #   BENCH_PROBE_FILE        file the rebuild probe is appended to
 #                           (default crates/jit/src/lib.rs)
-#   CARGO_CI_BUILD_LOCK     lock path shared with cargo-ci.sh
+#   CARGO_CI_BUILD_LOCK     lock path shared with the benchmark scripts
 #                           (default ${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock)
 #   CARGO_CI_LOCK_TIMEOUT   seconds to wait for that lock (default 1800);
 #                           the benchmark exits 2 when the wait passes, with
@@ -162,10 +162,10 @@ GIT_REVISION="${BENCH_GIT_REVISION_OVERRIDE:-$(git rev-parse HEAD)}"
 
 mkdir -p "$TARGET_BASE" "$OUT_DIR/raw"
 
-# --- host-wide build lock (shared with cargo-ci.sh) ---
+# --- host-wide build lock (shared with the benchmark scripts) ---
 # Acquired around replacing the sample logs and each sample's cargo invocations
 # only (not the whole script),
-# so a multi-hour benchmark run does not starve concurrent gate builds between
+# so a multi-hour benchmark run does not starve other lock holders between
 # samples. A blocking flock queues our request rather than running concurrently
 # with another lock holder, satisfying "refuses to overlap another repository
 # Cargo build" (REQ-01) without needing an explicit conflict check.
