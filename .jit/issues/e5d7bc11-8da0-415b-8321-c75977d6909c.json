@@ -8,6 +8,7 @@
   ],
   "description": "Make registry-first item queries take their TOML sources from the captured image, so `jit item` reads no declaration file outside its capture.\n\n## Background\n\n- `crates/jit/src/commands/item.rs` ~255: for a registry-first kind, the item query reads `gates.toml`, `rules.toml` or `invariants.toml` through `storage.read_repo_file` after capturing declarations, so a concurrent replacement makes the query consume bytes outside its image.\n- Story `d675102c` sol re-checkpoint review (commit `cea13616e`), finding 1. Steward ruling (just-in-time-d5, 2026-11-08): read the sources from the captured image's bytes and delete the `read_repo_file` path rather than keeping both.\n- Epic criterion: `b697a3f7` REQ-10 (read paths take declarations from a captured image).\n\n## Success Criteria\n\n- [hard] REQ-01: Registry-first item queries (`jit item show`, `search`, `list`) obtain each kind's TOML source from the captured image the query reads; the `read_repo_file` path in `commands/item.rs` is removed.\n- [hard] REQ-02: One test owns \"item queries read registry-first sources from the captured image\", observing that a source replaced after capture does not reach the query's result.\n- [hard] REQ-03: Item query output is unchanged for an unchanged repository.\n\n\n- Steward ruling (just-in-time-d5, 2026-11-08): local reworks of this task's parse behaviour stop after two code-review failures on parse-once findings; the reparse closes through `86a183c2`'s shared `DeclarationMemo` (dependency added). The captured-bytes behaviour stays landed; code-review reruns after `86a183c2` lands.\n\n\n- Steward ruling (just-in-time-d5, 2026-11-09): stated deviation from REQ-03, following the `a869900b` non-regular-file ruling. Registry-first item sources take the canonical `RepositoryImage::file_bytes` semantics: capture never follows symlinks, consistent with the no-follow capability layer, and a non-regular occupant (directory) reads as absent. A `policies.toml` symlink or directory occupant therefore changes query output by design; this does not violate REQ-03. No local `item.rs` fix: whether a non-regular occupant should read as absent is decided at the `file_bytes` source for every consumer (v1.1 follow-up `74657d61`).",
   "documents": [],
+  "done_at": "2026-11-08T23:43:36.549260584Z",
   "first_ready_at": "2026-11-08T13:24:26.893985008Z",
   "gates_required": [
     "cargo-ci",
@@ -38,7 +39,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Registry-first item queries read their sources from the captured image",
-  "updated_at": "2026-11-08T22:50:23.853535607Z"
+  "updated_at": "2026-11-08T23:43:36.549260584Z"
 }

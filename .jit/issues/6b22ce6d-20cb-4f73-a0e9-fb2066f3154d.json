@@ -25,7 +25,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "An exec gate evaluation resolves its documents once per captured image",
-  "updated_at": "2026-11-08T13:24:37.324152488Z"
+  "updated_at": "2026-11-08T23:43:36.439207582Z"
 }
