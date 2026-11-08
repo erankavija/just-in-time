@@ -121,7 +121,7 @@ Cross-checks: all 76 merges in `ledger-2026-11-04.txt` and all 92 in `ledger-202
 
 | Merge | Issue | Δ | Reason |
 |---|---|---:|---|
-| `0d980ee38` | dc048377 | +38 | It has no `epic:` label, but it is in df129d9e's transitive dependency tree as a prerequisite of 0546fc82, which is in this epic. It is counted in neither sum above. |
+| `0d980ee38` | dc048377 | +38 | It has no `epic:` label, but it is in df129d9e's transitive dependency tree as a prerequisite of 0546fc82, which is in this epic. It is excluded from the +306 sum and included in the +344 sum. |
 
 Merges whose ids belong only to other epics' labels, or to unlabelled issues outside df129d9e's dependency tree, are excluded. They are the `step other` rows of `ledger-final.txt`, with their epic labels.
 

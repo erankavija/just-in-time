@@ -69,13 +69,13 @@ fn test_validate_leases_detects_expired_lease() {
     let output = primary.command(["validate", "--leases"]).output().unwrap();
 
     assert!(!output.status.success(), "Should fail with expired lease");
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stderr.contains("Expired"),
+        stdout.contains("Expired"),
         "Error should mention expiration"
     );
     assert!(
-        stderr.contains("00000000-0000-4000-8000-000000000001") || stderr.contains(&issue_id[..8]),
+        stdout.contains("00000000-0000-4000-8000-000000000001") || stdout.contains(&issue_id[..8]),
         "Error should reference the lease or issue"
     );
 }
@@ -115,18 +115,18 @@ fn test_validate_leases_detects_missing_worktree() {
         !output.status.success(),
         "Should fail with missing worktree"
     );
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stderr.contains("Worktree") && stderr.contains("no longer exists"),
+        stdout.contains("Worktree") && stdout.contains("no longer exists"),
         "Error should mention missing worktree"
     );
     assert!(
-        stderr.contains(&worktree_id),
+        stdout.contains(&worktree_id),
         "Error should reference worktree ID"
     );
     assert!(
-        stderr.contains(&format!("jit claim force-evict {}", &issue_id[..8])),
-        "Remedy should force-evict by issue: {stderr}"
+        stdout.contains(&format!("jit claim force-evict {}", &issue_id[..8])),
+        "Remedy should force-evict by issue: {stdout}"
     );
 }
 
@@ -152,18 +152,18 @@ fn test_validate_leases_detects_missing_issue() {
     let output = primary.command(["validate", "--leases"]).output().unwrap();
 
     assert!(!output.status.success(), "Should fail with missing issue");
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stderr.contains("Issue") && stderr.contains("no longer exists"),
+        stdout.contains("Issue") && stdout.contains("no longer exists"),
         "Error should mention missing issue"
     );
     assert!(
-        stderr.contains(&fake_issue_id[..8]),
+        stdout.contains(&fake_issue_id[..8]),
         "Error should reference issue ID"
     );
     assert!(
-        stderr.contains(&format!("jit claim force-evict {}", &fake_issue_id[..8])),
-        "Remedy should force-evict by issue: {stderr}"
+        stdout.contains(&format!("jit claim force-evict {}", &fake_issue_id[..8])),
+        "Remedy should force-evict by issue: {stdout}"
     );
 }
 

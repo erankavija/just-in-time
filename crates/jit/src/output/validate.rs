@@ -126,20 +126,18 @@ impl ValidationChecksResponse {
         }
     }
 
+    /// The one-line stderr summary naming each failed check.
     pub fn failure_message(&self) -> String {
-        self.validations
+        let failed: Vec<_> = self
+            .validations
             .iter()
-            .find(|check| !check.valid)
-            .map_or_else(String::new, |check| match check.validation.as_str() {
-                "branch_drift" => {
-                    format!("error: Branch-drift validation failed:\n{}", check.message)
-                }
-                "leases" if check.message.starts_with("Error: ") => format!(
-                    "error: Lease validation error: {}",
-                    check.message.trim_start_matches("Error: ")
-                ),
-                _ => format!("error: Lease validation failed:\n{}", check.message),
+            .filter(|check| !check.valid)
+            .map(|check| match check.validation.as_str() {
+                "branch_drift" => "branch drift",
+                _ => "leases",
             })
+            .collect();
+        format!("Validation failed: {}", failed.join(", "))
     }
 }
 
@@ -147,10 +145,17 @@ impl ValidationChecksResponse {
     fn human_text(&self) -> String {
         self.validations
             .iter()
-            .take_while(|check| check.valid)
-            .filter_map(|check| match check.validation.as_str() {
-                "branch_drift" => Some("Branch is up-to-date with origin/main"),
-                "leases" => Some("All active leases are valid"),
+            .filter_map(|check| match (check.validation.as_str(), check.valid) {
+                ("branch_drift", true) => Some("Branch is up-to-date with origin/main".to_owned()),
+                ("branch_drift", false) => Some(format!(
+                    "Branch-drift validation failed:\n{}",
+                    check.message
+                )),
+                ("leases", true) => Some("All active leases are valid".to_owned()),
+                ("leases", false) => Some(match check.message.strip_prefix("Error: ") {
+                    Some(error) => format!("Lease validation error: {error}"),
+                    None => format!("Lease validation failed:\n{}", check.message),
+                }),
                 _ => None,
             })
             .map(|line| format!("{line}\n"))
@@ -241,5 +246,71 @@ impl HumanRender for RepositoryValidationResponse {
     fn render_human(&self, mode: OutputMode) -> String {
         let _ = mode;
         self.human_text()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dispatch::Outcome;
+    use crate::output::{emit_outcome, ErrorCode};
+
+    fn failing(validation: &'static str, message: &str) -> ValidationCheck {
+        ValidationCheck::new(validation, false, message.to_owned())
+    }
+
+    fn streams(response: ValidationChecksResponse) -> (String, String) {
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let mode = OutputMode {
+            json: false,
+            quiet: false,
+        };
+        let outcome: Outcome<ValidateResponse> = Outcome::findings(
+            ErrorCode::ValidationFailed,
+            response.failure_message(),
+            response,
+        );
+        emit_outcome(&outcome, mode, &mut out, &mut err).unwrap();
+        (
+            String::from_utf8(out).unwrap(),
+            String::from_utf8(err).unwrap(),
+        )
+    }
+
+    #[test]
+    fn test_checks_report_prints_every_failed_check_on_stdout_and_one_stderr_line() {
+        let (stdout, stderr) = streams(ValidationChecksResponse::new(vec![
+            failing("branch_drift", "diverged\nFix: git rebase origin/main"),
+            failing("leases", "Found 1 invalid lease(s):\nlease-a"),
+        ]));
+
+        assert!(stdout.contains("diverged\nFix: git rebase origin/main"));
+        assert!(stdout.contains("Found 1 invalid lease(s):\nlease-a"));
+        assert_eq!(stderr.lines().count(), 1, "{stderr:?}");
+        assert!(stderr.ends_with('\n'));
+    }
+
+    #[test]
+    fn test_checks_report_prints_passed_check_beside_failed_check() {
+        let (stdout, stderr) = streams(ValidationChecksResponse::new(vec![
+            ValidationCheck::new("branch_drift", true, String::new()),
+            failing("leases", "Error: unreadable"),
+        ]));
+
+        assert!(stdout.contains("Branch is up-to-date with origin/main"));
+        assert!(stdout.contains("Lease validation error: unreadable"));
+        assert_eq!(stderr.lines().count(), 1, "{stderr:?}");
+    }
+
+    #[test]
+    fn test_checks_report_prints_failed_branch_drift_beside_passed_leases() {
+        let (stdout, stderr) = streams(ValidationChecksResponse::new(vec![
+            failing("branch_drift", "diverged"),
+            ValidationCheck::new("leases", true, String::new()),
+        ]));
+
+        assert!(stdout.contains("diverged"));
+        assert!(stdout.contains("All active leases are valid"));
+        assert_eq!(stderr.lines().count(), 1, "{stderr:?}");
     }
 }
