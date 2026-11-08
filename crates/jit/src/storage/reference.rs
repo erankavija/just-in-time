@@ -740,7 +740,7 @@ pub fn render_reference_markdown() -> Result<String> {
          repository-relative document path. The archive execution finalizer\n\
          (`finalize_archive_execution`) appends the execution to this record in the same\n\
          redo record as the archive event. Preview and execution share one planner,\n\
-         `capture_archive_plan`, which captures it by target.\n\
+         `plan_archive_target`, which captures it by target.\n\
          \n\
          ```json\n\
          {example_archive_evidence}\n\
@@ -931,7 +931,7 @@ mod tests {
             "`target`",
             "`executions`",
             "captured_reusable_gate_run",
-            "capture_archive_plan",
+            "plan_archive_target",
             "finalize_archive_execution",
         ] {
             assert!(page.contains(required), "reference is missing `{required}`");

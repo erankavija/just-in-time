@@ -4,6 +4,7 @@
   "context": {},
   "created_at": "2026-10-20T20:12:38.027010524Z",
   "dependencies": [
+    "1471c12a-5117-45e0-8712-f4968ff7b934",
     "3a61ff16-9afb-4c7c-9583-8ce588581350",
     "a236e81e-4890-4607-931a-e3d3612c3899",
     "c8e79465-e28c-4dea-8c25-ad3fdc812e34"
@@ -29,14 +30,35 @@
       "format": "markdown",
       "label": "Execution handoff",
       "path": "dev/active/0f8efc37-frontends-share-core/handoff.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/0f8efc37-frontends-share-core/completion-report.md"
     }
   ],
+  "done_at": "2026-11-08T00:02:02.567043500Z",
   "first_ready_at": "2026-10-20T20:12:38.027010524Z",
   "gates_required": [
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "holistic-review": {
+      "run_id": "e2aec9e9-1cf0-45b9-8575-1fd0f18984cf",
+      "status": "passed",
+      "updated_at": "2026-11-08T00:01:26.622706886Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "run_id": "f489e553-b36b-4ba7-84df-fb52ffbcc293",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:57:58.819886453Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0f8efc37-8054-420d-9409-dde888ea0040",
   "labels": [
     "epic:frontends-share-core",
@@ -50,7 +72,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Run the server and web UI on the core's shared mechanisms",
-  "updated_at": "2026-11-05T04:05:19.958105726Z"
+  "updated_at": "2026-11-08T00:02:02.606171661Z"
 }

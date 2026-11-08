@@ -9,12 +9,26 @@
   ],
   "description": "Plan every archive candidate in one read attempt over one growing image, deriving configuration, hierarchy and captured issues once instead of once per candidate, and document the shared capture budget in the adopter reference.\n\n## Background\n\n- `archive_candidates` (`crates/jit/src/commands/archive.rs:158-170`) plans each effectively terminal container separately. Each plan captures the archive base (`capture_archive_base`, `crates/jit/src/commands/validate.rs:305`) and re-derives configuration, namespaces, hierarchy and captured issues at the head of `capture_archive_plan` (`archive.rs:516-525`). Measured on this repository: 190 candidates over 1589 issues take about 87 s, roughly 0.46 s per candidate.\n- `capture_archive_plan` grows its image through `capture_more`, `capture_paths` and `capture_artifact_evidence` (`archive.rs:314-470`). Capture rounds share the image without copying it, so one image can grow across many targets without per-round clones.\n- The archive base budget is shared by the whole session: a listing budget for every directory below the archive roots (`validate.rs:305-358`) and the session byte ceiling `CAPTURE_MAX_BYTES` (`crates/jit/src/commands/mod.rs:267`).\n- The session-open counter used by command tests is `SessionOpenCounter` (`crates/jit/src/commands/test_helpers.rs:51-70`); it counts `MutationPoint::SessionOpen`, which only mutation-session opens cross. `read-session` makes a read-session open cross `MutationPoint::ReadSessionOpen`.\n- `docs/reference/storage-format.md` lists the commands that read through the read driver, under the rule `lock-free-read-consumers` states.\n- `docs/reference/cli-commands.md:255-309` describes `jit archive candidates` as a read-only report.\n\n## Success Criteria\n\n- [hard] REQ-01: `capture_archive_plan` is split into a base derivation (configuration, policy, namespaces, hierarchy and captured issues, derived once per image) and a per-target planner over that base and the growing image; execute and preview call the same two functions.\n- [hard] REQ-02: `archive_candidates` runs one `with_read_session` closure that derives the base once and plans every candidate on the one image.\n- [hard] REQ-03: `SessionOpenCounter` counts `ReadSessionOpen` separately from `SessionOpen`. A harness test over several uncontended candidates counts one read-session open and no mutation-session open, and asserts that each candidate's plan equals that container's single-target preview.\n- [hard] REQ-04: The `jit archive candidates` section of `docs/reference/cli-commands.md` states that candidates are planned in one session sharing one capture budget, so a repository whose candidates together exceed the budget fails the whole listing with the budget error.\n- [hard] REQ-05: `docs/reference/storage-format.md` lists archive preview and `jit archive candidates` among the commands that read through the driver.\n\n## Notes\n\n- Behaviour is unchanged for the reported plans. A repository whose candidates together exceed the session's capture budget now fails candidate listing with the budget error instead of planning each candidate within its own budget; the worker states the observed budget use for this repository in the completion evidence.\n- `container-destination-once` and `archive-destination-no-legacy-fallback` follow this task and edit the per-target half it creates.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-07T23:21:40.823043735Z",
   "first_ready_at": "2026-11-06T04:26:48.078156313Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "0238c917-7e1e-46fb-8a61-dcffa057dd6b",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:18:41.765161160Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "09f3e02c-27f3-4d2b-a74e-53097f432a7a",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:21:22.473649353Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c0775a83-0b83-4a90-883b-527876784a21",
   "labels": [
     "type:task",
@@ -28,7 +42,7 @@
     "satisfies:b697a3f7/REQ-21"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Archive candidates plan in one read-only session",
-  "updated_at": "2026-11-06T04:27:07.391662902Z"
+  "updated_at": "2026-11-07T23:21:40.823043735Z"
 }

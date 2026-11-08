@@ -42,7 +42,6 @@ pub mod redo_record;
 pub mod reference;
 pub mod repo_lock;
 pub mod repository_state_store;
-pub mod ruleset_store;
 pub mod temp_cleanup;
 #[cfg(feature = "test-support")]
 mod test_support;
@@ -362,29 +361,6 @@ pub trait IssueStore: Clone {
         path: &str,
         at_commit: Option<&str>,
     ) -> Result<(Vec<u8>, String), PathReadError>;
-
-    /// Read file content as UTF-8 text, optionally at a specific git commit.
-    ///
-    /// Delegates to [`IssueStore::read_path_bytes`] and decodes the result as
-    /// UTF-8.  Bytes that are not valid UTF-8 are replaced with the Unicode
-    /// replacement character (U+FFFD) so that text-oriented callers receive a
-    /// `String` without an extra error path for encoding failures.
-    ///
-    /// Returns `(text, commit_label)` with the same commit-label semantics as
-    /// `read_path_bytes`.
-    ///
-    /// # Errors
-    ///
-    /// Propagates `PathReadError::NotFound`, `PathReadError::CommitNotFound`,
-    /// and `PathReadError::Other` from the underlying `read_path_bytes` call.
-    fn read_path_text(
-        &self,
-        path: &str,
-        at_commit: Option<&str>,
-    ) -> Result<(String, String), PathReadError> {
-        let (bytes, label) = self.read_path_bytes(path, at_commit)?;
-        Ok((String::from_utf8_lossy(&bytes).into_owned(), label))
-    }
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 {
   "epic_id": "0f8efc37-8054-420d-9409-dde888ea0040",
   "epic_short_id": "0f8efc37",
-  "current_wave": 3,
+  "current_wave": "complete",
   "waves": [
     {
       "wave_number": 1,
@@ -72,7 +72,7 @@
           "short_id": "d4172016",
           "title": "Converge document operation adapters",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "4538b071-a0f7-4ae6-8c1d-a11b76962b6e",
@@ -112,7 +112,7 @@
           "short_id": "c8e79465",
           "title": "Server convergence",
           "classification": "checkpoint",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -136,7 +136,19 @@
           "short_id": "3a61ff16",
           "title": "Browser convergence",
           "classification": "checkpoint",
-          "status": "pending"
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {
+          "id": "1471c12a-5117-45e0-8712-f4968ff7b934",
+          "short_id": "1471c12a",
+          "title": "Return repository-relative paths from linked-document search",
+          "classification": "implementation",
+          "status": "done"
         }
       ]
     }
@@ -160,25 +172,26 @@
         "32607213-7402-4c17-9889-7a6286e1959e"
       ],
       "dependent": "3a61ff16-9afb-4c7c-9583-8ce588581350",
-      "status": "blocked_on_permission",
+      "status": "done",
       "approval": "User authorized exact esbuild@0.25.12 allowScripts entry on 2026-11-08 via d5; entry applied in worktree branch worktree-agent-38df8a6c-2; verification npm ci --offline denied by session auto-mode classifier, awaiting user permission",
-      "blocked_command": "cd /mnt/nvme/jit/agents/worktrees/agent-38df8a6c/web && npm ci --offline",
       "parked": "Uncommitted web/package.json entry on worktree-agent-38df8a6c-2; commit only after clean-install verification passes. Old branch worktree-agent-38df8a6c untouched pending user cleanup."
-    }
-  ],
-  "escalations": [
+    },
     {
-      "issue": "38df8a6c",
-      "to": "just-in-time-d5",
-      "date": "2026-11-08",
-      "summary": "clean-install verification needs user permission"
+      "id": "1471c12a-5117-45e0-8712-f4968ff7b934",
+      "reason": "Holistic review ea3ab36e F1 (blocking): linked-document search returns absolute paths rejected by document routes",
+      "dependent": "0f8efc37-8054-420d-9409-dde888ea0040",
+      "status": "done",
+      "approval": "steward d5 approved; fix at source in core search_selected"
     }
   ],
+  "escalations": [],
   "rework_counts": {
     "9c3eb2bf": 2,
     "cd0ac0f7": 1,
     "4538b071": 1,
-    "6326532e": 3
+    "6326532e": 3,
+    "d4172016": 2,
+    "1471c12a": 1
   },
   "started_at": "2026-11-04T23:10:18.497421+00:00",
   "note": "Session 2 (2026-11-08): d4172016 stale claim released and reclaimed; prior WIP preserved and rebased; opus worker dispatched.",
@@ -187,7 +200,8 @@
       "issue": "abf68973",
       "source": "preliminary code-review F1",
       "summary": "Reviewer flags satisfies:c8e79465/REQ-01 on server-modules as not directly establishing route behavior; reconcile against server-story REQ-01 before container completion.",
-      "status": "open"
+      "status": "resolved",
+      "resolution": "satisfies namespace denotes contribution, not sole delivery (.jit/config.toml [namespaces.satisfies]); c8e79465 REQ-01 is delivered jointly by route-level children 0f302914, 6326532e, 4d8791fb, ca44bb7c, 4538b071, d4172016; c8e79465 code-review passed with 0 findings."
     }
   ],
   "decision_d25": {
@@ -201,5 +215,93 @@
     "advisory": "Read-only steward audit of 93ae39349 found blocking in-memory getters; e4184f3f2 fixed them. Narrow follow-up found swallowed library preview conflict; f49a69276 fixed it. Both findings remain review evidence.",
     "installed_verification": "nonblocking-install-verification.md"
   },
-  "scheduling_exception": "On 2026-11-05 the steward authorized dependency-ready b067c2db to start in parallel with unfinished wave 2 work because its only prerequisite 4d8791fb was done and its browser footprint is disjoint; all real dependencies, gates, and acceptance remain required."
+  "scheduling_exception": "On 2026-11-05 the steward authorized dependency-ready b067c2db to start in parallel with unfinished wave 2 work because its only prerequisite 4d8791fb was done and its browser footprint is disjoint; all real dependencies, gates, and acceptance remain required.",
+  "reviews": [
+    {
+      "issue": "38df8a6c",
+      "gate": "code-review",
+      "vendor": "openai-codex",
+      "model": "gpt-5.6-terra",
+      "effort": "high",
+      "verdict": "pass"
+    },
+    {
+      "issue": "3a61ff16",
+      "gate": "code-review",
+      "vendor": "openai-codex",
+      "model": "gpt-5.6-terra",
+      "effort": "high",
+      "verdict": "pass"
+    },
+    {
+      "issue": "d4172016",
+      "gate": "cargo-ci",
+      "verdict": "pass",
+      "tree": "e736d46f0"
+    },
+    {
+      "issue": "d4172016",
+      "gate": "code-review",
+      "run": "f6a2b9dd-32eb-4743-a3cb-16ce1c8df50d",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "fail",
+      "finding": "split combined server test (@/inv/orthogonal-tests)"
+    },
+    {
+      "issue": "d4172016",
+      "gate": "code-review",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "tree": "a4ce0b488"
+    },
+    {
+      "issue": "c8e79465",
+      "gate": "code-review",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass"
+    },
+    {
+      "issue": "0f8efc37",
+      "gate": "holistic-review",
+      "run": "ea3ab36e-fba6-48d1-b8e0-d92583179503",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "fail",
+      "findings": "F1 blocking -> 1471c12a; F2 advisory forwarded to steward, no action"
+    },
+    {
+      "issue": "1471c12a",
+      "gate": "code-review",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "tree": "52e2ea4fc"
+    },
+    {
+      "issue": "0f8efc37",
+      "gate": "holistic-review",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "advisories": "F1 stale doc fixed under d4172016; F2 no action (steward)"
+    }
+  ],
+  "amendments": [
+    {
+      "issue": "d4172016",
+      "by": "just-in-time-d5 (steward)",
+      "date": "2026-11-08",
+      "summary": "Git-less document history returns an empty list from the single core document_history (D-4, D-20); CLI behaviour changes from error to empty list; HTTP adapter maps nothing; real Git failures surface."
+    }
+  ],
+  "completed_at": "2026-11-08T00:05:00+00:00"
 }

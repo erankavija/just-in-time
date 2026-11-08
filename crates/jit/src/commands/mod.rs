@@ -132,15 +132,10 @@ pub use crate::storage::worktree_identity::WorktreeIdentity;
 
 // Common imports used across modules
 use crate::config::JitConfig;
-use crate::config_manager::ConfigManager;
-#[cfg(any(test, feature = "test-support"))]
-use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::declarations::{GateDefinition, GateMode};
 use crate::domain::identity::{GateKey, IssueId};
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
 use crate::domain::queries::ReadinessScope;
-#[cfg(any(test, feature = "test-support"))]
-use crate::domain::LabelNamespaces;
 use crate::domain::{
     is_dependency_met, Event, EventBody, GateEvaluationStability, GateState, GateStatus, Issue,
     Priority, ReadinessCorrection, State,
@@ -2544,38 +2539,6 @@ pub(crate) fn configuration_argument_error(
 /// (JSON files, SQLite, in-memory, etc.).
 pub struct CommandExecutor<S: IssueStore> {
     storage: S,
-    config_manager: ConfigManager,
-    // `rules`, `effective_rules` and `namespaces` are test-only remnants, removed
-    // by 42046050 (executor-config-caches-removal).
-    /// Lazily-parsed `.jit/rules.toml`, cached for the lifetime of the
-    /// executor so the validation ruleset is read at most once per process
-    /// rather than re-parsed on every write. The cached value retains any
-    /// load/parse error so callers can surface a misconfigured rules file
-    /// instead of silently treating it as "no rules".
-    #[cfg(any(test, feature = "test-support"))]
-    rules: OnceLock<Result<RuleSet, RuleConfigError>>,
-    /// Lazily-built EFFECTIVE rule set. When `.jit/rules.toml` is present it
-    /// supplies the rules, with the `origin = "default"` family reconciled against
-    /// this repo's `config.toml` registry at load
-    /// ([`reconcile_default_rules_with_config`](crate::repository_state::reconcile_default_rules_with_config));
-    /// when absent, the built-in
-    /// [`default_ruleset`](crate::repository_state::default_ruleset) is built
-    /// IN MEMORY. The former hard-coded checks (a0f0f342 migration) now live as
-    /// default rules here. A load/parse error from either source is retained as an
-    /// `Err` so a misconfigured repo surfaces the problem rather than silently
-    /// disabling enforcement.
-    #[cfg(any(test, feature = "test-support"))]
-    effective_rules: OnceLock<Result<RuleSet, String>>,
-    /// Lazily-loaded `.jit/config.toml`, cached so the unified write-time
-    /// validation entry point does not re-read and re-parse `config.toml` on
-    /// every write. The parsed config seeds the built-in default rules. A
-    /// malformed config is retained as an `Err` so it is surfaced rather than
-    /// swallowed.
-    config: OnceLock<Result<JitConfig, String>>,
-    /// Lazily-built label namespace registry, derived from the cached config and
-    /// cached alongside it for the same reason.
-    #[cfg(any(test, feature = "test-support"))]
-    namespaces: OnceLock<Result<LabelNamespaces, String>>,
     /// The canonical repository layout every session this executor opens mutates
     /// through.
     ///
@@ -2604,27 +2567,8 @@ pub struct CommandExecutor<S: IssueStore> {
 impl<S: IssueStore> CommandExecutor<S> {
     /// Create a new command executor with the given storage
     pub fn new(storage: S) -> Self {
-        let data_root = storage.root();
-        let config_layout = crate::storage::discover_repository_layout(
-            data_root
-                .parent()
-                .unwrap_or_else(|| std::path::Path::new(".")),
-            data_root,
-        )
-        .ok();
-        let config_manager = config_layout
-            .map(ConfigManager::new)
-            .unwrap_or_else(ConfigManager::unbound);
         Self {
             storage,
-            config_manager,
-            #[cfg(any(test, feature = "test-support"))]
-            rules: OnceLock::new(),
-            #[cfg(any(test, feature = "test-support"))]
-            effective_rules: OnceLock::new(),
-            config: OnceLock::new(),
-            #[cfg(any(test, feature = "test-support"))]
-            namespaces: OnceLock::new(),
             layout: None,
             worktree_paths: OnceLock::new(),
             recovered_records: 0,
@@ -2642,7 +2586,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         layout: crate::repository_state::RepositoryLayout,
     ) -> Result<Self> {
         self.storage.configure_repository_layout(&layout)?;
-        self.config_manager.bind_layout(layout.clone());
         self.layout = Some(layout);
         Ok(self)
     }
@@ -2959,103 +2902,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Get reference to the storage backend
     fn storage(&self) -> &S {
         &self.storage
-    }
-
-    /// Return the parsed validation ruleset, loading `.jit/rules.toml` on first
-    /// access and caching the result for subsequent calls.
-    ///
-    /// A MISSING `.jit/rules.toml` is not an error: it yields `Ok(`an empty
-    /// [`RuleSet`]`)`. A genuine parse or load failure (malformed TOML, an
-    /// invalid `assert` table, an unsafe schema reference, etc.) is returned as
-    /// `Err` rather than being swallowed, so a misconfigured repository cannot
-    /// silently disable all rule enforcement. The load is performed at most once
-    /// and the outcome (success or failure) is cached.
-    #[cfg(any(test, feature = "test-support"))]
-    pub(crate) fn rules(&self) -> Result<&RuleSet, &RuleConfigError> {
-        self.rules
-            .get_or_init(|| {
-                let config =
-                    self.cached_config()
-                        .map_err(|error| RuleConfigError::Configuration {
-                            message: error.to_string(),
-                        })?;
-                crate::storage::ruleset_store::load_ruleset(
-                    self.repository_layout()
-                        .map_err(|error| RuleConfigError::Configuration {
-                            message: error.to_string(),
-                        })?,
-                    config,
-                )
-            })
-            .as_ref()
-    }
-
-    /// Combine authored rules with registry-derived defaults in memory, without
-    /// writing files. Missing default rows apply even in an empty or custom-only
-    /// file; existing rows retain their policy edits. Custom rules load their
-    /// declared schemas, while default assertions derive from configuration.
-    ///
-    /// The result, including any configuration or rule-loading error, is cached.
-    #[cfg(any(test, feature = "test-support"))]
-    pub(crate) fn effective_rules(&self) -> Result<&RuleSet> {
-        self.effective_rules
-            .get_or_init(|| {
-                let layout = self.require_layout().map_err(|error| error.to_string())?;
-                let rules_path = layout
-                    .resolve(&crate::repository_state::VirtualPath::RULES)
-                    .map_err(|error| error.to_string())?;
-                if rules_path.exists() {
-                    let user = self.rules().map_err(|e| e.to_string())?.clone();
-                    let namespaces = self.cached_namespaces().map_err(|e| e.to_string())?;
-                    crate::repository_state::reconcile_default_rules_with_config(user, namespaces)
-                        .map_err(|error| error.to_string())
-                } else {
-                    // File absent: build the fixed defaults IN MEMORY (no write,
-                    // no warning) from the repo's namespace registry. Materialized
-                    // to disk only by `jit init`.
-                    let namespaces = self.cached_namespaces().map_err(|e| e.to_string())?;
-                    Ok(crate::repository_state::default_ruleset(namespaces))
-                }
-            })
-            .as_ref()
-            .map_err(|err| anyhow!("{err}"))
-    }
-
-    /// Return the cached parsed `.jit/config.toml`, loading it on first access.
-    ///
-    /// The config is read at most once per executor (cached in a `OnceLock`) so
-    /// the unified write-validation path does not re-parse `config.toml` on every
-    /// write. A malformed config is surfaced as an error rather than swallowed.
-    fn cached_config(&self) -> Result<&JitConfig> {
-        self.config
-            .get_or_init(|| self.config_manager.load().map_err(|err| err.to_string()))
-            .as_ref()
-            .map_err(|err| configuration_argument_error(err).into())
-    }
-
-    /// Return the cached label namespace registry, building it on first access.
-    ///
-    /// Cached alongside [`cached_config`](Self::cached_config) so the registry is
-    /// derived at most once per executor.
-    #[cfg(any(test, feature = "test-support"))]
-    fn cached_namespaces(&self) -> Result<&LabelNamespaces> {
-        self.namespaces
-            .get_or_init(|| {
-                // Derive namespaces from the already-cached config so a single
-                // write command reads `config.toml` at most once (the prior
-                // `get_namespaces()` call re-loaded it from disk).
-                match self.cached_config() {
-                    Ok(config) => Ok(self.config_manager.namespaces_from_config(config)),
-                    Err(err) => Err(format!("{err}")),
-                }
-            })
-            .as_ref()
-            .map_err(|err| {
-                crate::errors::InvalidArgumentError::new(format!(
-                    "invalid namespace configuration: {err}"
-                ))
-                .into()
-            })
     }
 
     /// Capture a state change's preflight in its own session, growing it to
@@ -4689,157 +4535,6 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
         );
         assert!(storage.load_issue(&id).unwrap().gates_required.is_empty());
         assert!(storage.read_events().unwrap().is_empty());
-    }
-
-    #[test]
-    fn test_rules_are_parsed_once_and_cached() {
-        use crate::declarations::rules::Assertion;
-        use crate::storage::InMemoryStorage;
-
-        let storage = InMemoryStorage::new();
-        let layout = storage.repository_layout();
-        let rules_path = layout
-            .resolve(&crate::repository_state::VirtualPath::RULES)
-            .unwrap();
-        std::fs::create_dir_all(rules_path.parent().unwrap()).unwrap();
-        std::fs::write(
-            &rules_path,
-            r#"
-[[rules]]
-name = "first"
-assert = { require-section = { heading = "Goals" } }
-"#,
-        )
-        .unwrap();
-
-        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
-
-        // First access parses and caches the file.
-        let first = executor.rules().expect("valid rules");
-        assert_eq!(first.rules.len(), 1);
-        assert_eq!(first.rules[0].name, "first");
-        let ptr_first = std::ptr::from_ref(first);
-
-        // Mutate the file on disk AFTER the first parse.
-        std::fs::write(
-            &rules_path,
-            r#"
-[[rules]]
-name = "second"
-assert = { require-section = { heading = "Other" } }
-
-[[rules]]
-name = "third"
-assert = { require-doc-type = { doc-type = "design" } }
-"#,
-        )
-        .unwrap();
-
-        // Second access must return the cached (original) parse, NOT re-read.
-        let second = executor.rules().expect("valid rules");
-        assert_eq!(second.rules.len(), 1, "ruleset was re-read from disk");
-        assert_eq!(second.rules[0].name, "first");
-        assert!(matches!(
-            second.rules[0].assert,
-            Assertion::RequireSection { .. }
-        ));
-        // Same cached instance is returned each time.
-        assert_eq!(ptr_first, std::ptr::from_ref(second));
-    }
-
-    #[test]
-    fn test_namespaces_are_parsed_once_and_cached() {
-        use crate::storage::InMemoryStorage;
-
-        let storage = InMemoryStorage::new();
-        let layout = storage.repository_layout();
-        let config_path = layout
-            .resolve(&crate::repository_state::VirtualPath::CONFIG)
-            .unwrap();
-        std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
-        std::fs::write(
-            &config_path,
-            r#"
-[namespaces.req]
-description = "Requirement tags"
-unique = false
-"#,
-        )
-        .unwrap();
-
-        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
-
-        // First access parses config.toml and caches the namespace registry.
-        let first = executor.cached_namespaces().expect("valid namespaces");
-        let ptr_first = std::ptr::from_ref(first);
-
-        // Mutate config.toml on disk AFTER the first parse. A re-read would pick
-        // up the new namespace; a cached registry must not.
-        std::fs::write(
-            &config_path,
-            r#"
-[namespaces.req]
-description = "Requirement tags"
-unique = false
-
-[namespaces.owner]
-description = "Ownership tags"
-unique = false
-"#,
-        )
-        .unwrap();
-
-        // Second access must return the SAME cached instance, proving the
-        // namespace config is parsed once per executor and not re-read per write.
-        let second = executor.cached_namespaces().expect("valid namespaces");
-        assert_eq!(
-            ptr_first,
-            std::ptr::from_ref(second),
-            "namespace registry was re-read from disk instead of cached"
-        );
-    }
-
-    #[test]
-    fn test_rules_missing_file_yields_empty_ok() {
-        use crate::storage::InMemoryStorage;
-
-        let storage = InMemoryStorage::new();
-        let layout = storage.repository_layout();
-        // No rules.toml written.
-
-        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
-        let rules = executor.rules().expect("missing file is not an error");
-        assert!(rules.rules.is_empty());
-    }
-
-    #[test]
-    fn test_rules_malformed_file_yields_err() {
-        use crate::storage::InMemoryStorage;
-
-        let storage = InMemoryStorage::new();
-        let layout = storage.repository_layout();
-        let rules_path = layout
-            .resolve(&crate::repository_state::VirtualPath::RULES)
-            .unwrap();
-        std::fs::create_dir_all(rules_path.parent().unwrap()).unwrap();
-
-        // A rule whose assert table has no kind is a genuine config error and
-        // must NOT be downgraded to an empty (no-rules) set.
-        std::fs::write(
-            rules_path,
-            r#"
-[[rules]]
-name = "broken"
-assert = {}
-"#,
-        )
-        .unwrap();
-
-        let executor = CommandExecutor::new(storage).with_layout(layout).unwrap();
-        assert!(
-            executor.rules().is_err(),
-            "malformed rules.toml must surface an error, not an empty set"
-        );
     }
 
     // Enforcement tests

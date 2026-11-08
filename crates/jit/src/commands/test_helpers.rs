@@ -13,24 +13,14 @@ use std::sync::{
     Arc, Mutex,
 };
 
-/// Kernel inspection for tests that own executor storage and rule fixtures.
+/// Kernel inspection for tests that own executor storage.
 pub trait ExecutorTestAccess<S: IssueStore> {
     fn storage(&self) -> &S;
-    fn rules(&self) -> Result<&super::RuleSet, &super::RuleConfigError>;
-    fn effective_rules(&self) -> anyhow::Result<&super::RuleSet>;
 }
 
 impl<S: IssueStore> ExecutorTestAccess<S> for CommandExecutor<S> {
     fn storage(&self) -> &S {
         CommandExecutor::storage(self)
-    }
-
-    fn rules(&self) -> Result<&super::RuleSet, &super::RuleConfigError> {
-        CommandExecutor::rules(self)
-    }
-
-    fn effective_rules(&self) -> anyhow::Result<&super::RuleSet> {
-        CommandExecutor::effective_rules(self)
     }
 }
 
@@ -174,26 +164,37 @@ pub(crate) fn seed_gate_registry(storage: &InMemoryStorage, registry: &GateRegis
     );
 }
 
-/// Count session opens via [`MutationPoint::SessionOpen`], the moment every
-/// session open crosses exactly once, injecting no failure. Shared by tests
-/// that assert a session-open budget.
-pub(crate) struct SessionOpenCounter(AtomicUsize);
+/// Count mutation-session opens ([`MutationPoint::SessionOpen`]) and read-session
+/// opens ([`MutationPoint::ReadSessionOpen`]) separately, injecting no failure.
+/// Each open crosses its point exactly once. Shared by tests that assert a
+/// session-open budget.
+#[derive(Default)]
+pub(crate) struct SessionOpenCounter {
+    mutation: AtomicUsize,
+    read: AtomicUsize,
+}
 
 impl SessionOpenCounter {
     pub(crate) fn new() -> Arc<Self> {
-        Arc::new(Self(AtomicUsize::new(0)))
+        Arc::default()
     }
 
-    pub(crate) fn count(&self) -> usize {
-        self.0.load(Ordering::SeqCst)
+    pub(crate) fn mutation_opens(&self) -> usize {
+        self.mutation.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn read_opens(&self) -> usize {
+        self.read.load(Ordering::SeqCst)
     }
 }
 
 impl crate::storage::MutationInterruptionInjector for SessionOpenCounter {
     fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
-        if point == &MutationPoint::SessionOpen {
-            self.0.fetch_add(1, Ordering::SeqCst);
-        }
+        match point {
+            MutationPoint::SessionOpen => self.mutation.fetch_add(1, Ordering::SeqCst),
+            MutationPoint::ReadSessionOpen => self.read.fetch_add(1, Ordering::SeqCst),
+            _ => return Ok(()),
+        };
         Ok(())
     }
 }
@@ -314,7 +315,7 @@ pub struct MemoryDeclarations<'a> {
     /// Install the supplied declarations verbatim after initialization, which
     /// then neither validates nor rejects them (such as malformed rules).
     pub after_initialization: bool,
-    /// Declarations removed from the store and its host mirror after
+    /// Declarations removed from the store after
     /// initialization and installation, for a scenario that needs them absent.
     pub absent: &'a [VirtualPath],
 }
@@ -359,8 +360,7 @@ pub fn memory_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStor
 /// path, before initialization unless
 /// [`MemoryDeclarations::after_initialization`] is set; initialization fills
 /// only absent paths without changing seeded state. Initializes a fault-free
-/// declaration copy, excluding [`VirtualPath::RECORDS`], and mirrors the
-/// declarations to the host paths their loaders read.
+/// declaration copy, excluding [`VirtualPath::RECORDS`].
 pub fn memory_executor_declaring(
     storage: InMemoryStorage,
     declarations: MemoryDeclarations<'_>,
@@ -380,24 +380,8 @@ pub fn memory_executor_wrapping<W: IssueStore>(
         declarations.install(&storage);
     }
     let layout = storage.repository_layout();
-    let rules_source = storage.root().join(VirtualPath::RULES.relative().as_path());
-    let rules_target = layout
-        .resolve(&VirtualPath::RULES)
-        .expect("test layout resolves its rules path");
-    match std::fs::read(&rules_source) {
-        Ok(bytes) => {
-            if let Some(parent) = rules_target.parent() {
-                std::fs::create_dir_all(parent).expect("create test rules directory");
-            }
-            std::fs::write(&rules_target, bytes).expect("mirror test rules through the layout");
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            if rules_target.exists() {
-                std::fs::remove_file(&rules_target).expect("remove absent test rules mirror");
-            }
-        }
-        Err(error) => panic!("read test rules fixture: {error}"),
-    }
+    // Host-backed fixtures (Git checkouts, worktree files) build under this root.
+    std::fs::create_dir_all(storage.root()).expect("create the memory store's host root");
     let pristine = InMemoryStorage::rooted_at(storage.root());
     {
         let held = storage.repository_state();
@@ -433,69 +417,9 @@ pub fn memory_executor_wrapping<W: IssueStore>(
         declarations.install(&storage);
     }
     declarations.remove_absent(&storage);
-    mirror_memory_declarations(&storage, &layout);
     CommandExecutor::new(wrap(storage))
         .with_layout(layout)
         .unwrap()
-}
-
-fn mirror_memory_declarations(
-    storage: &InMemoryStorage,
-    layout: &crate::repository_state::RepositoryLayout,
-) {
-    let state = storage.repository_state();
-    let schema_prefix = format!("{}/", VirtualPath::SCHEMAS.relative().as_str());
-    let paths = state
-        .entries
-        .keys()
-        .filter(|path| {
-            path.root_class() == crate::repository_state::RepositoryRootClass::Data
-                && ([
-                    VirtualPath::CONFIG,
-                    VirtualPath::TEMPLATES,
-                    VirtualPath::INVARIANTS,
-                    VirtualPath::RULES,
-                ]
-                .contains(*path)
-                    || path.relative().as_str().starts_with(&schema_prefix))
-        })
-        .cloned()
-        .collect::<Vec<_>>();
-    drop(state);
-
-    for virtual_path in [
-        VirtualPath::CONFIG,
-        VirtualPath::TEMPLATES,
-        VirtualPath::INVARIANTS,
-        VirtualPath::RULES,
-    ]
-    .into_iter()
-    .chain(
-        paths
-            .into_iter()
-            .filter(|path| path.relative().as_str().starts_with(&schema_prefix)),
-    ) {
-        let host_path = layout
-            .resolve(&virtual_path)
-            .expect("the memory layout resolves declaration paths");
-        match storage
-            .read_repo_file(&virtual_path.repository_relative())
-            .expect("memory declaration paths are canonical")
-        {
-            Some(contents) => {
-                if let Some(parent) = host_path.parent() {
-                    std::fs::create_dir_all(parent).expect("create declaration fixture directory");
-                }
-                std::fs::write(host_path, contents).expect("mirror memory declaration");
-            }
-            None if host_path.exists()
-                && !virtual_path.relative().as_str().starts_with(&schema_prefix) =>
-            {
-                std::fs::remove_file(host_path).expect("remove absent declaration fixture");
-            }
-            None => {}
-        }
-    }
 }
 
 /// Create an executor with enforcement mode configured.
@@ -603,15 +527,21 @@ mod tests {
             },
         );
 
-        let loaded = executor.config_manager.load().unwrap();
+        let captured = executor.captured_declarations().unwrap();
+        let loaded = captured.config();
         let declared_config: crate::config::JitConfig = toml::from_str(DECLARED_CONFIG).unwrap();
         assert_eq!(
             loaded.enforcement_mode(),
             declared_config.enforcement_mode()
         );
         assert_eq!(
-            executor.rules().unwrap(),
-            &crate::declarations::rules::RuleSet::parse(DECLARED_RULES, Some(&loaded), []).unwrap()
+            captured.rules(),
+            &crate::repository_state::reconcile_default_rules_with_config(
+                crate::declarations::rules::RuleSet::parse(DECLARED_RULES, Some(loaded), [])
+                    .unwrap(),
+                captured.namespaces(),
+            )
+            .unwrap()
         );
         assert_eq!(
             loaded.templates,
@@ -677,11 +607,11 @@ mod tests {
                 .as_deref(),
             Some(malformed)
         );
-        assert!(executor.rules().is_err());
+        assert!(executor.captured_declarations().is_err());
     }
 
     #[test]
-    fn test_memory_executor_declaring_removes_absent_declaration_from_store_and_host_mirror() {
+    fn test_memory_executor_declaring_removes_absent_declaration_from_store() {
         let path = VirtualPath::RULES;
         let storage = InMemoryStorage::new();
         let executor = memory_executor_declaring(
@@ -697,8 +627,6 @@ mod tests {
         let relative = path.repository_relative();
         assert!(reference.read_repo_file(&relative).unwrap().is_some());
         assert_eq!(storage.read_repo_file(&relative).unwrap(), None);
-        let host = storage.repository_layout().resolve(&path).unwrap();
-        assert!(!host.exists(), "{}", host.display());
         assert!(executor
             .storage()
             .read_repo_file(&relative)
@@ -728,7 +656,11 @@ mod tests {
         );
 
         assert_eq!(wrapped_image, Some(image(&reference)));
-        assert_eq!(counter.count(), 0, "initialization bypasses the wrapper");
+        assert_eq!(
+            counter.mutation_opens(),
+            0,
+            "initialization bypasses the wrapper"
+        );
         executor
             .issues()
             .create_issue(
@@ -743,7 +675,7 @@ mod tests {
             )
             .unwrap();
         assert!(
-            counter.count() > 0,
+            counter.mutation_opens() > 0,
             "the executor mutates through the wrapper"
         );
     }
@@ -760,7 +692,7 @@ mod tests {
         memory_executor(storage.clone());
 
         assert_eq!(
-            counter.count(),
+            counter.mutation_opens(),
             0,
             "initialization must not open the scenario store"
         );

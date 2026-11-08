@@ -403,7 +403,11 @@ impl<S: IssueStore> ConfigOps<'_, S> {
 
     /// Diagnose all admitted repository declarations; storage and input failures remain errors.
     pub fn validate(&self) -> Result<ConfigValidationReport> {
-        crate::config_manager::ConfigManager::invocation_write_override()?;
+        crate::config_manager::invocation_write_override(
+            std::env::var(crate::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV)
+                .ok()
+                .as_deref(),
+        )?;
         let root_override = std::env::var_os("JIT_WORKTREE_ROOT").map(PathBuf::from);
         let layout = self.exec.storage().repository_layout()?;
         ConfigValidationReport::at_data_root(layout.data_root(), root_override.as_deref())

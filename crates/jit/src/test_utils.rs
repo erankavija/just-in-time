@@ -6,6 +6,7 @@
 
 use crate::commands::{test_helpers::ExecutorTestAccess, CommandExecutor};
 use crate::config::ItemKindConfig;
+use crate::domain::relative_path::RootRelativePath;
 use crate::domain::{identity::IssueId, DocumentReference};
 use crate::profile::{capture_package_tree, ProfilePackage, ProfilePackageModel};
 use crate::repository_state::{Contribution, MapEntryTarget};
@@ -24,7 +25,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tempfile::TempDir;
@@ -949,13 +950,15 @@ title = \"New\", description = \"New gate\", stage = \"postcheck\", mode = \"man
 /// A temporary directory holding exactly `files`, each a worktree-relative path
 /// (parents created) with its contents.
 ///
-/// Fails before writing when a path is absolute or has a `..`, root or prefix
-/// component, since it would leave the directory.
+/// Fails before writing when a path is not a [`RootRelativePath::Descendant`]
+/// under `RootRelativePath::parse`, so an accepted path is always a normalized
+/// descendant of the directory.
 pub fn declaration_dir(files: &[(&str, &str)]) -> Result<TempDir> {
     if let Some((escaping, _)) = files.iter().find(|(relative, _)| {
-        !Path::new(relative)
-            .components()
-            .all(|component| matches!(component, Component::Normal(_) | Component::CurDir))
+        !matches!(
+            RootRelativePath::parse(relative),
+            Ok(RootRelativePath::Descendant(_))
+        )
     }) {
         anyhow::bail!("declaration path '{escaping}' is not confined to its directory");
     }

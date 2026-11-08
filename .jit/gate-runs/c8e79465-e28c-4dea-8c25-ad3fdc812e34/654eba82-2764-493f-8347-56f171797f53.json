@@ -1,0 +1,23 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "jit validate",
+  "commit": "52747410e08196a991a9a8e06dc7e0aaf4b926f0",
+  "completed_at": "2026-11-07T23:32:41.810449458Z",
+  "duration_ms": 11116,
+  "evaluation_stability": "stable",
+  "exit_code": 4,
+  "gate_key": "repo-validate",
+  "issue_id": "c8e79465-e28c-4dea-8c25-ad3fdc812e34",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "654eba82-2764-493f-8347-56f171797f53",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-07T23:32:30.694446325Z",
+  "status": "failed",
+  "stderr": "Repository integrity validation failed: Invalid repository: repository-integrity validation pass: Found 1 isolated issue(s) not connected to the dependency graph:\n  'f14fe734' (Converge lexical path normalization on one primitive)\nIsolated issues have no dependencies and are not dependencies of any other issue.\nEither add dependencies with 'jit dep add' or delete these issues.\n",
+  "stdout": "error: Repository integrity error: Invalid repository: repository-integrity validation pass: Found 1 isolated issue(s) not connected to the dependency graph:\n  'f14fe734' (Converge lexical path normalization on one primitive)\nIsolated issues have no dependencies and are not dependencies of any other issue.\nEither add dependencies with 'jit dep add' or delete these issues.\n"
+}

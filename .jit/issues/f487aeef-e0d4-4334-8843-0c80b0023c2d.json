@@ -4,6 +4,7 @@
   "context": {},
   "created_at": "2026-11-03T22:39:27.516378679Z",
   "dependencies": [
+    "0b35be66-d62d-443d-ac86-91c906a6efea",
     "4a01ccba-b6b9-46db-ae4a-cf92a98c9279",
     "8a14e8e9-689d-4d78-ac1e-d9b312966faa"
   ],
@@ -24,7 +25,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "backlog",
   "title": "Enforce the per-test limits and retire the whole-suite budget",
-  "updated_at": "2026-11-04T14:39:51.891636704Z"
+  "updated_at": "2026-11-07T23:05:44.079119755Z"
 }

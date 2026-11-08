@@ -8,12 +8,26 @@
   ],
   "description": "Permit the reviewed esbuild installer through npm's dependency script policy so a clean web install completes without blocked-script warnings.\n\n## Background\n\nOn Node 26 with npm 12, a clean Linux install reports that esbuild's postinstall is blocked. The pinned esbuild 0.25.12 installer selects a platform binary, verifies its version, and can use npm or HTTPS fallback when the optional platform package is missing. Node 20 remains the CI baseline.\n\n## Success Criteria\n\n- [hard] REQ-01: A clean Linux npm 12 install allows only the reviewed esbuild 0.25.12 installer through the project policy and emits no blocked-script warning for it; unrelated dependency scripts are not broadly approved.\n- [hard] REQ-02: A real clean offline install exercises that policy and the web checks pass; Node 20 and its bundled npm remain compatible with the project manifest.\n- [hard] REQ-03: No warning threshold, logging suppression, global npm setting, or unrelated installer approval is introduced.\n",
   "documents": [],
+  "done_at": "2026-11-07T23:07:07.370031926Z",
   "first_ready_at": "2026-11-05T00:01:26.294242287Z",
   "gates_required": [
     "npm-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "3745ea7a-6c46-42f7-a53c-cda253a058e5",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:06:57.105151744Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "run_id": "b662fdb6-6c24-4aa9-8f3a-9501d7940a83",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:03:58.199376009Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "38df8a6c-1a33-48e1-95b0-bc816c354a5f",
   "labels": [
     "epic:frontends-share-core",
@@ -22,7 +36,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Declare the reviewed web build installer policy",
-  "updated_at": "2026-11-05T00:01:34.918700893Z"
+  "updated_at": "2026-11-07T23:07:07.370031926Z"
 }

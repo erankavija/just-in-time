@@ -1,8 +1,7 @@
-//! Configuration access and conversion to domain settings.
+//! Pure conversions from parsed configuration to domain settings.
 
 use crate::config::{JitConfig, NamespaceConfig};
-use crate::domain::{LabelNamespace, LabelNamespaces};
-use crate::repository_state::RepositoryLayout;
+use crate::domain::{LabelNamespace, LabelNamespaces, LinkedCheckoutWriteStance};
 use anyhow::Result;
 use std::collections::HashMap;
 
@@ -12,161 +11,59 @@ use std::collections::HashMap;
 /// `[worktree] write_policy`, named after that key.
 pub const LINKED_CHECKOUT_WRITE_STANCE_ENV: &str = "JIT_WORKTREE_WRITE_POLICY";
 
-/// Manages configuration loading and access.
+/// The declared linked-checkout write stance, defaulting to
+/// [`LinkedCheckoutWriteStance::DEFAULT`].
 ///
-/// Disk reads delegate to [`crate::storage::configuration_store`].
-#[derive(Clone)]
-pub struct ConfigManager {
-    layout: Option<RepositoryLayout>,
+/// Unlike [`JitConfig::enforcement_mode`], an absent `write_policy` key in a
+/// present `[worktree]` section and an absent `[worktree]` section resolve
+/// identically, to the default.
+pub fn write_policy_from_config(config: &JitConfig) -> LinkedCheckoutWriteStance {
+    config
+        .worktree
+        .as_ref()
+        .map_or(LinkedCheckoutWriteStance::DEFAULT, |worktree| {
+            worktree.write_policy()
+        })
 }
 
-impl ConfigManager {
-    /// Create a new ConfigManager for the selected repository layout.
-    pub fn new(layout: RepositoryLayout) -> Self {
-        Self {
-            layout: Some(layout),
-        }
-    }
-
-    pub(crate) fn unbound() -> Self {
-        Self { layout: None }
-    }
-
-    pub(crate) fn bind_layout(&mut self, layout: RepositoryLayout) {
-        self.layout = Some(layout);
-    }
-
-    /// Load the repository's configuration and declaration registries.
-    ///
-    /// Absent files contribute empty declarations; invalid files are errors.
-    pub fn load(&self) -> Result<JitConfig> {
-        let layout = self.layout.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("no repository layout configured for configuration loading")
-        })?;
-        crate::storage::configuration_store::load_configuration(layout)
-    }
-
-    /// Get the namespace registry from configuration.
-    ///
-    /// Builds [`LabelNamespaces`] from `config.toml`, carrying exactly the
-    /// namespaces and type hierarchy it declares.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if config.toml exists but cannot be parsed.
-    pub fn get_namespaces(&self) -> Result<LabelNamespaces> {
-        let config = self.load()?;
-        Ok(self.namespaces_from_config(&config))
-    }
-
-    /// Build the namespace registry from an ALREADY-loaded config, without
-    /// re-reading `config.toml` from disk.
-    ///
-    /// Callers that already hold a parsed [`JitConfig`] (e.g. a cached copy)
-    /// should use this instead of [`get_namespaces`](Self::get_namespaces) so a
-    /// single write command parses `config.toml` at most once.
-    pub fn namespaces_from_config(&self, config: &JitConfig) -> LabelNamespaces {
-        namespaces_from_config(config)
-    }
-
-    /// Get the worktree write-policy stance for state-mutating commands run
-    /// inside a linked non-primary checkout.
-    ///
-    /// Returns the configured stance from `.jit/config.toml`, defaulting to
-    /// [`crate::domain::LinkedCheckoutWriteStance::DEFAULT`] if not
-    /// configured.
-    ///
-    /// Unlike [`JitConfig::enforcement_mode`], an absent `write_policy` key in
-    /// a present `[worktree]` section and an absent `[worktree]` section
-    /// altogether resolve identically, to the default.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if config.toml exists but cannot be parsed.
-    pub fn get_write_policy(&self) -> Result<crate::domain::LinkedCheckoutWriteStance> {
-        let config = self.load()?;
-        self.write_policy_from_config(&config)
-    }
-
-    /// Resolve the write-policy stance from an ALREADY-loaded config, without
-    /// re-reading `config.toml` from disk.
-    pub fn write_policy_from_config(
-        &self,
-        config: &JitConfig,
-    ) -> Result<crate::domain::LinkedCheckoutWriteStance> {
-        Ok(config
-            .worktree
-            .as_ref()
-            .map(crate::config::WorktreeConfig::write_policy)
-            .unwrap_or(crate::domain::LinkedCheckoutWriteStance::DEFAULT))
-    }
-
-    /// Read the per-invocation override of the linked-checkout write stance from
-    /// the environment.
-    ///
-    /// It takes no repository because an invocation's own stance is not repository
-    /// state; it sits beside [`Self::get_write_policy`] because the two are the
-    /// paired inputs of one resolution, and a caller needing one usually needs both.
-    ///
-    /// `None` means the invocation supplies no override, so
-    /// [`LinkedCheckoutWriteStance::resolve`](crate::domain::LinkedCheckoutWriteStance::resolve)
-    /// keeps whatever the repository declares. The token is parsed by the domain
-    /// type itself, the same parser the `write_policy` TOML key uses, so the two
-    /// sources accept the same tokens with the same case handling.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error naming the accepted tokens when the variable is set to a
-    /// value outside the stance vocabulary. Reading it is a load-time check: an
-    /// unusable override is reported rather than silently ignored.
-    pub fn invocation_write_override() -> Result<Option<crate::domain::LinkedCheckoutWriteStance>> {
-        std::env::var(LINKED_CHECKOUT_WRITE_STANCE_ENV)
-            .ok()
-            .map(|token| {
-                token
-                    .parse::<crate::domain::LinkedCheckoutWriteStance>()
-                    .map_err(|error| {
-                        crate::errors::InvalidArgumentError::new(format!(
-                            "invalid {LINKED_CHECKOUT_WRITE_STANCE_ENV}: {error}"
-                        ))
-                        .into()
-                    })
+/// Parse one invocation's override of the linked-checkout write stance, the
+/// value of [`LINKED_CHECKOUT_WRITE_STANCE_ENV`].
+///
+/// `None` supplies no override, so
+/// [`LinkedCheckoutWriteStance::resolve`] keeps the declared stance. The token
+/// uses the `write_policy` key's parser, so both sources accept the same tokens.
+///
+/// # Errors
+///
+/// A token outside the stance vocabulary, named with the accepted tokens.
+pub fn invocation_write_override(token: Option<&str>) -> Result<Option<LinkedCheckoutWriteStance>> {
+    token
+        .map(|token| {
+            token.parse::<LinkedCheckoutWriteStance>().map_err(|error| {
+                crate::errors::InvalidArgumentError::new(format!(
+                    "invalid {LINKED_CHECKOUT_WRITE_STANCE_ENV}: {error}"
+                ))
+                .into()
             })
-            .transpose()
-    }
+        })
+        .transpose()
+}
 
-    /// Get the configured canonical project name.
-    ///
-    /// Returns the `[project] name` value from `.jit/config.toml`, or `None`
-    /// when the `[project]` table (or its `name` key) is absent.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `config.toml` exists but is malformed, including an
-    /// invalid `[project] name` (rejected at parse time by the typed
-    /// [`ProjectName`](crate::config::ProjectName) field).
-    pub fn get_project_name(&self) -> Result<Option<String>> {
-        let config = self.load()?;
-        Ok(self.project_name_from_config(&config))
-    }
-
-    /// Resolve the configured project name from an ALREADY-loaded config,
-    /// without re-reading `config.toml` from disk.
-    ///
-    /// Callers that already hold a parsed [`JitConfig`] should use this so a
-    /// single command parses `config.toml` at most once. Returns `None` when
-    /// the `[project]` table or its `name` key is absent.
-    pub fn project_name_from_config(&self, config: &JitConfig) -> Option<String> {
-        config.project_name().map(str::to_string)
-    }
+/// The declared `[project] name`, or `None` when the table or key is absent.
+pub fn project_name_from_config(config: &JitConfig) -> Option<&str> {
+    config
+        .project
+        .as_ref()?
+        .name
+        .as_ref()
+        .map(crate::config::ProjectName::as_str)
 }
 
 /// Build the namespace registry from an already-parsed [`JitConfig`], without
 /// filesystem access.
 ///
-/// The single pure `config -> LabelNamespaces` conversion shared by the config
-/// manager's cached-config read path and the mutation derive pipeline, which
-/// derives the default rule family from this same registry. The registry carries
+/// The single `config -> LabelNamespaces` conversion; the default rule family
+/// derives from this same registry. The registry carries
 /// exactly what the configuration declares: an absent `[namespaces]` table
 /// yields no namespace, and an absent `[type_hierarchy]` table yields no
 /// hierarchy.
@@ -214,102 +111,18 @@ fn build_namespaces_from_config(
     result
 }
 
-/// Load the type taxonomy from the repository's `config.toml`.
-///
-/// Reads `[type_hierarchy]` and its label associations through a
-/// [`ConfigManager`] over the store's selected layout, and returns them as a
-/// [`HierarchyConfig`](crate::domain::type_taxonomy::HierarchyConfig). A
-/// repository that declares no `[type_hierarchy]` yields a hierarchy with no
-/// types, so every query that resolves tiers resolves none.
-///
-/// # Errors
-///
-/// Returns an error if `config.toml` cannot be parsed, or if the declared
-/// hierarchy is malformed (an empty type name or a level of 0).
-pub fn get_hierarchy_config<S: crate::storage::IssueStore>(
-    storage: &S,
-) -> Result<crate::domain::type_taxonomy::HierarchyConfig> {
-    let namespaces = ConfigManager::new(storage.repository_layout()?).get_namespaces()?;
-
-    Ok(crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository_state::RepositoryRootEvidence;
-    use crate::storage::IssueStore;
-    use std::fs;
-    use std::path::Path;
-    use tempfile::TempDir;
 
-    fn test_layout(data_root: &Path) -> RepositoryLayout {
-        let worktree_root = data_root.parent().unwrap_or(data_root);
-        RepositoryLayout::new(
-            RepositoryRootEvidence::new(worktree_root, "test-worktree", true),
-            RepositoryRootEvidence::new(data_root, "test-data", true),
-        )
-        .unwrap()
-    }
-
-    fn setup_test_dir() -> TempDir {
-        TempDir::new().unwrap()
+    fn config(toml: &str) -> JitConfig {
+        crate::declarations::assemble_configuration(Some(toml.as_bytes()), None, None).unwrap()
     }
 
     #[test]
-    fn test_load_missing_config() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
-        let config = config_mgr.load().unwrap();
-
-        // Missing config should return empty config, not error
-        assert!(config.version.is_none());
-        assert!(config.namespaces.is_none());
-    }
-
-    #[test]
-    fn test_load_valid_config() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-
-        let config_toml = r#"
-[version]
-schema = 2
-
-[namespaces.type]
-description = "Issue type"
-unique = true
-
-[namespaces.custom]
-description = "Custom membership"
-unique = false
-"#;
-        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
-
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
-        let config = config_mgr.load().unwrap();
-
-        assert_eq!(config.version.unwrap().schema, 2);
-        assert!(config.namespaces.is_some());
-        assert_eq!(config.namespaces.unwrap().len(), 2);
-    }
-
-    #[test]
-    fn test_get_namespaces_from_config() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-
+    fn test_namespaces_from_config_carries_the_declared_taxonomy() {
         let taxonomy = crate::test_taxonomy::test_taxonomy();
-        let config_toml = taxonomy.config_fragment();
-        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
-
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
-        let namespaces = config_mgr.get_namespaces().unwrap();
+        let namespaces = namespaces_from_config(&config(&taxonomy.config_fragment()));
 
         assert_eq!(namespaces.schema_version, 2);
         assert_eq!(namespaces.namespaces.len(), taxonomy.namespaces.len());
@@ -320,8 +133,6 @@ unique = false
         assert!(namespaces
             .namespaces
             .contains_key(taxonomy.type_at_level(2)));
-
-        // Check strategic types
         assert_eq!(
             namespaces.strategic_types.as_ref().unwrap(),
             &taxonomy.strategic_types
@@ -329,244 +140,74 @@ unique = false
     }
 
     #[test]
-    fn test_get_namespaces_without_declarations_yields_an_empty_registry() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
+    fn test_namespaces_from_config_without_declarations_yields_an_empty_registry() {
+        let namespaces = namespaces_from_config(&config(""));
 
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
-        let namespaces = config_mgr.get_namespaces().unwrap();
-
-        // A repository declaring nothing receives nothing.
         assert!(namespaces.namespaces.is_empty());
         assert!(namespaces.type_hierarchy.is_none());
         assert!(namespaces.label_associations.is_none());
         assert!(namespaces.strategic_types.is_none());
-    }
-
-    #[test]
-    fn test_get_hierarchy_config_without_declared_hierarchy_is_empty() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-        let storage = crate::storage::JsonFileStorage::new(&jit_dir);
-        let layout = test_layout(&jit_dir);
-        storage.configure_repository_layout(&layout).unwrap();
-
-        let hierarchy = get_hierarchy_config(&storage).unwrap();
-
         assert_eq!(
-            hierarchy,
+            crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces).unwrap(),
             crate::domain::type_taxonomy::HierarchyConfig::empty(),
         );
-        assert_eq!(hierarchy.types().count(), 0);
     }
 
     #[test]
-    fn test_get_hierarchy_config_preserves_constructor_error() {
-        let (_repo, storage, _) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
-        let config = crate::test_taxonomy::invalid_hierarchy_config_fragment();
-        fs::write(storage.root().join("config.toml"), config).unwrap();
+    fn test_namespaces_from_config_keeps_each_namespace_uniqueness() {
+        let namespaces = namespaces_from_config(&config(
+            "[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n\n\
+             [namespaces.component]\ndescription = \"Component\"\nunique = false\n",
+        ));
 
-        let error =
-            get_hierarchy_config(&storage).expect_err("invalid hierarchy must fail construction");
+        assert!(namespaces.namespaces["type"].unique);
+        assert!(!namespaces.namespaces["component"].unique);
+    }
 
+    #[test]
+    fn test_write_policy_from_config_defaults_unless_declared() {
+        [
+            ("", LinkedCheckoutWriteStance::DEFAULT),
+            (
+                "[type_hierarchy]\ntypes = { task = 1 }\n",
+                LinkedCheckoutWriteStance::DEFAULT,
+            ),
+            (
+                "[worktree]\nenforce_leases = \"strict\"\n",
+                LinkedCheckoutWriteStance::DEFAULT,
+            ),
+            (
+                "[worktree]\nwrite_policy = \"allow\"\n",
+                LinkedCheckoutWriteStance::Allow,
+            ),
+        ]
+        .into_iter()
+        .for_each(|(toml, expected)| {
+            assert_eq!(write_policy_from_config(&config(toml)), expected, "{toml}");
+        });
+    }
+
+    #[test]
+    fn test_invocation_write_override_parses_the_stance_vocabulary() {
+        assert_eq!(invocation_write_override(None).unwrap(), None);
         assert_eq!(
-            error.downcast_ref::<crate::domain::type_taxonomy::ConfigError>(),
-            Some(&crate::domain::type_taxonomy::ConfigError::InvalidLevel(0))
+            invocation_write_override(Some("allow")).unwrap(),
+            Some(LinkedCheckoutWriteStance::Allow)
         );
+        let error = invocation_write_override(Some("sometimes")).unwrap_err();
+        assert!(error
+            .downcast_ref::<crate::errors::InvalidArgumentError>()
+            .is_some());
+        assert!(error.to_string().contains(LINKED_CHECKOUT_WRITE_STANCE_ENV));
     }
 
     #[test]
-    fn test_namespace_unique_property() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-
-        let config_toml = r#"
-[namespaces.type]
-description = "Issue type"
-unique = true
-
-[namespaces.component]
-description = "Component"
-unique = false
-"#;
-        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
-
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
-        let namespaces = config_mgr.get_namespaces().unwrap();
-
-        assert!(namespaces.namespaces.get("type").unwrap().unique);
-        assert!(!namespaces.namespaces.get("component").unwrap().unique);
-    }
-
-    #[test]
-    fn test_malformed_config_returns_error() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-
-        let invalid_toml = "this is not valid toml [[[";
-        fs::write(jit_dir.join("config.toml"), invalid_toml).unwrap();
-
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
-        let result = config_mgr.load();
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_get_write_policy_default_when_missing() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
+    fn test_project_name_from_config_reads_the_declared_name() {
+        assert_eq!(project_name_from_config(&config("")), None);
+        assert_eq!(project_name_from_config(&config("[project]\n")), None);
         assert_eq!(
-            config_mgr.get_write_policy().unwrap(),
-            crate::domain::LinkedCheckoutWriteStance::Refuse
-        );
-    }
-
-    #[test]
-    fn test_get_write_policy_default_when_section_absent() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[type_hierarchy]\ntypes = { task = 1 }\n",
-        )
-        .unwrap();
-
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
-        assert_eq!(
-            config_mgr.get_write_policy().unwrap(),
-            crate::domain::LinkedCheckoutWriteStance::Refuse
-        );
-    }
-
-    #[test]
-    fn test_get_write_policy_default_when_key_absent_in_present_section() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nenforce_leases = \"strict\"\n",
-        )
-        .unwrap();
-
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
-        // This is the same default as an absent [worktree] section; write policy
-        // has no section-presence asymmetry like enforce_leases does.
-        assert_eq!(
-            config_mgr.get_write_policy().unwrap(),
-            crate::domain::LinkedCheckoutWriteStance::Refuse
-        );
-    }
-
-    #[test]
-    fn test_get_write_policy_allow_from_config() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nwrite_policy = \"allow\"\n",
-        )
-        .unwrap();
-
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
-        assert_eq!(
-            config_mgr.get_write_policy().unwrap(),
-            crate::domain::LinkedCheckoutWriteStance::Allow
-        );
-    }
-
-    #[test]
-    fn test_get_write_policy_invalid() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-        fs::write(
-            jit_dir.join("config.toml"),
-            "[worktree]\nwrite_policy = \"invalid\"\n",
-        )
-        .unwrap();
-
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
-        let result = config_mgr.get_write_policy();
-
-        assert!(result.is_err());
-        let msg = format!("{:#}", result.unwrap_err());
-        assert!(
-            msg.contains("invalid"),
-            "error chain must mention invalidity: {msg}"
-        );
-    }
-
-    #[test]
-    fn test_get_project_name_default_when_missing() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
-        assert_eq!(config_mgr.get_project_name().unwrap(), None);
-    }
-
-    #[test]
-    fn test_get_project_name_from_config() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-
-        let config_toml = "[project]\nname = \"just-in-time\"\n";
-        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
-
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
-        assert_eq!(
-            config_mgr.get_project_name().unwrap(),
-            Some("just-in-time".to_string())
-        );
-    }
-
-    #[test]
-    fn test_get_project_name_absent_name_key() {
-        // A `[project]` table present but without a `name` key still yields
-        // `None`, not an error.
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-
-        fs::write(jit_dir.join("config.toml"), "[project]\n").unwrap();
-
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
-        assert_eq!(config_mgr.get_project_name().unwrap(), None);
-    }
-
-    #[test]
-    fn test_get_project_name_invalid() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-
-        let config_toml = "[project]\nname = \"Bad_Name\"\n";
-        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
-
-        let config_mgr = ConfigManager::new(test_layout(&jit_dir));
-        let result = config_mgr.get_project_name();
-
-        // Invalid tokens are rejected at TOML parse time (via the typed
-        // ProjectName field), so the error propagates through load(), mirroring
-        // test_enforcement_mode_invalid.
-        assert!(result.is_err());
-        let msg = format!("{:#}", result.unwrap_err());
-        assert!(
-            msg.contains("Bad_Name"),
-            "error chain must name the offending value: {msg}"
+            project_name_from_config(&config("[project]\nname = \"just-in-time\"\n")),
+            Some("just-in-time")
         );
     }
 }

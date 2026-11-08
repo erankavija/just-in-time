@@ -2,7 +2,7 @@
  "epic_id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
  "epic_short_id": "b697a3f7",
  "lead_agent_id": "agent:b697a3f7-lead",
- "current_wave": 8,
+ "current_wave": 9,
  "waves": [
   {
    "wave_number": 1,
@@ -173,13 +173,54 @@
      "id": "c0775a83-0b83-4a90-883b-527876784a21",
      "short_id": "c0775a83",
      "title": "Archive candidates plan in one read-only session",
-     "status": "in_progress"
+     "status": "done"
     },
     {
      "id": "b0dc019f-8504-488a-b6f7-d386d53bc8e0",
      "short_id": "b0dc019f",
      "title": "Domain names nothing from repository_state and type labels have no hand-written filter",
+     "status": "done"
+    },
+    {
+     "id": "f98f2353-eec3-4473-8c83-811cdcdcea5f",
+     "short_id": "f98f2353",
+     "title": "Type-label extraction and process-group liveness each go through their one shared form",
+     "status": "done"
+    },
+    {
+     "id": "219b9df8",
+     "short_id": "219b9df8",
+     "title": "Test declaration fixtures validate paths through the canonical validator",
+     "status": "done"
+    }
+   ]
+  },
+  {
+   "wave_number": 9,
+   "issues": [
+    {
+     "id": "42046050",
+     "short_id": "42046050",
+     "title": "The executor holds no disk-backed configuration; ConfigManager and JitConfig::load are gone",
      "status": "in_progress"
+    },
+    {
+     "id": "4e2bed35",
+     "short_id": "4e2bed35",
+     "title": "Container marker and destination evidence are declared once",
+     "status": "in_progress"
+    }
+   ]
+  },
+  {
+   "wave_number": 10,
+   "issues": [
+    {
+     "id": "45d0a971",
+     "short_id": "45d0a971",
+     "title": "Cost evidence: the epic's four cost reductions against the base binary",
+     "status": "pending",
+     "note": "after 04:30 quiet window; coordinate with df129d9e fba8d478 quiet-host trials"
     }
    ]
   }
@@ -203,6 +244,16 @@
    "short_id": "b0dc019f",
    "title": "Domain names nothing from repository_state and type labels have no hand-written filter",
    "reason": "dfb2f10d checkpoint sweep: domain/relative_path.rs test imports repository_state (REQ-18); four hand-written type: filters in tests (REQ-20)",
+   "depends_on": [],
+   "blocks": [
+    "dfb2f10d"
+   ]
+  },
+  {
+   "id": "f98f2353-eec3-4473-8c83-811cdcdcea5f",
+   "short_id": "f98f2353",
+   "title": "Type-label extraction and process-group liveness each go through their one shared form",
+   "reason": "dfb2f10d sol checkpoint review: template_apply_tests type_of (REQ-20 type extraction); serve_cli_tests process_group_survives (REQ-20 liveness); invoker ruled option 1 shape",
    "depends_on": [],
    "blocks": [
     "dfb2f10d"
@@ -239,6 +290,14 @@
    "detail": "code-review e3ff064f F1: REQ-06 graph.rs rustdoc clause; the cited audit list was deleted by deb6d3beb (6ac41880). Recommended: rule vacuously satisfied and record on issue.",
    "status": "resolved",
    "decision": "steward: REQ-06 corrected (read_repo_file rustdoc names the parser; no other parser/splitter named in crates/); ruling dev/active/b2c28ec1/criteria-ruling.md; code-review passed on re-run"
+  },
+  {
+   "to": "just-in-time-d5",
+   "category": "gate configuration (shared infrastructure)",
+   "issue": "b0dc019f",
+   "detail": "code-review/holistic-review REVIEWER_AGENT pinned to gpt-5.6-terra in .jit/gates.toml; invoker asked for gpt-6.1-sol reviewers. Options: change gates.toml repo-wide, keep gate config and use sol for non-gate reviews, or hold.",
+   "status": "resolved",
+   "decision": "invoker (user): all five review gates use codex gpt-6.1-sol high, landed be302dc9c"
   }
  ],
  "rework_counts": {
@@ -252,7 +311,9 @@
   "30334066": 1,
   "850eaad3": 1,
   "b2c28ec1": 2,
-  "030df4b1": 1
+  "030df4b1": 1,
+  "219b9df8": 1,
+  "42046050": 1
  },
  "surfaced_pitfalls": [
   {
@@ -271,8 +332,15 @@
    "found_in": "030df4b1",
    "subject": "captured declaration parse fails on a missing default rule schema",
    "detail": "The captured-declaration parse fails with MissingCapture when a default schema file named by rules.toml is absent, so test_missing_default_schema_still_validates_and_enforces will not carry over unchanged when 42046050 removes the disk-backed rule caches; 42046050 must reconcile that test's semantics.",
-   "status": "open",
+   "status": "resolved by 42046050 per invoker ruling (pending rework 1)",
    "owner": "42046050"
+  },
+  {
+   "found_in": "c0775a83 completion evidence",
+   "subject": "archive candidates per-candidate cost",
+   "detail": "One-session candidates: 233 s for 230 candidates against 254 s per-candidate path on this repository; per-candidate planning (reachability, hashing, citation scan) dominates, not base derivation. 45d0a971 REQ-02(b) requires tip per-candidate slope <= 0.5 x base; may fail. Invoker warned 01:28.",
+   "status": "open",
+   "owner": "45d0a971"
   }
  ],
  "started_at": "2026-11-06T01:20:00+02:00",
@@ -305,7 +373,8 @@
  ],
  "notes": [
   "Wave 1 leaves 12064c7b, 4334df62, 9a2563fd, c2b3cefa, f6477007, 4d834432 done; worktrees reclaimed. 1a737bb4 (W1b) and wave 2 (d2acb105, 7fefd776, 905364c1) in flight; dispatched together because all are dependency-ready and their shared files are in disjoint functions.",
-  "Session 2026-11-08 (lead invoked by just-in-time-d5): c0775a83 resumed in its worktree after a lead-preserve WIP commit and a rebase onto main; host quiet window 03:30-04:30 Helsinki, no cargo from 03:15; coordinating crates/jit edits with df129d9e lead just-in-time-55. Pending pitfall: output.rs IssueScope (graph traversal key) shares its name with domain IssueScope; not a REQ-20 violation, raise in holistic review if it matters."
+  "Session 2026-11-08 (lead invoked by just-in-time-d5): c0775a83 resumed in its worktree after a lead-preserve WIP commit and a rebase onto main; host quiet window 03:30-04:30 Helsinki, no cargo from 03:15; coordinating crates/jit edits with df129d9e lead just-in-time-55. Pending pitfall: output.rs IssueScope (graph traversal key) shares its name with domain IssueScope; not a REQ-20 violation, raise in holistic review if it matters.",
+  "Trap: dispatch-worker-worktree.sh's default TMPDIR (/tmp/lead-worker-tmp/<repo-path>/agent-<id>) is too long for unix sockets; profile::package socket test fails with SUN_LEN. Briefs must set a short TMPDIR such as /tmp/lw-<id>."
  ],
  "story_checkpoints": [
   {
@@ -327,7 +396,77 @@
   {
    "issue": "bb596228",
    "decision": "Accept base-ratio premise difference (base R(8)/R(1)=16.6 because a single base reader waits behind the writer); README records it; tip verdict passes on the fixed thresholds."
+  },
+  {
+   "issue": "42046050",
+   "decision": "Invoker ruling: keep captured-parse skip of an absent optional default schema (production change: MissingCapture error -> successful validate); reason: regression from moving reads to captured images, D-20 one capability one answer, REQ-03 keeps the test. Condition: one rule both readers call (rework 1). Recorded as stated deviation on the issue."
+  },
+  {
+   "issue": "219b9df8",
+   "decision": "Invoker accepted rework-1 scope: RootRelativePath segments/split_leaf/resolve_link, assets.rs normalize_path deleted, capability fns typed; stricter refusal of ':', '\\\\', control chars recorded as deviation. f14fe734 copy count now six."
   }
  ],
- "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10"
+ "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",
+ "review_dispatches": [
+  {
+   "issue": "b0dc019f",
+   "review": "code-review gate",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "pass"
+  },
+  {
+   "issue": "c0775a83",
+   "review": "code-review gate",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "pass",
+   "run": "09f3e02c"
+  },
+  {
+   "issue": "dfb2f10d",
+   "review": "story checkpoint (non-gate)",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "2 blocking findings -> f98f2353"
+  },
+  {
+   "issue": "f98f2353",
+   "review": "code-review gate",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "pass",
+   "run": "11ef1b9b"
+  },
+  {
+   "issue": "219b9df8",
+   "review": "code-review gate",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "fail F1 capability_fs read_confined_relative",
+   "run": "6ffb399f"
+  },
+  {
+   "issue": "dfb2f10d",
+   "review": "story checkpoint round 2 (non-gate)",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "1 blocking finding -> 219b9df8"
+  },
+  {
+   "issue": "219b9df8",
+   "review": "code-review gate (rework 1)",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "pass",
+   "run": "007fb972"
+  }
+ ]
 }

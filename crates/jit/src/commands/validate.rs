@@ -2035,7 +2035,11 @@ mod tests {
                 .is_some_and(|failure| failure.contains(raced.id.as_str())),
             "the read derives from the raced write: {failure:?}"
         );
-        assert_eq!(opens.count(), 0, "the read opened a mutation session");
+        assert_eq!(
+            opens.mutation_opens(),
+            0,
+            "the read opened a mutation session"
+        );
     }
 
     #[test]

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "61008a67324059f9ca41873e009991a23245c2d3",
+  "completed_at": "2026-11-07T23:28:29.343748288Z",
+  "duration_ms": 113718,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All six hard criteria are satisfied; no issue-impact defects found. Recorded cargo-ci evidence covers all attributable commits.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f98f2353-eec3-4473-8c83-811cdcdcea5f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "11ef1b9b-094f-4d6e-bff3-a0f966e35bc8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-07T23:26:35.625049198Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:f98f2353 — 48f816cc, 8daed2f9, ed33d68c; each patch inspected individually.\nPolicy sources: AGENTS.md; dev/TESTING.md; .jit/reference/content-standards.md; no subtree AGENTS.md found.\nResolved items: @/inv/pid-safety, @/inv/convention-convergence, @/inv/orthogonal-tests, @/inv/essential-code-prose, @/inv/shared-test-contracts, @/inv/semantic-test-assertions, @/inv/architecture-dependency-direction, @/inv/canonical-cutover → .jit/invariants.toml; @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/issue/b697a3f7/requirement/REQ-20, @/issue/dfb2f10d/requirement/REQ-02 → respective issue descriptions; @/gate/cargo-ci, @/gate/jit-validate → .jit/gates.toml.\nGate evidence: cargo-ci passed, exit 0, 2026-11-07T23:25:03.600107109+00:00; supplied ancestry confirms run commit 0364936b contains all attributable commits; code-review pending, no recorded exit code; no gates rerun.\nTruncation recovery: narrower config, gate, testing-policy, labels, CLI-test, and help reads recovered relevant omitted output.\n\nNo findings. REQ-01–REQ-06 are satisfied: type extraction delegates to the shared helper; both liveness entry points use guarded targets and one probe; unit tests own errno policy and guard behavior; CLI teardown uses the shared group probe. `kill_process_group` is unchanged. Uncommitted tracker changes were excluded from attribution.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All six hard criteria are satisfied; no issue-impact defects found. Recorded cargo-ci evidence covers all attributable commits.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

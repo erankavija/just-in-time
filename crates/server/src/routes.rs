@@ -744,21 +744,21 @@ async fn get_document_content<S: IssueStore + RepositoryStateStore + Send + Sync
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Json<DocumentContentResponse>, StatusCode> {
-    let (content, commit_hash) = execute_blocking(&state, {
+    let reading = execute_blocking(&state, {
         let path = path.clone();
         move |executor| {
             let id = resolve_issue_path_id(executor, &id)?;
-            Ok(executor
+            executor
                 .documents()
-                .read_document_content(&id, &path, query.commit.as_deref())?)
+                .document_content(&id, &path, query.commit.as_deref())
         }
     })
     .await?;
 
     Ok(Json(DocumentContentResponse {
         path: path.clone(),
-        commit: commit_hash,
-        content,
+        content: reading.text(),
+        commit: reading.commit,
         content_type: infer_content_type(&path),
     }))
 }
@@ -787,27 +787,26 @@ fn raw_document_response(path: &str, bytes: Vec<u8>) -> Response<Body> {
 /// Get raw document bytes (issue-scoped variant)
 ///
 /// Verifies that `path` is a document of the requested issue, explicit or
-/// derived, then reads the file as raw bytes via `read_document_bytes` (which
-/// delegates to `IssueStore::read_path_bytes`).  Binary artifacts are served faithfully
-/// without any UTF-8 conversion.  HTML responses for working-tree reads get a
-/// `<base href>` injected so sibling assets resolve via `/api/raw/*path`.
+/// derived, then serves its selected-version bytes from `document_content`.
+/// Binary artifacts are served faithfully; HTML responses get a `<base href>`
+/// injected so sibling assets resolve via `/api/raw/*path`.
 async fn get_document_raw<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentContentQuery>,
     State(state): State<AppState<S>>,
 ) -> Result<Response<Body>, StatusCode> {
-    let (bytes, _commit_hash) = execute_blocking(&state, {
+    let reading = execute_blocking(&state, {
         let path = path.clone();
         move |executor| {
             let id = resolve_issue_path_id(executor, &id)?;
-            Ok(executor
+            executor
                 .documents()
-                .read_document_bytes(&id, &path, query.commit.as_deref())?)
+                .document_content(&id, &path, query.commit.as_deref())
         }
     })
     .await?;
 
-    Ok(raw_document_response(&path, bytes))
+    Ok(raw_document_response(&path, reading.bytes))
 }
 
 /// Get raw document bytes (path-only variant)
@@ -895,7 +894,7 @@ async fn get_document_history<S: IssueStore + RepositoryStateStore + Send + Sync
         let path = path.clone();
         move |executor| {
             let id = resolve_issue_path_id(executor, &id)?;
-            Ok(executor.documents().get_document_history(&id, &path)?)
+            Ok(executor.documents().document_history(&id, &path)?.commits)
         }
     })
     .await?;
@@ -943,12 +942,12 @@ async fn get_document_diff<S: IssueStore + RepositoryStateStore + Send + Sync + 
         let diff =
             executor
                 .documents()
-                .get_document_diff(&id, &path, &query.from, query.to.as_deref())?;
+                .document_diff(&id, &path, &query.from, query.to.as_deref())?;
         Ok(Json(DocumentDiffResponse {
-            path,
-            from: query.from,
-            to: query.to.unwrap_or_else(|| "HEAD".to_string()),
-            diff,
+            path: diff.path,
+            from: diff.from_commit,
+            to: diff.to_commit,
+            diff: diff.diff,
         }))
     })
     .await
@@ -2449,6 +2448,32 @@ unique = false
             .await
             .iter()
             .any(|hit| hit.issue_id.as_ref() == Some(&id)));
+    }
+
+    #[tokio::test]
+    async fn test_search_linked_document_match_path_loads_through_issue_document_content_route() {
+        let (temp, executor) =
+            setup_test_repo_with_config("[worktree]\nenforce_leases = \"off\"\n").unwrap();
+        let id = link_html_document(temp.path(), &executor);
+        let doc_rel = "notes/plan.md";
+        let doc_content = "linked-needle\n";
+        std::fs::create_dir_all(temp.path().join("notes")).unwrap();
+        std::fs::write(temp.path().join(doc_rel), doc_content).unwrap();
+        executor
+            .documents()
+            .add_document_reference(&id, doc_rel, None, None, None, true)
+            .unwrap();
+        let server = test_app(executor);
+        let hits = search_hits(&server, "linked-needle").await;
+        let hit = hits.first().expect("linked document match");
+        let url = format!(
+            "/issues/{id}/documents/{}/content",
+            percent_encode_segment(&hit.path)
+        );
+        let response = server.get(&url).await;
+        response.assert_status_ok();
+        let body: serde_json::Value = response.json();
+        assert_eq!(body["content"].as_str(), Some(doc_content));
     }
 
     #[tokio::test]

@@ -6,12 +6,26 @@
   "dependencies": [],
   "description": "Move the last `repository_state` references out of the domain layer and route the remaining hand-written type-label filter through the shared extractor, closing the story checkpoint of `one-form-convergence`.\n\n## Background\n\n- `crates/jit/src/domain/relative_path.rs` has a test module that imports `crate::repository_state::RepositoryLayoutError` for `test_rejected_parse_converts_to_lexical_escape_with_the_input_text`. That test checks `impl From<RootRelativePathError> for RepositoryLayoutError`, which lives in `crates/jit/src/repository_state/path.rs`.\n- The `RootRelativePath` rustdoc in the same file links `crate::repository_state::VirtualPath`, so the domain type documents an outer-layer consumer.\n- Four test sites read type labels by hand instead of through the extractors in `crates/jit/src/labels.rs` (`is_type_label`, `type_label_value`, `type_label_values`): the declared `--type` update test in `crates/jit/src/commands/issue.rs`, two tests in `crates/jit/tests/cli_issue/issue_create_positional_type_tests.rs`, and one in `crates/jit/tests/fast_docs_templates/template_binding_tests.rs`.\n- Epic criteria: `b697a3f7` REQ-18 (domain imports nothing from `repository_state`) and REQ-20 (type extraction from labels has one normalisation).\n\n## Success Criteria\n\n- [hard] REQ-01: No file under `crates/jit/src/domain/` names `repository_state`, in code, tests or rustdoc.\n- [hard] REQ-02: The conversion test asserts the same property from `crates/jit/src/repository_state/path.rs`, beside the `From` impl it covers.\n- [hard] REQ-03: No code under `crates/` outside `labels.rs` tests for or strips the `type:` prefix by hand; each of the four sites uses the shared extractor.\n",
   "documents": [],
+  "done_at": "2026-11-07T23:12:12.293120448Z",
   "first_ready_at": "2026-11-07T22:54:53.366748872Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "868e4c77-e11a-44ad-b3b3-05e7ba121246",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:08:11.908360329Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a6082918-fc9d-49ca-bf74-eae67c2c1b41",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:12:02.397287814Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b0dc019f-8504-488a-b6f7-d386d53bc8e0",
   "labels": [
     "type:task",
@@ -24,7 +38,7 @@
     "satisfies:b697a3f7/REQ-20"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Domain names nothing from repository_state and type labels have no hand-written filter",
-  "updated_at": "2026-11-07T22:55:19.907098509Z"
+  "updated_at": "2026-11-07T23:12:12.293120448Z"
 }

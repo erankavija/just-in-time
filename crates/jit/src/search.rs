@@ -114,6 +114,8 @@ pub fn search(data_dir: &Path, query: &str, options: SearchOptions) -> Result<Ve
 }
 
 /// Search only explicit repository-relative files; an empty list searches nothing.
+///
+/// Each result's `path` is the repository-relative path it was requested under.
 pub fn search_files(
     data_dir: &Path,
     query: &str,
@@ -140,7 +142,7 @@ pub fn search_files(
             anyhow::bail!("search path escapes repository: {file}");
         }
         if resolved.is_file() {
-            paths.push(resolved);
+            paths.push(relative.as_path().to_path_buf());
         }
     }
     if paths.is_empty() {
@@ -191,15 +193,16 @@ fn search_selected(
         }
     }
 
-    // ripgrep matches globs relative to its working directory, so run it in the search root.
+    // ripgrep resolves globs and relative paths against its working directory and, given no
+    // path, searches it and reports root-relative paths. A null stdin keeps it from reading
+    // an inherited pipe instead.
     // The pattern is the value of `--regexp=`, so a leading `-` is never read as a flag.
     cmd.arg(format!("--regexp={query}")).arg("--");
     if let Some(paths) = paths {
         cmd.args(paths);
-    } else {
-        cmd.arg(std::path::absolute(data_dir)?);
     }
     cmd.current_dir(data_dir)
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -592,6 +595,29 @@ mod tests {
     }
 
     #[test]
+    fn test_search_selected_and_unrestricted_report_the_same_root_relative_path() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("docs")).unwrap();
+        std::fs::write(dir.path().join("docs/plan.md"), "needle\n").unwrap();
+        let requested = "docs/plan.md".to_string();
+        let paths = |results: Vec<SearchResult>| {
+            results.into_iter().map(|hit| hit.path).collect::<Vec<_>>()
+        };
+        let selected = paths(
+            search_files(
+                dir.path(),
+                "needle",
+                SearchOptions::default(),
+                std::slice::from_ref(&requested),
+            )
+            .unwrap(),
+        );
+        let unrestricted = paths(search(dir.path(), "needle", SearchOptions::default()).unwrap());
+        assert_eq!(selected, vec![requested]);
+        assert_eq!(unrestricted, selected);
+    }
+
+    #[test]
     fn test_search_default_skips_history_files_and_explicit_glob_reaches_them() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
@@ -618,13 +644,7 @@ mod tests {
             search(root, "needle", options)
                 .unwrap()
                 .into_iter()
-                .map(|r| {
-                    Path::new(&r.path)
-                        .strip_prefix(root)
-                        .unwrap()
-                        .to_string_lossy()
-                        .into_owned()
-                })
+                .map(|r| r.path)
                 .collect()
         };
 

@@ -79,17 +79,6 @@ impl TestHarness {
     /// addressable items must opt in. Call before creating issues.
     pub fn with_item_kinds(self) -> Self {
         let item_kinds = crate::test_utils::shipped_item_kinds_toml();
-        // Query paths still load declarations through ConfigManager's filesystem
-        // reader, while mutation paths capture the aggregate in-memory image.
-        // Keep both fixture views coherent until the read-side storage facade is
-        // consolidated.
-        let config_path = self
-            .storage
-            .repository_layout()
-            .resolve(&crate::repository_state::VirtualPath::CONFIG)
-            .unwrap();
-        std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
-        std::fs::write(config_path, &item_kinds).unwrap();
         self.storage.add_data_file("config.toml", &item_kinds);
         self
     }

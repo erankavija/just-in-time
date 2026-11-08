@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Search result paths are relative to the search root.** Each `jit search`
+  result's `path` is relative to the `.jit/` data directory, and each
+  linked-document match from the server's combined search is relative to the
+  repository, rather than absolute, so a match path opens through the document
+  routes. See [`jit search`](docs/reference/cli-commands.md#jit-search).
+
 - **Every repository write appends an event.** A write that records no domain
   event, such as `jit config set`, `jit project render`, `jit validate --fix`
   repair or an export into the repository, now appends one `files_published`
@@ -25,6 +31,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   advisory findings, which stopped `set -e` scripts and gates. It now fails
   (exit `1`) only on a broken link; warnings still appear in the output and
   the JSON result.
+
+- **`jit doc show` and the server's document routes read through one core
+  operation.** `jit doc show` reports the resolved short commit, as the server
+  does, rather than echoing the requested reference. Document history outside
+  a Git checkout, or before its first commit, is an empty list from both
+  `jit doc history` and the server, and Git failures computing history are
+  reported rather than hidden.
 
 ### Removed
 

@@ -35,6 +35,15 @@ use crate::storage::{IssueStore, JsonFileStorage, RepositoryReadSession, Reposit
 use anyhow::{bail, Context, Result};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// The configuration-derived inputs every archive plan over one admitted
+/// image shares.
+struct ArchiveBase {
+    hierarchy: HierarchyConfig,
+    issues: Vec<Issue>,
+    policy: ArtifactClassificationPolicy,
+    documentation: crate::config::DocumentationConfig,
+}
+
 #[derive(Clone, Copy)]
 enum ArchiveTarget<'a> {
     Document(&'a str),
@@ -143,32 +152,27 @@ fn apply_recorded_residue_identities(
 }
 
 /// Grow `image` by the requests `add` puts in its spec, reading only those;
-/// `false` is a retryable conflict.
+/// `None` is a retryable conflict. The image moves into the extension, so a
+/// round reuses its answers without copying them.
 fn capture_more(
     session: &mut (dyn RepositoryReadSession + '_),
-    image: &mut crate::repository_state::RepositoryImage,
+    image: crate::repository_state::RepositoryImage,
     add: impl FnOnce(&mut crate::repository_state::CaptureSpec) -> Result<()>,
-) -> Result<bool> {
+) -> Result<Option<crate::repository_state::RepositoryImage>> {
     let mut spec = image.capture_spec().clone();
     add(&mut spec)?;
     if &spec == image.capture_spec() {
-        return Ok(true);
+        return Ok(Some(image));
     }
-    match capture_or_retry(session.extend(image.clone(), spec))? {
-        Some(next) => {
-            *image = next;
-            Ok(true)
-        }
-        None => Ok(false),
-    }
+    capture_or_retry(session.extend(image, spec))
 }
 
 /// [`capture_more`] of `paths`.
 fn capture_paths(
     session: &mut (dyn RepositoryReadSession + '_),
-    image: &mut crate::repository_state::RepositoryImage,
+    image: crate::repository_state::RepositoryImage,
     paths: impl IntoIterator<Item = crate::repository_state::VirtualPath>,
-) -> Result<bool> {
+) -> Result<Option<crate::repository_state::RepositoryImage>> {
     capture_more(session, image, |spec| Ok(spec.discover_paths(paths)?))
 }
 
@@ -244,10 +248,10 @@ fn image_evidence(
 
 fn capture_artifact_evidence(
     session: &mut (dyn RepositoryReadSession + '_),
-    image: &mut crate::repository_state::RepositoryImage,
+    mut image: crate::repository_state::RepositoryImage,
     paths: impl IntoIterator<Item = String>,
     evidence: &mut ArtifactEvidenceMap,
-) -> Result<bool> {
+) -> Result<Option<crate::repository_state::RepositoryImage>> {
     let paths = paths.into_iter().collect::<BTreeSet<_>>();
     for path in &paths {
         if !matches!(
@@ -291,15 +295,16 @@ fn capture_artifact_evidence(
             }
         }
         if requested.is_empty() {
-            return Ok(true);
+            return Ok(Some(image));
         }
-        if !capture_paths(session, image, requested.values().cloned())? {
-            return Ok(false);
-        }
+        let Some(next) = capture_paths(session, image, requested.values().cloned())? else {
+            return Ok(None);
+        };
+        image = next;
         for (path, _) in requested {
             evidence.insert(
                 path.clone(),
-                image_evidence(image, &path, ArtifactListingScope::MetadataOnly)?,
+                image_evidence(&image, &path, ArtifactListingScope::MetadataOnly)?,
             );
         }
     }
@@ -347,14 +352,36 @@ fn capture_directory_tree(
 impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
     /// Fully evaluate every effectively terminal configured non-leaf container
     /// without mutation.
+    ///
+    /// Every candidate plans in one read session over one growing image, so
+    /// the candidates together share that session's capture budget.
     pub fn archive_candidates(&self) -> Result<ArchiveCandidates> {
-        let hierarchy = crate::config_manager::get_hierarchy_config(&self.exec.storage)?;
-        let issues = self.exec.storage.list_issues()?;
-        let plans = effectively_terminal_container_ids(&issues, &hierarchy)
-            .into_iter()
-            .map(|id| self.preview_archive_target(ArchiveTarget::Container(&id)))
-            .collect::<Result<Vec<_>>>()?;
-        Ok(ArchiveCandidates::new(plans))
+        let layout = self.exec.require_layout()?;
+        with_read_session(
+            &self.exec.storage,
+            &layout,
+            "archive candidates",
+            |session| {
+                let Some((mut image, base)) = self.derive_archive_base(session)? else {
+                    return Ok(None);
+                };
+                let mut plans = Vec::new();
+                for id in effectively_terminal_container_ids(&base.issues, &base.hierarchy) {
+                    let Some((next, plan, _)) = self.plan_archive_target(
+                        session,
+                        &base,
+                        image,
+                        ArchiveTarget::Container(&id),
+                    )?
+                    else {
+                        return Ok(None);
+                    };
+                    image = next;
+                    plans.push(plan);
+                }
+                Ok(Some(ArchiveCandidates::new(plans)))
+            },
+        )
     }
 
     /// Build a complete non-mutating plan for one arbitrary repository document.
@@ -371,17 +398,42 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
     fn preview_archive_target(&self, target: ArchiveTarget<'_>) -> Result<ArtifactPlan> {
         let layout = self.exec.require_layout()?;
         with_read_session(&self.exec.storage, &layout, "archive preview", |session| {
+            let Some((image, base)) = self.derive_archive_base(session)? else {
+                return Ok(None);
+            };
             Ok(self
-                .capture_archive_plan(session, target)?
+                .plan_archive_target(session, &base, image, target)?
                 .map(|(_, plan, _)| plan))
         })
     }
 
-    /// Capture the image `target`'s plan reads and derive that plan; `None` is
-    /// a retryable conflict.
-    fn capture_archive_plan(
+    /// Capture the archive base image and derive the [`ArchiveBase`] every
+    /// target planned over it shares; `None` is a retryable conflict.
+    fn derive_archive_base(
         &self,
         session: &mut (dyn RepositoryReadSession + '_),
+    ) -> Result<Option<(crate::repository_state::RepositoryImage, ArchiveBase)>> {
+        let Some(image) = self.exec.capture_archive_base(session)? else {
+            return Ok(None);
+        };
+        let config = crate::repository_state::assemble_config(&image)?;
+        let namespaces = crate::config_manager::namespaces_from_config(&config);
+        let base = ArchiveBase {
+            hierarchy: HierarchyConfig::from_declarations(&namespaces)?,
+            issues: super::captured_active_issues(&image)?,
+            policy: ArtifactClassificationPolicy::from_documentation(config.documentation.as_ref()),
+            documentation: config.documentation.unwrap_or_default(),
+        };
+        Ok(Some((image, base)))
+    }
+
+    /// Grow `image` by what `target`'s plan reads and derive that plan over
+    /// `base`, returning the grown image; `None` is a retryable conflict.
+    fn plan_archive_target(
+        &self,
+        session: &mut (dyn RepositoryReadSession + '_),
+        base: &ArchiveBase,
+        mut image: crate::repository_state::RepositoryImage,
         target: ArchiveTarget<'_>,
     ) -> Result<
         Option<(
@@ -392,20 +444,16 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
     > {
         use crate::repository_state::{ArchiveExecutionError, MutationError, ProducerError};
 
-        let Some(mut image) = self.exec.capture_archive_base(session)? else {
-            return Ok(None);
-        };
-        let config = crate::repository_state::assemble_config(&image)?;
-        let namespaces = crate::config_manager::namespaces_from_config(&config);
-        let hierarchy =
-            crate::domain::type_taxonomy::HierarchyConfig::from_declarations(&namespaces)?;
-        let issues = super::captured_active_issues(&image)?;
+        let ArchiveBase {
+            hierarchy,
+            issues,
+            policy,
+            documentation,
+        } = base;
         let root_id = match target {
             ArchiveTarget::Document(_) => None,
-            ArchiveTarget::Container(id) => Some(super::require_issue_in_capture(&issues, id)?),
+            ArchiveTarget::Container(id) => Some(super::require_issue_in_capture(issues, id)?),
         };
-        let policy =
-            ArtifactClassificationPolicy::from_documentation(config.documentation.as_ref());
         let plan_target = match target {
             ArchiveTarget::Document(path) => PlanTarget::Document {
                 path: normalize_artifact_path(path),
@@ -419,12 +467,14 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
         };
         let evidence_path =
             crate::repository_state::VirtualPath::archive_evidence_record(&plan_target);
-        if !capture_more(session, &mut image, |spec| {
+        let Some(next) = capture_more(session, image, |spec| {
             spec.discover_paths(evidence_path.ancestor_directories()?)?;
             Ok(spec.discover_paths([evidence_path.clone()])?)
-        })? {
+        })?
+        else {
             return Ok(None);
-        }
+        };
+        image = next;
         let archive_evidence = match image
             .file_bytes(&evidence_path)
             .map_err(ProducerError::from)
@@ -463,7 +513,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                 .find(|issue| &issue.id == id)
                 .context("captured container missing")?;
             let preferred =
-                preferred_container_destination_root(issue, &hierarchy, &policy.archive_root);
+                preferred_container_destination_root(issue, hierarchy, &policy.archive_root);
             if policy.archive_root.is_empty() {
                 preferred
             } else {
@@ -474,24 +524,28 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                     .replace('\\', "/");
                 let archive_path = image_path(image.layout(), &archive_root)?;
                 let mut root_evidence = ArtifactEvidenceMap::new();
-                if !capture_artifact_evidence(
+                let Some(next) = capture_artifact_evidence(
                     session,
-                    &mut image,
+                    image,
                     [archive_root.clone()],
                     &mut root_evidence,
-                )? {
+                )?
+                else {
                     return Ok(None);
-                }
+                };
+                image = next;
                 let archive_is_directory = matches!(
                     root_evidence.get(&archive_root),
                     Some(ArtifactEvidence::Directory { .. })
                 );
                 let children = if archive_is_directory {
-                    if !capture_more(session, &mut image, |spec| {
+                    let Some(next) = capture_more(session, image, |spec| {
                         Ok(spec.discover_listing(archive_path.clone())?)
-                    })? {
+                    })?
+                    else {
                         return Ok(None);
-                    }
+                    };
+                    image = next;
                     image
                         .directory_listings()
                         .get(&archive_path)
@@ -510,9 +564,10 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                 if archive_is_directory {
                     child_paths.push(image_path(image.layout(), &legacy)?);
                 }
-                if !capture_paths(session, &mut image, child_paths)? {
+                let Some(next) = capture_paths(session, image, child_paths)? else {
                     return Ok(None);
-                }
+                };
+                image = next;
                 let mut markers = Vec::new();
                 for path in &children {
                     let child = image_path(image.layout(), path)?;
@@ -526,9 +581,10 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                         )?);
                     }
                 }
-                if !capture_paths(session, &mut image, markers)? {
+                let Some(next) = capture_paths(session, image, markers)? else {
                     return Ok(None);
-                }
+                };
+                image = next;
                 let mut evidence = ArtifactEvidenceMap::from([
                     (
                         archive_root.clone(),
@@ -583,15 +639,17 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                 root_id.as_ref().context("container id was not resolved")?,
             ),
         };
-        let pinned_requests = pinned_root_requests(&inventory_issues, &hierarchy, explicit)?;
-        if !capture_more(session, &mut image, |spec| {
+        let pinned_requests = pinned_root_requests(&inventory_issues, hierarchy, explicit)?;
+        let Some(next) = capture_more(session, image, |spec| {
             pinned_requests
                 .iter()
                 .try_for_each(|(revision, path)| spec.discover_pinned(revision, path))
                 .map_err(Into::into)
-        })? {
+        })?
+        else {
             return Ok(None);
-        }
+        };
+        image = next;
         let pinned = pinned_requests
             .into_iter()
             .map(|request| -> Result<_> {
@@ -620,13 +678,12 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                 Ok((request, fact))
             })
             .collect::<Result<_>>()?;
-        let inventory = inventory_explicit_roots(&inventory_issues, &hierarchy, explicit, &pinned)?;
+        let inventory = inventory_explicit_roots(&inventory_issues, hierarchy, explicit, &pinned)?;
         let inventory = match root_id.as_ref() {
             Some(root) => {
-                let documentation = config.documentation.clone().unwrap_or_default();
                 let mut files = Vec::new();
                 for directory in
-                    member_document_directories(&inventory_issues, &hierarchy, root, &documentation)
+                    member_document_directories(&inventory_issues, hierarchy, root, documentation)
                 {
                     let Some(next) = capture_directory_tree(session, image, &directory)? else {
                         return Ok(None);
@@ -640,10 +697,10 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                 }
                 inventory.with_unlinked_roots(member_derived_documents(
                     &inventory_issues,
-                    &hierarchy,
+                    hierarchy,
                     root,
                     &files,
-                    &documentation,
+                    documentation,
                 ))?
             }
             None => inventory,
@@ -672,20 +729,22 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                     paths,
                     state: next_state,
                 } => {
-                    if !capture_artifact_evidence(
+                    let Some(next) = capture_artifact_evidence(
                         session,
-                        &mut image,
+                        image,
                         paths.iter().cloned(),
                         &mut evidence,
-                    )? {
+                    )?
+                    else {
                         return Ok(None);
-                    }
+                    };
+                    image = next;
                     state = next_state;
                 }
             }
         };
         let (discovered, embedded) =
-            derive_archive_artifacts(inventory, &issues, &evidence, &parsed, &policy)?;
+            derive_archive_artifacts(inventory, issues, &evidence, &parsed, policy)?;
         let mut blockers = discovered.blockers;
         blockers.extend(
             conflicts
@@ -705,7 +764,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
             }
         }
         let artifacts = discovered.artifacts;
-        let layout = ArchiveLayout::new(&plan_target, &destination, &policy, &artifacts);
+        let layout = ArchiveLayout::new(&plan_target, &destination, policy, &artifacts);
         let mut paths = artifacts
             .iter()
             .filter(|a| !a.version().is_pinned())
@@ -727,9 +786,12 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
             })
             .collect::<BTreeSet<_>>();
         paths.extend(ancestors);
-        if !capture_artifact_evidence(session, &mut image, paths.iter().cloned(), &mut evidence)? {
+        let Some(next) =
+            capture_artifact_evidence(session, image, paths.iter().cloned(), &mut evidence)?
+        else {
             return Ok(None);
-        }
+        };
+        image = next;
         if matches!(plan_target, PlanTarget::Container { .. })
             && matches!(
                 evidence.get(&destination),
@@ -749,7 +811,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
             &plan_target,
             &destination,
             &artifacts,
-            &policy,
+            policy,
             embedded,
             &evidence,
         )?;
@@ -772,7 +834,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
         let plan = classify_artifacts(
             ArtifactClassificationInventory::new(plan_target, artifacts, blockers)
                 .with_destination_root(destination),
-            policy,
+            policy.clone(),
             facts,
         )?;
         Ok(Some((image, plan, archive_evidence)))
@@ -798,7 +860,11 @@ impl ArchiveOps<'_, JsonFileStorage> {
             &layout,
             "archive execution",
             |session| {
-                let Some((image, plan, evidence)) = self.capture_archive_plan(session, target)?
+                let Some((image, base)) = self.derive_archive_base(session)? else {
+                    return Ok(SessionStep::Retry);
+                };
+                let Some((image, plan, evidence)) =
+                    self.plan_archive_target(session, &base, image, target)?
                 else {
                     return Ok(SessionStep::Retry);
                 };
@@ -1087,6 +1153,84 @@ mod tests {
             report.candidates()[0].target(),
             &PlanTarget::Container { id }
         );
+    }
+
+    /// Candidates over shared and distinct artifacts plan in one read session,
+    /// each plan equal to its container's own preview.
+    #[test]
+    fn test_archive_candidates_plan_every_candidate_in_one_read_session() {
+        use crate::commands::test_helpers::SessionOpenCounter;
+
+        let storage = crate::storage::InMemoryStorage::new();
+        let root = storage
+            .root()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        storage.add_worktree_file(format!("{root}/active/shared.md"), "# Shared\n");
+        storage.add_worktree_file(format!("{root}/active/solo.md"), "# Solo\n");
+        let containers = ["a", "b", "c"]
+            .into_iter()
+            .map(|name| {
+                let path = format!("{root}/active/{name}.md");
+                let body = match name {
+                    "c" => "[solo](solo.md)\n",
+                    _ => "[shared](shared.md)\n",
+                };
+                storage.add_worktree_file(&path, body);
+                let mut issue = crate::test_utils::fixture_issue(name.into(), String::new());
+                issue.state = State::Done;
+                issue.labels = vec!["type:portfolio".into()];
+                issue.documents = vec![document_reference(path)];
+                let id = issue.id.clone();
+                crate::commands::test_helpers::seed_issue(&storage, issue);
+                id
+            })
+            .collect::<BTreeSet<_>>();
+        let config = format!(
+            "[documentation]\ndevelopment_root = \"{root}\"\nmanaged_paths = [\"{root}/active\"]\npermanent_paths = []\narchive_root = \"{root}/archive\"\n\n[type_hierarchy]\ntypes = {{ portfolio = 2, unit = 7 }}\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"
+        );
+        let counter = SessionOpenCounter::new();
+        let executor = crate::commands::test_helpers::memory_executor_wrapping(
+            storage,
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+            |initialized| initialized.with_mutation_interruption_view(counter.clone()),
+        );
+
+        let report = executor.archive().archive_candidates().unwrap();
+
+        assert_eq!(
+            (counter.read_opens(), counter.mutation_opens()),
+            (1, 0),
+            "candidates plan in one read session"
+        );
+        let planned = report
+            .candidates()
+            .iter()
+            .map(|plan| match plan.target() {
+                PlanTarget::Container { id } => id.clone(),
+                _ => panic!("candidate target must be a container"),
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(planned, containers);
+        assert!(
+            report.candidates().iter().all(|plan| plan.count() > 0),
+            "every candidate plans artifacts"
+        );
+        for plan in report.candidates() {
+            let PlanTarget::Container { id } = plan.target() else {
+                unreachable!("targets were checked above");
+            };
+            assert_eq!(
+                plan,
+                &executor.archive().preview_archive_container(id).unwrap(),
+                "candidate {id} plans as its own preview"
+            );
+        }
     }
 
     #[test]
@@ -1385,10 +1529,16 @@ mod tests {
             .storage
             .open_mutation_session(executor.require_layout().unwrap())
             .unwrap();
-        let (image, _, _) = executor
-            .archive()
-            .capture_archive_plan(
+        let archive = executor.archive();
+        let (image, base) = archive
+            .derive_archive_base(session.as_mut())
+            .unwrap()
+            .expect("an uncontended capture converges");
+        let (image, _, _) = archive
+            .plan_archive_target(
                 session.as_mut(),
+                &base,
+                image,
                 ArchiveTarget::Document("fixtures/root.md"),
             )
             .unwrap()

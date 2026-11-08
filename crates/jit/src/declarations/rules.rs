@@ -2,10 +2,9 @@
 //!
 //! This module defines the declarative validation rule model and pure parsing
 //! of already-captured `rules.toml`, configuration, and schema bytes into a
-//! [`RuleSet`]. Filesystem loading of the ruleset belongs to the storage boundary
-//! ([`load_ruleset`](crate::storage::ruleset_store::load_ruleset)); validation only
-//! evaluates the parsed declarations, and captured-view flows parse pre-resolved
-//! bytes. This module also implements
+//! [`RuleSet`]. The captured declaration parse supplies those bytes from one
+//! repository image; validation only evaluates the parsed declarations. This
+//! module also implements
 //! selector matching (the union of rules applicable to a given issue) and the
 //! config-level guards required by the design record:
 //!

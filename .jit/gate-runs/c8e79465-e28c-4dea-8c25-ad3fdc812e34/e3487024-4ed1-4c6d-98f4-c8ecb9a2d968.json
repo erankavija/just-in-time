@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "52747410e08196a991a9a8e06dc7e0aaf4b926f0",
+  "completed_at": "2026-11-07T23:36:09.987164347Z",
+  "duration_ms": 186506,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact defects found in the story-scoped source review; newer repository validation passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c8e79465-e28c-4dea-8c25-ad3fdc812e34",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e3487024-4ed1-4c6d-98f4-c8ecb9a2d968",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-07T23:33:03.480615794Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:c8e79465` — `9b291f4b`, `873700f6`; individual patches inspected, both tracker-only. Server implementation reviewed through issue intent and completed dependencies.\nPolicy sources: `AGENTS.md`.\nResolved items: @/issue/c8e79465/requirement/REQ-01; @/issue/0f8efc37/requirement/REQ-03, @/issue/0f8efc37/requirement/REQ-04, @/issue/0f8efc37/requirement/REQ-06, @/issue/0f8efc37/requirement/REQ-08, @/issue/0f8efc37/requirement/REQ-09, @/issue/0f8efc37/requirement/REQ-10, @/issue/0f8efc37/requirement/REQ-11, @/issue/0f8efc37/requirement/REQ-12; @/issue/0f8efc37/decision/D-2, @/issue/0f8efc37/decision/D-3, @/issue/0f8efc37/decision/D-4, @/issue/0f8efc37/decision/D-5, @/issue/0f8efc37/decision/D-6 → respective `.jit/issues/` descriptions; @/inv/architecture-dependency-direction, @/inv/convention-convergence, @/inv/canonical-cutover, @/inv/orthogonal-tests, @/inv/essential-code-prose, @/inv/semantic-test-assertions, @/inv/shared-test-contracts, @/inv/bounded-rust-build-footprint, @/inv/semantic-types → `.jit/invariants.toml`; @/charter/D-18, @/charter/D-20, @/charter/D-21, @/charter/D-25 → `dev/vision/9db27a3a-charter.md`; @/gate/jit-validate, @/gate/repo-validate → `.jit/gates.toml`.\nGate evidence: Captured repo-validate failed, exit 4, 2026-11-07T23:32:30Z; newer recorded run passed, exit 0, 2026-11-07T23:33:43Z, superseding that failure. Current code-review pending. Wrapper ancestry unavailable; coverage not asserted. No gates rerun.\nTruncation recovery: Narrower reads recovered relevant route, cache, and investigation sections; unrelated historical MCP and repository-wide inventories excluded.\n\nNo findings. Source inspection supports REQ-01: retained routes call shared core operations, list and graph share captured issues, and document adapters preserve selected-version bytes and supported diff. Focused coverage appears in `crates/server/src/routes.rs:1569` and `crates/server/tests/server_integration/document_api_tests.rs:170` and `:186`. Tests were inspected, not executed.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects found in the story-scoped source review; newer repository validation passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

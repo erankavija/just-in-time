@@ -18,7 +18,6 @@ use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::declarations::{GateChecker, GateMode};
 use jit::domain::identity::IssueId;
 use jit::domain::Priority;
-use jit::labels::parse_label;
 use jit::storage::{IssueStore, JsonFileStorage, PresetNotFoundError};
 use jit::templates::TemplatePrerequisitesUnmetError;
 use jit::templates::{GraphTemplate, TemplateRegistry};
@@ -119,11 +118,7 @@ fn declare_config(h: &TestHarness, config: &str) {
 }
 
 fn type_of(issue: &jit::domain::Issue) -> Option<String> {
-    issue.labels.iter().find_map(|l| {
-        parse_label(l)
-            .ok()
-            .and_then(|(ns, v)| (ns == "type").then_some(v))
-    })
+    jit::labels::type_label_value(&issue.labels).map(str::to_owned)
 }
 
 fn create_epic(h: &TestHarness, title: &str) -> IssueId {
@@ -167,7 +162,7 @@ fn container_binding(id: &IssueId) -> BTreeMap<String, IssueId> {
 }
 
 #[test]
-fn test_named_apply_auto_binding_comes_from_captured_template_not_cached_config() {
+fn test_named_apply_auto_binding_comes_from_captured_template() {
     let h = TestHarness::new();
     let epic = create_epic(&h, "Captured anchor epic");
     let templates = r#"

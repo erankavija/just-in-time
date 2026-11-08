@@ -17,20 +17,27 @@ pub fn process_group_target(pid: u32) -> Option<i32> {
 /// `EPERM`, and any other errno are alive. On non-Unix platforms, an accepted PID is alive. In
 /// particular, a lock or server held by another user's live process must not be treated as stale.
 pub(crate) fn is_alive(pid: u32) -> bool {
-    let Some(pid) = checked_pid(pid) else {
-        return false;
-    };
+    checked_pid(pid).is_some_and(probe)
+}
 
+/// Returns whether any process belongs to the group `pgid` leads, under the same errno policy as
+/// `is_alive`. A guard refusal (pgid 0, 1, or unrepresentable) is dead.
+pub fn is_group_alive(pgid: u32) -> bool {
+    process_group_target(pgid).is_some_and(probe)
+}
+
+/// The module's only signal-zero probe over an already-guarded `kill(2)` target.
+fn probe(target: i32) -> bool {
     #[cfg(unix)]
     {
         use nix::sys::signal::kill;
         use nix::unistd::Pid;
 
-        probe_result_is_alive(kill(Pid::from_raw(pid), None))
+        probe_result_is_alive(kill(Pid::from_raw(target), None))
     }
     #[cfg(not(unix))]
     {
-        let _ = pid;
+        let _ = target;
         true
     }
 }
@@ -46,7 +53,7 @@ fn probe_result_is_alive(result: Result<(), nix::errno::Errno>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{checked_pid, is_alive, process_group_target};
+    use super::{checked_pid, is_alive, is_group_alive, process_group_target};
 
     #[cfg(unix)]
     use super::probe_result_is_alive;
@@ -72,6 +79,20 @@ mod tests {
     fn test_is_alive_rejects_guard_refused_pids() {
         assert!(!is_alive(0));
         assert!(!is_alive(u32::MAX));
+    }
+
+    #[test]
+    fn test_is_group_alive_rejects_guard_refused_pgids() {
+        assert!(!is_group_alive(0));
+        assert!(!is_group_alive(1));
+        assert!(!is_group_alive(u32::MAX));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_is_group_alive_reports_own_group_alive() {
+        use nix::unistd::getpgrp;
+        assert!(is_group_alive(getpgrp().as_raw() as u32));
     }
 
     #[test]

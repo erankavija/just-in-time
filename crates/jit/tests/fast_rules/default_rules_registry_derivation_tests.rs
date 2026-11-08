@@ -8,7 +8,6 @@
 //! long after `jit init` baked the registry schema, and the first `enforces:`
 //! label failed `namespace-registry` against the frozen file.
 
-use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::domain::identity::IssueIdPrefix;
 use jit::domain::{ContentFormat, Issue, Priority};
 use jit::test_utils::{file_executor, setup_test_repo_with_config};
@@ -81,7 +80,8 @@ fn test_new_unique_namespace_enforces_uniqueness_without_regeneration() {
     declare_unique_squad_namespace(&jit_dir);
 
     let exec = file_executor(temp.path()).unwrap();
-    let rules = exec.effective_rules().unwrap();
+    let declarations = exec.config().captured_declarations().unwrap();
+    let rules = declarations.rules();
     assert!(
         rules
             .rules
@@ -165,7 +165,8 @@ fn test_undeclared_namespace_still_fails_validation() {
     let (temp, _) = setup_test_repo_with_config(TYPE_ONLY_CONFIG).unwrap();
 
     let exec = file_executor(temp.path()).unwrap();
-    let rules = exec.effective_rules().unwrap();
+    let declarations = exec.config().captured_declarations().unwrap();
+    let rules = declarations.rules();
     let eval = evaluate_local(
         &issue_with_label("undeclared:x"),
         rules,
@@ -209,7 +210,8 @@ fn test_create_issue_in_new_namespace_then_validate_label_clean() {
 
     let reloaded = file_executor(temp.path()).unwrap();
     let issue = reloaded.issues().show_issue(&id).unwrap();
-    let rules = reloaded.effective_rules().unwrap();
+    let declarations = reloaded.config().captured_declarations().unwrap();
+    let rules = declarations.rules();
     let eval = evaluate_local(&issue, rules, ContentFormat::Markdown).unwrap();
     assert!(
         !eval
@@ -231,16 +233,18 @@ fn namespace_registry_projection(jit_dir: &std::path::Path) -> std::path::PathBu
 #[test]
 fn test_missing_default_schema_still_validates_and_enforces() {
     // F1: a DELETED default projection must not break validation — the default
-    // rules derive from config, so `effective_rules` loads and they still enforce.
+    // rules derive from config, so the captured rule set loads and they still enforce.
     let (temp, _) = setup_test_repo_with_config(TYPE_ONLY_CONFIG).unwrap();
     let jit_dir = temp.path().join(".jit");
     let taxonomy = jit::test_taxonomy::test_taxonomy();
     std::fs::remove_file(namespace_registry_projection(&jit_dir)).unwrap();
 
     let exec = file_executor(temp.path()).unwrap();
-    let rules = exec
-        .effective_rules()
+    let declarations = exec
+        .config()
+        .captured_declarations()
         .expect("a missing default projection must not fail rule loading");
+    let rules = declarations.rules();
 
     // The default rule still ENFORCES from config: a registered namespace is
     // clean, an unregistered one still fails namespace-registry.
@@ -278,9 +282,11 @@ fn test_corrupt_default_schema_still_validates_and_enforces() {
     std::fs::write(namespace_registry_projection(&jit_dir), "{ not valid json").unwrap();
 
     let exec = file_executor(temp.path()).unwrap();
-    let rules = exec
-        .effective_rules()
+    let declarations = exec
+        .config()
+        .captured_declarations()
         .expect("a malformed default projection must not fail rule loading");
+    let rules = declarations.rules();
 
     let bad = evaluate_local(
         &issue_with_label("undeclared:x"),

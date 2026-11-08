@@ -210,19 +210,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 }
 
 impl<S: IssueStore> TemplateOps<'_, S> {
-    /// The repository's name for the anchor `jit apply <template> <container>`
-    /// binds to its positional `<container>` argument
-    /// (`.jit/templates.toml`'s `[anchors] container`, defaulting to
-    /// [`DEFAULT_CONTAINER_ANCHOR`](crate::templates::DEFAULT_CONTAINER_ANCHOR)).
-    pub fn container_anchor(&self) -> Result<&str> {
-        Ok(self
-            .exec
-            .cached_config()?
-            .templates
-            .anchors
-            .container_anchor())
-    }
-
     /// Apply a graph template named `template_name` to `container_id`
     /// (`jit apply <template> <container>`).
     ///

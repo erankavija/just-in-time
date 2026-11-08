@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-07T23:32:32.595644073Z",
+  "dependencies": [],
+  "description": "Lexical path normalization (resolving `.` and `..` without touching the filesystem) is implemented separately in seven places in `crates/jit`, with three different policies. Converging them on one primitive removes the copies and makes each call site's escape policy explicit.\n\n## Background\n\nThe copies, as of commit `c06181d3a`:\n\n| Site | `..` past the root | Relative input | Other checks |\n|---|---|---|---|\n| `commands/bootstrap.rs` `normalize_absolute_path` | silently popped | kept relative | — |\n| `document/link_validator.rs` `normalize_path` | silently popped | kept relative | drops root and prefix |\n| `storage/repo_lock.rs` `canonical_lock_key` | silently popped | joined to process working directory | — |\n| `storage/repository_state_store.rs` `lexical_absolute` | rejected (`LexicalEscape`) | joined to process working directory | — |\n| `repository_state/export.rs` `normalize_absolute` | rejected (`LexicalEscape`) | rejected (`RelativeRoot`) | rejects control characters |\n| `repository_state/path.rs` `lexical_absolute` | any `.` or `..` rejected | rejected (`RelativeRoot`) | — |\n| `storage/capability_fs.rs` `resolve_confined_symlink` | rejected (`UnsafeTarget`) | resolved against the link's parent | — |\n\nRoot-relative safe paths already have one validator (`RootRelativePath::parse`); this issue covers absolute and link-resolution normalization, which that validator does not serve. Two sites read the process working directory from library code to absolutize, which makes their result depend on process-wide state.\n\n## Success Criteria\n\n- [hard] REQ-01: One lexical normalization primitive serves every site listed above; no other function in `crates/jit` resolves `.`/`..` components by hand.\n- [hard] REQ-02: Each call site states its escape policy (reject or clamp) through the primitive's interface, and each site's observable behaviour is unchanged unless the change is named in the commit with its reason.\n- [hard] REQ-03: Library code takes the base for relative input from its caller, not from the process working directory.\n- [hard] REQ-04: The primitive's policy matrix (escape, relative input, root and prefix handling) is proven once by unit tests on the primitive; call sites test only that they go through it.\n\n## Notes\n\nRoot-relative link resolution already lives on the canonical type as `RootRelativePath::resolve_link` (reject-escape policy), which replaced the former `document/assets.rs` copy; it is the natural home for the converged primitive's root-relative case.\n\nFound during a sweep of `Component::` matches for the one-form convergence story; kept outside that story because its criteria cover safe-path validators only. Relevant: @/inv/convention-convergence, @/charter/D-18, @/inv/orthogonal-tests.\n\n",
+  "documents": [],
+  "first_ready_at": "2026-11-07T23:32:32.595644073Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "f14fe734-8a09-417b-b32e-bb826b154dc5",
+  "labels": [
+    "type:task",
+    "component:core",
+    "per:@/inv/convention-convergence",
+    "per:@/charter/D-18",
+    "milestone:v1.1"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Converge lexical path normalization on one primitive",
+  "updated_at": "2026-11-07T23:59:00.406177469Z"
+}

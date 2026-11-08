@@ -17,7 +17,7 @@
 
 use crate::cli::{Cli, Commands, ConfigCommands, IssueCommands, ProfileCommands, WorktreeCommands};
 use crate::commands::{open_repository, CommandExecutor, OpenedRepository, RepositoryInvocation};
-use crate::config_manager::ConfigManager;
+use crate::config_manager::{invocation_write_override, LINKED_CHECKOUT_WRITE_STANCE_ENV};
 use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::output::{status_after, ErrorCode, ExitCode, OutputMode, Report, RunStatus};
 use crate::schema::OutputSchema;
@@ -149,7 +149,11 @@ pub fn bootstrap(cli: &Cli) -> anyhow::Result<Option<BootstrapResult>> {
         is_recover: matches!(command, Commands::Recover),
         // Read before any repository work, so an unusable token fails the
         // invocation even for a command that never writes.
-        write_override: ConfigManager::invocation_write_override()?,
+        write_override: invocation_write_override(
+            std::env::var(LINKED_CHECKOUT_WRITE_STANCE_ENV)
+                .ok()
+                .as_deref(),
+        )?,
     };
     if matches!(command, Commands::Config(ConfigCommands::Validate)) {
         return crate::commands::ConfigValidationReport::for_invocation(&invocation)

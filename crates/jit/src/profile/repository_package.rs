@@ -978,19 +978,16 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let rules_toml = toml::to_string(&serde_json::json!({ "rules": rule_values })).unwrap();
-        let temp = TempDir::new().unwrap();
-        fs::create_dir_all(temp.path().join("schemas")).unwrap();
-        fs::write(
-            temp.path().join("schemas/jit-content-standards.json"),
-            package
-                .source_bytes("assets/install/.jit/schemas/jit-content-standards.json")
-                .unwrap(),
-        )
-        .unwrap();
-        std::fs::write(temp.path().join("rules.toml"), &rules_toml).unwrap();
-        let rules = crate::storage::ruleset_store::load_ruleset(
-            &crate::test_utils::repository_layout_for_data_root(temp.path()),
-            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        let rules = crate::declarations::rules::RuleSet::parse(
+            &rules_toml,
+            None,
+            [(
+                "schemas/jit-content-standards.json".to_string(),
+                package
+                    .source_bytes("assets/install/.jit/schemas/jit-content-standards.json")
+                    .unwrap()
+                    .to_vec(),
+            )],
         )
         .unwrap();
         let mut gates = GateRegistry::default();
