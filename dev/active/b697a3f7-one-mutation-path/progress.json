@@ -300,8 +300,8 @@
         {
           "id": "6a19e93f",
           "short_id": "6a19e93f",
-          "status": "pending",
-          "note": "after e7635f2f"
+          "status": "gating",
+          "note": "landed 03f73cf86 (f2e7c20e2); cargo-ci passed. REQ-03 quiet-host runs 09:08-09:12, 5 samples, harness 75c433e70, base 369d35a42: standard scenario (a) tip s(2000)/s(500)=0.378 (base 3.794), pass; graph-rule variant (rule bench-active-depends-on-active dependency-shape in_progress transitive) tip 1.234 (base 3.825), pass; load at start 1.43/1.91, end 1.46/1.59."
         },
         {
           "id": "86a183c2",
@@ -511,7 +511,8 @@
     "If c31c2e57 review flags a captured gate-registry parse site, cite a869900b REQ-04 as owner; do not rework c31c2e57 (invoker).",
     "c31c2e57 lead review FAIL r1: validate --fix derive_fixes reparses (capture_validation drops discovery parse; validation_declarations_from_image again) - REQ-01 literal.",
     "06:00-07:00 host held clear for df129d9e fba8d478 trials; c31c2e57 r1 and dd95bd9d r1 editing only, cargo held.",
-    "6a19e93f r0 ed67e4a7c: smoke (a) 1.38 (base 4.34, load ~10). Lead review FAIL r1: IssueIndex dependents map parallel to e7635f2f reverse index (convergence). Graph-rule transition full-list read: ruling requested from invoker."
+    "6a19e93f r0 ed67e4a7c: smoke (a) 1.38 (base 4.34, load ~10). Lead review FAIL r1: IssueIndex dependents map parallel to e7635f2f reverse index (convergence). Graph-rule transition full-list read: ruling requested from invoker.",
+    "09:06-09:12 quiet window: 45d0a971 base-only record into its worktree raw/base (load 1.93->1.56; base reproduces all three costs); 6a19e93f standard and graph-rule runs both pass."
   ],
   "story_checkpoints": [
     {
