@@ -237,6 +237,26 @@ pub fn render_archive_candidates(
         }
         rendered.push_str(&render_archive_plan(plan));
     }
+    rendered + &render_archive_advisory(report.advisory())
+}
+
+/// Render an archive advisory section: each cited artifact, then one
+/// `cited at` line per citation location. An empty section renders nothing.
+pub fn render_archive_advisory(
+    advisory: &crate::domain::archive_advisory::ArchiveAdvisory,
+) -> String {
+    use std::fmt::Write;
+
+    if advisory.citations.is_empty() {
+        return String::new();
+    }
+    let mut rendered = String::from("Advisory citations (live files, not part of the plan):\n");
+    for citations in &advisory.citations {
+        let _ = writeln!(rendered, "  - {}", citations.artifact);
+        for location in &citations.locations {
+            let _ = writeln!(rendered, "    cited at: {location}");
+        }
+    }
     rendered
 }
 
@@ -2300,6 +2320,33 @@ mod tests {
         }
         assert!(never.contains("has not been run yet") && never.contains("jit gate evaluate"));
         assert_eq!(passed, format!("Passed gate 'tests' for issue {id}"));
+    }
+
+    #[test]
+    fn test_render_archive_advisory_lists_each_citing_file_under_its_artifact_or_nothing() {
+        use crate::domain::archive_advisory::{
+            ArchiveAdvisory, ArtifactCitations, CitationLocation,
+        };
+
+        assert_eq!(render_archive_advisory(&ArchiveAdvisory::default()), "");
+        let locations = ["notes/x.md", "notes/y.md"].map(|citing| CitationLocation {
+            citing: citing.into(),
+            line: 2,
+            column: 5,
+        });
+        let rendered = render_archive_advisory(&ArchiveAdvisory {
+            citations: vec![ArtifactCitations {
+                artifact: "docs/a.md".into(),
+                locations: locations.to_vec(),
+            }],
+        });
+        let lines = rendered.lines().collect::<Vec<_>>();
+        assert!(lines[0].starts_with("Advisory"));
+        assert!(lines[1].contains("docs/a.md"));
+        for (line, location) in lines[2..].iter().zip(&locations) {
+            assert!(line.contains(&location.to_string()), "{line}");
+        }
+        assert_eq!(lines.len(), 2 + locations.len());
     }
 
     #[test]

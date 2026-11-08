@@ -13,6 +13,7 @@ mod reference;
 
 pub use adapter::{AdapterRegistry, DocFormatAdapter, HtmlAdapter, MarkdownAdapter};
 pub use assets::{Asset, AssetScanner, AssetType};
+pub(crate) use link_target::{classify_link_target, LinkTarget};
 pub use link_validator::{InternalLink, LinkType, LinkValidationResult, LinkValidator};
 pub use parser::{
     content_parser_for, slugify_heading, ContentParser, ContentParserError, MarkdownContentParser,

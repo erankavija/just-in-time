@@ -1,12 +1,13 @@
 //! Pure, versioned domain model for dependency-aware artifact archival plans.
 //!
 //! Planning code builds one [`ArtifactPlan`]. Preview surfaces serialize that
-//! value directly, and execution reads the same value through
+//! value beside an advisory citation section, and execution reads the same value through
 //! [`ArtifactPlan::executable_artifacts`]. Keeping ordering and eligibility in
 //! this module prevents either consumer from growing a second classification
 //! model.
 
 use crate::config::DocumentationConfig;
+use crate::domain::archive_advisory::ArchiveAdvisory;
 use crate::domain::artifact_classifier::ArtifactEvidenceError;
 use crate::domain::identity::IssueId;
 use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
@@ -27,10 +28,11 @@ pub const ARCHIVE_PLAN_SCHEMA_VERSION: u32 = 1;
 ///
 /// Each entry is the complete archive-plan envelope for one terminal container;
 /// the collection does not introduce a reduced candidate projection that could
-/// drift from preview or execution planning.
+/// drift from preview or execution planning. The advisory section beside it
+/// covers every candidate's artifacts.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(transparent)]
-pub struct ArchiveCandidates(ListEnvelope<CandidatesKey, ArtifactPlan, SchemaVersion>);
+pub struct ArchiveCandidates(ListEnvelope<CandidatesKey, ArtifactPlan, CandidatesHeader>);
 
 /// Collection key of [`ArchiveCandidates`].
 enum CandidatesKey {}
@@ -40,19 +42,21 @@ impl CollectionKey for CandidatesKey {
     const SCHEMA_NAME: Option<&'static str> = Some("ArchiveCandidates");
 }
 
-/// The wire schema version an archive envelope carries beside its collection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-struct SchemaVersion {
+/// Fields of an [`ArchiveCandidates`] envelope beside its collection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+struct CandidatesHeader {
     schema_version: u32,
+    advisory: ArchiveAdvisory,
 }
 
 impl ArchiveCandidates {
     /// Construct the schema-v1 list envelope from fully evaluated plans.
-    pub fn new(candidates: Vec<ArtifactPlan>) -> Self {
+    pub fn new(candidates: Vec<ArtifactPlan>, advisory: ArchiveAdvisory) -> Self {
         Self(ListEnvelope::with_extras(
             candidates,
-            SchemaVersion {
+            CandidatesHeader {
                 schema_version: ARCHIVE_PLAN_SCHEMA_VERSION,
+                advisory,
             },
         ))
     }
@@ -60,6 +64,11 @@ impl ArchiveCandidates {
     /// Candidate collection schema version.
     pub fn schema_version(&self) -> u32 {
         self.0.extras.schema_version
+    }
+
+    /// Advisory citations of every candidate's artifacts.
+    pub fn advisory(&self) -> &ArchiveAdvisory {
+        &self.0.extras.advisory
     }
 
     /// Number of fully evaluated candidate plans.
@@ -481,12 +490,6 @@ wire_vocabulary! {
         NotSelectedSibling = "not-selected-sibling",
         DynamicLoadingSuspected = "dynamic-loading-suspected",
         UnsupportedEdgeTarget = "unsupported-edge-target",
-        /// One citation of a relocating artifact's path in the text of a scanned
-        /// file: an occurrence naming that path whole, rather than one sitting
-        /// inside a longer path such as the destination the relocation publishes.
-        /// Its [`PlanWarning::path`] names the citing file with the citation's
-        /// 1-based line and column, spelled `<citing path>:<line>:<column>`.
-        MovingPathCitation = "moving-path-citation",
     }
 }
 

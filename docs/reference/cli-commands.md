@@ -241,8 +241,8 @@ short IDs. JSON retains full durable IDs in owner and target records.
 
 For a preview, `--json` prints the schema-version-1 artifact-plan object directly. Its top-level
 fields are `schema_version`, `target`, `destination_root`, `eligible`,
-`policy_status`, `action_counts`, `count`, `artifacts`, `blockers`, and
-`plan_warnings`; each artifact entry also names its structured diagnostics
+`policy_status`, `action_counts`, `count`, `artifacts`, `blockers`,
+`plan_warnings`, and `advisory`; each artifact entry also names its structured diagnostics
 `plan_warnings`. Execution results use the same field name. A preview does not
 add a `message` field. Artifact order is deterministic
 by normalized source path and version. Each blocker carries `code` and `path`;
@@ -250,26 +250,29 @@ a blocker caused by lifecycle state (`non-terminal-target`,
 `document-non-terminal-owner`) additionally carries a `guidance` string naming
 the permitted next action.
 
-A preview and an execution both report the in-content citations a relocation
-would break as `moving-path-citation` warnings, read from the declared
-`citation_scan_roots` universe — the repository-relative directories and files
-whose text the scan reads, which need not lie under the development root ([Citation scan
-roots](configuration.md#citation-scan-roots)). Only a relocating artifact earns
-them, and every citation is its own warning whose `path` names the citing file
-with the citation's 1-based line and column, spelled
-`<citing path>:<line>:<column>`. A citation is text naming the moving path
-whole, so text naming a longer path that ends with it — the destination the
-relocation publishes, or an unrelated path — reports nothing, and repointing a
-citation to the destination removes its warning. The warnings are advisory: they
-carry no action and no blocker, so eligibility, `--execute`, and issue
-transitions all behave as they would with no citation present. Execution
-relocates bytes and relinks document records while rewriting no document
-content, so a citing file survives byte for byte and keeps a stale citation
-until an adopter edits it. Its JSON `plan_warnings` array and human `warning:` lines
-include the same warning set that a preview computed immediately before the
-unchanged run, so either command reports the stale citations the run leaves.
-The structured JSON field is `plan_warnings` on both preview and execution
-results; human output continues to label them as warnings.
+A preview, a candidate listing, and an execution each report the in-content
+citations a relocation would break in an advisory section beside the plan,
+JSON `advisory.citations` and human `Advisory citations`, read from the
+declared `citation_scan_roots` universe — the repository-relative directories
+and files whose text the scan reads, which need not lie under the development
+root ([Citation scan roots](configuration.md#citation-scan-roots)). A command
+scans that universe once, after planning settles, over every artifact of its
+final plans, and looks each artifact up in the result. Only a relocating artifact is reported: each entry names its
+`artifact` source and lists every citation in `locations`, spelled
+`<citing path>:<line>:<column>` with a 1-based line and column. A citation is
+text naming the moving path whole, so text naming a longer path that ends with
+it — the destination the relocation publishes, or an unrelated path — reports
+nothing, and repointing a citation to the destination removes it from the
+section. A Markdown link destination is also resolved from the citing file's
+directory, so a relative link such as `[plan](plan.md)` is a citation of the
+path it reaches. The section is advisory: the scan reads live files outside the
+plan's captured snapshot, so the plan never depends on it, and eligibility,
+`--execute`, and issue transitions all behave as they would with no citation
+present. Execution relocates bytes and relinks document records while rewriting
+no document content, so a citing file survives byte for byte and keeps a stale
+citation until an adopter edits it. Execution scans after its run, over the
+plan it applied, so it reports the stale citations the run leaves, and a citing
+file the run leaves in place reports the locations a preview reported.
 
 `jit archive candidates` is the read-only container report. It lists every
 effectively terminal issue — `Done`, `Rejected`, or `Archived` from one of those
@@ -286,7 +289,8 @@ whose candidates together read more than that budget allows fails the whole
 listing with the capture budget error instead of reporting a partial list.
 
 The JSON shape is exactly
-`{"schema_version":1,"count":N,"candidates":[...]}`. Every entry in
+`{"schema_version":1,"count":N,"candidates":[...],"advisory":{...}}`, with one
+advisory citation section covering every candidate's artifacts. Every entry in
 `candidates` is the complete schema-version-1 target-plan object described
 above, not a summary: policy status, ownership, action counts, artifacts,
 evidence, warnings, and all blockers (including destination conflicts) remain
@@ -427,7 +431,8 @@ stable no-op rerun appends no event.
 For execution, `--execute --json` prints a distinct schema-version-1 execution
 result. Its top-level fields are `schema_version`, `target`,
 `destination_root`, `publications`, `reference_changes`, `planned_deletions`,
-`deleted_sources`, `plan_warnings`, `event_appended`, and `reconciling`.
+`deleted_sources`, `plan_warnings`, `event_appended`, `reconciling`, and
+`advisory`.
 `publications` reports each newly published or newly adopted destination with
 its source, SHA-256/byte-size identity, and `adopted` flag. The two deletion
 arrays distinguish removals recorded before
