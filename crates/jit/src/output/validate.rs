@@ -1,6 +1,9 @@
 //! Typed output for `jit validate`.
 
-use super::{render_validation_findings, DivergenceView, FindingsSummary, HumanRender, OutputMode};
+use super::{
+    render_validation_findings, DivergenceView, FindingsSummary, HumanRender, OutputMode,
+    SummaryLine,
+};
 use crate::domain::identity::IssueId;
 use crate::validation::report::{ExplainReport, RuleReport};
 use schemars::JsonSchema;
@@ -126,8 +129,8 @@ impl ValidationChecksResponse {
         }
     }
 
-    /// The one-line stderr summary naming each failed check.
-    pub fn failure_message(&self) -> String {
+    /// The summary naming each failed check.
+    pub fn failure_message(&self) -> SummaryLine {
         let failed: Vec<_> = self
             .validations
             .iter()
@@ -137,7 +140,7 @@ impl ValidationChecksResponse {
                 _ => "leases",
             })
             .collect();
-        format!("Validation failed: {}", failed.join(", "))
+        SummaryLine::new(format!("Validation failed: {}", failed.join(", ")))
     }
 }
 
@@ -204,7 +207,7 @@ pub struct RepositoryValidationResponse {
 }
 
 impl RepositoryValidationResponse {
-    /// The one-line `message`, also the findings stderr line; the integrity
+    /// The one-line `message`, also the findings summary; the integrity
     /// error's details stay in `integrity_error`.
     pub fn summary(error_count: usize, has_integrity_error: bool) -> String {
         match (error_count, has_integrity_error) {
@@ -308,12 +311,12 @@ mod tests {
             message: RepositoryValidationResponse::summary(error_count, true),
             fix: None,
         };
-        let message = response.message.clone();
+        let message = SummaryLine::new(&response.message);
         Outcome::findings(ErrorCode::ValidationFailed, message, response)
     }
 
     #[test]
-    fn test_checks_report_prints_every_failed_check_on_stdout_and_one_stderr_line() {
+    fn test_checks_report_prints_every_failed_check_on_stdout_and_keeps_details_off_stderr() {
         let (stdout, stderr) = streams(ValidationChecksResponse::new(vec![
             failing("branch_drift", "diverged\nFix: git rebase origin/main"),
             failing("leases", "Found 1 invalid lease(s):\nlease-a"),
@@ -321,7 +324,10 @@ mod tests {
 
         assert!(stdout.contains("diverged\nFix: git rebase origin/main"));
         assert!(stdout.contains("Found 1 invalid lease(s):\nlease-a"));
-        assert_eq!(stderr.lines().count(), 1, "{stderr:?}");
+        assert!(
+            !stderr.contains("diverged") && !stderr.contains("lease-a"),
+            "{stderr:?}"
+        );
         assert!(stderr.ends_with('\n'));
     }
 
@@ -334,7 +340,7 @@ mod tests {
 
         assert!(stdout.contains("Branch is up-to-date with origin/main"));
         assert!(stdout.contains("Lease validation error: unreadable"));
-        assert_eq!(stderr.lines().count(), 1, "{stderr:?}");
+        assert!(!stderr.contains("unreadable"), "{stderr:?}");
     }
 
     #[test]
@@ -346,37 +352,37 @@ mod tests {
 
         assert!(stdout.contains("diverged"));
         assert!(stdout.contains("All active leases are valid"));
-        assert_eq!(stderr.lines().count(), 1, "{stderr:?}");
+        assert!(!stderr.contains("diverged"), "{stderr:?}");
     }
 
     #[test]
-    fn test_repository_report_prints_drift_on_stdout_and_one_stderr_line() {
+    fn test_repository_report_prints_drift_on_stdout_and_keeps_it_off_stderr() {
         let (stdout, stderr) = emit(&repository_findings(0), false);
 
         assert!(stdout.contains(DRIFT), "{stdout:?}");
-        assert_eq!(stderr.lines().count(), 1, "{stderr:?}");
+        assert!(!stderr.contains(".jit/rules.toml"), "{stderr:?}");
         assert!(stderr.ends_with('\n'));
     }
 
     #[test]
-    fn test_repository_report_prints_drift_beside_rule_errors_with_one_stderr_line() {
+    fn test_repository_report_prints_drift_beside_rule_errors_and_keeps_it_off_stderr() {
         let (stdout, stderr) = emit(&repository_findings(2), false);
 
         assert!(stdout.contains(DRIFT), "{stdout:?}");
         assert!(stdout.contains("2 rule error(s)"), "{stdout:?}");
-        assert_eq!(stderr.lines().count(), 1, "{stderr:?}");
+        assert!(!stderr.contains(".jit/rules.toml"), "{stderr:?}");
         assert!(stderr.contains("2 rule error(s)"), "{stderr:?}");
     }
 
     #[test]
-    fn test_repository_report_json_keeps_drift_in_details_beside_one_line_message() {
+    fn test_repository_report_json_keeps_drift_in_details_and_off_the_message() {
         let (stdout, _) = emit(&repository_findings(0), true);
         let envelope: serde_json::Value = serde_json::from_str(&stdout).unwrap();
         let error = &envelope["error"];
 
         assert_eq!(error["details"]["integrity_error"], DRIFT);
         let message = error["message"].as_str().unwrap();
-        assert_eq!(message.lines().count(), 1, "{message:?}");
+        assert!(!message.contains(".jit/rules.toml"), "{message:?}");
         assert_eq!(error["details"]["message"], message);
     }
 }

@@ -54,7 +54,7 @@ pub use claim::{
 };
 pub use dep::{DependencyAddResponse, DependencyRemoveResponse};
 pub(crate) use emit::status_after;
-pub use emit::{emit_failure, emit_outcome, HumanRender, Report, Response};
+pub use emit::{emit_failure, emit_outcome, HumanRender, Report, Response, SummaryLine};
 pub use issue::{
     BatchCreateResponse, BlockedListing, IssueBatchCreateOutput, IssueDeleteResponse,
     IssueLifecycleResponse, IssueListing, IssueSearchResults, IssueShowOutput, IssueStatusOutput,

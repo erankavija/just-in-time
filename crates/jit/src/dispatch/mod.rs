@@ -19,7 +19,9 @@ use crate::cli::{Cli, Commands, ConfigCommands, IssueCommands, ProfileCommands, 
 use crate::commands::{open_repository, CommandExecutor, OpenedRepository, RepositoryInvocation};
 use crate::config_manager::{invocation_write_override, LINKED_CHECKOUT_WRITE_STANCE_ENV};
 use crate::domain::identity::{IssueId, IssueIdPrefix};
-use crate::output::{status_after, ErrorCode, ExitCode, OutputMode, Report, RunStatus};
+use crate::output::{
+    status_after, ErrorCode, ExitCode, OutputMode, Report, RunStatus, SummaryLine,
+};
 use crate::schema::OutputSchema;
 use crate::storage::{IssueNotFoundError, IssueStore, RepositoryStateStore};
 use anyhow::{anyhow, Context};
@@ -51,11 +53,12 @@ pub enum Outcome<R> {
         warnings: Vec<String>,
     },
     /// Findings that fail the command: `code` is the envelope code and exit
-    /// status, and `report` is the envelope's `error.details`. `warnings`
+    /// status, `message` its summary, and `report` the envelope's
+    /// `error.details`. `warnings`
     /// render as on a success, beside `error` under `--json`.
     Findings {
         code: ErrorCode,
-        message: String,
+        message: SummaryLine,
         report: Box<dyn Report>,
         warnings: Vec<String>,
     },
@@ -86,14 +89,10 @@ impl<R> Outcome<R> {
     }
 
     /// Findings that fail the command, with no warnings.
-    pub fn findings(
-        code: ErrorCode,
-        message: impl Into<String>,
-        report: impl Report + 'static,
-    ) -> Self {
+    pub fn findings(code: ErrorCode, message: SummaryLine, report: impl Report + 'static) -> Self {
         Self::Findings {
             code,
-            message: message.into(),
+            message,
             report: Box::new(report),
             warnings: Vec::new(),
         }

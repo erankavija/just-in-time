@@ -4,7 +4,7 @@ use super::{CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::ValidateArgs;
 use crate::domain::identity::IssueIdPrefix;
 use crate::output::{
-    ErrorCode, RepositoryValidationResponse, ValidateResponse, ValidationCheck,
+    ErrorCode, RepositoryValidationResponse, SummaryLine, ValidateResponse, ValidationCheck,
     ValidationChecksResponse, ValidationFixSummary, ValidationWarning,
 };
 use crate::validation::report::{RuleReport, RuleSelectionFault, Selection};
@@ -103,7 +103,7 @@ fn validate<S: HandlerStore>(
         let outcome = if response.has_errors() {
             Outcome::findings(
                 ErrorCode::ValidationFailed,
-                "Validation found error-severity rule failures".to_owned(),
+                SummaryLine::new("Validation found error-severity rule failures"),
                 response,
             )
         } else {
@@ -225,7 +225,7 @@ fn validate<S: HandlerStore>(
     Ok(if validation_failed {
         Outcome::findings(
             ErrorCode::ValidationFailed,
-            response.message.clone(),
+            SummaryLine::new(&response.message),
             response,
         )
     } else {
@@ -238,11 +238,11 @@ fn validation_findings(report: RuleReport, mode: ValidationMode) -> Outcome<Vali
     if report.has_errors() {
         Outcome::findings(
             ErrorCode::ValidationFailed,
-            format!(
+            SummaryLine::new(format!(
                 "{} with {} error(s)",
                 mode.failure_message(),
                 report.error_count()
-            ),
+            )),
             report,
         )
     } else {

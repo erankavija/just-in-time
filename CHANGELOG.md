@@ -12,8 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   validate` prints a repository-integrity error, such as multi-line
   derived-state drift, in full in the stdout report and in
   `error.details.integrity_error`; stderr, the JSON `error.message`, and the
-  report's `message` carry a one-line summary. A `jit gate preset apply` failure
-  escapes control characters in the preset name of its summary. See the
+  report's `message` carry a one-line summary. Every findings summary escapes
+  any control character it would carry, such as a line break in a `jit gate
+  preset apply` preset name. See the
   [failure contract](docs/reference/cli-commands.md#cli-json-contracts) and
   [`jit validate`](docs/reference/cli-commands.md#jit-validate).
 

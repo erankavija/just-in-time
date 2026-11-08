@@ -40,7 +40,8 @@ machine-readable failure contract.
 
 In human mode, a propagated error writes one `Error:` line to stderr. A findings
 outcome writes its report to stdout and its unprefixed one-line summary to
-stderr; under `--json` that summary is `error.message`.
+stderr; under `--json` that summary is `error.message`. A summary escapes any
+control character it would carry, such as a line break, as `\n`.
 
 `jit worktree exec` is a child-process passthrough: child stdout and stderr flow
 through directly, and jit returns the child's status. Its `--json` option shapes

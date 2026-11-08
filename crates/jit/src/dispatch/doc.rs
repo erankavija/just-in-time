@@ -9,7 +9,7 @@ use crate::commands::{
 };
 use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::domain::issue_scope::IssueScope;
-use crate::output::ErrorCode;
+use crate::output::{ErrorCode, SummaryLine};
 use crate::storage::IssueStore;
 
 fn issue<S: IssueStore>(ctx: &CommandContext<'_, S>, id: &str) -> anyhow::Result<IssueId> {
@@ -165,7 +165,11 @@ fn check_links<S: HandlerStore>(
     Ok(if result.valid {
         Outcome::success_with(result, message)
     } else {
-        Outcome::findings(ErrorCode::ValidationFailed, message, result)
+        Outcome::findings(
+            ErrorCode::ValidationFailed,
+            SummaryLine::new(message),
+            result,
+        )
     })
 }
 

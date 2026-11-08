@@ -6,7 +6,7 @@ use crate::commands::{
     parse_profile_selectors, parse_profile_variable_assignments, ProfileVariableOptions,
 };
 use crate::errors::InvalidArgumentError;
-use crate::output::ErrorCode;
+use crate::output::{ErrorCode, SummaryLine};
 use crate::profile::{
     ProfileAddResult, ProfileComposedApplyResult, ProfilePackResult, ProfileShowResult,
 };
@@ -49,10 +49,10 @@ fn diff<S: HandlerStore>(
     Ok(if conflicted > 0 {
         Outcome::findings(
             ErrorCode::ValidationFailed,
-            format!(
+            SummaryLine::new(format!(
                 "{conflicted} of {} profile(s) decided targets that cannot be published",
                 result.count()
-            ),
+            )),
             result,
         )
     } else {

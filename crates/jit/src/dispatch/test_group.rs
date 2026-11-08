@@ -1,7 +1,7 @@
 //! A test-only command group exercising the handler contract end to end.
 
 use super::{registered_output_schema, CommandContext, HandlerResult, Outcome};
-use crate::output::{ErrorCode, ExitCode, HumanRender, OutputMode, RunStatus};
+use crate::output::{ErrorCode, ExitCode, HumanRender, OutputMode, RunStatus, SummaryLine};
 use crate::schema::CommandSchema;
 use crate::storage::IssueStore;
 use crate::test_harness::TestHarness;
@@ -55,7 +55,7 @@ fn flag<S: IssueStore>(
 ) -> HandlerResult<CountResponse> {
     Ok(Outcome::findings(
         FINDINGS_CODE,
-        format!("flagged because {}", reason.escape_debug()),
+        SummaryLine::new(format!("flagged because {reason}")),
         FlagReport { reason },
     ))
 }
@@ -66,7 +66,7 @@ fn undeclared<S: IssueStore>(
 ) -> HandlerResult<CountResponse> {
     Ok(Outcome::findings(
         code,
-        "undeclared",
+        SummaryLine::new("undeclared"),
         FlagReport {
             reason: String::new(),
         },

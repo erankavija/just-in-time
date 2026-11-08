@@ -6,7 +6,7 @@ use crate::output::config::{
     ConfigGetResponse, ConfigSetResponse, ConfigShowResponse, ConfigValidateResponse,
     TypeHierarchyResponse,
 };
-use crate::output::ErrorCode;
+use crate::output::{ErrorCode, SummaryLine};
 use crate::storage::IssueStore;
 
 fn show<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<ConfigShowResponse> {
@@ -46,10 +46,10 @@ fn validation_outcome(
     } else {
         Outcome::findings(
             ErrorCode::ValidationFailed,
-            format!(
+            SummaryLine::new(format!(
                 "Configuration validation failed with {} error(s)",
                 response.0.errors.len()
-            ),
+            )),
             response,
         )
     }
