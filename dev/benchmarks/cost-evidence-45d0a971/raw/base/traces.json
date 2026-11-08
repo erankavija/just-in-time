@@ -1,0 +1,92 @@
+[
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "archive/C10",
+  "trace": "r0-base-archive-C10.tsv"
+ },
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "archive/C40",
+  "trace": "r0-base-archive-C40.tsv"
+ },
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "profile/package48",
+  "trace": "r0-base-profile-package48.tsv"
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "archive/C10",
+  "trace": "r1-base-archive-C10.tsv"
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "archive/C40",
+  "trace": "r1-base-archive-C40.tsv"
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "profile/package48",
+  "trace": "r1-base-profile-package48.tsv"
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "archive/C10",
+  "trace": "r2-base-archive-C10.tsv"
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "archive/C40",
+  "trace": "r2-base-archive-C40.tsv"
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "profile/package48",
+  "trace": "r2-base-profile-package48.tsv"
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "archive/C10",
+  "trace": "r3-base-archive-C10.tsv"
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "archive/C40",
+  "trace": "r3-base-archive-C40.tsv"
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "profile/package48",
+  "trace": "r3-base-profile-package48.tsv"
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "archive/C10",
+  "trace": "r4-base-archive-C10.tsv"
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "archive/C40",
+  "trace": "r4-base-archive-C40.tsv"
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "profile/package48",
+  "trace": "r4-base-profile-package48.tsv"
+ }
+]
