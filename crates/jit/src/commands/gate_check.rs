@@ -87,62 +87,181 @@ struct CapturedGateExecution<'a> {
     gate: &'a crate::declarations::GateDefinition,
     runs: &'a [GateRunResult],
     prompt: Option<&'a str>,
+    /// The validation report of `image` its built-in checkers share.
+    validation: &'a SharedValidation,
 }
 
+/// The validation reports a batch of built-in checkers judges, each computed
+/// on first use and shared by every checker run in the batch, which select
+/// their findings from it: the report of the batch's captured image under its
+/// configuration, and the live repository's report, taken once per batch.
+/// Gate-recency rules in either evaluate at the time of its first use.
+#[derive(Default)]
+pub(super) struct SharedValidation {
+    captured: std::sync::OnceLock<crate::validation::ValidationReport>,
+    live: std::sync::OnceLock<
+        std::result::Result<crate::validation::ValidationReport, std::sync::Arc<anyhow::Error>>,
+    >,
+}
+
+impl SharedValidation {
+    fn live_report(
+        &self,
+        validate: impl FnOnce() -> Result<crate::validation::ValidationReport>,
+    ) -> Result<&crate::validation::ValidationReport> {
+        self.live
+            .get_or_init(|| validate().map_err(std::sync::Arc::new))
+            .as_ref()
+            .map_err(|error| anyhow!("{error:#}"))
+    }
+
+    fn report(
+        &self,
+        image: &crate::repository_state::RepositoryImage,
+        config: &crate::config::JitConfig,
+    ) -> &crate::validation::ValidationReport {
+        self.captured.get_or_init(|| {
+            crate::validation::report(
+                &crate::validation::CapturedValidation::with_config(image, config.clone()),
+                &crate::validation::ReportInputs {
+                    now: chrono::Utc::now(),
+                    history: None,
+                },
+            )
+        })
+    }
+}
+
+type EvidenceInputs = Vec<(
+    crate::repository_state::VirtualPath,
+    Option<crate::repository_state::EntryIdentity>,
+)>;
+type PinnedEvidence =
+    std::collections::BTreeMap<(String, String), crate::repository_state::PinnedDocumentEvidence>;
+
 /// What evaluating a set of gates on one issue read from a captured image:
-/// the gate definitions, the identity of each input, and the pinned documents
-/// and directory listings their checkers judge.
+/// the gate definitions, the identity of each of the issue's inputs and its
+/// pinned documents, and the repository-wide evidence a broad checker judges.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct GateEvidence {
     gates: Vec<crate::declarations::GateDefinition>,
-    inputs: Vec<(
+    inputs: EvidenceInputs,
+    pinned: PinnedEvidence,
+    repository: Option<std::sync::Arc<RepositoryEvidence>>,
+}
+
+/// Every captured entry, pinned document and directory listing of one image:
+/// the evidence a broad checker judges beyond its issue's own, captured once
+/// and shared by every gate evidence taken from that image.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct RepositoryEvidence {
+    inputs: EvidenceInputs,
+    pinned: PinnedEvidence,
+    listings: std::collections::BTreeMap<
         crate::repository_state::VirtualPath,
-        Option<crate::repository_state::EntryIdentity>,
-    )>,
-    pinned: std::collections::BTreeMap<
-        (String, String),
-        crate::repository_state::PinnedDocumentEvidence,
+        crate::repository_state::DirectoryListing,
     >,
-    validation_view: Option<
-        std::collections::BTreeMap<
-            crate::repository_state::VirtualPath,
-            crate::repository_state::DirectoryListing,
-        >,
-    >,
+}
+
+impl RepositoryEvidence {
+    fn capture(image: &crate::repository_state::RepositoryImage) -> Self {
+        crate::domain::queries::note_repository_pass(image.entries().len());
+        Self {
+            inputs: image
+                .entries()
+                .iter()
+                .map(|(path, entry)| (path.clone(), entry.identity().cloned()))
+                .collect(),
+            pinned: image.pinned_evidence().clone(),
+            listings: image.directory_listings().clone(),
+        }
+    }
+
+    fn matches(&self, image: &crate::repository_state::RepositoryImage) -> Result<bool> {
+        crate::domain::queries::note_repository_pass(self.inputs.len());
+        Ok(inputs_match(&self.inputs, &self.pinned, image)?
+            && &self.listings == image.directory_listings())
+    }
+}
+
+/// Whether `image` holds `inputs` and `pinned` unchanged, compared over the
+/// entries and pinned documents its capture spec requests.
+fn inputs_match(
+    inputs: &EvidenceInputs,
+    pinned: &PinnedEvidence,
+    image: &crate::repository_state::RepositoryImage,
+) -> Result<bool> {
+    let spec = image.capture_spec();
+    let inputs_unchanged = inputs
+        .iter()
+        .filter(|(path, _)| spec.contains_path(path))
+        .map(|(path, identity)| {
+            image
+                .entry(path)
+                .map(|entry| entry.identity() == identity.as_ref())
+        })
+        .collect::<std::result::Result<Vec<_>, _>>()?
+        .into_iter()
+        .all(|unchanged| unchanged);
+    let pinned_unchanged = pinned
+        .iter()
+        .filter(|(key, _)| spec.pinned().contains(*key))
+        .all(|(key, evidence)| image.pinned_evidence().get(key) == Some(evidence));
+    Ok(inputs_unchanged && pinned_unchanged)
+}
+
+/// One image against which a session compares gate evidence, comparing each
+/// shared [`RepositoryEvidence`] once.
+pub(super) struct EvidenceComparison<'i> {
+    image: &'i crate::repository_state::RepositoryImage,
+    verdicts: std::cell::RefCell<Vec<(std::sync::Arc<RepositoryEvidence>, bool)>>,
+}
+
+impl<'i> EvidenceComparison<'i> {
+    pub(super) fn new(image: &'i crate::repository_state::RepositoryImage) -> Self {
+        Self {
+            image,
+            verdicts: std::cell::RefCell::new(Vec::new()),
+        }
+    }
+
+    pub(super) fn image(&self) -> &'i crate::repository_state::RepositoryImage {
+        self.image
+    }
+
+    fn repository_matches(&self, evidence: &std::sync::Arc<RepositoryEvidence>) -> Result<bool> {
+        let known = self
+            .verdicts
+            .borrow()
+            .iter()
+            .find(|(seen, _)| std::sync::Arc::ptr_eq(seen, evidence))
+            .map(|(_, verdict)| *verdict);
+        match known {
+            Some(verdict) => Ok(verdict),
+            None => {
+                let verdict = evidence.matches(self.image)?;
+                self.verdicts
+                    .borrow_mut()
+                    .push((std::sync::Arc::clone(evidence), verdict));
+                Ok(verdict)
+            }
+        }
+    }
 }
 
 impl GateEvidence {
     /// Whether these inputs judge the whole repository.
     pub(super) fn is_broad(&self) -> bool {
-        self.validation_view.is_some()
+        self.repository.is_some()
     }
 
-    /// Whether `image` holds this evidence unchanged, compared over the
-    /// entries and pinned documents its capture spec requests.
-    pub(super) fn matches(&self, image: &crate::repository_state::RepositoryImage) -> Result<bool> {
-        let spec = image.capture_spec();
-        let inputs_unchanged = self
-            .inputs
-            .iter()
-            .filter(|(path, _)| spec.contains_path(path))
-            .map(|(path, identity)| {
-                image
-                    .entry(path)
-                    .map(|entry| entry.identity() == identity.as_ref())
-            })
-            .collect::<std::result::Result<Vec<_>, _>>()?
-            .into_iter()
-            .all(|unchanged| unchanged);
-        let pinned_unchanged = self
-            .pinned
-            .iter()
-            .filter(|(key, _)| spec.pinned().contains(*key))
-            .all(|(key, evidence)| image.pinned_evidence().get(key) == Some(evidence));
-        let view_unchanged = self
-            .validation_view
-            .as_ref()
-            .is_none_or(|view| view == image.directory_listings());
-        Ok(inputs_unchanged && pinned_unchanged && view_unchanged)
+    /// Whether `comparison`'s image holds this evidence unchanged, compared
+    /// over the entries and pinned documents its capture spec requests.
+    pub(super) fn matches(&self, comparison: &EvidenceComparison<'_>) -> Result<bool> {
+        Ok(inputs_match(&self.inputs, &self.pinned, comparison.image)?
+            && self.repository.as_ref().map_or(Ok(true), |repository| {
+                comparison.repository_matches(repository)
+            })?)
     }
 }
 
@@ -421,6 +540,17 @@ pub(super) fn captured_gate_evidence(
     issue: &Issue,
     gates: &[&crate::declarations::GateDefinition],
 ) -> Result<CapturedGateEvidence> {
+    captured_gate_evidence_sharing(image, issue, gates, &std::cell::OnceCell::new())
+}
+
+/// [`captured_gate_evidence`] whose repository-wide part, when a gate is
+/// broad, is `repository`'s, captured from `image` on first use.
+pub(super) fn captured_gate_evidence_sharing(
+    image: &crate::repository_state::RepositoryImage,
+    issue: &Issue,
+    gates: &[&crate::declarations::GateDefinition],
+    repository: &std::cell::OnceCell<std::sync::Arc<RepositoryEvidence>>,
+) -> Result<CapturedGateEvidence> {
     use crate::declarations::GateChecker;
     use crate::repository_state::VirtualPath;
     use std::collections::{BTreeMap, BTreeSet};
@@ -486,11 +616,7 @@ pub(super) fn captured_gate_evidence(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    let mut paths = if broad {
-        image.entries().keys().cloned().collect::<BTreeSet<_>>()
-    } else {
-        BTreeSet::from([VirtualPath::issue_record(&issue.id)])
-    };
+    let mut paths = BTreeSet::from([VirtualPath::issue_record(&issue.id)]);
     paths.extend(issue.dependencies.iter().map(VirtualPath::issue_record));
     paths.extend(runs.inputs);
     paths.extend(
@@ -519,7 +645,7 @@ pub(super) fn captured_gate_evidence(
     let pinned = image
         .pinned_evidence()
         .iter()
-        .filter(|(key, _)| broad || wanted_pinned.contains(*key))
+        .filter(|(key, _)| wanted_pinned.contains(*key))
         .map(|(key, value)| (key.clone(), value.clone()))
         .collect::<BTreeMap<_, _>>();
     Ok(CapturedGateEvidence {
@@ -527,7 +653,12 @@ pub(super) fn captured_gate_evidence(
             gates: gates.iter().map(|gate| (*gate).clone()).collect(),
             inputs,
             pinned,
-            validation_view: broad.then(|| image.directory_listings().clone()),
+            repository: broad.then(|| {
+                std::sync::Arc::clone(
+                    repository
+                        .get_or_init(|| std::sync::Arc::new(RepositoryEvidence::capture(image))),
+                )
+            }),
         },
         prompts: prompts
             .into_iter()
@@ -964,6 +1095,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 gate,
                 runs: &captured.runs,
                 prompt: captured.prompts.get(&gate.key).map(String::as_str),
+                validation: &SharedValidation::default(),
             })?,
         };
         result.inputs_digest = digest;
@@ -1086,7 +1218,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         .map(Some)
     }
 
-    /// Execute a built-in checker against one exact repository image.
+    /// Execute a built-in checker against one exact repository image,
+    /// selecting its findings from `validation`'s report of that image.
     /// [`crate::declarations::GateChecker::RepositoryValidation`] instead runs the computation behind
     /// `jit validate`, which captures the evidence it needs from the live repository.
     fn execute_builtin_checker_with_repository_view(
@@ -1095,12 +1228,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         checker: &crate::declarations::GateChecker,
         repository_image: &crate::repository_state::RepositoryImage,
         config: &crate::config::JitConfig,
+        validation: &SharedValidation,
     ) -> Result<GateRunResult>
     where
         S: crate::storage::RepositoryStateStore,
     {
         use crate::declarations::GateChecker;
-        use crate::validation::{report::Selection, CapturedValidation, ReportInputs};
+        use crate::validation::{report::Selection, CapturedValidation};
 
         let GateRunSubject {
             run_id,
@@ -1121,35 +1255,24 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         // An `Err` is a fault: the checker could not judge the repository.
         // An `Ok` carries a verdict on the content.
-        let select_over_image = |captured: &CapturedValidation<'_>, selection: Selection| {
-            let inputs = ReportInputs {
-                now: chrono::Utc::now(),
-                history: None,
-            };
-            selected_gate_findings(&crate::validation::report(captured, &inputs), &selection)
+        let select_over_image = |selection: Selection| {
+            selected_gate_findings(validation.report(repository_image, config), &selection)
         };
         let judged: Result<(Vec<GateFinding>, bool)> = match checker {
-            GateChecker::RepositoryValidation => self
-                .validation()
-                .validate_repository_report()
-                .and_then(|report| selected_gate_findings(&report, &Selection::Whole)),
-            GateChecker::IssueValidation => select_over_image(
-                &CapturedValidation::with_config(repository_image, config.clone()),
-                Selection::Issue(issue_id.into()),
-            ),
-            GateChecker::RuleValidation { rule } => select_over_image(
-                &CapturedValidation::with_config(repository_image, config.clone()),
-                Selection::Rule {
-                    issue: issue_id.into(),
-                    rule: rule.clone(),
-                },
-            ),
+            GateChecker::RepositoryValidation => validation
+                .live_report(|| self.validation().validate_repository_report())
+                .and_then(|report| selected_gate_findings(report, &Selection::Whole)),
+            GateChecker::IssueValidation => select_over_image(Selection::Issue(issue_id.into())),
+            GateChecker::RuleValidation { rule } => select_over_image(Selection::Rule {
+                issue: issue_id.into(),
+                rule: rule.clone(),
+            }),
             GateChecker::LabelTargetValidation { label_namespace } => {
                 let captured = CapturedValidation::with_config(repository_image, config.clone());
                 label_target(&captured, issue_id, label_namespace).and_then(|target| {
-                    select_over_image(&captured, Selection::Scope(target.clone())).with_context(
-                        || format!("label '{label_namespace}:{target}' on issue {issue_id}"),
-                    )
+                    select_over_image(Selection::Scope(target.clone())).with_context(|| {
+                        format!("label '{label_namespace}:{target}' on issue {issue_id}")
+                    })
                 })
             }
             GateChecker::ReviewPlaceholder => Ok((
@@ -1388,6 +1511,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 checker,
                 input.image,
                 input.config,
+                input.validation,
             ),
         }
     }
@@ -1503,10 +1627,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             captured,
             image,
             config,
+            issues,
+            validation,
             issue,
             registry,
         } = precheck;
-        let issues = super::captured_active_issues(image)?;
         let mut projected_issue = issue.clone();
         let mut failed_gates = Vec::new();
         let mut runs = Vec::new();
@@ -1535,10 +1660,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                         image,
                         config,
                         issue: &projected_issue,
-                        issues: &issues,
+                        issues,
                         gate,
                         runs: checker_history,
                         prompt: captured.prompts.get(gate_key).map(String::as_str),
+                        validation,
                     }) {
                         Ok(result) => result,
                         Err(error) => {
@@ -2372,6 +2498,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 &GateChecker::IssueValidation,
                 &image,
                 &crate::repository_state::assemble_config(&image).unwrap(),
+                &super::SharedValidation::default(),
             )
             .unwrap();
 
@@ -3307,6 +3434,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 &GateChecker::RepositoryValidation,
                 &image,
                 &crate::repository_state::assemble_config(&image).unwrap(),
+                &super::SharedValidation::default(),
             )
             .unwrap();
         (validate, run)
@@ -3614,6 +3742,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     &checker,
                     &image,
                     &crate::repository_state::assemble_config(&image).unwrap(),
+                    &super::SharedValidation::default(),
                 )
                 .unwrap();
             let reported = run
@@ -3696,6 +3825,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     &checker,
                     &image,
                     &crate::repository_state::assemble_config(&image).unwrap(),
+                    &super::SharedValidation::default(),
                 )
                 .unwrap();
 

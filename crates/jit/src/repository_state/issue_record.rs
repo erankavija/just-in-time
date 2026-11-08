@@ -179,6 +179,7 @@ pub fn parse_issue_records<'a>(
     ids: &[IssueId],
     read: impl Fn(&VirtualPath) -> Result<Option<&'a [u8]>, CaptureError>,
 ) -> Result<Vec<(Issue, Value)>, IssueRecordsError> {
+    crate::domain::queries::note_repository_pass(ids.len());
     ids.iter()
         .map(|id| {
             let path = VirtualPath::issue_record(id);
