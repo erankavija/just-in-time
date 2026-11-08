@@ -91,7 +91,7 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                     &mut *session,
                     &probe_overrides,
                     &extra_paths,
-                    Some(config_image.into()),
+                    Some(config_image),
                 )?
                 else {
                     return Ok(SessionStep::Retry);
@@ -125,7 +125,7 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                     &mut *session,
                     &delta_overlay,
                     &extra_paths,
-                    Some(probe.into()),
+                    Some(probe),
                 )?
                 else {
                     return Ok(SessionStep::Retry);

@@ -925,11 +925,57 @@ impl RuleSet {
         config: Option<&JitConfig>,
         schemas: impl IntoIterator<Item = (String, Vec<u8>)>,
     ) -> Result<Self, RuleConfigError> {
+        RulesDocument::parse(content).rule_set(config, schemas)
+    }
+
+    /// Discover safe schema-byte requests without reading them.
+    pub fn schema_requests(content: &str) -> Result<Vec<SchemaRequest>, RuleConfigError> {
+        RulesDocument::parse(content).schema_requests()
+    }
+
+    /// Returns the union of rules whose selector matches the issue.
+    ///
+    /// Only cheap `Issue` fields are read (no description parse). Rules are
+    /// returned in authored order.
+    pub fn matching_rules(&self, issue: &Issue) -> Vec<&Rule> {
+        self.rules
+            .iter()
+            .filter(|rule| rule.when.matches(issue))
+            .collect()
+    }
+}
+
+/// One syntax parse of `rules.toml`, from which its schema requests and its
+/// rule set are both derived.
+pub(crate) struct RulesDocument {
+    raw: Result<RawRulesFile, toml::de::Error>,
+}
+
+impl RulesDocument {
+    pub(crate) fn parse(content: &str) -> Self {
+        #[cfg(test)]
+        super::count_parse(super::ParsedSource::Rules);
+        Self {
+            raw: toml::from_str(content),
+        }
+    }
+
+    fn raw(&self) -> Result<&RawRulesFile, RuleConfigError> {
+        self.raw.as_ref().map_err(|error| error.clone().into())
+    }
+
+    /// The rule set over explicit configuration and schema bytes.
+    pub(crate) fn rule_set(
+        &self,
+        config: Option<&JitConfig>,
+        schemas: impl IntoIterator<Item = (String, Vec<u8>)>,
+    ) -> Result<RuleSet, RuleConfigError> {
         let schemas = schemas.into_iter().collect::<BTreeMap<_, _>>();
-        let raw: RawRulesFile = toml::from_str(content)?;
-        let rules = raw
+        let rules = self
+            .raw()?
             .rules
-            .into_iter()
+            .iter()
+            .cloned()
             .map(|r| r.into_rule(config, &schemas))
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -945,35 +991,24 @@ impl RuleSet {
             });
         }
 
-        Ok(Self { rules })
+        Ok(RuleSet { rules })
     }
 
-    /// Discover safe schema-byte requests without reading them.
-    pub fn schema_requests(content: &str) -> Result<Vec<SchemaRequest>, RuleConfigError> {
-        let raw: RawRulesFile = toml::from_str(content)?;
-        raw.rules
-            .into_iter()
+    /// Safe schema-byte requests, without reading them.
+    pub(crate) fn schema_requests(&self) -> Result<Vec<SchemaRequest>, RuleConfigError> {
+        self.raw()?
+            .rules
+            .iter()
             .filter_map(|rule| {
-                rule.assert.json_schema.map(|reference| {
-                    validate_schema_reference(&rule.name, &reference)?;
+                rule.assert.json_schema.as_ref().map(|reference| {
+                    validate_schema_reference(&rule.name, reference)?;
                     Ok(SchemaRequest {
-                        rule: rule.name,
-                        reference,
+                        rule: rule.name.clone(),
+                        reference: reference.clone(),
                         required: rule.origin.as_deref() != Some(DEFAULT_ORIGIN),
                     })
                 })
             })
-            .collect()
-    }
-
-    /// Returns the union of rules whose selector matches the issue.
-    ///
-    /// Only cheap `Issue` fields are read (no description parse). Rules are
-    /// returned in authored order.
-    pub fn matching_rules(&self, issue: &Issue) -> Vec<&Rule> {
-        self.rules
-            .iter()
-            .filter(|rule| rule.when.matches(issue))
             .collect()
     }
 }
@@ -983,7 +1018,7 @@ impl RuleSet {
 // ---------------------------------------------------------------------------
 
 /// Top-level `rules.toml` document.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawRulesFile {
     #[serde(default, rename = "rules")]
@@ -991,7 +1026,7 @@ struct RawRulesFile {
 }
 
 /// A rule as authored, before validation of the `assert` table.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawRule {
     name: String,
@@ -1014,7 +1049,7 @@ struct RawRule {
 
 /// The `assert` table with every possible kind optional, so we can enforce the
 /// exactly-one and shorthand-XOR-file guards ourselves.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawAssert {
     #[serde(default, rename = "require-label")]
@@ -1052,7 +1087,7 @@ struct RawAssert {
 /// Exactly one of `max-age-days` / `max-age-hours` MUST be set; both-or-neither
 /// is a config error (caught in [`RawGateRecency::into_assertion`]).
 /// `deny_unknown_fields` rejects a stray key so a typo surfaces at load.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawGateRecency {
     #[serde(default, rename = "max-age-days")]
@@ -1116,7 +1151,7 @@ impl RawGateRecency {
 /// The `type-hierarchy` assert payload: a single `kind` discriminator selecting
 /// one of the two built-in hierarchy warnings. `deny_unknown_fields` rejects any
 /// stray key so a typo surfaces as a parse error.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawTypeHierarchy {
     kind: String,
@@ -1125,7 +1160,7 @@ struct RawTypeHierarchy {
 /// The `criteria-label-match` assert payload: compares a label namespace's
 /// values against criterion ids extracted from a configured section (CC-3).
 /// `deny_unknown_fields` rejects stray keys so a typo surfaces at load.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawCriteriaLabelMatch {
     /// Label namespace whose values are checked against criterion ids. Required.
@@ -1143,7 +1178,7 @@ struct RawCriteriaLabelMatch {
 
 /// The `criteria-to-check` assert payload. `check-namespace` is required, and
 /// `deny_unknown_fields` rejects unsupported configuration with rule context.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawCriteriaToCheck {
     #[serde(default, rename = "criteria-section")]
@@ -1184,14 +1219,14 @@ fn compile_id_pattern(rule: &str, source: Option<String>) -> Result<IdPattern, R
 ///
 /// `namespace` names the label namespace whose values must be unique across all
 /// matching issues. `scope` must name a [`LabelUniquenessScope`].
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawLabelUniqueness {
     namespace: String,
     scope: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawRequireLabel {
     label: String,
@@ -1201,20 +1236,20 @@ struct RawRequireLabel {
     max: Option<u32>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawRequireSection {
     heading: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawRequireDocType {
     #[serde(rename = "doc-type")]
     doc_type: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawLabelValuePattern {
     namespace: String,
@@ -1222,7 +1257,7 @@ struct RawLabelValuePattern {
 }
 
 /// The `label-coverage` payload, lowered at load after kind expansion.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 struct RawLabelCoverage {
     criteria_section: Option<String>,
@@ -1299,7 +1334,7 @@ impl RawLabelCoverage {
 
 /// The `label-reference` assert payload, lowered by
 /// [`RawLabelReference::into_assertion`].
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawLabelReference {
     from: String,
@@ -1333,7 +1368,7 @@ impl RawLabelReference {
 
 /// The `dependency-shape` assert payload, lowered by
 /// [`RawDependencyShape::into_assertion`].
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawDependencyShape {
     target: Selector,

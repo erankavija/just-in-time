@@ -7,16 +7,15 @@ use crate::output::config::{
     TypeHierarchyResponse,
 };
 use crate::output::{ErrorCode, SummaryLine};
-use crate::storage::IssueStore;
 
-fn show<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<ConfigShowResponse> {
+fn show<S: HandlerStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<ConfigShowResponse> {
     Ok(Outcome::success_with(
         ConfigShowResponse(ctx.executor.config().effective_config_snapshot()?),
         "Effective configuration",
     ))
 }
 
-fn get<S: IssueStore>(
+fn get<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     key: String,
 ) -> HandlerResult<ConfigGetResponse> {
@@ -33,7 +32,7 @@ fn set<S: HandlerStore>(
 
 /// An invalid configuration source is a registered validation failure; its
 /// report carries the errors under `--json` and the summary is the message.
-fn validate<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<ConfigValidateResponse> {
+fn validate<S: HandlerStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<ConfigValidateResponse> {
     Ok(validation_outcome(ctx.executor.config().validate()?))
 }
 

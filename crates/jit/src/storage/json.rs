@@ -411,6 +411,9 @@ pub struct JsonFileStorage {
     /// while the request resolves to the same commit and object, skipping the
     /// content hashing that dominates large pinned documents.
     pinned_evidence_cache: Arc<Mutex<PinnedEvidenceCache>>,
+    /// Declaration parses shared by this invocation's configuration
+    /// observations and every image it captures.
+    pub(crate) declaration_memo: Arc<crate::declarations::DeclarationMemo>,
     git: Git,
     /// How a mutation session's redo record is committed and applied.
     durability: crate::storage::atomic_write::Durability,
@@ -465,6 +468,7 @@ impl JsonFileStorage {
             worktree_paths: Arc::new(Mutex::new(None)),
             pinned_target_cache: Arc::new(Mutex::new(BTreeMap::new())),
             pinned_evidence_cache: Arc::new(Mutex::new(BTreeMap::new())),
+            declaration_memo: Arc::default(),
             git: Git::default(),
             durability: crate::storage::atomic_write::Durability::Full,
             root,

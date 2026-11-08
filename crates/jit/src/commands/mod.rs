@@ -407,42 +407,31 @@ pub(crate) fn grow_discovering(
     Ok(None)
 }
 
-/// The configuration a discovery assembles, kept across the rounds that grow
-/// one image and handed to the consumer of the returned image, so a mutation
-/// attempt assembles it once per captured image.
+/// The configuration of the images one discovery grows, from the declaration
+/// memo the images share, kept for the consumer of the returned image.
 ///
-/// A grown image keeps every byte its earlier rounds read, so the assembly
-/// changes only when a configuration source joins the capture. A failed
-/// assembly is kept like a successful one.
-pub(crate) struct ConfigurationParse<F = AssembleConfiguration> {
-    assemble: F,
-    /// The sources the kept assembly read; `None` before the first.
-    sources: Option<ConfigurationSources>,
-    /// The kept assembly, or the default configuration when it failed.
-    config: crate::config::JitConfig,
-    failure: Option<crate::repository_state::ProducerError>,
+/// Every round with the sources of an earlier one reuses that round's parse,
+/// its failure included.
+pub(crate) struct ConfigurationParse<F = ConfigurationOf> {
+    configuration_of: F,
+    /// The last round's parse, which the returned configuration borrows.
+    kept: Option<std::sync::Arc<crate::declarations::ParsedConfiguration>>,
+    default: crate::config::JitConfig,
+    default_schemas: std::sync::OnceLock<crate::declarations::DefaultSchemas>,
 }
 
-/// Which configuration sources a capture holds, in [`CONFIGURATION_SOURCES`] order.
-type ConfigurationSources = [bool; 3];
-
-pub(crate) const CONFIGURATION_SOURCES: [crate::repository_state::VirtualPath; 3] = [
-    crate::repository_state::VirtualPath::CONFIG,
-    crate::repository_state::VirtualPath::TEMPLATES,
-    crate::repository_state::VirtualPath::INVARIANTS,
-];
-
-/// An assembly of a captured image's configuration.
-pub(crate) type AssembleConfiguration =
-    fn(
-        &crate::repository_state::RepositoryImage,
-    )
-        -> std::result::Result<crate::config::JitConfig, crate::repository_state::ProducerError>;
+/// The parse of a captured image's configuration sources.
+pub(crate) type ConfigurationOf = fn(
+    &crate::repository_state::RepositoryImage,
+) -> std::result::Result<
+    std::sync::Arc<crate::declarations::ParsedConfiguration>,
+    crate::repository_state::ProducerError,
+>;
 
 impl ConfigurationParse {
-    /// Assemble with [`crate::repository_state::assemble_config`].
+    /// Parse the sources [`crate::repository_state::configuration_of`] reads.
     pub(crate) fn captured() -> Self {
-        Self::new(crate::repository_state::assemble_config)
+        Self::new(crate::repository_state::configuration_of)
     }
 }
 
@@ -450,87 +439,67 @@ impl<F> ConfigurationParse<F>
 where
     F: Fn(
         &crate::repository_state::RepositoryImage,
-    )
-        -> std::result::Result<crate::config::JitConfig, crate::repository_state::ProducerError>,
+    ) -> std::result::Result<
+        std::sync::Arc<crate::declarations::ParsedConfiguration>,
+        crate::repository_state::ProducerError,
+    >,
 {
-    /// Assemble with `assemble`.
-    pub(crate) fn new(assemble: F) -> Self {
+    /// Parse the sources `configuration_of` reads.
+    pub(crate) fn new(configuration_of: F) -> Self {
         Self {
-            assemble,
-            sources: None,
-            config: crate::config::JitConfig::default(),
-            failure: None,
+            configuration_of,
+            kept: None,
+            default: crate::config::JitConfig::default(),
+            default_schemas: std::sync::OnceLock::new(),
         }
     }
 
-    /// Keep `config`, the assembly of `image` an earlier discovery made.
-    pub(crate) fn seed(
-        &mut self,
-        image: &crate::repository_state::RepositoryImage,
-        config: std::result::Result<
-            crate::config::JitConfig,
-            crate::repository_state::ProducerError,
-        >,
-    ) {
-        self.sources = Some(Self::sources(image));
-        (self.config, self.failure) = match config {
-            Ok(config) => (config, None),
-            Err(error) => (crate::config::JitConfig::default(), Some(error)),
-        };
-    }
-
-    fn sources(image: &crate::repository_state::RepositoryImage) -> ConfigurationSources {
-        CONFIGURATION_SOURCES.map(|path| image.capture_spec().contains_path(&path))
-    }
-
-    /// Keep the assembly of `image`, reusing an earlier round's assembly of
-    /// the same sources.
-    fn assemble_sources_of(&mut self, image: &crate::repository_state::RepositoryImage) {
-        let sources = Some(Self::sources(image));
-        if self.sources != sources {
-            let config = (self.assemble)(image);
-            self.seed(image, config);
-        }
-    }
-
-    /// The configuration of `image`, or its assembly failure for a discovery
-    /// that stops on it.
+    /// The configuration of `image`, or its failure for a discovery that
+    /// stops on it.
     pub(crate) fn parse(
         &mut self,
         image: &crate::repository_state::RepositoryImage,
     ) -> std::result::Result<&crate::config::JitConfig, crate::repository_state::ProducerError>
     {
-        self.assemble_sources_of(image);
-        match self.failure.take() {
-            Some(error) => {
-                self.sources = None;
-                Err(error)
-            }
-            None => Ok(&self.config),
-        }
+        let parsed = self.kept.insert((self.configuration_of)(image)?);
+        parsed.assembled().map_err(|error| error.clone().into())
     }
 
-    /// The configuration of `image`, or the default configuration for a
-    /// discovery that plans past an assembly failure, which stays kept for
-    /// [`Self::into_config`].
+    /// The configuration of `image` and the schema files its default rules
+    /// derive, or the default configuration's for a discovery that plans past
+    /// a failure, which [`Self::into_config`] reports.
     pub(crate) fn parse_or_default(
         &mut self,
         image: &crate::repository_state::RepositoryImage,
-    ) -> &crate::config::JitConfig {
-        self.assemble_sources_of(image);
-        &self.config
+    ) -> (
+        &crate::config::JitConfig,
+        &crate::declarations::DefaultSchemas,
+    ) {
+        let default = || {
+            (
+                &self.default,
+                self.default_schemas
+                    .get_or_init(|| crate::repository_state::default_schema_paths(&self.default)),
+            )
+        };
+        match (self.configuration_of)(image) {
+            Ok(parsed) => {
+                let parsed = self.kept.insert(parsed);
+                match (parsed.assembled(), parsed.default_schemas()) {
+                    (Ok(config), Some(schemas)) => (config, schemas),
+                    _ => default(),
+                }
+            }
+            Err(_) => default(),
+        }
     }
 
-    /// The assembly of `image`, the image the discovery returned, by value.
+    /// The configuration of `image`, the image the discovery returned, by value.
     pub(crate) fn into_config(
-        mut self,
+        self,
         image: &crate::repository_state::RepositoryImage,
     ) -> std::result::Result<crate::config::JitConfig, crate::repository_state::ProducerError> {
-        self.assemble_sources_of(image);
-        match self.failure {
-            Some(error) => Err(error),
-            None => Ok(self.config),
-        }
+        Ok((self.configuration_of)(image)?.assemble()?)
     }
 }
 
@@ -667,7 +636,13 @@ fn rule_schema_paths(
     let requests = image
         .file_bytes(&VirtualPath::RULES)?
         .and_then(|bytes| std::str::from_utf8(bytes).ok())
-        .and_then(|content| crate::declarations::rules::RuleSet::schema_requests(content).ok())
+        .and_then(|content| {
+            image
+                .declaration_memo()
+                .rules(content)
+                .schema_requests()
+                .ok()
+        })
         .unwrap_or_default();
     Ok(requests
         .iter()
@@ -2788,11 +2763,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         with_read_session(&self.storage, &layout, "declaration read", |session| {
             let spec =
                 CaptureSpec::new(VirtualPath::DECLARATION_FILES, DECLARATION_CAPTURE_BUDGET)?;
-            // The parse of the latest discovery round; the final round, which adds
-            // nothing, parses the returned image.
-            let mut parsed = None;
             let Some(image) = capture_discovering(session, spec, |image, spec| {
-                parsed = None;
                 let before = spec.clone();
                 spec.discover_paths(rule_schema_paths(image)?)?;
                 // The declarations parse once every named schema is captured.
@@ -2800,15 +2771,13 @@ impl<S: IssueStore> CommandExecutor<S> {
                     return Ok(());
                 }
                 let declarations = crate::repository_state::declarations_from_image(image)?;
-                spec.discover_paths(sources(&declarations)?)?;
-                parsed = Some(declarations);
-                Ok(())
+                Ok(spec.discover_paths(sources(&declarations)?)?)
             })?
             else {
                 return Ok(None);
             };
-            let declarations =
-                parsed.ok_or_else(|| anyhow!("declaration capture ended unparsed"))?;
+            // The final round parsed these sources; the memo serves them without parsing again.
+            let declarations = crate::repository_state::declarations_from_image(&image)?;
             Ok(Some((declarations, image)))
         })
     }
@@ -3159,10 +3128,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 session,
                 &std::collections::BTreeMap::new(),
                 &unread_prompts,
-                Some(validate::GrowthStart {
-                    image,
-                    config: Some(Ok(config)),
-                }),
+                Some(image),
             )? {
                 Some((image, config)) => (image, config?),
                 None => return Ok(None),
@@ -3806,16 +3772,17 @@ mod tests {
         );
     }
 
-    /// Issue creation, template application, and `validate --fix` assemble
-    /// their configuration once per captured image, failed or not: discovery's
-    /// assembly is the one the derivation reads.
+    /// Every capture of an executor reuses the parse of declaration sources
+    /// (configuration, rules, gates) an earlier capture parsed, failed or not,
+    /// and a source no capture parsed yet parses once.
     #[test]
-    fn test_configuration_parse_assembles_once_per_captured_image_over_mutations_and_template_application(
-    ) {
+    fn test_configuration_parse_parses_each_distinct_source_once_across_captures() {
+        use crate::declarations::{parses_on_this_thread, ParsedSource};
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         let config = taxonomy.config_fragment();
+        let storage = crate::storage::InMemoryStorage::new();
         let executor = test_helpers::memory_executor_declaring(
-            crate::storage::InMemoryStorage::new(),
+            storage.clone(),
             test_helpers::MemoryDeclarations {
                 config: Some(&config),
                 ..Default::default()
@@ -3826,52 +3793,26 @@ mod tests {
             taxonomy.default_type,
         ))
         .unwrap();
-        fn assemblies<T>(run: impl FnOnce() -> T) -> (T, usize) {
-            let before = crate::declarations::assemblies_on_this_thread();
+        fn parses<T>(run: impl FnOnce() -> T) -> (T, [usize; 3]) {
+            let count = || {
+                [
+                    ParsedSource::Configuration,
+                    ParsedSource::Rules,
+                    ParsedSource::Gates,
+                ]
+                .map(parses_on_this_thread)
+            };
+            let before = count();
             let value = run();
+            let after = count();
             (
                 value,
-                crate::declarations::assemblies_on_this_thread() - before,
+                [0, 1, 2].map(|source| after[source] - before[source]),
             )
         }
-
-        let (container, creation) = assemblies(|| {
-            executor
-                .issues()
-                .create_issue(
-                    "Container".into(),
-                    String::new(),
-                    crate::domain::Priority::Normal,
-                    vec![],
-                    vec![],
-                    None,
-                    None,
-                    false,
-                )
-                .unwrap()
-                .issue
-                .id
-        });
-        let (_, application) = assemblies(|| {
-            executor
-                .templates()
-                .apply_template_with(&template, &container, &Default::default(), false)
-                .unwrap()
-        });
-        // The fix attempt and the report of its result capture one image each.
-        let (_, repair) = assemblies(|| executor.validation().validate_with_fix(false).unwrap());
-        // A failed assembly is handed on like a successful one.
-        let malformed = test_helpers::memory_executor_declaring(
-            crate::storage::InMemoryStorage::new(),
-            test_helpers::MemoryDeclarations {
-                config: Some("undeclared_key = 1\n"),
-                after_initialization: true,
-                ..Default::default()
-            },
-        );
-        let (refused, refusal) = assemblies(|| {
-            malformed.issues().create_issue(
-                "Refused".into(),
+        let create = |executor: &CommandExecutor<crate::storage::InMemoryStorage>| {
+            executor.issues().create_issue(
+                "Container".into(),
                 String::new(),
                 crate::domain::Priority::Normal,
                 vec![],
@@ -3880,10 +3821,42 @@ mod tests {
                 None,
                 false,
             )
+        };
+
+        let (container, creation) = parses(|| create(&executor).unwrap().issue.id);
+        let (_, application) = parses(|| {
+            executor
+                .templates()
+                .apply_template_with(&template, &container, &Default::default(), false)
+                .unwrap()
+        });
+        // The fix attempt and the report of its result capture one image each.
+        let (_, repair) = parses(|| executor.validation().validate_with_fix(false).unwrap());
+        crate::test_harness::seed_memory_repository_file(
+            &storage,
+            ".jit/config.toml",
+            &format!("{config}\n# edited\n"),
+        );
+        let (_, edited) = parses(|| executor.validation().validate_with_fix(false).unwrap());
+        // A failed assembly is reused like a successful one.
+        let malformed = test_helpers::memory_executor_declaring(
+            crate::storage::InMemoryStorage::new(),
+            test_helpers::MemoryDeclarations {
+                config: Some("undeclared_key = 1\n"),
+                after_initialization: true,
+                ..Default::default()
+            },
+        );
+        let (refused, refusal) = parses(|| {
+            create(&malformed).unwrap_err();
+            create(&malformed)
         });
 
         assert!(refused.is_err());
-        assert_eq!((creation, application, repair, refusal), (1, 1, 2, 1));
+        assert_eq!(
+            [creation, application, repair, edited, refusal],
+            [[1, 1, 1], [0, 0, 0], [0, 0, 0], [1, 0, 0], [1, 1, 0]]
+        );
     }
 
     #[test]
@@ -3920,7 +3893,8 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
             [],
         ).unwrap();
         let declarations = crate::repository_state::CapturedRepositoryDeclarations::from_parts(
-            config,
+            config.clone(),
+            crate::config_manager::namespaces_from_config(&config),
             crate::declarations::GateRegistry::default(),
             rules,
         );
@@ -4021,7 +3995,8 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
             }],
         };
         let declarations = crate::repository_state::CapturedRepositoryDeclarations::from_parts(
-            config,
+            config.clone(),
+            crate::config_manager::namespaces_from_config(&config),
             crate::declarations::GateRegistry::default(),
             rules,
         );

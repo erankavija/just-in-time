@@ -71,18 +71,27 @@ pub struct ConfigValidationReport {
 }
 
 impl ConfigValidationReport {
+    /// The report of an invocation that opens no repository: its one
+    /// observation parses through the memo of the store at the selected root.
     pub(crate) fn for_invocation(invocation: &super::RepositoryInvocation) -> Result<Self> {
+        use crate::storage::RepositoryStateStore;
         let (data_root, _) = super::bootstrap::select_data_root(invocation);
-        Self::at_data_root(&data_root, invocation.worktree_root_override.as_deref())
+        let storage = crate::storage::JsonFileStorage::new(&data_root);
+        Self::at_data_root(
+            &data_root,
+            invocation.worktree_root_override.as_deref(),
+            storage.declaration_memo(),
+        )
     }
 
     fn at_data_root(
         data_root: &std::path::Path,
         root_override: Option<&std::path::Path>,
+        memo: &crate::declarations::DeclarationMemo,
     ) -> Result<Self> {
         use crate::errors::WorktreeRootSource;
         use crate::storage::repository_state_store::ConfigurationObservation;
-        let observation = ConfigurationObservation::capture_initialized(data_root)?;
+        let observation = ConfigurationObservation::capture_initialized(data_root, memo)?;
         if let Some(root) = root_override {
             super::bootstrap::validate_worktree_root(
                 data_root,
@@ -348,12 +357,9 @@ impl<S: IssueStore> ConfigOps<'_, S> {
             // held session.
             let overrides =
                 std::iter::once((config_vpath.clone(), Some(edited_bytes.clone()))).collect();
-            let Some((base, edited_config)) = self.exec.capture_proposed_base(
-                session,
-                &overrides,
-                &[],
-                Some(config_image.into()),
-            )?
+            let Some((base, edited_config)) =
+                self.exec
+                    .capture_proposed_base(session, &overrides, &[], Some(config_image))?
             else {
                 return Ok(SessionStep::Retry);
             };
@@ -395,15 +401,22 @@ impl<S: IssueStore> ConfigOps<'_, S> {
     /// `jit config show`.
     ///
     /// Declaration reads are owned by [`crate::storage::configuration_store`].
-    pub fn effective_config_snapshot(&self) -> Result<serde_json::Value> {
+    pub fn effective_config_snapshot(&self) -> Result<serde_json::Value>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let config = crate::storage::configuration_store::load_configuration(
             self.exec.repository_layout()?,
+            self.exec.storage().declaration_memo(),
         )?;
         EffectiveConfig::new(config).full_snapshot()
     }
 
     /// Diagnose all admitted repository declarations; storage and input failures remain errors.
-    pub fn validate(&self) -> Result<ConfigValidationReport> {
+    pub fn validate(&self) -> Result<ConfigValidationReport>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         crate::config_manager::invocation_write_override(
             std::env::var(crate::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV)
                 .ok()
@@ -411,7 +424,11 @@ impl<S: IssueStore> ConfigOps<'_, S> {
         )?;
         let root_override = std::env::var_os("JIT_WORKTREE_ROOT").map(PathBuf::from);
         let layout = self.exec.storage().repository_layout()?;
-        ConfigValidationReport::at_data_root(layout.data_root(), root_override.as_deref())
+        ConfigValidationReport::at_data_root(
+            layout.data_root(),
+            root_override.as_deref(),
+            self.exec.storage().declaration_memo(),
+        )
     }
 
     /// The repository's declaration files, and the rule schemas `rules.toml`
@@ -451,7 +468,10 @@ impl<S: IssueStore> ConfigOps<'_, S> {
     /// code 2. A load/parse failure (e.g. a malformed `config.toml`) is left
     /// unconverted, so it is classified the same way every other config-load
     /// failure in this codebase is, not misreported as a bad argument.
-    pub fn get_config(&self, key: &str) -> Result<ConfigGetOutcome> {
+    pub fn get_config(&self, key: &str) -> Result<ConfigGetOutcome>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let snapshot = self.effective_config_snapshot()?;
         let value = resolve_dotted_key(&snapshot, key)
             .map_err(|e| anyhow::Error::from(InvalidArgumentError::new(e.to_string())))?;

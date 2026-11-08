@@ -149,11 +149,14 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
                 let rules_text = super::image_virtual_bytes(image, &VirtualPath::RULES)?
                     .map(String::from_utf8)
                     .transpose()?;
+                let schema_requests =
+                    crate::repository_state::schema_requests_of(image, rules_text.as_deref())
+                        .map_err(project_producer_error)?;
                 let closure = render_capture_closure(
                     image.layout(),
                     config,
                     &selected_projection_names(config, name)?,
-                    rules_text.as_deref(),
+                    schema_requests.as_deref(),
                 )
                 .map_err(project_producer_error)?;
                 Ok(spec.discover_paths(closure)?)

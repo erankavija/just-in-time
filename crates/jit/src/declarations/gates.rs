@@ -168,6 +168,8 @@ struct AuthoredGateFile {
 
 /// Parse exact authored `gates.toml` bytes without filesystem access.
 pub fn parse_gate_registry(bytes: &[u8]) -> Result<GateRegistry, GateDeclarationError> {
+    #[cfg(test)]
+    super::count_parse(super::ParsedSource::Gates);
     let text = std::str::from_utf8(bytes)?;
     let file: AuthoredGateFile = toml::from_str(text)?;
     file.gates
@@ -202,18 +204,15 @@ pub fn serialize_gate_registry(registry: &GateRegistry) -> Result<Vec<u8>, GateD
     Ok(bytes)
 }
 
-/// Apply a registry proposal to an authored gates document without replacing
-/// declarations that did not change.
+/// Apply a registry proposal to an authored gates document, whose parse is
+/// `previous`, without replacing declarations that did not change.
 pub fn edit_gate_registry_document(
     authored: Option<&[u8]>,
+    previous: &GateRegistry,
     registry: &GateRegistry,
 ) -> Result<Vec<u8>, GateDeclarationError> {
     use toml_edit::{ArrayOfTables, DocumentMut, Item};
 
-    let previous = authored
-        .map(parse_gate_registry)
-        .transpose()?
-        .unwrap_or_default();
     let mut document = authored
         .map(std::str::from_utf8)
         .transpose()?
@@ -428,7 +427,7 @@ fn set_item_table_positions(item: &mut toml_edit::Item, position: usize) {
 }
 
 /// Invalid authored gate declaration.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum GateDeclarationError {
     #[error("gate registry is not UTF-8: {0}")]
     Utf8(#[from] std::str::Utf8Error),

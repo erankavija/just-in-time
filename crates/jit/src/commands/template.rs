@@ -486,7 +486,13 @@ fn template_declaration_closure(
         .file_bytes(&VirtualPath::RULES)?
         .map(std::str::from_utf8)
         .transpose()?;
-    Ok(render_capture_closure(image.layout(), config, &[], rules)?)
+    let schema_requests = crate::repository_state::schema_requests_of(image, rules)?;
+    Ok(render_capture_closure(
+        image.layout(),
+        config,
+        &[],
+        schema_requests.as_deref(),
+    )?)
 }
 
 fn template_operation_capture_paths(
@@ -505,7 +511,7 @@ fn template_operation_capture_paths(
     let prerequisites_met = require_template_prerequisites(
         &template,
         config,
-        crate::repository_state::declarations_with_config(image, Ok(config.clone()))?.gates(),
+        &crate::repository_state::captured_gates(image)?,
         GatePresetCatalog::from_image(image)?.definitions(),
     )
     .is_ok();

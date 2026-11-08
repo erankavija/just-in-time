@@ -83,9 +83,10 @@ fn test_init_seeded_project_name_round_trips_through_jitconfig_load() {
     );
     cli.run(["init"]).unwrap();
 
-    let config = load_configuration(&jit::test_utils::repository_layout_for_data_root(
-        &cli.root().join(".jit"),
-    ))
+    let config = load_configuration(
+        &jit::test_utils::repository_layout_for_data_root(&cli.root().join(".jit")),
+        &Default::default(),
+    )
     .unwrap();
     assert_eq!(
         config

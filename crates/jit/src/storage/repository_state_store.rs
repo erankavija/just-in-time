@@ -399,6 +399,10 @@ pub trait RepositoryStateStore {
         &self,
         layout: RepositoryLayout,
     ) -> Result<Box<dyn OptimisticReadSession>, RepositoryStateStoreError>;
+
+    /// The memo every image and configuration observation of this store
+    /// parses its declarations through.
+    fn declaration_memo(&self) -> &Arc<crate::declarations::DeclarationMemo>;
 }
 
 /// What a read session observes of commits: whether a record is present, then
@@ -638,26 +642,34 @@ pub(crate) struct ConfigurationObservation {
     data_root: PathBuf,
     evidence: RepositoryRootEvidence,
     opened: CommitObservation,
-    declarations: [Option<Vec<u8>>; 3],
-    document: crate::declarations::ConfigurationDocument,
+    parsed: Arc<crate::declarations::ParsedConfiguration>,
 }
 
 impl ConfigurationObservation {
-    pub(crate) fn capture(data: &Path) -> anyhow::Result<Self> {
+    /// Observe the configuration at `data`, parsed through `memo`.
+    pub(crate) fn capture(
+        data: &Path,
+        memo: &crate::declarations::DeclarationMemo,
+    ) -> anyhow::Result<Self> {
         retry_optimistic_reads("configuration selection", || {
-            Self::attempt(data, false, || {})
+            Self::attempt(data, false, memo, || {})
         })
     }
 
-    pub(crate) fn capture_initialized(data: &Path) -> anyhow::Result<Self> {
+    /// [`Self::capture`] that also requires an initialized data root.
+    pub(crate) fn capture_initialized(
+        data: &Path,
+        memo: &crate::declarations::DeclarationMemo,
+    ) -> anyhow::Result<Self> {
         retry_optimistic_reads("initialized configuration", || {
-            Self::attempt(data, true, || {})
+            Self::attempt(data, true, memo, || {})
         })
     }
 
     fn attempt(
         data: &Path,
         initialized: bool,
+        memo: &crate::declarations::DeclarationMemo,
         after_index: impl FnOnce(),
     ) -> anyhow::Result<Option<anyhow::Result<Self>>> {
         let session = match DataReadSession::open(data) {
@@ -679,14 +691,11 @@ impl ConfigurationObservation {
                 )?;
             }
             let declarations = declarations?;
-            let document =
-                crate::declarations::ConfigurationDocument::parse(declarations[0].as_deref());
             Ok(Self {
                 data_root: session.root.data_root,
                 evidence: session.root.evidence,
                 opened: session.opened,
-                declarations,
-                document,
+                parsed: memo.configuration(declarations.each_ref().map(Option::as_deref)),
             })
         })()))
     }
@@ -694,10 +703,7 @@ impl ConfigurationObservation {
     pub(crate) fn assemble(
         &self,
     ) -> Result<crate::config::JitConfig, crate::declarations::ConfigurationAssemblyError> {
-        self.document.assemble(
-            self.declarations[1].as_deref(),
-            self.declarations[2].as_deref(),
-        )
+        self.parsed.assemble()
     }
 
     pub(crate) fn worktree(
@@ -706,7 +712,7 @@ impl ConfigurationObservation {
         needs_policy: bool,
     ) -> Result<crate::config::WorktreeConfig, crate::declarations::ConfigurationAssemblyError>
     {
-        self.document.worktree(needs_root, needs_policy)
+        self.parsed.selection().worktree(needs_root, needs_policy)
     }
 
     pub(in crate::storage) fn admit(&self) -> Result<ReadAdmission, RepositoryStateStoreError> {
@@ -718,7 +724,7 @@ impl ConfigurationObservation {
         if admission != ReadAdmission::Granted {
             return Ok(admission);
         }
-        if current.declarations()? != self.declarations {
+        if &current.declarations()? != self.parsed.sources() {
             return Ok(ReadAdmission::Moved);
         }
         current.admit()
@@ -928,11 +934,12 @@ impl JsonFileStorage {
         };
         let observation = match initial {
             Some(initial) => initial,
-            None => ConfigurationObservation::capture(self.root()).map_err(|error| {
-                error
-                    .downcast::<RepositoryStateStoreError>()
-                    .unwrap_or_else(RepositoryStateStoreError::Other)
-            })?,
+            None => ConfigurationObservation::capture(self.root(), self.declaration_memo())
+                .map_err(|error| {
+                    error
+                        .downcast::<RepositoryStateStoreError>()
+                        .unwrap_or_else(RepositoryStateStoreError::Other)
+                })?,
         };
         let worktree = observation
             .worktree(!overridden, mutation && expected_policy.is_some())
@@ -1199,6 +1206,10 @@ impl RepositoryStateStore for JsonFileStorage {
             selection,
         }))
     }
+
+    fn declaration_memo(&self) -> &Arc<crate::declarations::DeclarationMemo> {
+        &self.declaration_memo
+    }
 }
 
 impl RepositoryStateStore for InMemoryStorage {
@@ -1244,6 +1255,10 @@ impl RepositoryStateStore for InMemoryStorage {
             storage: self.clone(),
             opened: observe_memory_commits(self)?,
         }))
+    }
+
+    fn declaration_memo(&self) -> &Arc<crate::declarations::DeclarationMemo> {
+        &self.declaration_memo
     }
 }
 
@@ -1306,6 +1321,7 @@ impl RepositoryReadSession for MemoryReadSession {
         capture_memory_image(
             &self.layout,
             &*self.storage.try_repository_state()?,
+            &self.storage.declaration_memo,
             spec,
             CapturedAnswers::default(),
         )
@@ -1321,6 +1337,7 @@ impl RepositoryReadSession for MemoryReadSession {
         capture_memory_image(
             &self.layout,
             &*self.storage.try_repository_state()?,
+            &self.storage.declaration_memo,
             spec,
             prior,
         )
@@ -1578,7 +1595,13 @@ impl MemoryMutationSession {
         spec: CaptureSpec,
     ) -> Result<RepositoryImage, RepositoryStateStoreError> {
         let state = self.storage.repository_state();
-        let image = capture_memory_image(&self.layout, &state, spec, prior)?;
+        let image = capture_memory_image(
+            &self.layout,
+            &state,
+            &self.storage.declaration_memo,
+            spec,
+            prior,
+        )?;
         drop(state);
         self.captured = Some(image.token());
         Ok(image)
@@ -2057,12 +2080,16 @@ fn capture_capability_image(
             .collect();
     }
     drop(evidence_cache);
-    RepositoryImage::close(layout.clone(), spec, entries, listings, pinned).map_err(Into::into)
+    Ok(
+        RepositoryImage::close(layout.clone(), spec, entries, listings, pinned)?
+            .sharing_declarations(storage.declaration_memo()),
+    )
 }
 
 fn capture_memory_image(
     layout: &RepositoryLayout,
     state: &MemoryRepositoryState,
+    memo: &Arc<crate::declarations::DeclarationMemo>,
     spec: CaptureSpec,
     mut prior: CapturedAnswers,
 ) -> Result<RepositoryImage, RepositoryStateStoreError> {
@@ -2113,7 +2140,10 @@ fn capture_memory_image(
             ))
         })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
-    RepositoryImage::close(layout.clone(), spec, entries, listings, pinned).map_err(Into::into)
+    Ok(
+        RepositoryImage::close(layout.clone(), spec, entries, listings, pinned)?
+            .sharing_declarations(memo),
+    )
 }
 
 fn memory_listing(

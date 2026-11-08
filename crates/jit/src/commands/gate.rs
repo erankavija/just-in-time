@@ -323,7 +323,9 @@ fn capture_gate_preset_image(
                 )?
                 .map(String::from_utf8)
                 .transpose()?;
-                render_capture_closure(image.layout(), config, &[], rules_text.as_deref())?
+                let schema_requests =
+                    crate::repository_state::schema_requests_of(image, rules_text.as_deref())?;
+                render_capture_closure(image.layout(), config, &[], schema_requests.as_deref())?
             }
             None => Vec::new(),
         };
@@ -1068,8 +1070,15 @@ impl<S: IssueStore> GateOps<'_, S> {
                     } else {
                         Vec::new()
                     };
+                    let schema_requests =
+                        crate::repository_state::schema_requests_of(image, rules_text.as_deref())?;
                     Ok(spec.discover_paths(issue_paths.into_iter().chain(
-                        render_capture_closure(image.layout(), config, &[], rules_text.as_deref())?,
+                        render_capture_closure(
+                            image.layout(),
+                            config,
+                            &[],
+                            schema_requests.as_deref(),
+                        )?,
                     ))?)
                 })?
                 else {
@@ -2430,8 +2439,12 @@ mod tests {
         )
         .unwrap();
 
-        let edited = crate::declarations::edit_gate_registry_document(None, &derived.registry)
-            .expect("the proposed registry edits an empty authored document");
+        let edited = crate::declarations::edit_gate_registry_document(
+            None,
+            &Default::default(),
+            &derived.registry,
+        )
+        .expect("the proposed registry edits an empty authored document");
         let parsed =
             crate::declarations::parse_gate_registry(&edited).expect("the edited document parses");
 

@@ -347,6 +347,10 @@ impl<S: IssueStore + RepositoryStateStore> RepositoryStateStore for PublicationP
     {
         self.inner.open_read_session(layout)
     }
+
+    fn declaration_memo(&self) -> &Arc<jit::declarations::DeclarationMemo> {
+        self.inner.declaration_memo()
+    }
 }
 
 fn plan_template(taxonomy: &TestTaxonomy) -> GraphTemplate {

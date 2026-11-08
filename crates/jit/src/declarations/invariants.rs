@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use thiserror::Error;
 
 /// Invalid invariant declarations or serialization failures.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum InvariantConfigError {
     /// The invariants file is not valid TOML or does not match the schema. This
     /// covers a missing required field (`statement`, `id`, `kind`) and an

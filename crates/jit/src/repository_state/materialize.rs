@@ -29,6 +29,17 @@ pub(super) fn serialized_default_ruleset(
     serialize_ruleset(&default_ruleset(&namespaces))
 }
 
+/// The schema files the default rules `config` derives are written to.
+pub(crate) fn default_schema_paths(
+    config: &JitConfig,
+) -> Result<Vec<VirtualPath>, super::RepositoryLayoutError> {
+    serialized_default_ruleset(config)?
+        .schema_files
+        .iter()
+        .map(|schema| VirtualPath::schema(&schema.name))
+        .collect()
+}
+
 /// Exact configured-projection actions and report counts from one render pass.
 pub(crate) struct ConfiguredProjections {
     pub(crate) actions: Vec<RepositoryAction>,
@@ -68,11 +79,19 @@ fn read_text_at(
 }
 
 /// Assemble the repository configuration from the image's captured declaration
-/// bytes through [`assemble_configuration`](crate::declarations::assemble_configuration).
+/// bytes: the assembly of [`configuration_of`].
+pub fn assemble_config(image: &RepositoryImage) -> Result<JitConfig, ProducerError> {
+    Ok(configuration_of(image)?.assemble()?)
+}
+
+/// The parse of the image's captured configuration sources, from the image's
+/// declaration memo.
 ///
 /// `config.toml` must lie in the captured closure; a `templates.toml` or
 /// `invariants.toml` outside it is absent, matching the on-disk load boundary.
-pub fn assemble_config(image: &RepositoryImage) -> Result<JitConfig, ProducerError> {
+pub(crate) fn configuration_of(
+    image: &RepositoryImage,
+) -> Result<std::sync::Arc<crate::declarations::ParsedConfiguration>, ProducerError> {
     let sibling = |path: &VirtualPath| -> Result<Option<&[u8]>, ProducerError> {
         if image.capture_spec().contains_path(path) {
             Ok(image.file_bytes(path)?)
@@ -80,11 +99,22 @@ pub fn assemble_config(image: &RepositoryImage) -> Result<JitConfig, ProducerErr
             Ok(None)
         }
     };
-    Ok(crate::declarations::assemble_configuration(
+    Ok(image.declaration_memo().configuration([
         image.file_bytes(&VirtualPath::CONFIG)?,
         sibling(&VirtualPath::TEMPLATES)?,
         sibling(&VirtualPath::INVARIANTS)?,
-    )?)
+    ]))
+}
+
+/// The schema requests of `rules`, `rules.toml` content read from `image`,
+/// from the image's declaration memo.
+pub(crate) fn schema_requests_of(
+    image: &RepositoryImage,
+    rules: Option<&str>,
+) -> Result<Option<Vec<crate::declarations::rules::SchemaRequest>>, ProducerError> {
+    Ok(rules
+        .map(|content| image.declaration_memo().rules(content).schema_requests())
+        .transpose()?)
 }
 
 /// Enumerate the capture closure for `jit project render`.
@@ -95,7 +125,7 @@ pub fn assemble_config(image: &RepositoryImage) -> Result<JitConfig, ProducerErr
 /// content: the four engine registries (`config.toml`, `invariants.toml`,
 /// `rules.toml`, `gates.toml`), each selected projection's documentation target
 /// (read for region-mode splicing), each projected kind's declared source, and —
-/// when the captured `rules.toml` bytes are supplied — the schema files the
+/// when the captured `rules.toml` schema requests are supplied — the schema files the
 /// effective rule set references (needed to parse the effective rules the
 /// full-style rule/gate view renders). The caller feeds these to
 /// [`CaptureSpec::discover_paths`](super::CaptureSpec::discover_paths) once the
@@ -112,7 +142,7 @@ pub fn render_capture_closure(
     layout: &super::RepositoryLayout,
     config: &JitConfig,
     selected: &[String],
-    rules_content: Option<&str>,
+    schema_requests: Option<&[crate::declarations::rules::SchemaRequest]>,
 ) -> Result<Vec<VirtualPath>, ProducerError> {
     use crate::config::SourceOfTruth;
     use crate::domain::item::resolve_item_kinds;
@@ -157,10 +187,8 @@ pub fn render_capture_closure(
             }
         }
     }
-    if let Some(content) = rules_content {
-        for request in crate::declarations::rules::RuleSet::schema_requests(content)? {
-            paths.push(VirtualPath::schema_reference(&request.reference)?);
-        }
+    for request in schema_requests.unwrap_or_default() {
+        paths.push(VirtualPath::schema_reference(&request.reference)?);
     }
     paths.sort();
     paths.dedup();
@@ -190,8 +218,9 @@ pub struct ValidationCaptureClosure {
 /// `invariants.toml`, `rules.toml`, `gates.toml`, `templates.toml`), the
 /// repository index and the data root's ignore file, every
 /// ordinary issue record plus the complete
-/// `issues` listing, the schema files the effective rules reference and the ones
-/// the current configuration derives, every declared
+/// `issues` listing, the schema files the effective rules reference and
+/// `default_schemas`, the ones the current configuration derives
+/// ([`default_schema_paths`]), every declared
 /// projection's documentation target and projected-kind sources, and every
 /// project-scope item-kind source the item-link pass indexes. The caller feeds
 /// [`paths`](ValidationCaptureClosure::paths) to
@@ -205,7 +234,8 @@ pub fn validate_capture_closure(
     layout: &super::RepositoryLayout,
     config: &JitConfig,
     issue_ids: &[IssueId],
-    rules_content: Option<&str>,
+    schema_requests: Option<&[crate::declarations::rules::SchemaRequest]>,
+    default_schemas: &[VirtualPath],
 ) -> Result<ValidationCaptureClosure, ProducerError> {
     use crate::config::SourceOfTruth;
     use crate::domain::item::resolve_item_kinds;
@@ -269,17 +299,13 @@ pub fn validate_capture_closure(
         }
     }
 
-    if let Some(content) = rules_content {
-        for request in crate::declarations::rules::RuleSet::schema_requests(content)? {
-            paths.push(VirtualPath::schema_reference(&request.reference)?);
-        }
+    for request in schema_requests.unwrap_or_default() {
+        paths.push(VirtualPath::schema_reference(&request.reference)?);
     }
     // Every schema the CURRENT configuration derives, whether or not the authored
     // file references it yet: a newly-declared table adds a default rule whose
     // projection must be publishable in the same pass that adds its row.
-    for schema in &serialized_default_ruleset(config)?.schema_files {
-        paths.push(VirtualPath::schema(&schema.name)?);
-    }
+    paths.extend(default_schemas.iter().cloned());
     paths.sort();
     paths.dedup();
     Ok(ValidationCaptureClosure { paths, listings })
@@ -567,7 +593,10 @@ pub(crate) fn compose_default_ruleset(
         .collect();
     let mut default_refs = std::collections::BTreeSet::new();
     let mut foreign_refs = std::collections::BTreeSet::new();
-    for req in crate::declarations::rules::RuleSet::schema_requests(&current_rules)
+    for req in image
+        .declaration_memo()
+        .rules(&current_rules)
+        .schema_requests()
         .map_err(ProducerError::from)?
     {
         let schema_path = VirtualPath::schema_reference(&req.reference)?;
@@ -749,6 +778,7 @@ kind = "advisory"
             &config,
             std::slice::from_ref(&id),
             None,
+            &default_schema_paths(&config).unwrap(),
         )
         .unwrap();
         let paths: BTreeSet<VirtualPath> = closure.paths.into_iter().collect();
@@ -766,11 +796,14 @@ kind = "advisory"
         }
         // The complete issues listing states the issue ids.
         assert_eq!(closure.listings, vec![VirtualPath::data("issues").unwrap()]);
-        // A referenced rule schema enters the closure when rules bytes are supplied.
-        let rules = "[[rules]]\nname = \"shape\"\n\
-             assert = { json-schema = \"schemas/custom.json\" }\n";
+        // A referenced rule schema enters the closure when its request is supplied.
+        let rules = crate::declarations::rules::RuleSet::schema_requests(
+            "[[rules]]\nname = \"shape\"\n\
+             assert = { json-schema = \"schemas/custom.json\" }\n",
+        )
+        .unwrap();
         let with_schema =
-            validate_capture_closure(&synthetic_layout(), &config, &[], Some(rules)).unwrap();
+            validate_capture_closure(&synthetic_layout(), &config, &[], Some(&rules), &[]).unwrap();
         assert!(with_schema
             .paths
             .contains(&VirtualPath::data("schemas/custom.json").unwrap()));
@@ -781,9 +814,13 @@ kind = "advisory"
         let config: JitConfig = toml::from_str(&CONFIG).unwrap();
         // A rules.toml that references a json-schema pulls that schema into the
         // closure, so the effective-rule parse reads image-projected bytes.
-        let rules = "[[rules]]\nname = \"shape\"\n\
-             assert = { json-schema = \"schemas/custom.json\" }\n";
-        let paths = render_capture_closure(&synthetic_layout(), &config, &[], Some(rules)).unwrap();
+        let rules = crate::declarations::rules::RuleSet::schema_requests(
+            "[[rules]]\nname = \"shape\"\n\
+             assert = { json-schema = \"schemas/custom.json\" }\n",
+        )
+        .unwrap();
+        let paths =
+            render_capture_closure(&synthetic_layout(), &config, &[], Some(&rules)).unwrap();
         assert!(paths.contains(&VirtualPath::data("schemas/custom.json").unwrap()));
     }
 
@@ -1911,7 +1948,14 @@ kind = "advisory"
         let worktree_ignore = VirtualPath::worktree(".gitignore").unwrap();
         let config: JitConfig = toml::from_str(&CONFIG).unwrap();
 
-        let closure = validate_capture_closure(&synthetic_layout(), &config, &[], None).unwrap();
+        let closure = validate_capture_closure(
+            &synthetic_layout(),
+            &config,
+            &[],
+            None,
+            &default_schema_paths(&config).unwrap(),
+        )
+        .unwrap();
         assert!(
             !closure.paths.contains(&worktree_ignore),
             "derived-state repair must not read the adopter's root ignore file"

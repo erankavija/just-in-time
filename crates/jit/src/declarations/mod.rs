@@ -6,6 +6,7 @@
 
 mod gates;
 pub mod invariants;
+mod memo;
 pub mod rules;
 
 pub(crate) use gates::normalize_gate_registry_for_document;
@@ -14,6 +15,8 @@ pub use gates::{
     GateDeclarationError, GateDefinition, GateMode, GateRegistry, GateStage,
     REVIEW_PLACEHOLDER_WARNING,
 };
+pub use memo::DeclarationMemo;
+pub(crate) use memo::{DefaultSchemas, ParsedConfiguration};
 
 use crate::config::{ItemKindConfigError, JitConfig, WorktreeConfig};
 use crate::declarations::invariants::{InvariantConfigError, InvariantRegistry};
@@ -31,8 +34,19 @@ enum ConfigurationSyntaxError {
     Toml(toml::de::Error),
 }
 
+impl ConfigurationSyntaxError {
+    fn assembly_error(&self) -> ConfigurationAssemblyError {
+        match self {
+            Self::Utf8(error) => ConfigurationAssemblyError::ConfigUtf8(*error),
+            Self::Toml(error) => ConfigurationAssemblyError::Config(error.clone()),
+        }
+    }
+}
+
 impl ConfigurationDocument {
     pub(crate) fn parse(bytes: Option<&[u8]>) -> Self {
+        #[cfg(test)]
+        count_parse(ParsedSource::Configuration);
         let syntax = bytes.map_or_else(
             || Ok(toml::Value::Table(toml::Table::new())),
             |bytes| {
@@ -44,12 +58,9 @@ impl ConfigurationDocument {
     }
 
     fn value(&self) -> Result<&toml::Value, ConfigurationAssemblyError> {
-        self.syntax.as_ref().map_err(|error| match error {
-            ConfigurationSyntaxError::Utf8(error) => ConfigurationAssemblyError::ConfigUtf8(*error),
-            ConfigurationSyntaxError::Toml(error) => {
-                ConfigurationAssemblyError::Config(error.clone())
-            }
-        })
+        self.syntax
+            .as_ref()
+            .map_err(ConfigurationSyntaxError::assembly_error)
     }
 
     /// Deserialize only fields needed for this invocation's root/policy authority.
@@ -74,12 +85,31 @@ impl ConfigurationDocument {
         toml::Value::Table(selected).try_into().map_err(Into::into)
     }
 
-    pub(crate) fn assemble(
-        &self,
+    /// A document holding only this one's `[worktree]` table, or its syntax
+    /// failure, for [`Self::worktree`].
+    pub(crate) fn worktree_view(&self) -> Self {
+        let syntax = self.syntax.as_ref().map_err(Clone::clone).map(|value| {
+            toml::Value::Table(
+                value
+                    .get("worktree")
+                    .map(|worktree| ("worktree".to_owned(), worktree.clone()))
+                    .into_iter()
+                    .collect(),
+            )
+        });
+        Self { syntax }
+    }
+
+    /// The configuration this document assembles with its sibling sources.
+    pub(crate) fn into_assembled(
+        self,
         templates: Option<&[u8]>,
         invariants: Option<&[u8]>,
     ) -> Result<JitConfig, ConfigurationAssemblyError> {
-        let mut assembled: JitConfig = self.value()?.clone().try_into()?;
+        let mut assembled: JitConfig = self
+            .syntax
+            .map_err(|error| error.assembly_error())?
+            .try_into()?;
         assembled.validate_item_kinds()?;
         let hierarchy_types: Vec<&str> = assembled
             .type_hierarchy
@@ -122,24 +152,40 @@ pub fn assemble_configuration(
     templates: Option<&[u8]>,
     invariants: Option<&[u8]>,
 ) -> Result<JitConfig, ConfigurationAssemblyError> {
-    #[cfg(test)]
-    ASSEMBLIES.with(|count| count.set(count.get() + 1));
-    ConfigurationDocument::parse(config).assemble(templates, invariants)
+    ConfigurationDocument::parse(config).into_assembled(templates, invariants)
+}
+
+/// A declaration source whose syntax parses are counted in tests.
+#[cfg(test)]
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ParsedSource {
+    Configuration,
+    Rules,
+    Gates,
 }
 
 #[cfg(test)]
 thread_local! {
-    static ASSEMBLIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static PARSES: std::cell::Cell<[usize; 3]> = const { std::cell::Cell::new([0; 3]) };
 }
 
-/// The number of [`assemble_configuration`] calls this thread has made.
 #[cfg(test)]
-pub(crate) fn assemblies_on_this_thread() -> usize {
-    ASSEMBLIES.with(std::cell::Cell::get)
+fn count_parse(source: ParsedSource) {
+    PARSES.with(|parses| {
+        let mut counts = parses.get();
+        counts[source as usize] += 1;
+        parses.set(counts);
+    });
+}
+
+/// The number of `source` parses this thread has made.
+#[cfg(test)]
+pub(crate) fn parses_on_this_thread(source: ParsedSource) -> usize {
+    PARSES.with(|parses| parses.get()[source as usize])
 }
 
 /// A configuration source that failed assembly, named by its file.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum ConfigurationAssemblyError {
     #[error("config.toml is not UTF-8: {0}")]
     ConfigUtf8(#[source] std::str::Utf8Error),
@@ -266,7 +312,7 @@ mod tests {
             selected.root.as_deref(),
             Some(std::path::Path::new("../code"))
         );
-        assert!(document.assemble(None, None).is_err());
+        assert!(document.clone().into_assembled(None, None).is_err());
         assert!(document.worktree(false, true).is_err());
     }
 
@@ -279,7 +325,7 @@ mod tests {
             crate::domain::LinkedCheckoutWriteStance::Allow
         );
         assert!(document.worktree(true, false).is_err());
-        assert!(document.assemble(None, None).is_err());
+        assert!(document.into_assembled(None, None).is_err());
     }
 
     #[test]
@@ -288,7 +334,7 @@ mod tests {
         assert!(document.worktree(false, false).is_ok());
         assert!(document.worktree(true, false).is_err());
         assert!(document.worktree(false, true).is_err());
-        assert!(document.assemble(None, None).is_err());
+        assert!(document.into_assembled(None, None).is_err());
         assert!(ConfigurationDocument::parse(None)
             .worktree(true, true)
             .unwrap()

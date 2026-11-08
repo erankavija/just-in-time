@@ -62,6 +62,7 @@ pub use materialize::{
     assemble_config, render_capture_closure, render_data_root_ignore, validate_capture_closure,
     ValidationCaptureClosure,
 };
+pub(crate) use materialize::{configuration_of, default_schema_paths, schema_requests_of};
 pub(crate) use mutation::MutationContextFactory;
 pub(crate) use mutation::{
     canonical_json, captured_gate_run_ids, captured_gate_run_issue_ids, captured_gate_verdict_keys,
@@ -374,14 +375,16 @@ pub struct CapturedRepositoryDeclarations {
 }
 
 impl CapturedRepositoryDeclarations {
+    /// The declarations over `config` and `namespaces`, its namespace registry.
     pub(crate) fn from_parts(
         config: crate::config::JitConfig,
+        namespaces: crate::domain::LabelNamespaces,
         gates: GateRegistry,
         rules: RuleSet,
     ) -> Self {
         Self {
             item_kinds: resolved_item_kinds(&config),
-            namespaces: crate::config_manager::namespaces_from_config(&config),
+            namespaces,
             config,
             gates,
             rules,
@@ -484,16 +487,14 @@ pub(crate) fn validation_declarations_with_config(
 ) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
     let config = config?;
     let namespaces = crate::config_manager::namespaces_from_config(&config);
-    let gates = match image.file_bytes(&VirtualPath::GATES)? {
-        Some(bytes) => crate::declarations::parse_gate_registry(bytes)?,
-        None => GateRegistry::default(),
-    };
+    let gates = captured_gates(image)?;
     let rules = match image.file_bytes(&VirtualPath::RULES)? {
         Some(bytes) => (|| -> Result<RuleSet, DeclarationParseError> {
-            let content = std::str::from_utf8(bytes)?;
+            let document = image.declaration_memo().rules(std::str::from_utf8(bytes)?);
             // An absent optional schema is skipped; the parse substitutes its
             // placeholder.
-            let schemas = RuleSet::schema_requests(content)?
+            let schemas = document
+                .schema_requests()?
                 .into_iter()
                 .filter_map(|request| -> Option<Result<_, DeclarationParseError>> {
                     let bytes = VirtualPath::schema_reference(&request.reference)
@@ -509,7 +510,7 @@ pub(crate) fn validation_declarations_with_config(
                     }
                 })
                 .collect::<Result<Vec<_>, DeclarationParseError>>()?;
-            let parsed = RuleSet::parse(content, Some(&config), schemas)?;
+            let parsed = document.rule_set(Some(&config), schemas)?;
             Ok(reconcile_default_rules_with_config(parsed, &namespaces)?)
         })(),
         None => Ok(default_ruleset(&namespaces)),
@@ -518,9 +519,21 @@ pub(crate) fn validation_declarations_with_config(
         Ok(rules) => (rules, None),
         Err(error) => (RuleSet { rules: Vec::new() }, Some(error)),
     };
-    let mut declarations = CapturedRepositoryDeclarations::from_parts(config, gates, rules);
+    let mut declarations =
+        CapturedRepositoryDeclarations::from_parts(config, namespaces, gates, rules);
     declarations.rules_load_error = rules_load_error;
     Ok(declarations)
+}
+
+/// The gate registry of `image`, from its declaration memo; an absent
+/// `gates.toml` declares no gates.
+pub(crate) fn captured_gates(
+    image: &RepositoryImage,
+) -> Result<GateRegistry, DeclarationParseError> {
+    Ok(match image.file_bytes(&VirtualPath::GATES)? {
+        Some(bytes) => image.declaration_memo().gates(bytes).to_registry()?,
+        None => GateRegistry::default(),
+    })
 }
 
 /// How a configuration assembly of an image becomes its declarations:

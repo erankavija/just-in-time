@@ -973,10 +973,13 @@ pub(super) fn finalize_delta(
     for intent in intents {
         if let MutationIntent::EditGateRegistry { registry } = intent {
             let path = VirtualPath::GATES;
-            let bytes = crate::declarations::edit_gate_registry_document(
-                image.file_bytes(&path)?,
-                registry,
-            )?;
+            let authored = image.file_bytes(&path)?;
+            let previous = authored
+                .map(|bytes| image.declaration_memo().gates(bytes).to_registry())
+                .transpose()?
+                .unwrap_or_default();
+            let bytes =
+                crate::declarations::edit_gate_registry_document(authored, &previous, registry)?;
             let current = image.entry(&path)?;
             if !matches!(
                 current,

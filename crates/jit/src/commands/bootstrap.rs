@@ -98,6 +98,7 @@ pub fn open_repository(invocation: RepositoryInvocation) -> Result<OpenedReposit
                 let observation =
                     crate::storage::repository_state_store::ConfigurationObservation::capture(
                         &data_root,
+                        storage.declaration_memo(),
                     )?;
                 let base = match &detected {
                     Some(paths) => paths,
@@ -795,6 +796,7 @@ mod linked_checkout_write_decision_tests {
         crate::config_manager::write_policy_from_config(
             &crate::storage::configuration_store::load_configuration(
                 &repository_layout_for_data_root(data),
+                &Default::default(),
             )
             .unwrap(),
         )

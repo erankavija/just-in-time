@@ -776,7 +776,7 @@ pub(crate) fn profile_capture_closure(
         proposed.layout(),
         &config,
         &[],
-        rules.as_deref(),
+        super::materialize::schema_requests_of(&proposed, rules.as_deref())?.as_deref(),
     )?
     .into_iter()
     .collect::<BTreeSet<_>>()
