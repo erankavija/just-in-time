@@ -4,7 +4,7 @@ use super::{CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::ValidateArgs;
 use crate::domain::identity::IssueIdPrefix;
 use crate::output::{
-    ErrorCode, RepositoryValidationResponse, ValidateResponse, ValidationCheck,
+    ErrorCode, RepositoryValidationResponse, SummaryLine, ValidateResponse, ValidationCheck,
     ValidationChecksResponse, ValidationFixSummary, ValidationWarning,
 };
 use crate::validation::report::{RuleReport, RuleSelectionFault, Selection};
@@ -103,7 +103,7 @@ fn validate<S: HandlerStore>(
         let outcome = if response.has_errors() {
             Outcome::findings(
                 ErrorCode::ValidationFailed,
-                "Validation found error-severity rule failures".to_owned(),
+                SummaryLine::new("Validation found error-severity rule failures"),
                 response,
             )
         } else {
@@ -191,8 +191,8 @@ fn validate<S: HandlerStore>(
     };
     let (structural_failure, rule_report) = validation_report.into_parts();
     let integrity_error = structural_failure.map(|error| format!("Invalid repository: {error:#}"));
-    let rules_failed = rule_report.has_errors();
-    let validation_failed = rules_failed || integrity_error.is_some();
+    let has_integrity_error = integrity_error.is_some();
+    let validation_failed = rule_report.has_errors() || has_integrity_error;
     let warning_findings: Vec<_> = rule_report
         .findings
         .iter()
@@ -208,38 +208,28 @@ fn validate<S: HandlerStore>(
         })
         .collect::<Vec<_>>();
     let error_count = rule_report.error_count();
-    let integrity_message = integrity_error.as_ref().map(ToString::to_string);
-    let message = if let Some(error) = &integrity_message {
-        if rules_failed {
-            format!(
-                "Repository validation failed: {error_count} rule error(s) and a \
-                 repository-integrity error: {error}"
-            )
-        } else {
-            format!("Repository integrity validation failed: {error}")
-        }
-    } else if rules_failed {
-        format!("Repository validation failed with {error_count} rule error(s)")
-    } else {
-        "Repository validation passed".to_owned()
-    };
     let divergence_count = divergence_report.count();
     let response = RepositoryValidationResponse {
         valid: !validation_failed,
-        integrity_error: integrity_message,
+        integrity_error,
         warning_count: warnings.len(),
         validation_warnings: warnings,
         membership_divergences: divergence_report.items,
         divergence_count,
         rule_findings: rule_report.findings,
         error_count,
-        message: message.clone(),
+        message: RepositoryValidationResponse::summary(error_count, has_integrity_error),
         fix,
     };
 
     Ok(if validation_failed {
-        Outcome::findings(ErrorCode::ValidationFailed, message, response)
+        Outcome::findings(
+            ErrorCode::ValidationFailed,
+            SummaryLine::new(&response.message),
+            response,
+        )
     } else {
+        let message = response.message.clone();
         Outcome::success_with(ValidateResponse::Repository(response), message)
     })
 }
@@ -248,11 +238,11 @@ fn validation_findings(report: RuleReport, mode: ValidationMode) -> Outcome<Vali
     if report.has_errors() {
         Outcome::findings(
             ErrorCode::ValidationFailed,
-            format!(
+            SummaryLine::new(format!(
                 "{} with {} error(s)",
                 mode.failure_message(),
                 report.error_count()
-            ),
+            )),
             report,
         )
     } else {

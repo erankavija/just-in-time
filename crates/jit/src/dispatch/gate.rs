@@ -21,7 +21,7 @@ use crate::output::gate::{
 use crate::output::{
     BatchTarget, ErrorCode, GateCheckAllResponse, GateCheckSummary, GateDefinition,
     GateEvaluateManyResponse, GateEvaluateManyResult, GateFindingsResponse, GateFlatReportResponse,
-    GateListResponse, GatePresetListResponse, GateRunHistoryResponse, GateRunSummary,
+    GateListResponse, GatePresetListResponse, GateRunHistoryResponse, GateRunSummary, SummaryLine,
 };
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -317,11 +317,11 @@ fn preset_apply<S: HandlerStore>(
     } else {
         Outcome::findings(
             ErrorCode::PresetError,
-            format!(
+            SummaryLine::new(format!(
                 "Failed to apply preset '{}' to {} issue(s)",
                 report.preset,
                 report.errors.len()
-            ),
+            )),
             report,
         )
     };
@@ -529,7 +529,7 @@ fn status_all<S: HandlerStore>(
     Ok(if all_passed {
         Outcome::success_with(response, message)
     } else {
-        Outcome::findings(ErrorCode::GateFailed, message, response)
+        Outcome::findings(ErrorCode::GateFailed, SummaryLine::new(message), response)
     })
 }
 
@@ -661,7 +661,7 @@ fn evaluate_many<S: HandlerStore>(
     let response = GateEvaluateManyResponse::new(results);
     let outcome = match first_failure {
         None => Outcome::success_with(response, message),
-        Some(code) => Outcome::findings(code, message, response),
+        Some(code) => Outcome::findings(code, SummaryLine::new(message), response),
     };
     Ok(outcome.with_warnings(warnings))
 }

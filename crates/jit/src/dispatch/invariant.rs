@@ -3,7 +3,7 @@
 use super::{CommandContext, HandlerResult, HandlerStore, Outcome};
 use crate::cli::InvariantCommands;
 use crate::commands::InvariantCheckResult;
-use crate::output::ErrorCode;
+use crate::output::{ErrorCode, SummaryLine};
 
 /// Enforcement drift is a findings outcome; a clean registry succeeds.
 fn check<S: HandlerStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<InvariantCheckResult> {
@@ -11,7 +11,7 @@ fn check<S: HandlerStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<Invarian
     Ok(if result.has_drift() {
         Outcome::findings(
             ErrorCode::ValidationFailed,
-            format!("Enforcement drift: {} finding(s)", result.count()),
+            SummaryLine::new(format!("Enforcement drift: {} finding(s)", result.count())),
             result,
         )
     } else {

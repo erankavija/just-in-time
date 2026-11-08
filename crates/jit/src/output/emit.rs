@@ -5,7 +5,42 @@ use super::{ErrorCode, ExitCode, JsonError, JsonOutput, OutputMode, RunStatus};
 use crate::dispatch::Outcome;
 use schemars::JsonSchema;
 use serde::Serialize;
+use std::fmt;
 use std::io::{self, Write};
+
+/// A findings outcome's summary: the stderr line in human mode and
+/// `error.message` under `--json`. Construction flattens: each control
+/// character, line breaks included, becomes its escape sequence (`\n`), so a
+/// summary is always one line. Multi-line details belong in the report.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SummaryLine(String);
+
+impl SummaryLine {
+    pub fn new(text: impl AsRef<str>) -> Self {
+        Self(
+            text.as_ref()
+                .chars()
+                .fold(String::new(), |mut line, character| {
+                    if character.is_control() {
+                        line.extend(character.escape_default());
+                    } else {
+                        line.push(character);
+                    }
+                    line
+                }),
+        )
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for SummaryLine {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
 
 /// The human rendering of a response or report under `mode`: the complete
 /// text, trailing newline included, written verbatim to stdout. `mode.quiet`
@@ -169,6 +204,15 @@ mod tests {
     }
 
     #[test]
+    fn test_summary_line_new_flattens_every_control_character_into_its_escape() {
+        let line = SummaryLine::new("drift:\n- a\r\n- b\tc\u{1b}");
+
+        assert!(!line.as_str().chars().any(char::is_control), "{line}");
+        assert_eq!(line.as_str(), "drift:\\n- a\\r\\n- b\\tc\\u{1b}");
+        assert_eq!(SummaryLine::new("plain 'text'").as_str(), "plain 'text'");
+    }
+
+    #[test]
     fn test_emit_outcome_success_json_carries_outcome_message_beside_response() {
         #[derive(Serialize, JsonSchema)]
         struct Named {
@@ -215,7 +259,13 @@ mod tests {
             emit_outcome(outcome, json, &mut out, &mut io::sink()).unwrap();
             serde_json::from_slice::<serde_json::Value>(&out).unwrap()
         };
-        let findings = || Outcome::findings(ErrorCode::ValidationFailed, "failed", Object {});
+        let findings = || {
+            Outcome::findings(
+                ErrorCode::ValidationFailed,
+                SummaryLine::new("failed"),
+                Object {},
+            )
+        };
 
         let warned = [
             printed(&Outcome::from(Object {}).with_warnings(["a", "b"])),
@@ -308,8 +358,12 @@ mod tests {
 
     #[test]
     fn test_emit_outcome_findings_warnings_follow_the_message_line_on_stderr() {
-        let outcome =
-            Outcome::findings(ErrorCode::ValidationFailed, "failed", Framed).with_warnings(["w"]);
+        let outcome = Outcome::findings(
+            ErrorCode::ValidationFailed,
+            SummaryLine::new("failed"),
+            Framed,
+        )
+        .with_warnings(["w"]);
 
         let (_, loud) = rendered(OutputMode::default(), &outcome);
         let (_, quiet) = rendered(

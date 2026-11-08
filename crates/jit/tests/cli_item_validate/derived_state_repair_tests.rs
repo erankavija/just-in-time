@@ -96,12 +96,12 @@ fn test_cli_validate_fix_preserves_malformed_rules_validation_classification() {
         if json_mode {
             let error = json(&output);
             assert_eq!(error["error"]["code"], "VALIDATION_FAILED");
-            assert!(error["error"]["message"]
+            assert!(error["error"]["details"]["integrity_error"]
                 .as_str()
                 .unwrap()
                 .contains("TOML parse error"));
         } else {
-            assert!(String::from_utf8_lossy(&output.stderr).contains("TOML parse error"));
+            assert!(String::from_utf8_lossy(&output.stdout).contains("TOML parse error"));
         }
         assert_snapshot_unchanged(cli.root(), &before);
     }
@@ -159,7 +159,7 @@ fn test_cli_validate_fix_preserves_permission_error_classification() {
 }
 
 #[test]
-fn test_validate_derived_state_drift_names_repair_command_and_repository_paths() {
+fn test_validate_derived_state_drift_reports_repair_command_and_repository_paths_on_stdout() {
     let cli = JitCli::initialised().unwrap();
 
     let config_path = cli.root().join(".jit/config.toml");
@@ -172,11 +172,7 @@ fn test_validate_derived_state_drift_names_repair_command_and_repository_paths()
 
     let validation = cli.command(["validate"]).output().unwrap();
     assert!(!validation.status.success(), "{validation:?}");
-    let diagnostic = format!(
-        "{}{}",
-        String::from_utf8_lossy(&validation.stdout),
-        String::from_utf8_lossy(&validation.stderr)
-    );
+    let diagnostic = String::from_utf8_lossy(&validation.stdout);
     assert!(
         diagnostic.contains("jit validate --fix"),
         "diagnostic should name the repair command: {diagnostic}"
