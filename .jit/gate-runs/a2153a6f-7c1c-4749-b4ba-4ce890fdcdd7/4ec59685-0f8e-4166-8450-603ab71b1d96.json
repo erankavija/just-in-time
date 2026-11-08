@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "32cdcc1e43e4b85c0d791676c2a88d714900c413",
+  "completed_at": "2026-11-08T03:37:42.166125797Z",
+  "duration_ms": 212407,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No issue-impact defects found in the captured gate registry cutover; scoped criteria and test ownership are satisfied.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a2153a6f-7c1c-4749-b4ba-4ce890fdcdd7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4ec59685-0f8e-4166-8450-603ab71b1d96",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T03:34:09.758190988Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:a2153a6f` — `d6b226a02985bd830b7f6286bfb33f355ed8a9be`; individual patch inspected; uncommitted workflow data excluded.\nPolicy sources: `AGENTS.md`; no subtree policies found.\nResolved items: `@/charter/D-18`, `@/charter/D-20`, `@/charter/D-25` → `dev/vision/9db27a3a-charter.md`; `@/invariant/canonical-cutover`, `@/invariant/architecture-dependency-direction`, `@/invariant/orthogonal-tests`, `@/invariant/shared-test-contracts`, `@/invariant/semantic-test-assertions`, `@/invariant/essential-code-prose` → `.jit/invariants.toml`; requirements REQ-01–03 of `@/issue/a2153a6f` and REQ-10, REQ-12 of `@/issue/b697a3f7` → respective issue descriptions; `@/gate/cargo-ci`, `@/gate/jit-validate` → `.jit/gates.toml`.\nGate evidence: `cargo-ci` passed, exit 0, 2026-11-08T03:32:27.435371575+00:00; wrapper ancestry confirms run commit `32cdcc1e43e4b85c0d791676c2a88d714900c413` covers the attributable commit; not rerun.\nTruncation recovery: narrower patch, caller, parser, and policy reads recovered relevant evidence; unrelated parent-epic background excluded from this issue’s scope.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No issue-impact defects found in the captured gate registry cutover; scoped criteria and test ownership are satisfied.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

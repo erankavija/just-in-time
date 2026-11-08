@@ -232,8 +232,8 @@
           "id": "a2153a6f",
           "short_id": "a2153a6f",
           "title": "Gate registry reads come from the captured image; the live-file reader is gone",
-          "status": "in_progress",
-          "note": "dispatched 05:1x on opus, worktrees based f9dbac535"
+          "status": "done",
+          "note": "landed 32cdcc1e4 (d6b226a02); cargo-ci passed; code-review passed run 4ec59685"
         },
         {
           "id": "c31c2e57",
@@ -627,6 +627,15 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "verdict": "REQ-02/03 met; REQ-01 unmet (F1 live citation scan in plan), REQ-04 unmet (F2 snapshot staging overwrite); ruling requested from invoker"
+    },
+    {
+      "issue": "a2153a6f",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "4ec59685"
     }
   ]
 }
