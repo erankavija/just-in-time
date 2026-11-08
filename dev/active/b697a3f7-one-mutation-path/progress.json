@@ -596,6 +596,11 @@
       "at": "10:2x",
       "decision": "6a19e93f final attempt: structural indexed id resolution; slice scan deleted/confined; shared parsed records for label-target; counter at shared primitive; sol pre-check before gate",
       "by": "invoker just-in-time-d5"
+    },
+    {
+      "at": "12:0x",
+      "decision": "45d0a971 tip record: one harness run, default 5 samples, quiet host (1-min load <1 checked by lead before start, harness defaults unchanged), no other jit/gf2 work (check with gf2-cf), record host load; verdict stands, no reruns; if (a) fails send numbers + flat per-match counts to invoker (criterion-design question for the user)",
+      "by": "invoker just-in-time-d5"
     }
   ],
   "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",
