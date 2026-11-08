@@ -26,7 +26,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Enforce the per-test limits and retire the whole-suite budget",
-  "updated_at": "2026-11-08T02:39:17.096650979Z"
+  "updated_at": "2026-11-08T03:31:43.832669423Z"
 }

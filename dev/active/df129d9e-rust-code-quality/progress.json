@@ -699,14 +699,15 @@
           "short_id": "afd2d573",
           "title": "Bring the bootstrap audit-replay test under the unit limit",
           "classification": "implementation",
-          "status": "rework",
+          "status": "done",
           "model_tier": "sonnet",
           "tier_reason": "single-test cost cut reusing 0b35be66 mechanism",
           "dispatched": "2026-11-08T04:33+02:00",
           "worktree": ".agents/worktrees/agent-afd2d573",
           "branch": "worktree-agent-afd2d573",
-          "branch_head": "f89fe20ba",
-          "rework_note": "join through test_utils::join_reraising after merging main"
+          "branch_head": "da2f3d9e8",
+          "landed": "bed5d7f2a",
+          "gates": "cargo-ci passed (retry after exit 75), code-review passed (0 findings)"
         },
         {
           "key": "near-limit-tests",
@@ -714,10 +715,13 @@
           "short_id": "7909527f",
           "title": "Bring the three near-limit unit tests under 1.5 s",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "model_tier": "sonnet",
           "dispatched": "2026-11-08T05:04+02:00",
-          "branch": "worktree-agent-7909527f"
+          "branch": "worktree-agent-7909527f",
+          "branch_head": "cff056858",
+          "landed": "2318609d5",
+          "gates": "cargo-ci passed, code-review passed (0 findings)"
         }
       ]
     },
@@ -1017,6 +1021,14 @@
       "issue": "0b35be66",
       "summary": "redo_conformance FileBackend Unsynced adapter setting",
       "status": "resolved by d5: accept adapter-level setting; condition (redo_apply Full-durability sync assertions) verified at 948212c82: test_redo_applier_apply_syncs_a_parent_its_puts_share_once uses RedoApplier::new (Full)"
+    },
+    {
+      "date": "2026-11-08",
+      "from": "just-in-time-d5",
+      "type": "ruling",
+      "subject": "near-limit margin tasks",
+      "ruling": "7909527f is the last margin task; the bound is the declared 2 s/6 s limit. Only a test over its limit on a quiet host (1-min load < 1) gets a refactor task, measured in fba8d478's quiet trials. Loaded-host noise is handled solely by cargo-ci exit 75 (D-18).",
+      "status": "resolved"
     }
   ],
   "rework_counts": {
