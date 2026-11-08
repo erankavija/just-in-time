@@ -1,0 +1,9 @@
+tests 5159
+4.099 jit::cli cli_repo_workflow::steering_scenarios::test_all_steering_scenarios
+3.411 jit::cli cli_repo_workflow::profile_acceptance_tests::test_shipped_profile_archive_bootstraps_a_repository_without_jit_state
+3.282 jit::cli cli_repo_workflow::lease_enforcement_tests::test_strict_lease_exempt_paths_write_for_their_stated_reason
+3.060 jit::cli cli_repo_workflow::lease_enforcement_tests::test_mutating_leaves_classified_as_no_record_leave_every_issue_record_alone
+2.469 jit::cli cli_repo_workflow::profile_acceptance_tests::test_offline_public_cli_profile_reaches_implementation_ready_breakdown
+2.460 jit::cli cli_issue::command_exit_code_projection_tests::test_command_exit_codes_retryable_reads_emit_12
+2.425 jit::cli cli_repo_workflow::profile_acceptance_tests::test_profile_fresh_init_and_existing_apply_are_equivalent_without_git
+2.349 jit::cli cli_repo_workflow::lock_contention_tests::test_concurrent_mutations_queue_behind_a_holder_under_the_default_wait

@@ -34,7 +34,7 @@ set -uo pipefail
 # The exit-status classifier (0/1/75) is driven through `cargo-ci.sh --classify`
 # over synthetic step output and load samples, one assertion per exit path. A
 # compiler wrapper that cannot run exits 75 before any step, driven through
-# wrappers this self-test owns. The build-lock wait of this gate and of the
+# wrappers this self-test owns. The build-lock wait of the
 # profiling and benchmark scripts is driven against a lock it owns, in a repository
 # it owns.
 #
@@ -162,7 +162,6 @@ EOF
     PATH="$fake_bin:$PATH" \
       SELFTEST_CARGO_VERSION="$real_cargo_version" \
       SELFTEST_UNEXPECTED_CARGO="$unexpected" \
-      CARGO_CI_NO_LOCK=1 \
       CARGO_CI_NO_SCCACHE=1 \
       "$gate"
   ) >"$out" 2>&1
@@ -211,7 +210,6 @@ EOF2
       SELFTEST_CARGO_LOG="$suite_log" \
       SELFTEST_SUITE_STATUS="$1" \
       SELFTEST_SUITE_OUTPUT="${2:-Summary [1s] 1 tests run: 1 passed, 0 skipped}" \
-      CARGO_CI_NO_LOCK=1 \
       CARGO_CI_NO_SCCACHE=1 \
       "$gate" --suite
   ) >"$suite_out" 2>&1
@@ -246,37 +244,6 @@ test_fail_fast_timeout_fails_only_the_test_step() {
     grep -qF "failing steps (test)" "$suite_out"
 }
 
-# The real wrapper must distinguish lock acquisition from every child status.
-test_build_lock_status_propagation() {
-  local fixture="$scratch/build-lock" rc status
-  mkdir -p "$fixture/bin"
-  cat >"$fixture/bin/cargo" <<'EOF'
-#!/usr/bin/env bash
-if [ "${1:-}" = "--version" ]; then
-  echo "cargo 1.90.0 (selftest fixture)"
-  exit 0
-fi
-if flock -n "$CARGO_CI_BUILD_LOCK" true; then
-  echo "child ran without the build lock" >&2
-  exit 98
-fi
-exit "$SELFTEST_CHILD_STATUS"
-EOF
-  chmod +x "$fixture/bin/cargo"
-  for status in 0 1 2 75 255; do
-    env -u CARGO_CI_LOCKED -u CARGO_CI_NO_LOCK \
-      PATH="$fixture/bin:$PATH" CARGO_CI_NO_SCCACHE=1 \
-      CARGO_CI_BUILD_LOCK="$fixture/build.lock" CARGO_CI_LOCK_TIMEOUT=0.01 \
-      SELFTEST_CHILD_STATUS="$status" \
-      "$gate" --cargo selftest >"$fixture/out" 2>&1
-    rc=$?
-    check "build lock: child status $status survives while the lock is held" test "$rc" -eq "$status"
-    check "build lock: child status $status is not diagnosed as acquisition timeout" \
-      test "$(grep -c 'timed out' "$fixture/out")" -eq 0
-  done
-  check "build lock: child exit releases the lock" flock -n "$fixture/build.lock" true
-}
-
 # A wrapper that cannot run is the environment, whichever source selects it and
 # whichever entry point reaches it. Cargo here is real, because the probe compiles
 # through it. The sccache stand-in answers version queries and stdin input and
@@ -305,7 +272,7 @@ EOF
     local cwd="$1" args="$2"
     shift 2
     # shellcheck disable=SC2086 # <gate-args> is a word list
-    (cd "$cwd" && env -u CARGO_CI_NO_SCCACHE PATH="$fixture/bin:$PATH" CARGO_CI_NO_LOCK=1 "$@" "$gate" $args) >"$out" 2>&1
+    (cd "$cwd" && env -u CARGO_CI_NO_SCCACHE PATH="$fixture/bin:$PATH" "$@" "$gate" $args) >"$out" 2>&1
     rc=$?
   }
   focused_gate_from() { # focused_gate_from <cwd> [VAR=value ...]; sets rc
@@ -423,7 +390,7 @@ EOF
     shift 2
     (
       cd "$repo" || exit 3
-      env -u CARGO_CI_LOCKED -u CARGO_CI_NO_LOCK -u PROFILE_TEST_SUITE_LOCKED -u SESSION_BENCH_BIN \
+      env -u PROFILE_TEST_SUITE_LOCKED -u SESSION_BENCH_BIN \
         PATH="$path_prefix:$PATH" SELFTEST_CARGO_RAN="$cargo_ran" \
         CARGO_CI_BUILD_LOCK="$lock" CARGO_CI_LOCK_TIMEOUT="$bound" \
         PROFILE_TEST_SUITE_OUTPUT="$fixture/profile.json" \
@@ -461,7 +428,7 @@ EOF
 
   echo
   echo "== script build lock: the wait is bounded, announced and builds nothing =="
-  for script in cargo-ci.sh profile-test-suite.sh benchmark-session-cost.sh benchmark-rust-build.sh; do
+  for script in profile-test-suite.sh benchmark-session-cost.sh benchmark-rust-build.sh; do
     name=$script
     script="$here/$script"
     out="$fixture/$name.out"
@@ -568,8 +535,7 @@ EOF
         SELFTEST_SEEN="$fixture/seen-$name" \
         SELFTEST_SUITE_STATUS="$suite_status" \
         SELFTEST_SERVER_TMPDIR="$fixture/server-$name" \
-        CARGO_CI_NO_LOCK=1 \
-        "$gate" "$@"
+          "$gate" "$@"
     ) >"$fixture/out-$name" 2>&1
     rc=$?
   }
@@ -876,9 +842,7 @@ stale_expect_worker() { signature_worker "$1"; }
 # Runs scripts/cargo-ci.sh — the real one, at its real path — over the merged
 # tree, capturing its combined output. CARGO_TARGET_DIR is cleared so the
 # fixture builds into its own throwaway target rather than into a target
-# directory this run inherited, and the host-wide build lock is skipped: this
-# self-test itself runs inside a gate run that already holds that lock, and the
-# fixture is far too small to need it. These fixtures compile for real, so they
+# directory this run inherited. These fixtures compile for real, so they
 # opt out of sccache: the host daemon's health is no part of their verdict.
 # No inherited NEXTEST_* setting applies, and every fixture's tests run at once:
 # nextest's default fail-fast stops scheduling at the first failure, so a fixture
@@ -890,7 +854,7 @@ run_gate_script() { # run_gate_script <script> <repo> <output-file> [VAR=value .
   (
     cd "$repo" || exit 3
     unset CARGO_TARGET_DIR "${!NEXTEST_@}"
-    env CARGO_CI_NO_LOCK=1 CARGO_CI_NO_SCCACHE=1 NEXTEST_TEST_THREADS="$FIXTURE_TEST_THREADS" "$@" "$script"
+    env CARGO_CI_NO_SCCACHE=1 NEXTEST_TEST_THREADS="$FIXTURE_TEST_THREADS" "$@" "$script"
   ) >"$out" 2>&1
 }
 
@@ -1209,7 +1173,6 @@ run_test test_suite_mode_runs_only_the_suite_steps
 run_test test_fail_fast_timeout_fails_only_the_test_step
 run_test test_classifier_exit_paths
 run_test test_classifier_enospc_exit_paths
-run_test test_build_lock_status_propagation
 run_test test_script_build_lock_wait
 run_test test_unrunnable_compiler_wrapper
 run_test test_run_removes_its_temporary_directory
