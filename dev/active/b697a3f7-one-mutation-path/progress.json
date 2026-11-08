@@ -426,7 +426,7 @@
       "issue": "6a19e93f",
       "reason": "rework limit exceeded; repeated class (precheck per-match scans)",
       "to": "just-in-time-d5",
-      "status": "open"
+      "status": "resolved: option A final attempt, structural id index"
     }
   ],
   "rework_counts": {
@@ -445,7 +445,7 @@
     "42046050": 2,
     "c31c2e57": 2,
     "dd95bd9d": 3,
-    "6a19e93f": 2
+    "6a19e93f": 3
   },
   "surfaced_pitfalls": [
     {
@@ -587,6 +587,11 @@
     {
       "at": "09:2x",
       "decision": "2add77bc option A: validate root once, held handle (identity binding); amend 5046408a design.md:40; conditions: external data root own validated handle, mid-replay replacement test",
+      "by": "invoker just-in-time-d5"
+    },
+    {
+      "at": "10:2x",
+      "decision": "6a19e93f final attempt: structural indexed id resolution; slice scan deleted/confined; shared parsed records for label-target; counter at shared primitive; sol pre-check before gate",
       "by": "invoker just-in-time-d5"
     }
   ],
