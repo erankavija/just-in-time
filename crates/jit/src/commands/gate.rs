@@ -293,12 +293,10 @@ fn captured_gate_preset_fixed_paths() -> Vec<crate::repository_state::VirtualPat
 
 fn capture_gate_preset_image(
     session: &mut dyn crate::storage::RepositoryMutationSession,
-    include_projection_closure: bool,
+    projection_closure: Option<&mut super::ConfigurationParse>,
     create_target: Option<&str>,
 ) -> Result<Option<crate::repository_state::RepositoryImage>> {
-    use crate::repository_state::{
-        assemble_config, render_capture_closure, CaptureSpec, VirtualPath,
-    };
+    use crate::repository_state::{render_capture_closure, CaptureSpec, VirtualPath};
 
     let presets_dir = VirtualPath::GATE_PRESETS;
     let issues_dir = VirtualPath::ISSUES;
@@ -311,20 +309,24 @@ fn capture_gate_preset_image(
     let create_path = create_target
         .map(|name| VirtualPath::data(format!("{}/{name}.json", presets_dir.relative().as_str())))
         .transpose()?;
+    let mut projection_closure = projection_closure;
     let Some(image) = super::capture_discovering(session, spec, |image, spec| {
         let issue_paths = crate::repository_state::captured_issue_ids(image)?
             .iter()
             .map(VirtualPath::issue_record)
             .collect::<Vec<_>>();
-        let closure = if include_projection_closure {
-            let config = assemble_config(image)?;
-            let rules_text =
-                super::image_virtual_bytes(image, &crate::repository_state::VirtualPath::RULES)?
-                    .map(String::from_utf8)
-                    .transpose()?;
-            render_capture_closure(image.layout(), &config, &[], rules_text.as_deref())?
-        } else {
-            Vec::new()
+        let closure = match projection_closure.as_deref_mut() {
+            Some(configuration) => {
+                let config = configuration.parse(image)?;
+                let rules_text = super::image_virtual_bytes(
+                    image,
+                    &crate::repository_state::VirtualPath::RULES,
+                )?
+                .map(String::from_utf8)
+                .transpose()?;
+                render_capture_closure(image.layout(), config, &[], rules_text.as_deref())?
+            }
+            None => Vec::new(),
         };
         Ok(spec.discover_paths(
             GatePresetCatalog::paths(image)?
@@ -1006,8 +1008,8 @@ impl<S: IssueStore> GateOps<'_, S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{
-            assemble_config, finalize_gate_registry_edit, render_capture_closure, CaptureBudget,
-            CaptureSpec, MutationIntent, VirtualPath,
+            finalize_gate_registry_edit, render_capture_closure, CaptureBudget, CaptureSpec,
+            MutationIntent, VirtualPath,
         };
 
         let layout = self.exec.require_layout()?;
@@ -1045,8 +1047,9 @@ impl<S: IssueStore> GateOps<'_, S> {
                 if leased_gate.is_some() {
                     spec.discover_listings([VirtualPath::ISSUES])?;
                 }
+                let mut configuration = super::ConfigurationParse::captured();
                 let Some(image) = super::capture_discovering(session, spec, |image, spec| {
-                    let config = assemble_config(image)?;
+                    let config = configuration.parse(image)?;
                     let rules_text = super::image_virtual_bytes(
                         image,
                         &crate::repository_state::VirtualPath::RULES,
@@ -1062,18 +1065,16 @@ impl<S: IssueStore> GateOps<'_, S> {
                         Vec::new()
                     };
                     Ok(spec.discover_paths(issue_paths.into_iter().chain(
-                        render_capture_closure(
-                            image.layout(),
-                            &config,
-                            &[],
-                            rules_text.as_deref(),
-                        )?,
+                        render_capture_closure(image.layout(), config, &[], rules_text.as_deref())?,
                     ))?)
                 })?
                 else {
                     return Ok(SessionStep::Retry);
                 };
-                let mut declarations = crate::repository_state::declarations_from_image(&image)?;
+                let mut declarations = crate::repository_state::declarations_with_config(
+                    &image,
+                    configuration.into_config(&image),
+                )?;
                 let warnings = if let Some(key) = leased_gate {
                     let targets = super::captured_active_issues(&image)?
                         .into_iter()
@@ -1344,12 +1345,18 @@ impl<S: IssueStore> GateOps<'_, S> {
                 .transpose()?
                 .flatten();
             let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
-            let Some(image) = capture_gate_preset_image(&mut *session, true, None)? else {
+            let mut configuration = super::ConfigurationParse::captured();
+            let Some(image) =
+                capture_gate_preset_image(&mut *session, Some(&mut configuration), None)?
+            else {
                 return Ok(AttemptOutcome::Retry);
             };
             let issues = super::captured_active_issues(&image)?;
             let target = super::require_issue_in_capture(&issues, issue_id)?;
-            let mut declarations = crate::repository_state::declarations_from_image(&image)?;
+            let mut declarations = crate::repository_state::declarations_with_config(
+                &image,
+                configuration.into_config(&image),
+            )?;
             let mode = declarations.config().enforcement_mode();
             if target != expected_target || mode != expected_mode {
                 return Ok(AttemptOutcome::Retry);
@@ -1442,7 +1449,7 @@ impl<S: IssueStore> GateOps<'_, S> {
             &layout,
             "gate preset creation",
             |session| {
-                let Some(image) = capture_gate_preset_image(session, false, Some(preset_name))?
+                let Some(image) = capture_gate_preset_image(session, None, Some(preset_name))?
                 else {
                     return Ok(SessionStep::Retry);
                 };
@@ -2137,7 +2144,7 @@ mod tests {
             .open_mutation_session(layout.clone())
             .unwrap();
         let stale_image =
-            capture_gate_preset_image(stale_session.as_mut(), false, Some("race-preset"))
+            capture_gate_preset_image(stale_session.as_mut(), None, Some("race-preset"))
                 .unwrap()
                 .unwrap();
         let preset = GatePresetDefinition {
