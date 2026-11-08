@@ -188,7 +188,7 @@ fn arbitrary_case() -> impl Strategy<Value = Case> {
                     if broken_records && i == 0 { b"not json".to_vec() } else { crate::repository_state::serialize_issue(issue).unwrap() },
                 )
             }).build();
-            let declarations = crate::repository_state::validation_declarations_from_image(&image).unwrap();
+            let declarations = crate::repository_state::validation_declarations_with_config(&image, crate::repository_state::assemble_config(&image)).unwrap();
             let rules = declarations.rules_loaded().then(|| declarations.rules().clone());
             let rule_pass_fails = plan_missing && rules.is_some() && !broken_records;
             Case { image, issues, rules, broken_records, rule_pass_fails }

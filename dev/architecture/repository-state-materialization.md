@@ -225,7 +225,7 @@ site:
 - `ProducerError` — a producer read an uncaptured path, malformed captured bytes,
   or an invalid declaration.
 - `DeclarationParseError` — parsing captured declaration files into the canonical
-  bundle (`declarations_from_image` / `validation_declarations_from_image`).
+  bundle (`declarations_from_image` / `validation_declarations_with_config`).
 - `RulesDocumentError` — a `rules.toml` that could not be parsed or safely spliced.
 - `GateRegistryEditError` — the typed tail of `finalize_gate_registry_edit`.
 - `ArchiveExecutionError` — the typed tail of `finalize_archive_execution`.

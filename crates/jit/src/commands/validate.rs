@@ -19,6 +19,13 @@ enum BaseCapturePurpose<'a> {
 /// A capture's parsed issues and, for validation, the JSON value each decoded from.
 type ParsedIssues = (Result<Vec<Issue>>, Vec<serde_json::Value>);
 
+/// A captured base, its issues, and the configuration its discovery assembled.
+type CapturedBase = (
+    crate::repository_state::RepositoryImage,
+    ParsedIssues,
+    std::result::Result<JitConfig, crate::repository_state::ProducerError>,
+);
+
 /// The `--fix` count and messages and, unless the issue records do not parse,
 /// the plan publishing them.
 type DerivedFixes = (
@@ -141,14 +148,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         };
         let image = &captured.image;
         let mut projected = original.to_vec();
-        let declarations = crate::repository_state::validation_declarations_from_image(image);
-        let mut fixes = match declarations {
+        let mut fixes = match captured.declarations() {
             Ok(declarations) => {
                 let fixes = self
                     .plan_hierarchy_fixes(declarations.config(), &mut projected, dry_run)?
                     .merge(plan_reduction_fixes(&mut projected)?);
                 let graph = CapturedGraphEvidence {
-                    declarations: &declarations,
+                    declarations,
                     plan_content: plan_content_with_issues(
                         image,
                         declarations.config(),
@@ -400,7 +406,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             extra_paths,
             BaseCapturePurpose::Validation,
         )
-        .map(|captured| captured.map(|(image, _)| image))
+        .map(|captured| captured.map(|(image, ..)| image))
     }
 
     /// The base an issue mutation derives from: the registries, every issue,
@@ -442,7 +448,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         )
         .and_then(|captured| {
             captured
-                .map(|(image, (issues, _))| Ok(MutationBase::new(image, issues?)))
+                .map(|(image, (issues, _), config)| Ok(MutationBase::new(image, issues?, config)))
                 .transpose()
         })
     }
@@ -484,16 +490,29 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             return Ok(Some(MutationPreflight {
                 image,
                 target,
-                issues: None,
+                base: None,
             }));
         }
-        Ok(self
-            .extend_mutation_base(session, image, std::slice::from_ref(issue_id))?
-            .map(|MutationBase { image, issues, .. }| MutationPreflight {
+        self.capture_proposed_base_inner(
+            session,
+            Some(image),
+            &std::collections::BTreeMap::new(),
+            &[],
+            BaseCapturePurpose::Mutation {
+                precheck_targets: std::slice::from_ref(issue_id),
+            },
+        )?
+        .map(|(image, (issues, _), config)| {
+            Ok(MutationPreflight {
                 image,
                 target,
-                issues: Some(issues),
-            }))
+                base: Some(PreflightBase {
+                    issues: issues?,
+                    config,
+                }),
+            })
+        })
+        .transpose()
     }
 
     /// The base an archive plan reads: the event log's length and tail, with
@@ -509,7 +528,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             &[],
             BaseCapturePurpose::Archive,
         )
-        .map(|captured| captured.map(|(image, _)| image))
+        .map(|captured| captured.map(|(image, ..)| image))
     }
 
     /// One capture round of the base, from `start` when the caller has read
@@ -521,7 +540,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// registries plan. Validation and mutation passes also read linked plan
     /// documents; a mutation's precheck targets add prompt files and gate-run
     /// results.
-    /// Repair and archive omit these rule-evaluation inputs.
+    /// Repair and archive omit these rule-evaluation inputs. The configuration
+    /// the closure planning assembled is returned with the image.
     fn capture_proposed_base_inner(
         &self,
         session: &mut (dyn crate::storage::RepositoryReadSession + '_),
@@ -532,7 +552,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
         purpose: BaseCapturePurpose<'_>,
-    ) -> Result<Option<(crate::repository_state::RepositoryImage, ParsedIssues)>> {
+    ) -> Result<Option<CapturedBase>> {
         use crate::repository_state::{
             validate_capture_closure, CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath,
         };
@@ -573,6 +593,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 }
             };
         let mut issues = None::<ParsedIssues>;
+        let mut configuration = super::ConfigurationParse::new(|image: &RepositoryImage| {
+            effective_config(image, overrides)
+        });
         let mut add_base = start.is_some();
         let mut discover = |image: &RepositoryImage, spec: &mut CaptureSpec| -> Result<()> {
             if add_base {
@@ -588,7 +611,14 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             // (its projection, item-kind, issue, and schema entries drop out),
             // and the subsequent validation report surfaces the parse
             // error as a finding.
-            let config = effective_config(image, &effective_virtual_path).unwrap_or_default();
+            let fallback;
+            let config = match configuration.parse(image) {
+                Ok(config) => config,
+                Err(_) => {
+                    fallback = JitConfig::default();
+                    &fallback
+                }
+            };
             let issue_ids =
                 crate::repository_state::overlaid_issue_ids(image, overrides).unwrap_or_default();
             let rules_text = effective_virtual_path(image, &VirtualPath::RULES)?
@@ -598,7 +628,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 crate::declarations::rules::RuleSet::schema_requests(content).is_ok()
             });
             let closure =
-                validate_capture_closure(image.layout(), &config, &issue_ids, schema_rules)?;
+                validate_capture_closure(image.layout(), config, &issue_ids, schema_rules)?;
             let read = image.capture_spec();
             let closure_read = closure.paths.iter().all(|path| read.contains_path(path))
                 && closure
@@ -648,7 +678,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                         image,
                         spec,
                         parsed.as_deref().unwrap_or_default(),
-                        &config,
+                        config,
                         &effective_virtual_path,
                         precheck_targets,
                     )?;
@@ -665,7 +695,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 super::capture_discovering(session, spec, &mut discover)?
             }
         };
-        Ok(image.zip(issues))
+        Ok(image.zip(issues).map(|(image, issues)| {
+            let config = configuration.into_config(&image);
+            (image, issues, config)
+        }))
     }
 }
 
@@ -701,13 +734,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                     return Ok(None);
                 };
                 let issues = captured.issues.as_deref().unwrap_or_default();
-                let divergences =
-                    crate::repository_state::validation_declarations_from_image(&captured.image)
-                        .map_err(anyhow::Error::from)
-                        .and_then(|declarations| {
-                            captured_divergences(issues, declarations.config())
-                        })
-                        .unwrap_or_else(|_| crate::commands::DivergenceResponse::new(Vec::new()));
+                let divergences = captured
+                    .declarations()
+                    .map_err(anyhow::Error::from)
+                    .and_then(|declarations| captured_divergences(issues, declarations.config()))
+                    .unwrap_or_else(|_| crate::commands::DivergenceResponse::new(Vec::new()));
                 let Some(document_references) =
                     capture_document_reference_validation(session, issues)?
                 else {
@@ -809,8 +840,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
         )
     }
 
-    /// Capture the whole-repository validation base with the issue records its
-    /// closure planning parsed.
+    /// Capture the whole-repository validation base with the issue records and
+    /// configuration its closure planning parsed.
     pub(super) fn capture_validation(
         &self,
         session: &mut (dyn crate::storage::RepositoryReadSession + '_),
@@ -824,17 +855,26 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 &[],
                 BaseCapturePurpose::Validation,
             )?
-            .map(|(image, (issues, values))| {
-                crate::validation::CapturedValidation::with_records(image, issues, values)
+            .map(|(image, (issues, values), config)| {
+                crate::validation::CapturedValidation::with_records(image, issues, values, config)
             }))
     }
 
     /// Capture the repository's own validation closure: its registries, its
-    /// event log, and the paths they plan.
+    /// event log, and the paths they plan, with the declarations its
+    /// discovery's configuration assembly yields.
     pub(super) fn capture_repair_base(
         &self,
         session: &mut (dyn crate::storage::RepositoryReadSession + '_),
-    ) -> Result<Option<crate::repository_state::RepositoryImage>> {
+    ) -> Result<
+        Option<(
+            crate::repository_state::RepositoryImage,
+            std::result::Result<
+                crate::repository_state::CapturedRepositoryDeclarations,
+                crate::repository_state::DeclarationParseError,
+            >,
+        )>,
+    > {
         Ok(self
             .exec
             .capture_proposed_base_inner(
@@ -844,7 +884,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 &[],
                 BaseCapturePurpose::Repair,
             )?
-            .map(|(image, _)| image))
+            .map(|(image, _, config)| {
+                let declarations =
+                    crate::repository_state::validation_declarations_with_config(&image, config);
+                (image, declarations)
+            }))
     }
 
     /// Capture the repair base and derive its exact repair plan.
@@ -859,11 +903,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
     ) -> Result<Option<Result<CapturedRepairPlan>>> {
         use crate::repository_state::{derive_materialization, MaterializationRequest};
 
-        let Some(image) = self.capture_repair_base(session)? else {
+        let Some((image, declarations)) = self.capture_repair_base(session)? else {
             return Ok(None);
         };
-        let declarations = match crate::repository_state::validation_declarations_from_image(&image)
-        {
+        let declarations = match declarations {
             Ok(declarations) => declarations,
             Err(error) => {
                 return Ok(Some(Err(
@@ -909,19 +952,20 @@ type EffectiveVirtualPath<'a> = dyn Fn(
     ) -> Result<Option<Vec<u8>>>
     + 'a;
 
-/// Assemble the (possibly overlaid) configuration.
+/// Assemble the configuration of `image` overlaid with `overrides`.
 fn effective_config(
     image: &crate::repository_state::RepositoryImage,
-    effective: &EffectiveVirtualPath<'_>,
-) -> Result<JitConfig> {
+    overrides: &std::collections::BTreeMap<crate::repository_state::VirtualPath, Option<Vec<u8>>>,
+) -> std::result::Result<JitConfig, crate::repository_state::ProducerError> {
     use crate::repository_state::VirtualPath;
-    let config = effective(image, &VirtualPath::CONFIG)?;
-    let templates = effective(image, &VirtualPath::TEMPLATES)?;
-    let invariants = effective(image, &VirtualPath::INVARIANTS)?;
+    let effective = |path: &VirtualPath| match overrides.get(path) {
+        Some(value) => Ok(value.as_deref()),
+        None => image.file_bytes(path),
+    };
     Ok(crate::declarations::assemble_configuration(
-        config.as_deref(),
-        templates.as_deref(),
-        invariants.as_deref(),
+        effective(&VirtualPath::CONFIG)?,
+        effective(&VirtualPath::TEMPLATES)?,
+        effective(&VirtualPath::INVARIANTS)?,
     )?)
 }
 
@@ -1017,39 +1061,37 @@ pub(crate) struct MutationBase {
     pub(crate) image: crate::repository_state::RepositoryImage,
     /// Every issue the listing in `image` states, sorted by id.
     pub(crate) issues: Vec<Issue>,
-    declarations: std::cell::OnceCell<ParsedBaseDeclarations>,
+    declarations: crate::repository_state::DeferredDeclarations,
 }
 
-type ParsedBaseDeclarations = std::result::Result<
-    crate::repository_state::CapturedRepositoryDeclarations,
-    std::sync::Arc<crate::repository_state::DeclarationParseError>,
->;
-
 impl MutationBase {
-    pub(crate) fn new(image: crate::repository_state::RepositoryImage, issues: Vec<Issue>) -> Self {
+    /// The base over `image` and its `issues`, with `config`, the
+    /// configuration assembled from `image`.
+    pub(crate) fn new(
+        image: crate::repository_state::RepositoryImage,
+        issues: Vec<Issue>,
+        config: std::result::Result<JitConfig, crate::repository_state::ProducerError>,
+    ) -> Self {
         Self {
             image,
             issues,
-            declarations: std::cell::OnceCell::new(),
+            declarations: crate::repository_state::DeferredDeclarations::new(
+                crate::repository_state::declarations_with_config,
+                Some(config),
+            ),
         }
     }
 
-    /// The declarations of `image`, parsed on first use so a mutation fails
-    /// on a declaration only when it reads one. Every call returns that one
-    /// parse, its failure included.
+    /// The declarations of `image`, from its [`DeferredDeclarations`].
+    ///
+    /// [`DeferredDeclarations`]: crate::repository_state::DeferredDeclarations
     pub(crate) fn declarations(
         &self,
     ) -> std::result::Result<
         &crate::repository_state::CapturedRepositoryDeclarations,
         std::sync::Arc<crate::repository_state::DeclarationParseError>,
     > {
-        self.declarations
-            .get_or_init(|| {
-                crate::repository_state::declarations_from_image(&self.image)
-                    .map_err(std::sync::Arc::new)
-            })
-            .as_ref()
-            .map_err(std::sync::Arc::clone)
+        self.declarations.get(&self.image)
     }
 }
 
@@ -1057,12 +1099,20 @@ impl MutationBase {
 /// guard, from [`CommandExecutor::capture_mutation_preflight`].
 pub(crate) struct MutationPreflight {
     /// Configuration and candidate issue, or the full mutation base
-    /// when `issues` is present.
+    /// when `base` is present.
     pub(crate) image: crate::repository_state::RepositoryImage,
     /// The issue the request names.
     pub(crate) target: Issue,
-    /// Every listed issue, when the preflight grew to the full base.
-    pub(crate) issues: Option<Vec<Issue>>,
+    /// What the base discovery read, when the preflight grew to the full base.
+    pub(crate) base: Option<PreflightBase>,
+}
+
+/// The parts of a mutation base a grown preflight carries beside its image.
+pub(crate) struct PreflightBase {
+    /// Every listed issue.
+    pub(crate) issues: Vec<Issue>,
+    /// The configuration the base discovery assembled from the image.
+    pub(crate) config: std::result::Result<JitConfig, crate::repository_state::ProducerError>,
 }
 
 /// Request only the references a consuming pass selects.
@@ -1416,38 +1466,6 @@ mod tests {
         .unwrap();
         let executor = crate::commands::test_helpers::setup().with_worktree_paths(paths);
         assert!(executor.validation().validate_branch_drift().is_ok());
-    }
-
-    #[test]
-    fn test_mutation_base_declarations_returns_one_parse_from_every_call() {
-        use crate::test_harness::image::ImageBuilder;
-        let base = |gates: &str| {
-            MutationBase::new(
-                ImageBuilder::new()
-                    .files(&[
-                        (".jit/config.toml", Some("")),
-                        (".jit/gates.toml", Some(gates)),
-                        (".jit/rules.toml", None),
-                    ])
-                    .build(),
-                Vec::new(),
-            )
-        };
-
-        let parsed = base("");
-        assert!(std::ptr::eq(
-            parsed.declarations().unwrap(),
-            parsed.declarations().unwrap()
-        ));
-
-        let unparseable = base("[[gates]\n");
-        let first = unparseable.declarations().err().unwrap();
-        let second = unparseable.declarations().err().unwrap();
-        assert!(matches!(
-            *first,
-            crate::repository_state::DeclarationParseError::Gate(_)
-        ));
-        assert!(std::sync::Arc::ptr_eq(&first, &second));
     }
 
     use super::*;
@@ -2364,7 +2382,7 @@ kind = \"enforced\"
             (BaseCapturePurpose::Repair, ReadMode::Tail),
             (BaseCapturePurpose::Archive, ReadMode::Tail),
         ] {
-            let (image, _) = executor
+            let (image, ..) = executor
                 .capture_proposed_base_inner(
                     session.as_mut(),
                     None,
@@ -2647,7 +2665,7 @@ depends_on = ["planning"]
             .unwrap()
             .expect("a settled capture");
 
-        assert_eq!(preflight.issues.map(|issues| issues.len()), Some(2));
+        assert_eq!(preflight.base.map(|base| base.issues.len()), Some(2));
         assert_eq!(counter.1, 1);
     }
 

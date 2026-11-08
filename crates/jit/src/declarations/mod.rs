@@ -122,7 +122,20 @@ pub fn assemble_configuration(
     templates: Option<&[u8]>,
     invariants: Option<&[u8]>,
 ) -> Result<JitConfig, ConfigurationAssemblyError> {
+    #[cfg(test)]
+    ASSEMBLIES.with(|count| count.set(count.get() + 1));
     ConfigurationDocument::parse(config).assemble(templates, invariants)
+}
+
+#[cfg(test)]
+thread_local! {
+    static ASSEMBLIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// The number of [`assemble_configuration`] calls this thread has made.
+#[cfg(test)]
+pub(crate) fn assemblies_on_this_thread() -> usize {
+    ASSEMBLIES.with(std::cell::Cell::get)
 }
 
 /// A configuration source that failed assembly, named by its file.
