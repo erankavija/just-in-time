@@ -675,9 +675,12 @@
           "short_id": "f487aeef",
           "title": "Enforce the per-test limits and retire the whole-suite budget",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "rework",
           "model_tier": "opus",
-          "tier_reason": "cross-cutting script, self-test, Rust test and prose retirement"
+          "tier_reason": "cross-cutting script, self-test, Rust test and prose retirement",
+          "landed": "48c408716",
+          "gates": "cargo-ci passed on 48c408716; code-review failed: F1 self-test over-limit depends on nextest concurrency (fail-fast, 1 slot); F2 lead-tools/land-one.sh keeps suite-duration retry branch",
+          "production_delta": 0
         },
         {
           "key": "over-limit-tests",
@@ -1081,7 +1084,7 @@
     "ab168296": 0,
     "755964b2": 1,
     "fe3ad1b0": 1,
-    "f487aeef": 1,
+    "f487aeef": 2,
     "0b35be66": 1,
     "afd2d573": 1
   },
