@@ -917,9 +917,10 @@ fn precheck_gates<'a>(
 fn captured_precheck_evidence(
     image: &crate::repository_state::RepositoryImage,
     issue: &Issue,
+    config: &crate::config::JitConfig,
     registry: &crate::declarations::GateRegistry,
 ) -> Result<gate_check::CapturedGateEvidence> {
-    gate_check::captured_gate_evidence(image, issue, &precheck_gates(issue, registry))
+    gate_check::captured_gate_evidence(image, issue, config, &precheck_gates(issue, registry))
 }
 
 fn claims_mutation_guard(
@@ -1190,24 +1191,27 @@ impl RecordedPrechecks {
 
 /// Record `cached`'s precheck runs for `planned`, the captured issue as the
 /// change leaves it, marking each run moved when its inputs changed in
-/// `comparison`'s image since the preflight.
+/// `comparison`'s image, whose configuration is `config`, since the preflight.
+///
+/// The evidence is recomputed only over inputs that image holds unchanged, the
+/// issue record among them, so `planned` is the issue the preflight planned and
+/// the image holds what its prechecks read.
 fn record_captured_prechecks(
     cached: Option<&CachedPrecheckExecution>,
     expected: Option<&gate_check::CapturedGateEvidence>,
     comparison: &gate_check::EvidenceComparison<'_>,
     planned: &Issue,
+    config: &crate::config::JitConfig,
     registry: &crate::declarations::GateRegistry,
 ) -> Result<RecordedPrechecks> {
     let (Some(cached), Some(expected)) = (cached, expected) else {
         return Ok(RecordedPrechecks::default());
     };
     let inputs_moved = expected.evidence != cached.evidence
-        || if cached.evidence.is_broad() {
-            !cached.evidence.matches(comparison)?
-        } else {
-            captured_precheck_evidence(comparison.image(), planned, registry)?.evidence
-                != cached.evidence
-        };
+        || !cached.evidence.matches(comparison)?
+        || !cached.evidence.is_broad()
+            && captured_precheck_evidence(comparison.image(), planned, config, registry)?.evidence
+                != cached.evidence;
     let runs = cached
         .execution
         .runs
@@ -2834,7 +2838,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Publish a manual gate's `status` attested `by`, rebased on a freshly
-    /// captured issue record, gate registry and event log.
+    /// captured issue record, declarations and event log.
     ///
     /// A conflict reopens a session and derives again under a fresh context,
     /// so an attestation's run identity and time are sampled under the write
@@ -2864,11 +2868,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         with_mutation_session(&self.storage, &layout, "manual gate status", |session| {
             let context = production_mutation_context();
             let run_paths = gate_run_record_paths(&context, &issue_id, 0..1);
-            let mut paths = BTreeSet::from([
-                VirtualPath::CONFIG,
-                VirtualPath::GATES,
-                VirtualPath::issue_record(&issue_id),
-            ]);
+            let mut paths = BTreeSet::from(VirtualPath::DECLARATION_FILES);
+            paths.insert(VirtualPath::issue_record(&issue_id));
             paths.extend(run_paths.iter().cloned());
             let base = issue_mutation_capture_budget();
             let budget = crate::repository_state::CaptureBudget {
@@ -2880,7 +2881,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let mut spec = CaptureSpec::new(paths, budget)?;
             spec.discover_tail(VirtualPath::EVENTS)?;
-            let Some(image) = capture_or_retry(session.capture(spec))? else {
+            let Some(image) = capture_discovering(session, spec, |image, spec| {
+                Ok(spec.discover_paths(rule_schema_paths(image)?)?)
+            })?
+            else {
                 return Ok(SessionStep::Retry);
             };
             let issue_path = VirtualPath::issue_record(&issue_id);
@@ -2900,21 +2904,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                     issue.id
                 ));
             }
-            let registry = match image.entry(&VirtualPath::GATES)? {
-                RepositoryEntry::File { content, .. } => {
-                    crate::declarations::parse_gate_registry(content.bytes())
-                        .context("failed to parse captured gate registry")?
-                }
-                RepositoryEntry::Absent => crate::declarations::GateRegistry::default(),
-                _ => return Err(anyhow!("captured gate registry is not an ordinary file")),
-            };
-
+            let declarations = crate::repository_state::declarations_from_image(&image)?;
             let warnings = refuse_foreign_leases_held(
-                crate::repository_state::assemble_config(&image)?.enforcement_mode(),
+                declarations.config().enforcement_mode(),
                 std::slice::from_ref(&issue_id),
                 claims_guard.as_ref(),
             )?;
-            let derived = derive_captured_issue_mutation(issue, &registry, &request, &context)?;
+            let derived =
+                derive_captured_issue_mutation(issue, declarations.gates(), &request, &context)?;
             let plan = finalize(&layout, &image, &context, &derived.intents, None)?;
             Ok(SessionStep::Apply(plan, warnings))
         })
@@ -3139,11 +3136,41 @@ impl<S: IssueStore> CommandExecutor<S> {
                 None => return Ok(None),
             },
         };
+        let validates_repository = planned.iter().any(|issue| {
+            precheck_gates(issue, registry).iter().any(|gate| {
+                matches!(
+                    gate.checker,
+                    Some(crate::declarations::GateChecker::RepositoryValidation)
+                )
+            })
+        });
+        let validated_issues = match validates_repository {
+            true => validate::validation_issues(&image),
+            false => Vec::new(),
+        };
+        let Some(image) = grow_discovering(session, image, |image, spec| {
+            planned.iter().try_for_each(|issue| {
+                gate_check::discover_gate_inputs(
+                    image,
+                    spec,
+                    issue,
+                    &validated_issues,
+                    &precheck_gates(issue, registry),
+                    &config,
+                )
+            })
+        })?
+        else {
+            return Ok(None);
+        };
+        let history = validates_repository
+            .then(|| validate::RepositoryHistory::read(session))
+            .transpose()?;
         let issues = std::sync::Arc::new(crate::domain::queries::IndexedIssues::new(
             captured_active_issues(&image)?,
         ));
         let repository = std::cell::OnceCell::new();
-        let validation = std::sync::Arc::new(gate_check::SharedValidation::default());
+        let validation = std::sync::Arc::new(gate_check::SharedValidation::new(history));
         planned
             .into_iter()
             .map(|issue| {
@@ -3151,6 +3178,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     captured: gate_check::captured_gate_evidence_sharing(
                         &image,
                         &issue,
+                        &config,
                         &precheck_gates(&issue, registry),
                         &repository,
                     )?,
@@ -3303,13 +3331,16 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .transpose()?
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(base) = self.capture_mutation_base(
+            let Some(base) = self.capture_precheck_mutation_base(
                 session.as_mut(),
                 &precheck_run_paths,
                 match precheck {
                     Some(_) => std::slice::from_ref(&request.issue_id),
                     None => &[],
                 },
+                precheck
+                    .map(|precheck| std::slice::from_ref(&precheck.issue))
+                    .unwrap_or_default(),
             )?
             else {
                 return Ok(AttemptOutcome::Retry);
@@ -3352,6 +3383,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 precheck.map(|precheck| &precheck.captured),
                 &gate_check::EvidenceComparison::new(image),
                 &projected.issue,
+                graph.declarations.config(),
                 &graph.declarations.gates,
             )?;
             if recorded.refused {
@@ -3492,10 +3524,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .flatten();
 
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(base) = self.capture_mutation_base(
+            let Some(base) = self.capture_precheck_mutation_base(
                 session.as_mut(),
                 &precheck_run_paths,
                 std::slice::from_ref(request.issue_id()),
+                precheck
+                    .as_ref()
+                    .map(|precheck| std::slice::from_ref(&precheck.issue))
+                    .unwrap_or_default(),
             )?
             else {
                 return Ok(AttemptOutcome::Retry);
@@ -3521,6 +3557,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 precheck.as_ref().map(|precheck| &precheck.captured),
                 &gate_check::EvidenceComparison::new(image),
                 &issue,
+                declarations.config(),
                 &declarations.gates,
             )?;
             if recorded.refused {
@@ -4352,8 +4389,14 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
             .iter()
             .find(|issue| &issue.id == issue_id)
             .unwrap();
-        let registry = &base.declarations().unwrap().gates;
-        captured_precheck_evidence(&base.image, issue, registry).unwrap()
+        let declarations = base.declarations().unwrap();
+        captured_precheck_evidence(
+            &base.image,
+            issue,
+            declarations.config(),
+            &declarations.gates,
+        )
+        .unwrap()
     }
 
     fn prior_precheck_run(issue_id: &IssueId) -> crate::domain::GateRunResult {
@@ -4815,28 +4858,6 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
         );
 
         assert_ne!(
-            capture_precheck_evidence(&executor, &issue_id).evidence,
-            before
-        );
-    }
-
-    #[test]
-    fn test_precheck_evidence_excludes_document_content_its_mutation_base_did_not_capture() {
-        use crate::storage::IssueStore;
-        let storage = crate::storage::InMemoryStorage::new();
-        let issue_id = seed_precheck_evidence(&storage);
-        let mut issue = storage.load_issue(&issue_id).unwrap();
-        issue
-            .documents
-            .push(crate::test_utils::document_reference("dev/notes.md"));
-        crate::commands::test_helpers::seed_issue(&storage, issue);
-        storage.add_worktree_file("dev/notes.md", "captured notes");
-        let executor = crate::commands::test_helpers::memory_executor(storage.clone());
-        let before = capture_precheck_evidence(&executor, &issue_id).evidence;
-
-        storage.add_worktree_file("dev/notes.md", "mutated notes");
-
-        assert_eq!(
             capture_precheck_evidence(&executor, &issue_id).evidence,
             before
         );

@@ -87,28 +87,62 @@ struct CapturedGateExecution<'a> {
     gate: &'a crate::declarations::GateDefinition,
     runs: &'a [GateRunResult],
     prompt: Option<&'a str>,
-    /// The validation report of `image` its built-in checkers share.
+    /// The validation reports of `image` its built-in checkers share.
     validation: &'a SharedValidation,
 }
 
 /// What a batch of built-in checkers judges, each computed on first use and
 /// shared by every checker run in the batch: the report of the batch's
 /// captured image under its configuration, which each checker selects its
-/// findings from, and the whole live repository's judgement, taken once per
-/// batch. Gate-recency rules in either evaluate at the time of its first use.
+/// findings from, and the whole-repository judgement of that image with
+/// `history`, the event log read in the session that captured it, taken once
+/// per batch. Gate-recency rules in either evaluate at the time of its first
+/// use.
 #[derive(Default)]
 pub(super) struct SharedValidation {
+    history: Option<super::validate::RepositoryHistory>,
     captured: std::sync::OnceLock<crate::validation::ValidationReport>,
-    live: std::sync::OnceLock<std::result::Result<Judgement, std::sync::Arc<anyhow::Error>>>,
+    whole: std::sync::OnceLock<std::result::Result<Judgement, std::sync::Arc<anyhow::Error>>>,
 }
 
 /// A built-in checker's findings and whether they fail its gate.
 type Judgement = (Vec<GateFinding>, bool);
 
 impl SharedValidation {
-    fn live_judgement(&self, judge: impl FnOnce() -> Result<Judgement>) -> Result<Judgement> {
-        self.live
-            .get_or_init(|| judge().map_err(std::sync::Arc::new))
+    /// Reports over a batch's image whose whole-repository judgement reads
+    /// `history`.
+    pub(super) fn new(history: Option<super::validate::RepositoryHistory>) -> Self {
+        Self {
+            history,
+            ..Self::default()
+        }
+    }
+
+    fn whole_judgement(
+        &self,
+        image: &crate::repository_state::RepositoryImage,
+        config: &crate::config::JitConfig,
+    ) -> Result<Judgement> {
+        self.whole
+            .get_or_init(|| {
+                (|| {
+                    let history = self
+                        .history
+                        .as_ref()
+                        .ok_or_else(|| anyhow!("repository validation has no captured history"))?;
+                    let captured =
+                        crate::validation::CapturedValidation::with_config(image, config.clone());
+                    let inputs = crate::validation::ReportInputs {
+                        now: chrono::Utc::now(),
+                        history: Some(super::validate::history_verdicts(&captured, history)?),
+                    };
+                    selected_gate_findings(
+                        &crate::validation::report(&captured, &inputs),
+                        &crate::validation::report::Selection::Whole,
+                    )
+                })()
+                .map_err(std::sync::Arc::new)
+            })
             .clone()
             .map_err(|error| anyhow!("{error:#}"))
     }
@@ -325,22 +359,6 @@ fn captured_bound_issue(
         .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()).into())
 }
 
-fn captured_gate_registry(
-    image: &crate::repository_state::RepositoryImage,
-) -> Result<crate::declarations::GateRegistry> {
-    use crate::repository_state::{RepositoryEntry, VirtualPath};
-
-    let path = VirtualPath::GATES;
-    match image.entry(&path)? {
-        RepositoryEntry::File { content, .. } => {
-            crate::declarations::parse_gate_registry(content.bytes())
-                .context("failed to parse captured gate registry")
-        }
-        RepositoryEntry::Absent => Ok(crate::declarations::GateRegistry::default()),
-        _ => Err(anyhow!("captured .jit/gates.toml is not a regular file")),
-    }
-}
-
 fn captured_direct_dependency_issues(
     image: &crate::repository_state::RepositoryImage,
     issue: &Issue,
@@ -363,6 +381,80 @@ fn checker_needs_validation_image(checker: &crate::declarations::GateChecker) ->
             | crate::declarations::GateChecker::LabelTargetValidation { .. }
             | crate::declarations::GateChecker::RuleValidation { .. }
     )
+}
+
+/// Add to `spec` what evaluating `gates` on `issue` reads from `image` beside
+/// its base: the dependency records a non-broad gate reads, an exec checker's
+/// documents and prompt file, the runs a history-consuming checker reads, and
+/// the history repository validation judges. `issues` holds the image's issues
+/// and `config` its configuration.
+pub(super) fn discover_gate_inputs(
+    image: &crate::repository_state::RepositoryImage,
+    spec: &mut crate::repository_state::CaptureSpec,
+    issue: &Issue,
+    issues: &[Issue],
+    gates: &[&crate::declarations::GateDefinition],
+    config: &crate::config::JitConfig,
+) -> Result<()> {
+    use crate::declarations::GateChecker;
+    use crate::repository_state::VirtualPath;
+
+    let checkers = gates
+        .iter()
+        .filter(|gate| gate.mode == GateMode::Auto)
+        .filter_map(|gate| gate.checker.as_ref())
+        .collect::<Vec<_>>();
+    if gates.iter().any(|gate| !super::is_broad_builtin_gate(gate)) {
+        spec.discover_paths(
+            issue
+                .dependencies
+                .iter()
+                .map(VirtualPath::issue_record)
+                .collect::<Vec<_>>(),
+        )?;
+    }
+    if checkers
+        .iter()
+        .any(|checker| matches!(checker, GateChecker::Exec { .. }))
+    {
+        super::document::discover_issue_documents(image, spec, issue, config)?;
+    }
+    spec.discover_paths(
+        checkers
+            .iter()
+            .filter_map(|checker| match checker {
+                GateChecker::Exec {
+                    pass_context: true,
+                    prompt_file: Some(path),
+                    ..
+                } => Some(path),
+                _ => None,
+            })
+            .map(|path| {
+                image
+                    .layout()
+                    .classify_repository_relative(path)
+                    .map_err(|_| anyhow!("prompt_file '{}' resolves outside the repository", path))
+            })
+            .collect::<Result<Vec<_>>>()?,
+    )?;
+    if checkers
+        .iter()
+        .any(|checker| super::checker_consumes_run_history(checker))
+    {
+        spec.discover_paths(
+            super::named_gate_run_records(issue)
+                .map(|(_, _, path)| path)
+                .collect::<Vec<_>>(),
+        )?;
+    }
+    if checkers
+        .iter()
+        .any(|checker| matches!(checker, GateChecker::RepositoryValidation))
+    {
+        super::validate::discover_repository_history(image, spec, issues)?;
+    }
+    Ok(())
 }
 
 fn required_automated_gate<'a>(
@@ -529,16 +621,19 @@ fn captured_gate_runs(
 }
 
 /// Capture the evidence evaluating `gates` on `issue` reads from `image`,
-/// refusing a prompt file over [`MAX_PROMPT_FILE_SIZE`].
+/// whose configuration is `config`, refusing a prompt file over
+/// [`MAX_PROMPT_FILE_SIZE`].
 ///
-/// An automatic exec checker's document references contribute only the
-/// entries and pinned documents `image`'s capture spec requests.
+/// An automatic exec checker contributes every document
+/// [`captured_issue_documents`](super::document::captured_issue_documents)
+/// discovers in `image`.
 pub(super) fn captured_gate_evidence(
     image: &crate::repository_state::RepositoryImage,
     issue: &Issue,
+    config: &crate::config::JitConfig,
     gates: &[&crate::declarations::GateDefinition],
 ) -> Result<CapturedGateEvidence> {
-    captured_gate_evidence_sharing(image, issue, gates, &std::cell::OnceCell::new())
+    captured_gate_evidence_sharing(image, issue, config, gates, &std::cell::OnceCell::new())
 }
 
 /// [`captured_gate_evidence`] whose repository-wide part, when a gate is
@@ -546,6 +641,7 @@ pub(super) fn captured_gate_evidence(
 pub(super) fn captured_gate_evidence_sharing(
     image: &crate::repository_state::RepositoryImage,
     issue: &Issue,
+    config: &crate::config::JitConfig,
     gates: &[&crate::declarations::GateDefinition],
     repository: &std::cell::OnceCell<std::sync::Arc<RepositoryEvidence>>,
 ) -> Result<CapturedGateEvidence> {
@@ -571,8 +667,7 @@ pub(super) fn captured_gate_evidence_sharing(
         .iter()
         .any(|(_, checker)| matches!(checker, GateChecker::Exec { .. }))
     {
-        issue
-            .documents
+        super::document::captured_issue_documents(image, issue, config)?
             .iter()
             .map(crate::document::DocumentReferenceRequests::for_reference)
             .collect::<std::result::Result<Vec<_>, _>>()?
@@ -621,7 +716,6 @@ pub(super) fn captured_gate_evidence_sharing(
         documents
             .iter()
             .filter_map(|requests| requests.worktree())
-            .filter(|path| image.capture_spec().contains_path(path))
             .cloned(),
     );
     paths.extend(prompts.iter().map(|(_, path, _)| path.clone()));
@@ -853,6 +947,9 @@ impl<S: IssueStore> GateOps<'_, S> {
 impl<S: IssueStore> CommandExecutor<S> {
     /// Capture the resolved issue and the inputs `gate_key` evaluates, with
     /// the configuration, issue, gate registry and gate the capture resolved.
+    ///
+    /// The declarations come from the image's own declaration files; an
+    /// unloadable rules source is left for a checker that reads rules to judge.
     fn capture_gate_evaluation_image(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
@@ -876,84 +973,71 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         let issues = Vec::from_iter(captured_issue_record(&bound, issue_id)?);
         let target_id = super::require_issue_in_capture(&issues, issue_id)?;
-        let mut paths = vec![
-            VirtualPath::CONFIG,
+        let mut paths = VirtualPath::DECLARATION_FILES.to_vec();
+        paths.extend([
             VirtualPath::issue_record(&target_id),
-            VirtualPath::GATES,
             VirtualPath::GATE_RUNS,
-        ];
+        ]);
         paths.extend(run_paths.iter().cloned());
         let mut spec = bound.capture_spec().clone();
         spec.discover_paths(paths)?;
         spec.discover_tail(VirtualPath::EVENTS)?;
-        let Some(initial) = capture_or_retry(session.extend(bound, spec))? else {
+        let Some(extended) = capture_or_retry(session.extend(bound, spec))? else {
+            return Ok(None);
+        };
+        let Some(initial) = super::grow_discovering(session, extended, |image, spec| {
+            Ok(spec.discover_paths(super::rule_schema_paths(image)?)?)
+        })?
+        else {
             return Ok(None);
         };
         let issue = captured_bound_issue(&initial, &target_id)?;
-        let registry = captured_gate_registry(&initial)?;
+        let crate::repository_state::CapturedRepositoryDeclarations {
+            config,
+            gates: registry,
+            ..
+        } = crate::repository_state::validation_declarations_with_config(
+            &initial,
+            crate::repository_state::assemble_config(&initial),
+        )?;
         let gate = required_automated_gate(&issue, &registry, gate_key)?.clone();
         let checker = gate
             .checker
             .as_ref()
             .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", gate_key))?;
-        let bind = |image,
-                    config: std::result::Result<
-            crate::config::JitConfig,
-            crate::repository_state::ProducerError,
-        >|
-         -> Result<BoundGateEvaluation> {
-            Ok(BoundGateEvaluation {
-                image,
-                config: config?,
-                issue: issue.clone(),
-                registry: registry.clone(),
-                gate: gate.clone(),
-            })
+        let (image, config) = if checker_needs_validation_image(checker) {
+            match self.capture_proposed_base(
+                session,
+                &BTreeMap::new(),
+                run_paths,
+                Some(super::validate::GrowthStart {
+                    image: initial,
+                    config: Some(Ok(config)),
+                }),
+            )? {
+                Some((image, config)) => (image, config?),
+                None => return Ok(None),
+            }
+        } else {
+            (initial, config)
         };
-        if checker_needs_validation_image(checker) {
-            return self
-                .capture_proposed_base(session, &BTreeMap::new(), run_paths, Some(initial.into()))?
-                .map(|(image, config)| bind(image, config))
-                .transpose();
-        }
-        let layout = initial.layout().clone();
-        let image = super::grow_discovering(session, initial, |_, spec| {
-            spec.discover_paths(
-                issue
-                    .dependencies
-                    .iter()
-                    .map(VirtualPath::issue_record)
-                    .collect::<Vec<_>>(),
-            )?;
-            if matches!(checker, GateChecker::Exec { .. }) {
-                super::validate::discover_document_references(&issue.documents, spec)?;
-            }
-            if let GateChecker::Exec {
-                pass_context: true,
-                prompt_file: Some(path),
-                ..
-            } = checker
-            {
-                let prompt = layout.classify_repository_relative(path).map_err(|_| {
-                    anyhow!("prompt_file '{}' resolves outside the repository", path)
-                })?;
-                spec.discover_paths([prompt])?;
-            }
-            if super::checker_consumes_run_history(checker) {
-                spec.discover_paths(
-                    super::named_gate_run_records(&issue)
-                        .map(|(_, _, path)| path)
-                        .collect::<Vec<_>>(),
-                )?;
-            }
-            Ok(())
-        })?;
-        image
-            .map(|image| {
-                let config = crate::repository_state::assemble_config(&image);
-                bind(image, config)
-            })
-            .transpose()
+        let issues = match checker {
+            GateChecker::RepositoryValidation => super::validate::validation_issues(&image),
+            _ => Vec::new(),
+        };
+        let Some(image) = super::grow_discovering(session, image, |image, spec| {
+            discover_gate_inputs(image, spec, &issue, &issues, &[&gate], &config)
+        })?
+        else {
+            return Ok(None);
+        };
+        Ok(Some(BoundGateEvaluation {
+            image,
+            config,
+            issue,
+            registry,
+            gate,
+        }))
     }
 }
 
@@ -1013,7 +1097,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         let mutation = super::production_mutation_context();
         let run_id = mutation.gate_run_id_at(0);
         let run_paths = super::gate_run_record_paths(&mutation, issue_id, 0..1);
-        let (bound, issues, captured, input_warnings) =
+        let (bound, issues, captured, history, input_warnings) =
             with_mutation_attempts("gate evaluation inputs", || {
                 let claims_guard =
                     super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
@@ -1044,11 +1128,23 @@ impl<S: IssueStore> GateOps<'_, S> {
                             .collect()
                     },
                 );
-                let captured = captured_gate_evidence(&bound.image, &bound.issue, &[&bound.gate])?;
+                let captured = captured_gate_evidence(
+                    &bound.image,
+                    &bound.issue,
+                    &bound.config,
+                    &[&bound.gate],
+                )?;
+                let history = matches!(
+                    bound.gate.checker,
+                    Some(crate::declarations::GateChecker::RepositoryValidation)
+                )
+                .then(|| super::validate::RepositoryHistory::read(session.as_mut()))
+                .transpose()?;
                 Ok(AttemptOutcome::Done((
                     bound,
                     issues,
                     captured,
+                    history,
                     input_warnings,
                 )))
             })?;
@@ -1089,7 +1185,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 gate,
                 runs: &captured.runs,
                 prompt: captured.prompts.get(&gate.key).map(String::as_str),
-                validation: &SharedValidation::default(),
+                validation: &SharedValidation::new(history.clone()),
             })?,
         };
         result.inputs_digest = digest;
@@ -1128,6 +1224,7 @@ impl<S: IssueStore> GateOps<'_, S> {
             let final_captured = captured_gate_evidence(
                 &final_bound.image,
                 &final_bound.issue,
+                &final_bound.config,
                 &[&final_bound.gate],
             )?;
             result.evaluation_stability = if final_captured.evidence == captured.evidence
@@ -1213,9 +1310,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Execute a built-in checker against one exact repository image,
-    /// selecting its findings from `validation`'s report of that image.
-    /// [`crate::declarations::GateChecker::RepositoryValidation`] instead runs the computation behind
-    /// `jit validate`, which captures the evidence it needs from the live repository.
+    /// selecting its findings from `validation`'s reports of that image.
     fn execute_builtin_checker_with_repository_view(
         &self,
         subject: GateRunSubject<'_>,
@@ -1253,11 +1348,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             selected_gate_findings(validation.report(repository_image, config), &selection)
         };
         let judged: Result<(Vec<GateFinding>, bool)> = match checker {
-            GateChecker::RepositoryValidation => validation.live_judgement(|| {
-                self.validation()
-                    .validate_repository_report()
-                    .and_then(|report| selected_gate_findings(&report, &Selection::Whole))
-            }),
+            GateChecker::RepositoryValidation => {
+                validation.whole_judgement(repository_image, config)
+            }
             GateChecker::IssueValidation => select_over_image(Selection::Issue(issue_id.into())),
             GateChecker::RuleValidation { rule } => select_over_image(Selection::Rule {
                 issue: issue_id.into(),
@@ -1475,8 +1568,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             } => repo_root.join(subdir),
             _ => repo_root,
         };
-        let documents = self.documents().issue_documents(input.issue)?;
-        let context = self.build_captured_gate_context(checker, &input, &documents)?;
         let subject = GateRunSubject {
             run_id: input.run_id,
             gate_key: &input.gate.key,
@@ -1485,6 +1576,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         match checker {
             crate::declarations::GateChecker::Exec { .. } => {
+                let documents = super::document::captured_issue_documents(
+                    input.image,
+                    input.issue,
+                    input.config,
+                )?;
+                let context = self.build_captured_gate_context(checker, &input, &documents)?;
                 let head = self
                     .require_worktree_paths()?
                     .code_checkout()
@@ -1766,6 +1863,26 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    /// The image and history an evaluation of `issue_id`'s repository
+    /// validation gate captures in one session.
+    fn repository_validation_inputs<S: IssueStore + crate::storage::RepositoryStateStore>(
+        executor: &CommandExecutor<S>,
+        issue_id: &IssueId,
+        gate_key: &GateKey,
+    ) -> (
+        crate::repository_state::RepositoryImage,
+        crate::commands::validate::RepositoryHistory,
+    ) {
+        let layout = executor.require_layout().unwrap();
+        let mut session = executor.storage().open_mutation_session(layout).unwrap();
+        let bound = executor
+            .capture_gate_evaluation_image(session.as_mut(), issue_id, gate_key, &[])
+            .unwrap()
+            .unwrap();
+        let history = crate::commands::validate::RepositoryHistory::read(session.as_mut()).unwrap();
+        (bound.image, history)
     }
 
     struct FailNthPublication {
@@ -3109,7 +3226,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .capture_gate_evaluation_image(session.as_mut(), issue_id, gate_key, &run_paths)
             .unwrap()
             .unwrap();
-        super::captured_gate_evidence(&bound.image, &bound.issue, &[&bound.gate])
+        super::captured_gate_evidence(&bound.image, &bound.issue, &bound.config, &[&bound.gate])
             .unwrap()
             .evidence
     }
@@ -3412,13 +3529,17 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let (repo, executor) =
             crate::test_utils::setup_unsynced_test_repo_with_config(&config).unwrap();
         let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
-        let image = validation_image(&executor);
         change(repo.path(), &issue_id);
         let validate = executor
             .validation()
             .validate_repository_report()
             .map(|report| report.structural_failure.is_none() && !report.rule_report().has_errors())
             .unwrap();
+        let (image, history) = repository_validation_inputs(
+            &executor,
+            &issue_id,
+            &"not-a-reserved-repository-key".parse().unwrap(),
+        );
         let run = executor
             .execute_builtin_checker_with_repository_view(
                 GateRunSubject {
@@ -3430,7 +3551,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 &GateChecker::RepositoryValidation,
                 &image,
                 &crate::repository_state::assemble_config(&image).unwrap(),
-                &super::SharedValidation::default(),
+                &super::SharedValidation::new(Some(history)),
             )
             .unwrap();
         (validate, run)
@@ -3464,6 +3585,47 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 run.stderr
             );
         }
+    }
+
+    #[test]
+    fn test_repository_validation_checker_judges_its_captured_image_without_recapturing() {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) =
+            crate::test_utils::setup_unsynced_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
+        let (image, history) = repository_validation_inputs(
+            &executor,
+            &issue_id,
+            &"not-a-reserved-repository-key".parse().unwrap(),
+        );
+        for change in [
+            repeat_last_event,
+            add_dangling_dependency,
+            respell_created_at,
+        ] {
+            change(repo.path(), &issue_id);
+        }
+
+        let run = executor
+            .execute_builtin_checker_with_repository_view(
+                GateRunSubject {
+                    run_id: &crate::test_utils::gate_run_id(1),
+                    gate_key: &"not-a-reserved-repository-key".parse().unwrap(),
+                    issue_id: &issue_id,
+                    stage: GateStage::Postcheck,
+                },
+                &GateChecker::RepositoryValidation,
+                &image,
+                &crate::repository_state::assemble_config(&image).unwrap(),
+                &super::SharedValidation::new(Some(history)),
+            )
+            .unwrap();
+
+        assert_eq!(run.status, GateRunStatus::Passed, "{}", run.stdout);
     }
 
     #[test]
@@ -3672,7 +3834,11 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "## Success Criteria\n\n- [hard] REQ-99: uncovered\n".to_string(),
         );
         unrelated.labels = vec!["type:epic".to_string()];
-        unrelated.dependencies = vec![rule_gated.clone(), scope_gated.clone(), repository_gated];
+        unrelated.dependencies = vec![
+            rule_gated.clone(),
+            scope_gated.clone(),
+            repository_gated.clone(),
+        ];
         seed_issue(&executor.storage, unrelated);
         let image = validation_image(&executor);
         let validate = crate::validation::report(
@@ -3682,16 +3848,21 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 history: None,
             },
         );
-        // The repository checker judges its own history-reading capture, not
-        // `image`; its expected side is that capture of the same unchanged
-        // repository, whose findings match the report over `image`.
+        // The repository checker judges its evaluation's capture, which adds
+        // the history `jit validate` reads to the same unchanged repository.
         let whole = executor.validation().validate_repository_report().unwrap();
         assert_eq!(whole.rule_report(), validate.rule_report());
+        let (repository_image, history) = repository_validation_inputs(
+            &executor,
+            &repository_gated,
+            &"repository-gate".parse().unwrap(),
+        );
         let cases = [
             (
                 GateChecker::IssueValidation,
                 child_id.clone(),
                 validate.select(&Selection::Issue((&child_id).into())),
+                (&image, super::SharedValidation::default()),
             ),
             (
                 rule,
@@ -3700,20 +3871,26 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     issue: (&rule_gated).into(),
                     rule: "coverage-preview".to_string(),
                 }),
+                (&image, super::SharedValidation::default()),
             ),
             (
                 label_target,
                 scope_gated,
                 validate.select(&Selection::Scope((&container_id).into())),
+                (&image, super::SharedValidation::default()),
             ),
             (
                 GateChecker::RepositoryValidation,
                 child_id,
                 whole.select(&Selection::Whole),
+                (
+                    &repository_image,
+                    super::SharedValidation::new(Some(history)),
+                ),
             ),
         ];
 
-        for (checker, gated, selected) in cases {
+        for (checker, gated, selected, (image, validation)) in cases {
             let (selected, failure) = match selected {
                 Ok(selected) => (selected, None),
                 Err(error) => {
@@ -3736,9 +3913,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                         stage: GateStage::Postcheck,
                     },
                     &checker,
-                    &image,
-                    &crate::repository_state::assemble_config(&image).unwrap(),
-                    &super::SharedValidation::default(),
+                    image,
+                    &crate::repository_state::assemble_config(image).unwrap(),
+                    &validation,
                 )
                 .unwrap();
             let reported = run
@@ -3809,7 +3986,11 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 label_namespace: "target".to_string(),
             },
         ] {
-            let image = validation_image(&executor);
+            let (image, history) = repository_validation_inputs(
+                &executor,
+                &issue_id,
+                &"not-a-reserved-repository-key".parse().unwrap(),
+            );
             let result = executor
                 .execute_builtin_checker_with_repository_view(
                     GateRunSubject {
@@ -3821,7 +4002,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     &checker,
                     &image,
                     &crate::repository_state::assemble_config(&image).unwrap(),
-                    &super::SharedValidation::default(),
+                    &super::SharedValidation::new(Some(history)),
                 )
                 .unwrap();
 
@@ -5043,6 +5224,191 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(
             executor.storage.load_issue(&issue_id).unwrap().state,
             State::Ready
+        );
+    }
+
+    /// A file repository declaring one issue-scoped area, with an issue owning
+    /// one document there by location; returns that document's path.
+    fn seed_owned_document_repository() -> (
+        tempfile::TempDir,
+        CommandExecutor<JsonFileStorage>,
+        IssueId,
+        String,
+    ) {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}\n[documentation]\nissue_scoped_areas = [\"dev/active\"]\n",
+            taxonomy.config_fragment()
+        );
+        let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
+        let issue_id = seed_file_repository(&executor, &taxonomy, "Test", "Test");
+        let directory = executor
+            .documents()
+            .resolve_issue_artifact_directory(&issue_id, "dev/active")
+            .unwrap()
+            .directory;
+        let document = format!("{directory}/notes.md");
+        std::fs::create_dir_all(repo.path().join(&directory)).unwrap();
+        std::fs::write(repo.path().join(&document), "# Notes\n").unwrap();
+        (repo, executor, issue_id, document)
+    }
+
+    #[test]
+    fn test_capture_gate_evaluation_image_derives_owned_documents_from_its_capture() {
+        use crate::storage::RepositoryStateStore;
+
+        let (repo, executor, issue_id, document) = seed_owned_document_repository();
+        let gate_key: GateKey = "owned-docs".parse().unwrap();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            &gate_key,
+            "Owned docs",
+            "true".to_string(),
+            None,
+        );
+        let layout = executor.require_layout().unwrap();
+        let mut session = executor.storage.open_mutation_session(layout).unwrap();
+        let bound = executor
+            .capture_gate_evaluation_image(session.as_mut(), &issue_id, &gate_key, &[])
+            .unwrap()
+            .unwrap();
+        drop(session);
+        let added = document.replace("notes.md", "added.md");
+        std::fs::write(repo.path().join(&added), "# Added\n").unwrap();
+
+        let paths = crate::commands::document::captured_issue_documents(
+            &bound.image,
+            &bound.issue,
+            &bound.config,
+        )
+        .unwrap()
+        .into_iter()
+        .map(|document| document.path)
+        .collect::<Vec<_>>();
+
+        assert_eq!(paths, vec![document]);
+    }
+
+    #[test]
+    fn test_capture_gate_evaluation_image_derives_owned_trees_wider_and_deeper_than_its_budget() {
+        use crate::storage::RepositoryStateStore;
+
+        let (repo, executor, issue_id, document) = seed_owned_document_repository();
+        let directory = document.trim_end_matches("/notes.md").to_string();
+        let budget = super::super::validate::MUTATION_CAPTURE_BUDGET;
+        let deep =
+            (0..budget.max_depth).fold(directory.clone(), |path, level| format!("{path}/d{level}"));
+        std::fs::create_dir_all(repo.path().join(&deep)).unwrap();
+        std::fs::write(repo.path().join(&deep).join("deep.md"), "# Deep\n").unwrap();
+        let wide = (0..budget.max_listings)
+            .map(|index| format!("{directory}/w{index}/wide.md"))
+            .collect::<Vec<_>>();
+        for path in &wide {
+            let path = repo.path().join(path);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, "# Wide\n").unwrap();
+        }
+        let gate_key: GateKey = "owned-docs".parse().unwrap();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            &gate_key,
+            "Owned docs",
+            "true".to_string(),
+            None,
+        );
+        let layout = executor.require_layout().unwrap();
+        let mut session = executor.storage.open_mutation_session(layout).unwrap();
+
+        let bound = executor
+            .capture_gate_evaluation_image(session.as_mut(), &issue_id, &gate_key, &[])
+            .unwrap()
+            .unwrap();
+
+        let paths = crate::commands::document::captured_issue_documents(
+            &bound.image,
+            &bound.issue,
+            &bound.config,
+        )
+        .unwrap()
+        .into_iter()
+        .map(|document| document.path)
+        .collect::<std::collections::BTreeSet<_>>();
+        let expected = wide
+            .into_iter()
+            .chain([document, format!("{deep}/deep.md")])
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(paths, expected);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_check_gate_records_inputs_moved_when_its_checker_changes_an_owned_document() {
+        let (_repo, executor, issue_id, document) = seed_owned_document_repository();
+        let gate_key: GateKey = "owned-docs".parse().unwrap();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            &gate_key,
+            "Owned docs",
+            format!("printf changed > {document}"),
+            None,
+        );
+
+        let run = executor.gates().check_gate(&issue_id, &gate_key).unwrap();
+
+        assert_eq!(run.status, GateRunStatus::Passed, "{}", run.stderr);
+        assert_eq!(
+            run.evaluation_stability,
+            crate::domain::GateEvaluationStability::InputsMoved
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_claim_records_a_moved_precheck_run_when_its_checker_changes_an_owned_document() {
+        let (_repo, executor, issue_id, document) = seed_owned_document_repository();
+        let gate_key: GateKey = "owned-docs".parse().unwrap();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            &gate_key,
+            "Owned docs",
+            format!("printf changed > {document}"),
+            None,
+        );
+        executor
+            .gates()
+            .update_gate(
+                &gate_key,
+                GateUpdate {
+                    stage: Some(GateStage::Precheck),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        crate::test_utils::transition_issue(&executor, &issue_id, State::Ready).unwrap();
+
+        executor
+            .issues()
+            .claim_issue(
+                &IssueIdPrefix::from(&issue_id),
+                "agent:worker".parse().unwrap(),
+            )
+            .unwrap();
+
+        let runs = executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .into_iter()
+            .filter(|run| run.gate_key == gate_key)
+            .collect::<Vec<_>>();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(
+            runs[0].evaluation_stability,
+            crate::domain::GateEvaluationStability::InputsMoved
         );
     }
 

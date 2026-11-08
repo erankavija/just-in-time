@@ -279,16 +279,15 @@ const GATE_PRESET_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
 
 fn captured_gate_preset_fixed_paths() -> Vec<crate::repository_state::VirtualPath> {
     use crate::repository_state::VirtualPath;
-    vec![
-        VirtualPath::CONFIG,
-        VirtualPath::INDEX,
-        VirtualPath::INVARIANTS,
-        VirtualPath::RULES,
-        VirtualPath::GATES,
-        VirtualPath::CONFIG_DIR,
-        VirtualPath::GATE_PRESETS,
-        VirtualPath::ISSUES,
-    ]
+    VirtualPath::DECLARATION_FILES
+        .into_iter()
+        .chain([
+            VirtualPath::INDEX,
+            VirtualPath::CONFIG_DIR,
+            VirtualPath::GATE_PRESETS,
+            VirtualPath::ISSUES,
+        ])
+        .collect()
 }
 
 fn capture_gate_preset_image(
@@ -340,19 +339,6 @@ fn capture_gate_preset_image(
         return Ok(None);
     };
     Ok(Some(image))
-}
-
-fn captured_gate_registry(
-    image: &crate::repository_state::RepositoryImage,
-) -> Result<crate::declarations::GateRegistry> {
-    use crate::repository_state::{RepositoryEntry, VirtualPath};
-    match image.entry(&VirtualPath::GATES)? {
-        RepositoryEntry::File { content, .. } => {
-            crate::declarations::parse_gate_registry(content.bytes()).map_err(Into::into)
-        }
-        RepositoryEntry::Absent => Ok(crate::declarations::GateRegistry::default()),
-        _ => Err(anyhow!("captured gate registry is not an ordinary file")),
-    }
 }
 
 fn captured_gate_preset_issue(
@@ -1495,7 +1481,12 @@ impl<S: IssueStore> GateOps<'_, S> {
                 if issue.gates_required.is_empty() {
                     return Err(anyhow!("Issue has no gates to create preset from"));
                 }
-                let registry = captured_gate_registry(&image)?;
+                // An unloadable rules source does not concern a preset of gates.
+                let declarations = crate::repository_state::validation_declarations_with_config(
+                    &image,
+                    crate::repository_state::assemble_config(&image),
+                )?;
+                let registry = declarations.gates();
                 let gates = issue
                     .gates_required
                     .iter()

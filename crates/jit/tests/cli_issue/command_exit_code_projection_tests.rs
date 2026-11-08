@@ -497,26 +497,33 @@ fn invoke_gate_evaluate_many_mutation_lock_timeout(json: bool) -> Vec<Output> {
     vec![output]
 }
 
-/// `gate evaluate-many` whose document read meets a redo record that appeared
-/// after the gate's input capture: the declared input is a FIFO, held open until
-/// the record is written.
+/// `gate evaluate-many` whose read of its target meets a redo record that
+/// appeared after bootstrap: the target's record is a FIFO, held open until the
+/// redo record is written.
 #[cfg(unix)]
 fn invoke_gate_evaluate_many_retryable_read(json: bool) -> Vec<Output> {
     use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
     use std::time::Duration;
 
     let cli = JitCli::initialised().unwrap();
     let id = setup_auto_gate_issue(&cli, "true");
-    let registry = cli.root().join(".jit/gates.toml");
-    let mut gates = fs::read_to_string(&registry).unwrap();
-    gates.push_str("\n[gates.inputs]\nroots = [\"probe.fifo\"]\n");
-    fs::write(&registry, gates).unwrap();
-    let fifo = cli.root().join("probe.fifo");
+    let record = cli.root().join(".jit/issues").join(format!("{id}.json"));
+    let bytes = fs::read(&record).unwrap();
+    fs::remove_file(&record).unwrap();
     nix::unistd::mkfifo(
-        &fifo,
+        &record,
         nix::sys::stat::Mode::S_IRUSR | nix::sys::stat::Mode::S_IWUSR,
     )
     .unwrap();
+
+    let (ready, reader_started) = std::sync::mpsc::channel();
+    let fifo = record.clone();
+    let writer = std::thread::spawn(move || {
+        ready
+            .send(fs::OpenOptions::new().write(true).open(fifo).unwrap())
+            .unwrap();
+    });
     let mut command = cli.command(["gate", "evaluate-many", "projection-gate", &id, "--force"]);
     if json {
         command.arg("--json");
@@ -527,12 +534,26 @@ fn invoke_gate_evaluate_many_retryable_read(json: bool) -> Vec<Output> {
             .output()
             .unwrap()
     });
-    // Opening for write returns once the gate's input digest opens the FIFO.
-    let mut pipe = fs::OpenOptions::new().write(true).open(&fifo).unwrap();
+    let mut pipe = match reader_started.recv_timeout(Duration::from_secs(5)) {
+        Ok(pipe) => pipe,
+        Err(error) => {
+            let _unblock = fs::OpenOptions::new()
+                .read(true)
+                .custom_flags(nix::libc::O_NONBLOCK)
+                .open(&record)
+                .unwrap();
+            writer.join().unwrap();
+            let output = child.join().unwrap();
+            panic!("gate never read the fixture record: {error}; {output:?}");
+        }
+    };
+    writer.join().unwrap();
     let scratch = cli.root().join(".jit/tmp");
     fs::create_dir_all(&scratch).unwrap();
     fs::write(scratch.join("redo.record"), b"pending").unwrap();
-    pipe.write_all(b"input").unwrap();
+    fs::remove_file(&record).unwrap();
+    fs::write(&record, &bytes).unwrap();
+    pipe.write_all(&bytes).unwrap();
     drop(pipe);
     let output = child.join().unwrap();
     assert_batch_report(&output, json);

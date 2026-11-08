@@ -403,17 +403,19 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         use crate::domain::artifact_discovery::ArtifactListingScope;
 
         let declarations = self.exec.captured_declarations()?;
-        let documentation = declarations
-            .config()
-            .documentation
-            .clone()
-            .unwrap_or_default();
-        let hierarchy = declarations.hierarchy()?;
+        let declarations = DocumentDeclarations {
+            documentation: declarations
+                .config()
+                .documentation
+                .clone()
+                .unwrap_or_default(),
+            hierarchy: declarations.hierarchy()?,
+        };
         let files = match issues.as_slice() {
             [issue] => crate::domain::artifact_directory::owned_artifact_directories(
                 issue,
-                &documentation,
-                &hierarchy,
+                &declarations.documentation,
+                &declarations.hierarchy,
             )
             .iter()
             .map(|directory| {
@@ -424,7 +426,10 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             .flatten()
             .collect::<Vec<_>>(),
             _ => self
-                .list_issue_scoped_areas(&documentation, ArtifactListingScope::RecursiveFiles)?
+                .list_issue_scoped_areas(
+                    &declarations.documentation,
+                    ArtifactListingScope::RecursiveFiles,
+                )?
                 .into_iter()
                 .flat_map(|(_, files)| files)
                 .collect::<Vec<_>>(),
@@ -432,17 +437,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         Ok(issues
             .into_iter()
             .map(|issue| {
-                let documents = issue
-                    .documents
-                    .iter()
-                    .cloned()
-                    .chain(crate::domain::artifact_directory::derive_issue_documents(
-                        &issue,
-                        &files,
-                        &documentation,
-                        &hierarchy,
-                    ))
-                    .collect();
+                let documents = declarations.issue_documents(&issue, &files);
                 (issue, documents)
             })
             .collect())
@@ -1419,6 +1414,163 @@ impl<S: IssueStore> DocumentOps<'_, S> {
             |session| capture_link_check_readings(session, documents, link_validator),
         )
     }
+}
+
+/// The repository declarations a document location is resolved against: the
+/// issue-scoped area registry and the type taxonomy an artifact directory is
+/// composed from.
+pub(super) struct DocumentDeclarations {
+    pub(super) documentation: crate::config::DocumentationConfig,
+    pub(super) hierarchy: crate::domain::type_taxonomy::HierarchyConfig,
+}
+
+impl DocumentDeclarations {
+    /// The declarations `config` carries: its documentation section (defaulted
+    /// when absent) and the taxonomy its namespace registry defines.
+    ///
+    /// # Errors
+    ///
+    /// Returns the hierarchy constructor's error for malformed declarations.
+    pub(super) fn from_config(config: &crate::config::JitConfig) -> Result<Self> {
+        let namespaces = crate::config_manager::namespaces_from_config(config);
+        Ok(Self {
+            documentation: config.documentation.clone().unwrap_or_default(),
+            hierarchy: crate::domain::type_taxonomy::HierarchyConfig::from_declarations(
+                &namespaces,
+            )?,
+        })
+    }
+
+    /// `issue`'s documents: its explicit links, then the files of `files` it
+    /// owns by location.
+    fn issue_documents(
+        &self,
+        issue: &crate::domain::Issue,
+        files: &[String],
+    ) -> Vec<crate::domain::DocumentReference> {
+        issue
+            .documents
+            .iter()
+            .cloned()
+            .chain(crate::domain::artifact_directory::derive_issue_documents(
+                issue,
+                files,
+                &self.documentation,
+                &self.hierarchy,
+            ))
+            .collect()
+    }
+}
+
+/// What a captured image holds of the directory trees an issue owns: the files
+/// they list, and the kinds and listings a capture must add to read the rest.
+#[derive(Default)]
+struct OwnedTreeWalk {
+    files: Vec<String>,
+    kinds: Vec<crate::repository_state::VirtualPath>,
+    listings: Vec<crate::repository_state::VirtualPath>,
+}
+
+/// Walk the trees `issue` owns under `declarations` as far as `image` captured
+/// them, without following a symbolic link: a root that is absent or not a
+/// directory lists nothing, and every listed occupant that is not a directory
+/// is a file.
+fn walk_owned_trees(
+    image: &crate::repository_state::RepositoryImage,
+    issue: &crate::domain::Issue,
+    declarations: &DocumentDeclarations,
+) -> Result<OwnedTreeWalk> {
+    use crate::repository_state::{RepositoryEntry, VirtualPath};
+
+    let mut pending = crate::domain::artifact_directory::owned_artifact_directories(
+        issue,
+        &declarations.documentation,
+        &declarations.hierarchy,
+    )
+    .iter()
+    .map(|directory| Ok((VirtualPath::worktree(directory)?, true)))
+    .collect::<Result<Vec<_>>>()?;
+    let mut walk = OwnedTreeWalk::default();
+    while let Some((path, is_root)) = pending.pop() {
+        if !image.capture_spec().contains_path(&path) {
+            walk.kinds.push(path);
+            continue;
+        }
+        match image.entry(&path)? {
+            RepositoryEntry::Directory { .. } => match image.directory_listings().get(&path) {
+                Some(listing) => pending.extend(
+                    listing
+                        .names()
+                        .iter()
+                        .map(|name| {
+                            Ok((
+                                VirtualPath::worktree(path.relative().as_path().join(name))?,
+                                false,
+                            ))
+                        })
+                        .collect::<Result<Vec<_>>>()?,
+                ),
+                None => walk.listings.push(path),
+            },
+            RepositoryEntry::Absent => {}
+            _ if is_root => {}
+            _ => walk.files.push(path.relative().as_str().to_string()),
+        }
+    }
+    Ok(walk)
+}
+
+/// Add to `spec` what [`captured_issue_documents`] reads of `issue` from
+/// `image`: the trees it owns and the references of every document it has.
+pub(super) fn discover_issue_documents(
+    image: &crate::repository_state::RepositoryImage,
+    spec: &mut crate::repository_state::CaptureSpec,
+    issue: &crate::domain::Issue,
+    config: &crate::config::JitConfig,
+) -> Result<()> {
+    let declarations = DocumentDeclarations::from_config(config)?;
+    let walk = walk_owned_trees(image, issue, &declarations)?;
+    // The walk reads as many listings, as deep, as the owned trees hold; a
+    // listing's children are one level below it.
+    spec.widen_budget(crate::repository_state::CaptureBudget {
+        max_listings: spec.listings().len() + walk.listings.len(),
+        max_bytes: 0,
+        max_depth: walk
+            .kinds
+            .iter()
+            .map(|path| path.relative().depth())
+            .chain(walk.listings.iter().map(|path| path.relative().depth() + 1))
+            .max()
+            .unwrap_or(0),
+    });
+    spec.discover_kinds(walk.kinds)?;
+    spec.discover_listings(walk.listings)?;
+    super::validate::discover_document_references(
+        &declarations.issue_documents(issue, &walk.files),
+        spec,
+    )
+}
+
+/// `issue`'s documents as `image` holds them under `config`, the image's own
+/// configuration: its explicit links, then the files it owns by location.
+///
+/// # Errors
+///
+/// When `image` lacks what [`discover_issue_documents`] requests.
+pub(super) fn captured_issue_documents(
+    image: &crate::repository_state::RepositoryImage,
+    issue: &crate::domain::Issue,
+    config: &crate::config::JitConfig,
+) -> Result<Vec<crate::domain::DocumentReference>> {
+    let declarations = DocumentDeclarations::from_config(config)?;
+    let walk = walk_owned_trees(image, issue, &declarations)?;
+    if !walk.kinds.is_empty() || !walk.listings.is_empty() {
+        anyhow::bail!(
+            "the captured image does not hold the artifact directories issue {} owns",
+            issue.id
+        );
+    }
+    Ok(declarations.issue_documents(issue, &walk.files))
 }
 
 /// Capture and read every document reference at the version it names, in one
