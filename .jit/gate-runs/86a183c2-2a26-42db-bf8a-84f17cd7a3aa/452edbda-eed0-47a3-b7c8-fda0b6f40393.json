@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "dd637516d8f8b114597f711288149254596ca431",
+  "completed_at": "2026-11-08T23:40:03.005776007Z",
+  "duration_ms": 314868,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Prior findings are addressed; command-wide memo routing, retention and request isolation satisfy the criteria by inspection, and the recorded performance smoke passes. Supplied cargo-ci evidence predates the latest implementation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "86a183c2-2a26-42db-bf8a-84f17cd7a3aa",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "452edbda-eed0-47a3-b7c8-fda0b6f40393",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T23:34:48.136981073Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:86a183c2` — e97d1fd0, bcc831a4, a66e8081, 94cebf8c, 1190374e, bcae3c65, 6c75253c, aa72dc55, e43d02eb, 33df6c14, f07211c0, 53f34398, 34315d5e, beab241c, bb9a8795, c41d3b54; uncommitted updates excluded.\nPolicy sources: AGENTS.md; .jit/config.toml; dev/TESTING.md.\nResolved items: @/issue/86a183c2/requirement/REQ-01, @/issue/86a183c2/requirement/REQ-02, @/issue/86a183c2/requirement/REQ-03, @/issue/86a183c2/requirement/REQ-04 → context issue description; @/issue/b697a3f7/requirement/REQ-10, @/issue/b697a3f7/requirement/REQ-22 → b697a3f7 issue description; @/charter/D-19, @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/invariant/canonical-cutover, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/architecture-dependency-direction, @/invariant/semantic-types, @/invariant/convention-convergence, @/invariant/derived-state-coherence → .jit/invariants.toml; @/gate/jit-validate → .jit/gates.toml.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T14:12:42.045601831+00:00; supplied ancestry excludes e97d1fd0, bcc831a4, a66e8081 and 94cebf8c. Passing gate not rerun. Latest prior structured code-review failed; its three blocking findings are addressed.\nTruncation recovery: narrower configuration, per-path patch, current-source and issue-description reads recovered relevant omissions; unrelated sibling-issue material and historical diagnostic transcripts excluded.\n\nNo findings. Bootstrap retries share the memo (`commands/bootstrap.rs:79`), direct assembly bypasses are removed, and memo entries are retained without eviction (`declarations/memo.rs:180`). The owning test revisits five distinct sources (`commands/mod.rs:3798`); the server test verifies fresh memos for two requests (`crates/server/src/routes.rs:1166`). The recorded REQ-04 smoke reports base D 18.570 ms, tip D 12.864 ms, ratio 0.693, satisfying ≤0.7.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Prior findings are addressed; command-wide memo routing, retention and request isolation satisfy the criteria by inspection, and the recorded performance smoke passes. Supplied cargo-ci evidence predates the latest implementation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
