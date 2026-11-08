@@ -30,8 +30,16 @@
       "format": "markdown",
       "label": "Execution handoff",
       "path": "dev/active/0f8efc37-frontends-share-core/handoff.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/0f8efc37-frontends-share-core/completion-report.md"
     }
   ],
+  "done_at": "2026-11-08T00:02:02.567043500Z",
   "first_ready_at": "2026-10-20T20:12:38.027010524Z",
   "gates_required": [
     "repo-validate",
@@ -39,9 +47,9 @@
   ],
   "gates_status": {
     "holistic-review": {
-      "run_id": "ea3ab36e-fba6-48d1-b8e0-d92583179503",
-      "status": "failed",
-      "updated_at": "2026-11-07T23:41:56.103025852Z",
+      "run_id": "e2aec9e9-1cf0-45b9-8575-1fd0f18984cf",
+      "status": "passed",
+      "updated_at": "2026-11-08T00:01:26.622706886Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
@@ -64,7 +72,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Run the server and web UI on the core's shared mechanisms",
-  "updated_at": "2026-11-07T23:57:58.819886453Z"
+  "updated_at": "2026-11-08T00:02:02.606171661Z"
 }

@@ -1,7 +1,7 @@
 {
   "epic_id": "0f8efc37-8054-420d-9409-dde888ea0040",
   "epic_short_id": "0f8efc37",
-  "current_wave": 7,
+  "current_wave": "complete",
   "waves": [
     {
       "wave_number": 1,
@@ -284,6 +284,15 @@
       "effort": "high",
       "verdict": "pass",
       "tree": "52e2ea4fc"
+    },
+    {
+      "issue": "0f8efc37",
+      "gate": "holistic-review",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "advisories": "F1 stale doc fixed under d4172016; F2 no action (steward)"
     }
   ],
   "amendments": [
@@ -293,5 +302,6 @@
       "date": "2026-11-08",
       "summary": "Git-less document history returns an empty list from the single core document_history (D-4, D-20); CLI behaviour changes from error to empty list; HTTP adapter maps nothing; real Git failures surface."
     }
-  ]
+  ],
+  "completed_at": "2026-11-08T00:05:00+00:00"
 }

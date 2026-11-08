@@ -1,0 +1,48 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6165f5c4b6224a7d24686c18a731b679f2821747",
+  "completed_at": "2026-11-08T00:01:26.615883997Z",
+  "duration_ms": 201213,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 2752,
+        "references": [
+          "@/inv/single-source-prose"
+        ],
+        "severity": "low",
+        "summary": "The document-command overview says history always requires Git, contradicting the canonical implementation, owning test, and detailed reference."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/0f8efc37-frontends-share-core/nonblocking-install-verification.md",
+        "id": "F2",
+        "line": 9,
+        "severity": "low",
+        "summary": "The installed-binary smoke report lacks a retained transcript substantiating its locked-read, timeout, exit-code, and redo-preservation claims."
+      }
+    ],
+    "summary": "All active hard criteria are verified and the prior blocking search-path defect is fixed; two advisory documentation and evidence gaps remain.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "0f8efc37-8054-420d-9409-dde888ea0040",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e2aec9e9-1cf0-45b9-8575-1fd0f18984cf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-07T23:58:05.402423220Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "All 13 active hard criteria are verifiably met. The dependency closure is terminal, and the prior blocking search-path defect is fixed by `b9f9b2ee0`, with a regression test loading a returned match through the document-content route.\n\n| Criteria | Verified artifacts |\n|---|---|\n| REQ-01–02 | Shared `open_repository` bootstrap; fallible layout binding; startup and storage conformance tests. |\n| REQ-03–04 | Core path allowlist includes configuration; watcher notification and browser hierarchy-refresh tests. |\n| REQ-05 | Full graph metadata supplies labels and dependency titles; browser refresh test verifies no issue-list request. |\n| REQ-06 | Shared capture cache, generation/concurrency tests, live artifact overlay, and configuration invalidation test. |\n| REQ-07 | Executor-reaching handlers use `execute_blocking`, `spawn_blocking`, and shared error classification. |\n| REQ-08 | Shared semantic matcher, linked-document-only ripgrep selection, browser server search, and preserved raw-search scope. |\n| REQ-09 | CLI and HTTP use the canonical content/history/diff methods; selected-byte and HTTP diff tests exist. |\n| REQ-10 | Requested routes/client methods removed; supported routes retained; matching core response types reused. |\n| REQ-11–12 | Binary imports library modules; manifest dependencies have consumers; shared raw-response builder uses `mime_guess` and `percent-encoding`. |\n| REQ-15 | Bulk layout and refresh lookups use pass-local indexes; remaining array searches concern the excluded event-handler scope. |\n\nValidation relied on source inspection, git history, and retained Cargo/web gate outputs. Manifest counts and historical warning counts were independently checked against their artifacts and git data.\n\n1. **F1 — Low, advisory:** The document-command overview still says `history` always requires Git. This contradicts `document_history`, its test, and the detailed reference, which return an empty list outside Git. Update the overview in [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2752). Reference: `@/inv/single-source-prose`.\n\n2. **F2 — Low, advisory:** The installed-binary smoke report still lacks a retained transcript supporting its successful locked read, bounded completion, exit 12, and untouched redo-record assertions. Source tests and gate records support the underlying behavior, but do not substantiate that particular installed-binary execution. See [nonblocking-install-verification.md](/home/vkaskivuo/Projects/just-in-time/dev/active/0f8efc37-frontends-share-core/nonblocking-install-verification.md:9).\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All active hard criteria are verified and the prior blocking search-path defect is fixed; two advisory documentation and evidence gaps remain.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"summary\":\"The document-command overview says history always requires Git, contradicting the canonical implementation, owning test, and detailed reference.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":2752,\"references\":[\"@/inv/single-source-prose\"]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"summary\":\"The installed-binary smoke report lacks a retained transcript substantiating its locked-read, timeout, exit-code, and redo-preservation claims.\",\"file\":\"dev/active/0f8efc37-frontends-share-core/nonblocking-install-verification.md\",\"line\":9}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
