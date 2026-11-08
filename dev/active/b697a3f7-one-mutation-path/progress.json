@@ -452,7 +452,8 @@
     "c31c2e57": 2,
     "dd95bd9d": 3,
     "6a19e93f": 3,
-    "86a183c2": 1
+    "86a183c2": 1,
+    "e5d7bc11": 1
   },
   "surfaced_pitfalls": [
     {
@@ -533,7 +534,9 @@
     "a869900b landed 34b33911e, cargo-ci + code-review passed, closed. d675102c re-checkpoint (sol gpt-6.1-sol, effort high, read-only) dispatched on bb9a8795f. 86a183c2 dispatched (opus) on bb9a8795f with fallback deadline 2h30m.",
     "86a183c2 lead review FAIL on 16450a564: REQ-02 fresh DeclarationMemo in load_configuration (claim, config show) and capture_initialized (config at_data_root); expect() panic in memo.rs. Rework 1 dispatched. Smoke run of scenario (c) on 16450a564 running as early signal; REQ-04 is recorded on the final commit.",
     "86a183c2 smoke (early signal, 16450a564, harness defaults, raw in lead scratch, load ~1.7): dep tip D 14.39 ms, ratio 0.753 FAIL (≤0.7); bulk slope 1.14 pass. REQ-04 is recorded on the final commit.",
-    "d5 ruling applied: e5d7bc11 (F1, item.rs) dispatched on sonnet; 6b22ce6d (F3) after 86a183c2; 86a183c2 REQ-01/02 amended (gates.toml, handoffs, one memo)."
+    "d5 ruling applied: e5d7bc11 (F1, item.rs) dispatched on sonnet; 6b22ce6d (F3) after 86a183c2; 86a183c2 REQ-01/02 amended (gates.toml, handoffs, one memo).",
+    "e5d7bc11 landed 90862f758; cargo-ci passed; code-review FAILED (captured_declarations_with parses the bundle twice, mod.rs:2798/2804). Fix-forward rework 1 dispatched on a fresh worktree from 2b3ee3f19.",
+    "86a183c2 rework 1 at dea774533 (gates.toml memo, handoffs, no fresh memos, no panic); local tip D still ~14.5 ms. Lead decision: REQ-04 requires closing the gap inside this task; derived values (default schema names, namespaces) are computed once per memo entry. No scope change."
   ],
   "story_checkpoints": [
     {
