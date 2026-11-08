@@ -2763,6 +2763,25 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
+        self.captured_declarations_with(|_| Ok(Vec::new()))
+            .map(|(declarations, _)| declarations)
+    }
+
+    /// [`captured_declarations`](Self::captured_declarations) plus the files
+    /// `sources` names from the parsed declarations, captured in the same
+    /// snapshot; the returned image holds their bytes.
+    pub(crate) fn captured_declarations_with(
+        &self,
+        sources: impl Fn(
+            &crate::repository_state::CapturedRepositoryDeclarations,
+        ) -> Result<Vec<crate::repository_state::VirtualPath>>,
+    ) -> Result<(
+        crate::repository_state::CapturedRepositoryDeclarations,
+        crate::repository_state::RepositoryImage,
+    )>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::repository_state::{CaptureSpec, VirtualPath};
 
         let layout = self.require_layout()?;
@@ -2770,14 +2789,20 @@ impl<S: IssueStore> CommandExecutor<S> {
             let spec =
                 CaptureSpec::new(VirtualPath::DECLARATION_FILES, DECLARATION_CAPTURE_BUDGET)?;
             let Some(image) = capture_discovering(session, spec, |image, spec| {
-                Ok(spec.discover_paths(rule_schema_paths(image)?)?)
+                let before = spec.clone();
+                spec.discover_paths(rule_schema_paths(image)?)?;
+                // The declarations parse once every named schema is captured.
+                if *spec != before {
+                    return Ok(());
+                }
+                let declarations = crate::repository_state::declarations_from_image(image)?;
+                Ok(spec.discover_paths(sources(&declarations)?)?)
             })?
             else {
                 return Ok(None);
             };
-            Ok(Some(crate::repository_state::declarations_from_image(
-                &image,
-            )?))
+            let declarations = crate::repository_state::declarations_from_image(&image)?;
+            Ok(Some((declarations, image)))
         })
     }
 

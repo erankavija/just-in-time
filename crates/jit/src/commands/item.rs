@@ -68,16 +68,48 @@ impl<S: IssueStore> CommandExecutor<S> {
 /// Captured repository declarations.
 type Declarations = crate::repository_state::CapturedRepositoryDeclarations;
 
+/// One query's captured image: the declarations and the registry-first
+/// sources they name.
+struct ItemCapture {
+    declarations: Declarations,
+    image: crate::repository_state::RepositoryImage,
+}
+
 impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
-    /// The captured declarations, with a declaration that does not parse
-    /// reported as an invalid configuration argument.
-    fn declarations(&self) -> Result<Declarations> {
-        self.exec.captured_declarations().map_err(|error| {
-            match error.downcast::<crate::repository_state::DeclarationParseError>() {
-                Ok(error) => configuration_argument_error(error).into(),
-                Err(error) => error,
-            }
-        })
+    /// Capture the declarations and every registry-first project kind's toml
+    /// source in one snapshot. A declaration that does not parse is reported as
+    /// an invalid configuration argument.
+    fn capture(&self) -> Result<ItemCapture> {
+        let layout = self.exec.require_layout()?;
+        self.exec
+            .captured_declarations_with(|declarations| {
+                Self::item_kinds(declarations)?
+                    .iter()
+                    .filter(|kind| kind.kind_scope().is_project())
+                    .filter_map(ItemKind::toml_source)
+                    .map(|descriptor| {
+                        layout
+                            .classify_repository_relative(&descriptor.toml)
+                            .map_err(|error| {
+                                crate::errors::InvalidArgumentError::new(format!(
+                                    "invalid toml source '{}': {error}",
+                                    descriptor.toml
+                                ))
+                                .into()
+                            })
+                    })
+                    .collect()
+            })
+            .map(|(declarations, image)| ItemCapture {
+                declarations,
+                image,
+            })
+            .map_err(|error| {
+                match error.downcast::<crate::repository_state::DeclarationParseError>() {
+                    Ok(error) => configuration_argument_error(error).into(),
+                    Err(error) => error,
+                }
+            })
     }
 
     /// Resolve the effective item kinds from the captured `[item_kinds]` registry.
@@ -130,19 +162,20 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
     /// so `--kind inv` filters the same items as `--kind invariant`. An unknown
     /// kind name yields an empty result (not an error) so callers can probe freely.
     pub fn list_items(&self, kind_filter: Option<&str>) -> Result<ItemListResult> {
-        let declarations = self.declarations()?;
+        let captured = self.capture()?;
+        let declarations = &captured.declarations;
         // Resolve a kind alias in the filter to the canonical registry name so both
         // the kind-set filter and the item filter compare against canonical names
         // (items always carry the registry name). An unresolved filter is kept
         // verbatim, so an unknown kind still yields an empty result.
         let canonical_filter: Option<String> = match kind_filter {
-            Some(f) => Some(Self::canonical_kind_name(&declarations, f)?),
+            Some(f) => Some(Self::canonical_kind_name(declarations, f)?),
             None => None,
         };
         let filter = canonical_filter.as_deref();
         // Only issue-scope kinds index issue descriptions; project-scope kinds are
         // sourced from their config-declared file via `project_items`.
-        let kinds: Vec<ItemKind> = Self::issue_item_kinds(&declarations)?
+        let kinds: Vec<ItemKind> = Self::issue_item_kinds(declarations)?
             .into_iter()
             .filter(|k| filter.is_none_or(|f| k.name() == f))
             .collect();
@@ -156,7 +189,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
         // order, so both substrates surface through one list (REQ-01). The same
         // `kind_filter` applies to both substrates.
         items.extend(
-            self.project_items(&declarations)?
+            self.project_items(&captured)?
                 .into_iter()
                 .filter(|i| filter.is_none_or(|f| i.kind == f)),
         );
@@ -197,6 +230,25 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
         Ok(ItemListResult::new(items))
     }
 
+    /// The text of the registry-first source at `rel` in the captured image;
+    /// `None` when the file is absent.
+    fn captured_toml(&self, captured: &ItemCapture, rel: &str) -> Result<Option<String>> {
+        let path = self
+            .exec
+            .require_layout()?
+            .classify_repository_relative(rel)?;
+        captured
+            .image
+            .file_bytes(&path)
+            .map_err(anyhow::Error::from)
+            .and_then(|bytes| {
+                bytes
+                    .map(|bytes| String::from_utf8(bytes.to_vec()).map_err(anyhow::Error::from))
+                    .transpose()
+            })
+            .with_context(|| format!("cannot read toml source '{rel}'"))
+    }
+
     /// Index the project-scope (`@`) addressable items, routing each kind by its
     /// `source-of-truth` so both authoring substrates surface through one path.
     ///
@@ -214,8 +266,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
     ///   registry, NOT a markdown source. The registry is the AUTHORITATIVE source
     ///   and NO markdown index is read or produced for them (REQ-02). The kind's
     ///   toml `source` descriptor ([`ItemKind::toml_source`]) names the backing
-    ///   `.toml`: its file is read through the storage boundary and each entry
-    ///   projected through the descriptor's field mapping by
+    ///   `.toml`: its bytes come from the query's captured image (never a later
+    ///   read of the file) and each entry projected through the descriptor's field mapping by
     ///   [`load_toml_scope_items`] (REQ-02). An absent file contributes no items
     ///   (graceful); a present-but-malformed file is a typed error. Any
     ///   descriptor-backed kind routes through this same generic path with no
@@ -229,7 +281,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
     /// qualified-id derivation are identical across them.
     ///
     /// [`ItemError::MissingProjectSource`]: crate::domain::item::ItemError::MissingProjectSource
-    fn project_items(&self, declarations: &Declarations) -> Result<Vec<AddressableItem>> {
+    fn project_items(&self, captured: &ItemCapture) -> Result<Vec<AddressableItem>> {
+        let declarations = &captured.declarations;
         let mut sources = Vec::new();
         let mut registry_items = Vec::new();
         for kind in Self::item_kinds(declarations)? {
@@ -244,22 +297,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
                 // the defensive `else` keeps this non-panicking without a re-fetch.
                 SourceOfTruth::RegistryFirst => {
                     if let Some(descriptor) = kind.toml_source() {
-                        // Read the named `.toml` through the storage boundary and
-                        // project each entry through the descriptor's field mapping.
-                        // An absent file contributes no items (graceful), mirroring
-                        // the markdown-first path; a present-but-malformed file is a
+                        // Project each entry of the kind's captured `.toml`
+                        // through the descriptor's field mapping. An absent file
+                        // contributes no items (graceful), mirroring the
+                        // markdown-first path; a present-but-malformed file is a
                         // typed error.
-                        let toml = self
-                            .exec
-                            .storage
-                            .read_repo_file(&descriptor.toml)
-                            .with_context(|| {
-                                format!(
-                                    "cannot read toml source '{}' for item kind '{}'",
-                                    descriptor.toml,
-                                    kind.name()
-                                )
-                            })?;
+                        let toml = self.captured_toml(captured, &descriptor.toml)?;
                         if let Some(toml) = toml {
                             let rows = load_toml_scope_items(kind.name(), descriptor, &toml)
                                 .with_context(|| {
@@ -342,14 +385,15 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
     /// different kind's item. An unresolvable scope or an unknown self-id is a
     /// descriptive error rather than a silent miss.
     pub fn show_item(&self, qualified: &str) -> Result<ItemShowResult> {
-        let declarations = self.declarations()?;
-        match Self::resolve_item_address(&declarations, qualified)? {
+        let captured = self.capture()?;
+        let declarations = &captured.declarations;
+        match Self::resolve_item_address(declarations, qualified)? {
             // Project scope: sourced from a config-declared file, no owning issue
             // (REQ-01). The address always names its kind, so filter by kind AND
             // self-id.
             ResolvedItemAddress::Project { kind, self_id } => {
                 let item = self
-                    .project_items(&declarations)?
+                    .project_items(&captured)?
                     .into_iter()
                     .find(|i| i.kind == kind && i.self_id == self_id)
                     .ok_or_else(|| {
@@ -383,7 +427,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
                     })?;
                 let issue = self.exec.storage.load_issue(&full_id)?;
 
-                let kinds = Self::issue_item_kinds(&declarations)?;
+                let kinds = Self::issue_item_kinds(declarations)?;
                 let repo_format = declarations.config().content_format();
                 let parser = crate::document::content_parser_for(issue.content_format, repo_format)
                     .map_err(|err| {
@@ -1148,6 +1192,35 @@ statement = \"Every dependency edge stays acyclic.\"
         // Both surface in the cross-repo list under the `@` project scope.
         let listed = exec.items().list_items(Some("policy")).unwrap();
         assert_eq!(listed.items.len(), 2);
+    }
+
+    #[test]
+    fn test_project_items_read_registry_first_source_from_the_captured_image() {
+        let storage = InMemoryStorage::new();
+        seed_memory_repository_file(&storage, "policies.toml", TWO_POLICIES);
+        let exec = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            MemoryDeclarations {
+                config: Some(POLICY_CONFIG),
+                ..MemoryDeclarations::default()
+            },
+        );
+        let items = exec.items();
+        let captured = items.capture().unwrap();
+
+        seed_memory_repository_file(
+            exec.storage(),
+            "policies.toml",
+            "[[policies]]\nid = \"POL-99\"\nstatement = \"Replaced after capture.\"\n",
+        );
+
+        let self_ids: Vec<String> = items
+            .project_items(&captured)
+            .unwrap()
+            .into_iter()
+            .map(|item| item.self_id)
+            .collect();
+        assert_eq!(self_ids, ["POL-01", "POL-02"]);
     }
 
     #[test]
