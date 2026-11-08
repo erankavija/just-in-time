@@ -582,7 +582,7 @@ mod tests {
                 .collect();
             handles
                 .into_iter()
-                .for_each(|handle| handle.join().unwrap());
+                .for_each(crate::test_utils::join_reraising);
         });
     }
 

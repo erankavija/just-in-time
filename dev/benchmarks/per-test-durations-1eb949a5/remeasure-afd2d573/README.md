@@ -10,7 +10,7 @@
 | after, isolated focused run | afd2d573 | 0.20 | 0.187 s |
 | after, whole workspace | afd2d573 | 3.72 | 0.268 s |
 
-The whole-workspace run also timed out `prop_re_application_after_an_interruption_at_any_point_reaches_and_holds_the_new_state` at 20 s: this tree is based on main without 0b35be66's unsynced redo-conformance backend.
+The whole-workspace run also timed out `prop_re_application_after_an_interruption_at_any_point_reaches_and_holds_the_new_state` at 20 s: this tree is based on main without 0b35be66's unsynced redo-conformance backend. Main now has 0b35be66 (`ae01461e7`), so those timeouts are fixed there; not re-measured after merging main and joining the case threads through `join_reraising`.
 
 ## Cause and change
 
