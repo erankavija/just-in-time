@@ -154,6 +154,7 @@ mod tests {
             entries,
             BTreeMap::from([(dir, listing)]),
             BTreeMap::new(),
+            &Default::default(),
         )
         .unwrap()
     }

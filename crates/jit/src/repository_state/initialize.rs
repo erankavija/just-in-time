@@ -192,29 +192,36 @@ impl InitializationScaffold {
     /// Render every neutral scaffold byte from the template body and identity.
     ///
     /// `config_skeleton` is the template's generated configuration body; the final
-    /// `config.toml` is rendered here. Default rules and their schemas derive from
-    /// the parsed configuration's namespaces, so the scaffold is internally
-    /// coherent before any capture.
+    /// `config.toml` is rendered here and parsed through `declarations`. Default
+    /// rules and their schemas derive from the parsed configuration's namespaces,
+    /// so the scaffold is internally coherent before any capture.
     pub fn render(
         config_skeleton: &str,
         project_name: ProjectName,
         profile: Option<ProfileApplicationInput>,
+        declarations: &crate::declarations::DeclarationMemo,
     ) -> Result<Self, InitializationError> {
         let config = render_repo_config(config_skeleton, &project_name);
-        Self::from_config(config, project_name, profile)
+        Self::from_config(
+            &declarations.configuration([Some(config.as_bytes()), None, None]),
+            project_name,
+            profile,
+        )
     }
 
-    /// Render a scaffold whose configuration bytes are already final (an existing
-    /// repository's captured `config.toml`), deriving default rules/schemas from it.
-    pub fn from_config(
-        config: String,
+    /// Render a scaffold whose configuration is already final (an existing
+    /// repository's captured `config.toml`, or a rendered one), deriving default
+    /// rules/schemas from its parse.
+    pub(crate) fn from_config(
+        configuration: &crate::declarations::ParsedConfiguration,
         project_name: ProjectName,
         profile: Option<ProfileApplicationInput>,
     ) -> Result<Self, InitializationError> {
-        let parsed =
-            crate::declarations::assemble_configuration(Some(config.as_bytes()), None, None)
-                .map_err(|error| InitializationError::Config(error.to_string()))?;
-        let namespaces = namespaces_from_config(&parsed);
+        let parsed = configuration
+            .assembled()
+            .map_err(|error| InitializationError::Config(error.to_string()))?;
+        let config = configuration.sources()[0].clone().unwrap_or_default();
+        let namespaces = namespaces_from_config(parsed);
         let serialized = serialize_ruleset(&default_ruleset(&namespaces))?;
         let schemas = serialized
             .schema_files
@@ -222,7 +229,7 @@ impl InitializationScaffold {
             .map(|schema| (schema.name, schema.content.into_bytes()))
             .collect();
         Ok(Self {
-            config: config.into_bytes(),
+            config,
             index: fresh_index_bytes()
                 .map_err(|error| InitializationError::Config(error.to_string()))?,
             gates: serialize_gate_registry(&GateRegistry::default())

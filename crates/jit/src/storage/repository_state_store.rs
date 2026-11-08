@@ -400,9 +400,15 @@ pub trait RepositoryStateStore {
         layout: RepositoryLayout,
     ) -> Result<Box<dyn OptimisticReadSession>, RepositoryStateStoreError>;
 
-    /// The memo every image and configuration observation of this store
-    /// parses its declarations through.
+    /// The memo of the command this store serves, which every image and
+    /// configuration observation parses its declarations through.
     fn declaration_memo(&self) -> &Arc<crate::declarations::DeclarationMemo>;
+
+    /// This store serving another command, whose declarations parse through
+    /// `memo`; every other state is shared.
+    fn with_declaration_memo(&self, memo: Arc<crate::declarations::DeclarationMemo>) -> Self
+    where
+        Self: Sized;
 }
 
 /// What a read session observes of commits: whether a record is present, then
@@ -1210,6 +1216,12 @@ impl RepositoryStateStore for JsonFileStorage {
     fn declaration_memo(&self) -> &Arc<crate::declarations::DeclarationMemo> {
         &self.declaration_memo
     }
+
+    fn with_declaration_memo(&self, memo: Arc<crate::declarations::DeclarationMemo>) -> Self {
+        let mut storage = self.clone();
+        storage.declaration_memo = memo;
+        storage
+    }
 }
 
 impl RepositoryStateStore for InMemoryStorage {
@@ -1259,6 +1271,12 @@ impl RepositoryStateStore for InMemoryStorage {
 
     fn declaration_memo(&self) -> &Arc<crate::declarations::DeclarationMemo> {
         &self.declaration_memo
+    }
+
+    fn with_declaration_memo(&self, memo: Arc<crate::declarations::DeclarationMemo>) -> Self {
+        let mut storage = self.clone();
+        storage.declaration_memo = memo;
+        storage
     }
 }
 
@@ -2080,10 +2098,14 @@ fn capture_capability_image(
             .collect();
     }
     drop(evidence_cache);
-    Ok(
-        RepositoryImage::close(layout.clone(), spec, entries, listings, pinned)?
-            .sharing_declarations(storage.declaration_memo()),
-    )
+    Ok(RepositoryImage::close(
+        layout.clone(),
+        spec,
+        entries,
+        listings,
+        pinned,
+        storage.declaration_memo(),
+    )?)
 }
 
 fn capture_memory_image(
@@ -2140,10 +2162,14 @@ fn capture_memory_image(
             ))
         })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
-    Ok(
-        RepositoryImage::close(layout.clone(), spec, entries, listings, pinned)?
-            .sharing_declarations(memo),
-    )
+    Ok(RepositoryImage::close(
+        layout.clone(),
+        spec,
+        entries,
+        listings,
+        pinned,
+        memo,
+    )?)
 }
 
 fn memory_listing(

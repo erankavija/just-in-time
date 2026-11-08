@@ -1373,13 +1373,14 @@ fn configured_projection_targets(
     base: &RepositoryImage,
     registries: &BTreeMap<VirtualPath, (Vec<u8>, FileMode)>,
 ) -> Result<BTreeSet<VirtualPath>, RepositoryStateError> {
-    let config_path = VirtualPath::CONFIG;
-    let bytes = match registries.get(&config_path) {
-        Some((bytes, _)) => Some(bytes.as_slice()),
-        None => base.file_bytes(&config_path).map_err(ProducerError::from)?,
-    };
-    let config = crate::declarations::assemble_configuration(bytes, None, None)
-        .map_err(ProducerError::from)?;
+    let parsed = super::configuration_overlaid(base, |path| {
+        registries
+            .get(path)
+            .map(|(bytes, _)| Some(bytes.as_slice()))
+    })?;
+    let config = parsed
+        .assembled()
+        .map_err(|error| ProducerError::from(error.clone()))?;
     config
         .projection
         .iter()

@@ -134,6 +134,34 @@ pub struct AppState<S: IssueStore + RepositoryStateStore> {
     pub shutdown: CancellationToken,
 }
 
+impl<S: IssueStore + RepositoryStateStore> AppState<S> {
+    /// The state one request is served from: a request is one command, so
+    /// its executor parses declarations through a memo of its own.
+    fn for_request(&self) -> Self {
+        Self {
+            executor: Arc::new(self.executor.with_declaration_memo(Arc::default())),
+            ..self.clone()
+        }
+    }
+}
+
+/// The [`AppState::for_request`] of the request being served.
+struct RequestState<S: IssueStore + RepositoryStateStore>(AppState<S>);
+
+#[axum::async_trait]
+impl<S: IssueStore + RepositoryStateStore + Send + Sync> FromRequestParts<AppState<S>>
+    for RequestState<S>
+{
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(
+        _parts: &mut Parts,
+        state: &AppState<S>,
+    ) -> Result<Self, Self::Rejection> {
+        Ok(Self(state.for_request()))
+    }
+}
+
 /// Per-version repository capture and its projections.
 #[derive(Default)]
 pub struct ProjectionCache {
@@ -269,7 +297,7 @@ impl Serialize for IssueBody {
 
 /// List all issues, each `documents` explicit and derived from one shared listing of the declared areas.
 async fn list_issues<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Json<Vec<IssueResponse>>, StatusCode> {
     let snapshot = capture_snapshot(&state).await?;
     let issues = snapshot.issues.clone();
@@ -295,7 +323,7 @@ fn resolve_issue_path_id<S: IssueStore + RepositoryStateStore>(
 /// Get single issue by ID, its `documents` explicit and derived.
 async fn get_issue<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path(id): Path<String>,
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Json<IssueResponse>, StatusCode> {
     execute_blocking(&state, move |executor| {
         let id = resolve_issue_path_id(executor, &id)?;
@@ -366,7 +394,7 @@ pub struct GraphEdge {
 /// type levels. Resolution is repository-wide, matching `jit graph tree` with no
 /// root.
 async fn get_graph<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Json<GraphData>, StatusCode> {
     let snapshot = capture_snapshot(&state).await?;
     let graph = snapshot
@@ -455,7 +483,7 @@ pub struct SearchResponse {
 /// Search issues and documents
 async fn search_issues<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Query(params): Query<SearchQuery>,
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Json<SearchResponse>, StatusCode> {
     execute_blocking(&state, move |executor| {
         let start = std::time::Instant::now();
@@ -549,7 +577,7 @@ struct DocumentByPathQuery {
 /// reads remain in the domain layer, not in the route handler.
 async fn get_document_by_path<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Query(query): Query<DocumentByPathQuery>,
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Json<DocumentContentResponse>, StatusCode> {
     execute_blocking(&state, move |executor| {
         let (bytes, commit_hash) = executor
@@ -742,7 +770,7 @@ struct DocumentContentResponse {
 async fn get_document_content<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentContentQuery>,
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Json<DocumentContentResponse>, StatusCode> {
     let reading = execute_blocking(&state, {
         let path = path.clone();
@@ -793,7 +821,7 @@ fn raw_document_response(path: &str, bytes: Vec<u8>) -> Response<Body> {
 async fn get_document_raw<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentContentQuery>,
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Response<Body>, StatusCode> {
     let reading = execute_blocking(&state, {
         let path = path.clone();
@@ -824,7 +852,7 @@ async fn get_document_raw<S: IssueStore + RepositoryStateStore + Send + Sync + '
 /// both classified as invalid arguments.
 async fn get_document_raw_by_path<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Query(query): Query<DocumentByPathQuery>,
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Response<Body>, StatusCode> {
     let (bytes, _commit_hash) = execute_blocking(&state, {
         let path = query.path.clone();
@@ -854,7 +882,7 @@ async fn get_document_raw_by_path<S: IssueStore + RepositoryStateStore + Send + 
 async fn get_raw_wildcard<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path(path): Path<String>,
     Query(query): Query<DocumentContentQuery>,
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Response<Body>, StatusCode> {
     let (bytes, _commit_hash) = execute_blocking(&state, {
         let path = path.clone();
@@ -888,7 +916,7 @@ struct CommitInfoResponse {
 /// Get document history
 async fn get_document_history<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path((id, path)): Path<(String, String)>,
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Json<DocumentHistoryResponse>, StatusCode> {
     let commits = execute_blocking(&state, {
         let path = path.clone();
@@ -935,7 +963,7 @@ struct DocumentDiffResponse {
 async fn get_document_diff<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path((id, path)): Path<(String, String)>,
     Query(query): Query<DocumentDiffQuery>,
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Json<DocumentDiffResponse>, StatusCode> {
     execute_blocking(&state, move |executor| {
         let id = resolve_issue_path_id(executor, &id)?;
@@ -955,7 +983,7 @@ async fn get_document_diff<S: IssueStore + RepositoryStateStore + Send + Sync + 
 
 /// List all gate definitions from the registry
 async fn list_gates<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Json<Vec<GateDefinition>>, StatusCode> {
     execute_blocking(&state, |executor| Ok(Json(executor.gates().list_gates()?))).await
 }
@@ -970,7 +998,7 @@ struct GateRunsQuery {
 async fn list_gate_runs<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path(id): Path<String>,
     Query(params): Query<GateRunsQuery>,
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Json<Vec<GateRunSummary>>, StatusCode> {
     let runs = execute_blocking(&state, move |executor| {
         let id = resolve_issue_path_id(executor, &id)?;
@@ -987,7 +1015,7 @@ async fn list_gate_runs<S: IssueStore + RepositoryStateStore + Send + Sync + 'st
 /// Get a single gate run result with full stdout/stderr
 async fn get_gate_run<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
     Path((id, run_id)): Path<(String, String)>,
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Json<GateRunSummary>, StatusCode> {
     execute_blocking(&state, move |executor| {
         let id = resolve_issue_path_id(executor, &id)?;
@@ -1008,7 +1036,7 @@ struct HierarchyResponse {
 
 /// Get type hierarchy configuration
 async fn get_hierarchy<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Json<HierarchyResponse>, StatusCode> {
     let (namespaces, icons) = execute_blocking(&state, |executor| {
         let declarations = executor.config().captured_declarations()?;
@@ -1041,7 +1069,7 @@ struct NamespaceInfo {
 
 /// Get namespace registry from configuration
 async fn get_namespaces<S: IssueStore + RepositoryStateStore + Send + Sync + 'static>(
-    State(state): State<AppState<S>>,
+    RequestState(state): RequestState<S>,
 ) -> Result<Json<NamespacesResponse>, StatusCode> {
     let label_namespaces = execute_blocking(&state, |executor| {
         Ok(executor
@@ -1130,6 +1158,44 @@ mod tests {
         .await
         .unwrap();
         assert_ne!(blocking_thread, async_thread);
+    }
+
+    /// A request is one command: the server serves each through a
+    /// declaration memo of its own.
+    #[tokio::test]
+    async fn test_request_state_serves_each_request_through_a_fresh_declaration_memo() {
+        type Memo = Arc<jit::declarations::DeclarationMemo>;
+        let state = AppState {
+            executor: Arc::new(memory_executor_declaring(
+                InMemoryStorage::new(),
+                MemoryDeclarations::default(),
+            )),
+            tracker: Arc::new(ChangeTracker::new(16)),
+            capture_cache: Default::default(),
+            project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
+        };
+        let startup: Memo = Arc::clone(state.executor.storage().declaration_memo());
+        let served = Arc::new(std::sync::Mutex::new(Vec::<Memo>::new()));
+        let probe = {
+            let served = Arc::clone(&served);
+            move |RequestState(state): RequestState<InMemoryStorage>| async move {
+                served
+                    .lock()
+                    .unwrap()
+                    .push(Arc::clone(state.executor.storage().declaration_memo()));
+            }
+        };
+        let server =
+            TestServer::new(Router::new().route("/probe", get(probe)).with_state(state)).unwrap();
+
+        server.get("/probe").await.assert_status_ok();
+        server.get("/probe").await.assert_status_ok();
+
+        let served = served.lock().unwrap();
+        assert_eq!(served.len(), 2);
+        assert!(!Arc::ptr_eq(&served[0], &served[1]));
+        assert!(served.iter().all(|memo| !Arc::ptr_eq(memo, &startup)));
     }
 
     #[tokio::test]

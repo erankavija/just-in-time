@@ -65,13 +65,10 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
             |session| {
                 let (config, project_name, config_image) =
                     self.resolve_init_config(&mut *session, repo_dir)?;
-                let scaffold = InitializationScaffold::from_config(
-                    config.clone(),
-                    project_name.clone(),
-                    None,
-                )?
-                .with_gitattributes(gitattributes.clone())
-                .with_profiles(profiles.clone());
+                let scaffold =
+                    InitializationScaffold::from_config(&config, project_name.clone(), None)?
+                        .with_gitattributes(gitattributes.clone())
+                        .with_profiles(profiles.clone());
 
                 let mut extra_paths = scaffold
                     .delta_paths()?
@@ -224,16 +221,17 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
         Ok(result)
     }
 
-    /// Resolve the effective configuration bytes and project identity: an existing
-    /// `config.toml` is preserved (its authored project name kept), otherwise the
-    /// structural minimum is rendered under a slug of the repository directory
-    /// name. Returns the round's image for the base to grow from.
+    /// Resolve the effective configuration, parsed through the session's memo,
+    /// and project identity: an existing `config.toml` is preserved (its
+    /// authored project name kept), otherwise the structural minimum is rendered
+    /// under a slug of the repository directory name. Returns the round's image
+    /// for the base to grow from.
     fn resolve_init_config(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
         repo_dir: &Path,
     ) -> Result<(
-        String,
+        std::sync::Arc<crate::declarations::ParsedConfiguration>,
         ProjectName,
         crate::repository_state::RepositoryImage,
     )> {
@@ -249,32 +247,31 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                 .unwrap_or(""),
         )
         .parse()?;
-        let (config, project_name) = match super::image_virtual_bytes(
-            &image,
-            &crate::repository_state::VirtualPath::CONFIG,
-        )? {
-            Some(bytes) => {
-                let config =
-                    String::from_utf8(bytes).context("existing .jit/config.toml is not UTF-8")?;
-                let parsed = crate::declarations::assemble_configuration(
-                    Some(config.as_bytes()),
-                    None,
-                    None,
-                )
-                .context("Failed to parse existing init configuration")?;
-                let project_name = parsed
+        let (config, project_name) = match image.file_bytes(&VirtualPath::CONFIG)? {
+            Some(_) => {
+                let config = crate::repository_state::configuration_of(&image)?;
+                let project_name = config
+                    .assembled()
+                    .map_err(Clone::clone)
+                    .context("Failed to parse existing init configuration")?
                     .project
-                    .and_then(|project| project.name)
+                    .as_ref()
+                    .and_then(|project| project.name.clone())
                     .unwrap_or(generated_name);
                 (config, project_name)
             }
-            None => (
-                crate::repository_state::render_repo_config(
+            None => {
+                let rendered = crate::repository_state::render_repo_config(
                     &crate::repository_state::structural_minimum_config(),
                     &generated_name,
-                ),
-                generated_name,
-            ),
+                );
+                (
+                    image
+                        .declaration_memo()
+                        .configuration([Some(rendered.as_bytes()), None, None]),
+                    generated_name,
+                )
+            }
         };
         Ok((config, project_name, image))
     }
@@ -1328,8 +1325,16 @@ mod tests {
         )
         .unwrap();
         let proposed_config = config.as_bytes().to_vec();
-        let scaffold =
-            InitializationScaffold::from_config(config, project_name, Some(profile)).unwrap();
+        let scaffold = InitializationScaffold::from_config(
+            &executor.storage().declaration_memo().configuration([
+                Some(config.as_bytes()),
+                None,
+                None,
+            ]),
+            project_name,
+            Some(profile),
+        )
+        .unwrap();
         let layout = executor.require_layout().unwrap();
         let mut session = executor.storage().open_mutation_session(layout).unwrap();
         let (image, _) = executor

@@ -75,13 +75,16 @@ pub struct OpenedRepository {
 pub fn open_repository(invocation: RepositoryInvocation) -> Result<OpenedRepository> {
     let (data_root, non_git_worktree_root) = select_data_root(&invocation);
 
+    // The invocation's one memo: every attempt's store parses through it.
+    let declarations = std::sync::Arc::<crate::declarations::DeclarationMemo>::default();
     let mut detected = None;
     let mut recovered_records = 0;
     crate::storage::repository_state_store::retry_optimistic_reads(
         "repository root selection",
         || {
             let attempt = (|| -> Result<OpenedRepository> {
-                let storage = JsonFileStorage::new(&data_root);
+                let storage =
+                    JsonFileStorage::for_command(&data_root, std::sync::Arc::clone(&declarations));
                 let recovery_failure = |error: anyhow::Error| {
                     if invocation.is_recover && is_leftover_record_failure(&error) {
                         RecoveryFailedError(error).into()

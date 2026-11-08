@@ -1035,6 +1035,13 @@ impl jit::storage::RepositoryStateStore for FailingMutationStorage {
     fn declaration_memo(&self) -> &std::sync::Arc<jit::declarations::DeclarationMemo> {
         self.inner.declaration_memo()
     }
+
+    fn with_declaration_memo(
+        &self,
+        memo: std::sync::Arc<jit::declarations::DeclarationMemo>,
+    ) -> Self {
+        Self::new(self.inner.with_declaration_memo(memo))
+    }
 }
 
 impl IssueStore for FailingMutationStorage {

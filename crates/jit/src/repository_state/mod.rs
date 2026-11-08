@@ -62,7 +62,9 @@ pub use materialize::{
     assemble_config, render_capture_closure, render_data_root_ignore, validate_capture_closure,
     ValidationCaptureClosure,
 };
-pub(crate) use materialize::{configuration_of, default_schema_paths, schema_requests_of};
+pub(crate) use materialize::{
+    configuration_of, configuration_overlaid, default_schema_paths, schema_requests_of,
+};
 pub(crate) use mutation::MutationContextFactory;
 pub(crate) use mutation::{
     canonical_json, captured_gate_run_ids, captured_gate_run_issue_ids, captured_gate_verdict_keys,

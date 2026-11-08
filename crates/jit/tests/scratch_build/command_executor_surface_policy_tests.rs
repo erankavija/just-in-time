@@ -65,8 +65,10 @@ impl Surface {
         self.methods
             .iter()
             .filter(|(name, output)| {
-                !matches!(name.as_str(), "new" | "with_layout" | "with_worktree_paths")
-                    && !output.as_ref().is_some_and(|ty| self.facades.contains(ty))
+                !matches!(
+                    name.as_str(),
+                    "new" | "with_layout" | "with_worktree_paths" | "with_declaration_memo"
+                ) && !output.as_ref().is_some_and(|ty| self.facades.contains(ty))
             })
             .map(|(name, _)| name.as_str())
             .collect()
