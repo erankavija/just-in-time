@@ -518,7 +518,9 @@
     "c31c2e57 lead review FAIL r1: validate --fix derive_fixes reparses (capture_validation drops discovery parse; validation_declarations_from_image again) - REQ-01 literal.",
     "06:00-07:00 host held clear for df129d9e fba8d478 trials; c31c2e57 r1 and dd95bd9d r1 editing only, cargo held.",
     "6a19e93f r0 ed67e4a7c: smoke (a) 1.38 (base 4.34, load ~10). Lead review FAIL r1: IssueIndex dependents map parallel to e7635f2f reverse index (convergence). Graph-rule transition full-list read: ruling requested from invoker.",
-    "09:06-09:12 quiet window: 45d0a971 base-only record into its worktree raw/base (load 1.93->1.56; base reproduces all three costs); 6a19e93f standard and graph-rule runs both pass."
+    "09:06-09:12 quiet window: 45d0a971 base-only record into its worktree raw/base (load 1.93->1.56; base reproduces all three costs); 6a19e93f standard and graph-rule runs both pass.",
+    "10:46-10:50 quiet runs on be754ee04 (sha f0173410): standard tip 1.708 (base 3.748), graph-rule 1.721 (base 3.761), both FAIL at load <2; fb38ed248 passed (1.33/0.60). Regression sent to worker for profiling.",
+    "Process (invoker): every non-gate sol brief states before the criteria: Report only defects that violate the quoted criterion text or a cited invariant, each with a reachable failure scenario. Do not extend a criterion to cases it does not name; list such observations separately as non-blocking. Sort output by that split before acting."
   ],
   "story_checkpoints": [
     {
