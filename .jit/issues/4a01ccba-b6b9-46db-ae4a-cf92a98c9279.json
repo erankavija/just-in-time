@@ -13,7 +13,7 @@
       "doc_type": "benchmark",
       "format": "markdown",
       "label": null,
-      "path": "dev/benchmarks/per-test-durations-1eb949a5/remeasure-4a01ccba/README.md"
+      "path": "dev/archive/df129d9e-rust-code-quality/benchmarks/per-test-durations-1eb949a5/remeasure-4a01ccba/README.md"
     }
   ],
   "done_at": "2026-11-04T14:06:11.505713998Z",
@@ -47,5 +47,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Refactor every test over the per-test limit",
-  "updated_at": "2026-11-04T14:06:11.505713998Z"
+  "updated_at": "2026-11-08T08:21:18.485583047Z"
 }

@@ -11,7 +11,7 @@
       "doc_type": "evidence",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/3b696589/req-04-evidence.md"
+      "path": "dev/archive/df129d9e-rust-code-quality/active/3b696589/req-04-evidence.md"
     }
   ],
   "done_at": "2026-11-04T13:59:23.786082843Z",
@@ -45,5 +45,5 @@
   "priority": "high",
   "state": "done",
   "title": "Graceful-shutdown tests observe the server through explicit signals",
-  "updated_at": "2026-11-04T13:59:23.786082843Z"
+  "updated_at": "2026-11-08T08:21:18.485583047Z"
 }

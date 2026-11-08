@@ -9,29 +9,11 @@
   "description": "Freeze the before figure for `crates/jit/src` production lines, counted the way the epic's Background describes, so the completion report states a reproducible delta.\n\n## Background\n\nThe epic's survey counts production lines excluding `#[cfg(test)]` blocks, test-only sibling modules, doc comments and blank lines. The planning investigation's counter, `dev/active/df129d9e-rust-code-quality/prodlines.py`, implements exactly that in its default mode, reporting per top-level module; at 21f9e563 it yields 66,372. The survey's stated figure of about 63,100 is reproduced only with `--strip-line-comments --test-support-as-test` (63,118), which also drops plain comments and `test-support`-gated code. The figure moves with every commit of this and concurrent epics, so the baseline must be pinned to a named commit taken before this epic first changes `crates/jit/src`.\n\n## Success Criteria\n\n- [hard] REQ-01: The counter is committed as `scripts/production-lines.py` with unchanged definitions and flags, so the reports and the budget script share one implementation; the planning copy stays as investigation evidence.\n- [hard] REQ-02: `dev/active/df129d9e-rust-code-quality/line-count-baseline.md` records per-module and total production lines in the default (survey-described) mode as the authoritative figures, with the flagged-mode figures beside them.\n- [hard] REQ-03: The document names the full commit SHA measured and the exact commands, and that commit precedes every commit of this epic that changes `crates/jit/src`.\n- [hard] REQ-04: Re-running the recorded commands at the recorded commit reproduces every figure.\n\n## Notes\n\n842b0ac6 deletes code concurrently, which is why the commit is pinned. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.",
   "documents": [
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "f5e8219b412d443911cd5957d0ad6701e9141b77ecbcb8870eae401b76abaa7c",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "../../../scripts/production-lines.py",
-          "resolved_path": "scripts/production-lines.py"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "e5099fd96f86de2d1e09f3c12536382dc25b900f03d8c164c01fa912b6eadba9",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "prodlines.py",
-          "resolved_path": "dev/active/df129d9e-rust-code-quality/prodlines.py"
-        }
-      ],
       "commit": null,
       "doc_type": "report",
       "format": "markdown",
       "label": "Production-line baseline",
-      "path": "dev/active/df129d9e-rust-code-quality/line-count-baseline.md"
+      "path": "dev/archive/df129d9e-rust-code-quality/active/line-count-baseline.md"
     }
   ],
   "done_at": "2026-10-21T05:55:13.501056991Z",
@@ -59,5 +41,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Record the production-line baseline for crates/jit/src",
-  "updated_at": "2026-10-21T05:55:13.501056991Z"
+  "updated_at": "2026-11-08T08:21:18.485583047Z"
 }

@@ -11,7 +11,7 @@
       "doc_type": "verification",
       "format": "markdown",
       "label": "Rust API documentation verification",
-      "path": "dev/active/755964b2/verification.md"
+      "path": "dev/archive/df129d9e-rust-code-quality/active/755964b2/verification.md"
     }
   ],
   "done_at": "2026-11-05T01:28:07.836954605Z",
@@ -45,5 +45,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Rust API links name the owners after facade extraction",
-  "updated_at": "2026-11-05T01:28:07.836954605Z"
+  "updated_at": "2026-11-08T08:21:18.485583047Z"
 }

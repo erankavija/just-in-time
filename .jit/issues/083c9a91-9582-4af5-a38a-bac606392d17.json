@@ -13,7 +13,7 @@
       "doc_type": "notes",
       "format": "markdown",
       "label": "cargo-ci evidence and commit ancestry",
-      "path": "dev/active/df129d9e-rust-code-quality/evidence-083c9a91-ci-ancestry.md"
+      "path": "dev/archive/df129d9e-rust-code-quality/active/evidence-083c9a91-ci-ancestry.md"
     }
   ],
   "done_at": "2026-11-03T20:25:12.892318681Z",
@@ -49,5 +49,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Claim and recover operations behind a claims facade",
-  "updated_at": "2026-11-03T20:25:12.892318681Z"
+  "updated_at": "2026-11-08T08:21:18.485583047Z"
 }
