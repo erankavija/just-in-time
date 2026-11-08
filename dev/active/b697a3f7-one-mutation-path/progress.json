@@ -239,8 +239,8 @@
           "id": "c31c2e57",
           "short_id": "c31c2e57",
           "title": "A mutation attempt parses its configuration once per captured image",
-          "status": "rework 2",
-          "note": "r1 landed f3f3eb2ea (b590b9deb); cargo-ci passed; code-review FAILED run 81638c37 (F1 failed assembly not memoized; F2 capture_archive_base drops discovery parse). Fix-forward from f3f3eb2ea; class sweep requested."
+          "status": "done",
+          "note": "r2 landed dd7d4178c (86898bfe1); cargo-ci passed; code-review passed run 5f86b8ae"
         },
         {
           "id": "e73ad8bc",
@@ -694,6 +694,15 @@
       "effort": "high",
       "verdict": "fail (F1, F2 blocking)",
       "run": "b33701f2"
+    },
+    {
+      "issue": "c31c2e57",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "5f86b8ae"
     }
   ]
 }

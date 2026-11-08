@@ -26,7 +26,7 @@
     "satisfies:b697a3f7/REQ-12"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "A gate evaluation resolves checker documents and validation from its own captured image",
-  "updated_at": "2026-11-08T03:24:26.161833639Z"
+  "updated_at": "2026-11-08T05:26:40.495494754Z"
 }

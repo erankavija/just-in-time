@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "dd7d4178cb5b97f40ef697ab84587182cb2e7249",
+  "completed_at": "2026-11-08T05:26:27.426628193Z",
+  "duration_ms": 171769,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied; both prior blocking findings are resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c31c2e57-ffc0-4a71-9e98-e7a6da5bc577",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5f86b8ae-247d-4037-b4bd-0aa022a22f0f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T05:23:35.657447566Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:c31c2e57 — 86898bfe, 8f9d250d, b590b9de, efab0755, 0a56c961; uncommitted changes excluded.\nPolicy sources: AGENTS.md; dev/TESTING.md; no subtree AGENTS.md.\nResolved items: @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/issue/c31c2e57/requirement/REQ-01, @/issue/c31c2e57/requirement/REQ-02, @/issue/c31c2e57/requirement/REQ-03, @/issue/b697a3f7/requirement/REQ-10 → issue descriptions; @/inv/orthogonal-tests, @/inv/essential-code-prose, @/inv/architecture-dependency-direction, @/inv/derived-state-coherence, @/inv/convention-convergence, @/inv/shared-test-contracts, @/inv/semantic-test-assertions, @/inv/canonical-cutover → .jit/invariants.toml; @/gate/cargo-ci, @/gate/jit-validate → .jit/gates.toml.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T05:21:33.510974224+00:00; wrapper confirms dd7d4178 covers all five tagged commits; no rerun. Prior code-review failed, exit 1; both findings rechecked.\nTruncation recovery: recovered b590b9de patches through separate reads of validate.rs, validation files, gate.rs, invariant.rs, project.rs, template.rs, and the architecture note.\n\nNo findings. Both prior blockers are resolved: discovery retains failed assemblies, and archive consumes its returned configuration. MutationBase and template application reuse discovery’s assembly. One isolated test owns the parse-count property, including malformed configuration; inspection and the covering cargo-ci evidence support unchanged mutation behavior.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied; both prior blocking findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
