@@ -191,7 +191,7 @@
      "id": "219b9df8",
      "short_id": "219b9df8",
      "title": "Test declaration fixtures validate paths through the canonical validator",
-     "status": "rework 1"
+     "status": "done"
     }
    ]
   },
@@ -400,6 +400,10 @@
   {
    "issue": "42046050",
    "decision": "Invoker ruling: keep captured-parse skip of an absent optional default schema (production change: MissingCapture error -> successful validate); reason: regression from moving reads to captured images, D-20 one capability one answer, REQ-03 keeps the test. Condition: one rule both readers call (rework 1). Recorded as stated deviation on the issue."
+  },
+  {
+   "issue": "219b9df8",
+   "decision": "Invoker accepted rework-1 scope: RootRelativePath segments/split_leaf/resolve_link, assets.rs normalize_path deleted, capability fns typed; stricter refusal of ':', '\\\\', control chars recorded as deviation. f14fe734 copy count now six."
   }
  ],
  "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",
@@ -454,6 +458,15 @@
    "model": "gpt-6.1-sol",
    "effort": "high",
    "verdict": "1 blocking finding -> 219b9df8"
+  },
+  {
+   "issue": "219b9df8",
+   "review": "code-review gate (rework 1)",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "pass",
+   "run": "007fb972"
   }
  ]
 }

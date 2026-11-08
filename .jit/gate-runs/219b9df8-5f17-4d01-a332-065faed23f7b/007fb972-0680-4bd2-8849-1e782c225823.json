@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "48a3e91a4a2bb29d699cba809d17344d5a39e5f0",
+  "completed_at": "2026-11-08T00:02:36.961896114Z",
+  "duration_ms": 136658,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied; prior F1 is resolved, and no unresolved issue-impact defects were found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "219b9df8-5f17-4d01-a332-065faed23f7b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "007fb972-0680-4bd2-8849-1e782c225823",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T00:00:20.303480487Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:219b9df8 — 52747410, 2cbceb7c, 062ced2e, f1be78e9, c06181d3; individual patches inspected\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/issue/219b9df8/requirement/REQ-01, @/issue/219b9df8/requirement/REQ-02, @/issue/219b9df8/requirement/REQ-03, @/issue/b697a3f7/requirement/REQ-20, @/issue/dfb2f10d/requirement/REQ-02 → respective issue descriptions; @/invariant/convention-convergence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/semantic-types, @/invariant/architecture-dependency-direction, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions → .jit/invariants.toml; @/gate/jit-validate → .jit/gates.toml\nGate evidence: cargo-ci passed, exit 0, 2026-11-07T23:58:51Z; wrapper confirms coverage of all five commits. Previous code-review failed, exit 1; its F1 is addressed.\nTruncation recovery: .jit/invariants.toml reread in narrower ranges, recovering all omitted relevant policy\n\nNo findings. `declaration_dir` validates every path before creating its directory (`crates/jit/src/test_utils.rs:957`). Confined reads now revalidate resolved symlink destinations through the canonical parser (`crates/jit/src/storage/capability_fs.rs:644`), resolving prior F1. All three hard criteria are supported by inspection and the covering cargo-ci evidence.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied; prior F1 is resolved, and no unresolved issue-impact defects were found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
