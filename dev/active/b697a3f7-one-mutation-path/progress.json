@@ -283,8 +283,8 @@
         {
           "id": "e7635f2f",
           "short_id": "e7635f2f",
-          "status": "pending",
-          "note": "opus"
+          "status": "done",
+          "note": "landed 27beaa785 (d3b03a461); cargo-ci passed; code-review passed run 7ec5800e; smoke (b) ratio 0.178 (base 38.01 ms, tip 6.78 ms, load ~7)"
         },
         {
           "id": "2add77bc",
@@ -768,6 +768,15 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "verdict": "all MET, no findings"
+    },
+    {
+      "issue": "e7635f2f",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "7ec5800e"
     }
   ]
 }
