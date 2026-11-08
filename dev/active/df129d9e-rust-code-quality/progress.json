@@ -1060,7 +1060,8 @@
       "to": "just-in-time-d5",
       "subject": "75a90224 REQ-02 vs D-03: JSON error.message becomes the one-line summary",
       "options": "A amend REQ-02 (recommended) / B new emitter mechanism or dispatch mode branch",
-      "status": "open"
+      "status": "resolved",
+      "ruling": "A: REQ-02 amended (steward D-01 on 75a90224); update docs/schema examples of old error.message, CHANGELOG line if JSON-visible changes are recorded; fix F2"
     }
   ],
   "rework_counts": {
