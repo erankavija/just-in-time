@@ -16,7 +16,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "07dadc43-8fff-43ae-b09e-c513f2f9b5b8",
+      "status": "passed",
+      "updated_at": "2026-11-08T03:41:20.646789128Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "84694380-da57-4310-ac2f-c6318e19869a",
+      "status": "failed",
+      "updated_at": "2026-11-08T03:45:17.615269997Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f487aeef-e0d4-4334-8843-0c80b0023c2d",
   "labels": [
     "epic:rust-code-quality",
@@ -28,5 +41,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Enforce the per-test limits and retire the whole-suite budget",
-  "updated_at": "2026-11-08T03:31:43.832669423Z"
+  "updated_at": "2026-11-08T03:45:17.615269997Z"
 }

@@ -1,0 +1,50 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "48c4087161ed95f6a030360c16c656298811499d",
+  "completed_at": "2026-11-08T03:45:17.613649947Z",
+  "duration_ms": 236857,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/cargo-ci-selftest.sh",
+        "id": "F1",
+        "line": 1072,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The timeout self-test falsely fails with one test slot because fail-fast prevents both layers from running."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/df129d9e-rust-code-quality/lead-tools/land-one.sh",
+        "id": "F2",
+        "line": 34,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f487aeef/requirement/REQ-04"
+        ],
+        "severity": "low",
+        "summary": "Active landing tooling retains commentary and retry logic for the retired suite-duration budget."
+      }
+    ],
+    "summary": "The timeout self-test depends on concurrency, and active landing tooling retains the retired suite-budget policy.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f487aeef-e0d4-4334-8843-0c80b0023c2d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "84694380-da57-4310-ac2f-c6318e19869a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T03:41:20.756544134Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6463 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1b93f-12a8-7531-9709-21450c0ef896\n--------\nuser\n--- 6450 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:f487aeef` — 3caaf7a2, 61fca413, 0977e9ba, 7dce61b1; uncommitted changes excluded.\nPolicy sources: AGENTS.md; dev/TESTING.md; no subtree AGENTS.md found.\nResolved items: @/inv/canonical-cutover, @/inv/orthogonal-tests, @/inv/shared-test-contracts, @/inv/semantic-test-assertions, @/inv/essential-code-prose, @/inv/bounded-rust-build-footprint, @/inv/no-ignored-tests, @/inv/single-source-prose → .jit/invariants.toml; @/gate/cargo-ci, @/gate/jit-validate → .jit/gates.toml; @/charter/D-18 → dev/vision/9db27a3a-charter.md; @/issue/f487aeef/decision/D-01 and @/issue/f487aeef/requirement/REQ-01, @/issue/f487aeef/requirement/REQ-02, @/issue/f487aeef/requirement/REQ-03, @/issue/f487aeef/requirement/REQ-04, @/issue/f487aeef/requirement/REQ-05 → issue description.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T03:40:06.760310516+00:00; wrapper confirms commit 48c40871 covers all four tagged commits; current code-review pending; gates not rerun.\nTruncation recovery: separate script-patch reads, narrowed dependency descriptions and budget-script ranges; unrelated historical npm stdout excluded.\n\n1. **F1 — Medium, blocking, issue-impact:** [scripts/cargo-ci-selftest.sh:1072](/home/vkaskivuo/Projects/just-in-time/scripts/cargo-ci-selftest.sh:1072) runs both nonterminating fixtures together and subsequently requires both TIMEOUT records. The pinned runner defaults to fail-fast and CPU-based concurrency, while the fixture inherits `NEXTEST_TEST_THREADS`. With one test slot, the first timeout prevents the other layer from starting, producing a false self-test failure. Run each layer independently or explicitly provide sufficient fixture concurrency.\n\n2. **F2 — Low, blocking, issue-impact:** [dev/active/df129d9e-rust-code-quality/lead-tools/land-one.sh:34](/home/vkaskivuo/Projects/just-in-time/dev/active/df129d9e-rust-code-quality/lead-tools/land-one.sh:34) retains live commentary and retry logic for the retired suite-duration budget. Lines 35–36 still parse doctest duration and match `test suite duration: observed`. This executable landing helper is not a historical record; remove the obsolete branch to satisfy REQ-04’s cleanup requirement.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The timeout self-test depends on concurrency, and active landing tooling retains the retired suite-budget policy.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The timeout self-test falsely fails with one test slot because fail-fast prevents both layers from running.\",\"file\":\"scripts/cargo-ci-selftest.sh\",\"line\":1072,\"references\":[]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Active landing tooling retains commentary and retry logic for the retired suite-duration budget.\",\"file\":\"dev/active/df129d9e-rust-code-quality/lead-tools/land-one.sh\",\"line\":34,\"references\":[\"@/issue/f487aeef/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
