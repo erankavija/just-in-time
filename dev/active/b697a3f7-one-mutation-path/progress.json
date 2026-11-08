@@ -442,7 +442,8 @@
     "Trap: `jit <cmd> --json >/dev/null && echo ok` hides refusals; jit dep add refused a non-reduced edge (VALIDATION_FAILED) yet the echo ran. Check the JSON error field or the resulting graph; use `jit dep add --reduce` when the new edge makes a parent edge redundant.",
     "03:14 quiet-window stop: all workers idle, no cargo running, host load ~0.2. Resume after the invoker's all-clear (gf2-16 benchmark at 04:00). Next: 4e2bed35 clippy fix and land; wave 11 a2153a6f + c31c2e57 (opus); then a869900b; e73ad8bc after 4e2bed35; 45d0a971 after df129d9e's fba8d478 quiet-host trials.",
     "05:15 resumed after invoker all-clear. 4e2bed35 landed and closed. Wave 11: a2153a6f, c31c2e57 (opus), e73ad8bc (sonnet). Coordination: df129d9e 7909527f will touch two gate_check.rs tests (overlaps a2153a6f); it announces before landing. Trap: worktree script default tmp root is long; give workers TMPDIR=/tmp/lw-<id>.",
-    "Coordination protocol with df129d9e (agreed 05:2x): each lead messages before a land and waits for the other OK; no merge onto main while the other lead has a gate judging main."
+    "Coordination protocol with df129d9e (agreed 05:2x): each lead messages before a land and waits for the other OK; no merge onto main while the other lead has a gate judging main.",
+    "If c31c2e57 review flags a captured gate-registry parse site, cite a869900b REQ-04 as owner; do not rework c31c2e57 (invoker)."
   ],
   "story_checkpoints": [
     {
@@ -477,6 +478,11 @@
     {
       "issue": "219b9df8",
       "decision": "Invoker accepted rework-1 scope: RootRelativePath segments/split_leaf/resolve_link, assets.rs normalize_path deleted, capability fns typed; stricter refusal of ':', '\\\\', control chars recorded as deviation. f14fe734 copy count now six."
+    },
+    {
+      "at": "05:3x",
+      "decision": "Five private captured-gate-registry parses (gate_check.rs, gate.rs, mod.rs, template.rs, validate.rs) folded into a869900b as REQ-04, with a Rulings note on non-regular-file behaviour; dep a869900b→c31c2e57 added with --reduce (dropped d675102c→c31c2e57)",
+      "by": "invoker just-in-time-d5"
     }
   ],
   "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",

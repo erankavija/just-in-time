@@ -7,8 +7,7 @@
     "42046050-895f-42bb-a486-383a47e39649",
     "850eaad3-53a3-4d50-bd02-6a51a0c84208",
     "9a2563fd-61ed-45c2-9cfa-b5f006c47afa",
-    "a869900b-c255-45b5-b915-29d9c4034b24",
-    "c31c2e57-ffc0-4a71-9e98-e7a6da5bc577"
+    "a869900b-c255-45b5-b915-29d9c4034b24"
   ],
   "description": "Aggregate the work that gives configuration one assembly from bytes, removes the executor's disk-backed caches, and converges gate presets and gate evidence capture on captured images.\n\n## Success Criteria\n\n- [hard] REQ-01: One pure function assembles `JitConfig` from source bytes for filesystem loading and image capture, and `ConfigurationDeclarations` duplicates no assembled field.\n- [hard] REQ-02: The executor holds no disk-backed configuration, rules or namespace cache; read paths take declarations from a captured image, and each mutation attempt parses its declarations once per captured image.\n- [hard] REQ-03: Gate presets are read as storage-supplied bytes keyed by the gate-presets path through one pure catalog, with no preset file I/O outside storage.\n- [hard] REQ-04: Gate evaluation and precheck capture evidence through one function that enforces the prompt size limit, and each evaluation resolves its inputs once per captured image.\n\n\n## Rulings\n\n- Sol checkpoint review finding 3, in part, is out of scope (steward ruling, just-in-time-d5, 2026-11-08): verdict digests that read live files (`gate_check.rs` ~920, `gate_execution.rs` ~410) stay as they are. An exec checker runs on the working tree, so its digest must fingerprint the live inputs it consumes. REQ-04 covers only that each evaluation resolves its inputs once per captured image (task `a869900b`).\n",
   "documents": [],
@@ -31,5 +30,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Configuration and gate declarations come from captured images",
-  "updated_at": "2026-11-08T00:31:12.012876326Z"
+  "updated_at": "2026-11-08T03:24:26.161833639Z"
 }
