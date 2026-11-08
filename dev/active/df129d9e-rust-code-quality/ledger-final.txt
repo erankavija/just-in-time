@@ -1,0 +1,1069 @@
+# module	name	default-base	default-final	default-delta	flagged-base	flagged-final	flagged-delta
+module	commands	21113	19159	-1954	19926	18258	-1668
+module	storage	9727	11593	+1866	9313	10715	+1402
+module	repository_state	10620	9367	-1253	10325	9168	-1157
+module	domain	7483	8258	+775	7347	7982	+635
+module	main	7965	37	-7928	7366	34	-7332
+module	profile	5041	3123	-1918	4370	2975	-1395
+module	output	1839	5014	+3175	1782	4834	+3052
+module	dispatch	-	3661	+3661	-	3632	+3632
+module	validation	2952	3076	+124	2763	2916	+153
+module	cli	1672	1375	-297	1661	1366	-295
+module	declarations	1369	1668	+299	1303	1620	+317
+module	document	1237	1185	-52	1174	1126	-48
+module	config	1149	704	-445	1105	695	-410
+module	test_utils	1029	1141	+112	-	-	-
+module	schema	1013	600	-413	912	514	-398
+module	graph	831	853	+22	781	803	+22
+module	errors	734	760	+26	728	754	+26
+module	test_harness	-	605	+605	-	-	-
+module	templates	366	591	+225	353	581	+228
+module	gate_execution	457	384	-73	406	342	-64
+module	gate_presets	444	341	-103	421	199	-222
+module	query_engine	375	387	+12	366	378	+12
+module	test_cli	-	287	+287	-	-	-
+module	generated_artifacts	148	204	+56	-	-	-
+module	search	140	197	+57	129	183	+54
+module	test_taxonomy	151	188	+37	-	-	-
+module	visualization	177	188	+11	172	183	+11
+module	config_manager	149	72	-77	141	68	-73
+module	snapshot	142	112	-30	141	112	-29
+module	labels	112	136	+24	100	127	+27
+module	runtime_defaults	62	120	+58	53	8	-45
+module	agent_config	88	93	+5	79	86	+7
+module	output_macros	71	-	-71	68	-	-68
+module	type_icons	46	62	+16	42	58	+16
+module	lib	49	47	-2	42	36	-6
+module	test_lease_store	-	46	+46	-	-	-
+module	process	-	33	+33	-	33	+33
+module	build_info	23	23	+0	23	23	+0
+module	test_mode	15	-	-15	3	-	-3
+module	tar_format	12	12	+0	12	12	+0
+module	TOTAL	78801	75702	-3099	73407	69821	-3586
+# step	class	merge	issues	epics	delta	subject  (epic and ambiguous merges; others when delta != 0)
+step	other	2fb6b59b0	0ec8b001	epic:greenfield-cutover	-163	Merge branch 'worktree-agent-0ec8b001' (jit:0ec8b001)
+step	other	8a85bc870	52732879	epic:greenfield-cutover	-190	Merge branch 'worktree-agent-52732879' (jit:52732879)
+step	other	76db712c5	aa423d02	epic:audit-correctness	+11	Merge branch 'worktree-agent-aa423d02' (jit:aa423d02)
+step	other	e7ca0af72	756ec5ec	epic:greenfield-cutover	-117	Merge branch 'worktree-agent-756ec5ec' (jit:756ec5ec)
+step	epic	e84318f92	9ca31c64	epic:rust-code-quality	-2	Merge branch 'worktree-agent-9ca31c64' (jit:9ca31c64)
+step	other	131e5080c	fd9bfab8	epic:lead-friction	+3	Merge branch 'worktree-agent-fd9bfab8' (jit:fd9bfab8)
+step	other	a51913ccd	ae2e3739	epic:lead-friction	+87	Merge branch 'worktree-agent-ae2e3739' (jit:ae2e3739)
+step	other	78684701c	d6bbe05f	epic:lead-friction	-244	Merge branch 'worktree-agent-d6bbe05f' (jit:d6bbe05f)
+step	other	4bbd04626	f11514dd	epic:greenfield-cutover	-264	Merge branch 'worktree-agent-f11514dd' (jit:f11514dd)
+step	other	4d409adf3	bedf0962	epic:audit-correctness	-67	Merge branch 'worktree-agent-bedf0962' (jit:bedf0962)
+step	other	428147948	66986f88	epic:lead-friction	+38	Merge branch 'worktree-agent-66986f88' (jit:66986f88)
+step	other	471b998f7	05d1b34e	epic:audit-correctness	+5	Merge branch 'worktree-agent-05d1b34e' (jit:05d1b34e)
+step	epic	e20c3b743	1874e265	epic:rust-code-quality	+11	Merge branch 'worktree-agent-1874e265' (jit:1874e265)
+step	other	94b072c04	05d1b34e	epic:audit-correctness	+7	Merge branch 'worktree-agent-05d1b34e' (jit:05d1b34e rework 1)
+step	other	8aab9a5aa	47a082ef	epic:greenfield-cutover	-6	Merge branch 'worktree-agent-47a082ef' (jit:47a082ef)
+step	other	2707c8924	c0d0c8bf	epic:audit-correctness	-10	Merge branch 'worktree-agent-c0d0c8bf' (jit:c0d0c8bf)
+step	other	b9a0d249d	0ec8b001	epic:greenfield-cutover	+1	Merge branch 'worktree-agent-0ec8b001' (jit:0ec8b001)
+step	other	203c67fd2	72d89161	epic:lead-friction	-158	Merge branch 'worktree-agent-72d89161' (jit:72d89161)
+step	other	95c5cbb4d	4251137e	epic:greenfield-cutover	-55	Merge branch 'worktree-agent-4251137e' (jit:4251137e)
+step	other	7f4b74e92	866bdde0	epic:greenfield-cutover	-317	Merge branch 'worktree-agent-866bdde0' (jit:866bdde0)
+step	other	80088964d	c0d0c8bf	epic:audit-correctness	-9	Merge branch 'worktree-agent-c0d0c8bf' (jit:c0d0c8bf rework 1)
+step	other	2e77bc1cb	45b442f3	epic:greenfield-cutover	-4	Merge branch 'worktree-agent-45b442f3' (jit:45b442f3)
+step	other	f4507f330	66986f88,ae2e3739,d6bbe05f,fd9bfab8	epic:lead-friction	-1	Merge branch 'worktree-agent-docfix1' (jit:d6bbe05f, jit:fd9bfab8, jit:ae2e3739, jit:66986f88 doc rework)
+step	other	ffc98b7ce	4c216a28	epic:greenfield-cutover	-3	Merge branch 'worktree-agent-4c216a28' (jit:4c216a28)
+step	epic	6470711b4	ef9897ab	epic:rust-code-quality	+258	Merge branch 'worktree-agent-ef9897ab' (jit:ef9897ab)
+step	other	f1c74fa1b	d759d606	epic:greenfield-cutover	-47	Merge branch 'worktree-agent-d759d606' (jit:d759d606)
+step	other	6672b0d65	84745746	epic:greenfield-cutover	-200	Merge branch 'worktree-agent-84745746' (jit:84745746)
+step	other	1d8eca5b9	16d63038	epic:audit-correctness	-123	Merge branch 'worktree-agent-16d63038' (jit:16d63038)
+step	epic	40aaec181	719a5501	epic:rust-code-quality	-121	Merge branch 'worktree-agent-719a5501' (jit:719a5501)
+step	other	b41a28ee9	66bd4b5c	epic:greenfield-cutover	-36	Merge branch 'worktree-agent-66bd4b5c' (jit:66bd4b5c)
+step	other	77cfcd1f4	24268b05	epic:lead-friction	-993	Merge branch 'worktree-agent-24268b05' (jit:24268b05)
+step	other	abe42b563	71b0af0e	epic:greenfield-cutover	-130	Merge branch 'worktree-agent-71b0af0e' (jit:71b0af0e)
+step	epic	6d24ab6ee	f7f01654	epic:rust-code-quality	+129	Merge branch 'worktree-agent-f7f01654' (jit:f7f01654)
+step	other	e9779e829	b5faef84	epic:audit-correctness	+2	Merge branch 'worktree-agent-b5faef84' (jit:b5faef84)
+step	other	44ccef81a	8397eb74	epic:greenfield-cutover	-91	Merge branch 'worktree-agent-8397eb74' (jit:8397eb74)
+step	other	0c5a9aea1	72d4990c	epic:greenfield-cutover	-7	Merge branch 'worktree-agent-72d4990c' (jit:72d4990c)
+step	other	a8bf89160	8673dc5e	epic:lead-friction	+84	Merge branch 'worktree-agent-8673dc5e' (jit:8673dc5e)
+step	other	7e0e58cd2	16d63038	epic:audit-correctness	+152	Merge branch 'worktree-agent-16d63038' (jit:16d63038 rework 1)
+step	other	f84732b2f	c998dfd3	epic:greenfield-cutover	-2	Merge branch 'worktree-agent-c998dfd3' (jit:c998dfd3)
+step	epic	4a9f6f686	233f4a09	epic:rust-code-quality	+0	Merge branch 'worktree-agent-233f4a09' (jit:233f4a09)
+step	other	a3d36f0fb	9aa54649	epic:greenfield-cutover	+51	Merge branch 'worktree-agent-9aa54649' (jit:9aa54649)
+step	other	8849930aa	8673dc5e	epic:lead-friction	+5	Merge branch 'worktree-agent-8673dc5e' (jit:8673dc5e rework 1)
+step	other	bc13fc9eb	af9a5509	epic:greenfield-cutover	-307	Merge branch 'worktree-agent-af9a5509' (jit:af9a5509)
+step	epic	988b20792	650e6a56	epic:rust-code-quality	-94	Merge branch 'worktree-agent-650e6a56' (jit:650e6a56)
+step	other	fe42b77de	81e7cdc3	epic:greenfield-cutover	-8	Merge branch 'worktree-agent-81e7cdc3' (jit:81e7cdc3)
+step	epic	fae1d1a07	650e6a56	epic:rust-code-quality	+0	Merge branch 'worktree-agent-650e6a56' (jit:650e6a56 rework 1)
+step	other	07c2bdd2c	2dd6b833	epic:lead-friction	-471	Merge branch 'worktree-agent-2dd6b833' (jit:2dd6b833)
+step	other	38e817597	5e846743	epic:greenfield-cutover	-32	Merge branch 'worktree-agent-5e846743' (jit:5e846743)
+step	other	6a430a7c4	f37d228e	epic:lead-friction	-18	Merge branch 'worktree-agent-f37d228e' (jit:f37d228e)
+step	other	c6753aea5	5e846743	epic:greenfield-cutover	+3	Merge branch 'worktree-agent-5e846743' (jit:5e846743)
+step	other	32225f790	3754095f	epic:lead-friction	+10	Merge branch 'worktree-agent-3754095f' (jit:3754095f)
+step	other	74394675c	8673dc5e	epic:lead-friction	+20	Merge branch 'worktree-agent-8673dc5e' (jit:8673dc5e rework 2)
+step	other	537da82c0	e1af39db	epic:greenfield-cutover	-15	Merge branch 'worktree-agent-e1af39db' (jit:e1af39db)
+step	other	629f3194a	459bb995	epic:greenfield-cutover	-38	Merge branch 'worktree-agent-459bb995' (jit:459bb995)
+step	other	b964b98bb	d125490a	epic:greenfield-cutover	-27	Merge branch 'worktree-agent-d125490a' (jit:d125490a)
+step	other	4568aea4f	459bb995	epic:greenfield-cutover	+28	Merge branch 'worktree-agent-459bb995' (jit:459bb995)
+step	other	f059dee4e	1a989754	epic:lead-friction	-138	Merge branch 'worktree-agent-1a989754' (jit:1a989754)
+step	other	e608637c4	2492ab29	epic:greenfield-cutover	-242	Merge branch 'worktree-agent-2492ab29' (jit:2492ab29)
+step	other	21b5a9c36	cd7b6c4a	epic:greenfield-cutover	+34	Merge branch 'worktree-agent-cd7b6c4a' (jit:cd7b6c4a)
+step	other	282827ce9	fbb661f2	epic:greenfield-cutover	-2	Merge branch 'worktree-agent-fbb661f2' (jit:fbb661f2)
+step	epic	f767033dc	d8176fd3	epic:rust-code-quality	-318	Merge branch 'worktree-agent-d8176fd3' (jit:d8176fd3)
+step	epic	78975ecf1	d8176fd3	epic:rust-code-quality	+0	Merge branch 'worktree-agent-d8176fd3' (jit:d8176fd3 follow-up)
+step	other	12f6a06aa	fbb661f2	epic:greenfield-cutover	+1	Merge branch 'worktree-agent-fbb661f2' (jit:fbb661f2)
+step	other	b80cd0da6	f866d9d8	epic:lead-friction	-1271	Merge branch 'worktree-agent-f866d9d8' (jit:f866d9d8)
+step	other	cef1cd74e	fe761000	epic:greenfield-cutover	-29	Merge branch 'worktree-agent-fe761000' (jit:fe761000)
+step	other	a1fd176cb	34361448	epic:greenfield-cutover	-46	Merge branch 'worktree-agent-34361448' (jit:34361448)
+step	epic	d144d3d84	27f0a575	epic:rust-code-quality	+47	Merge branch 'worktree-agent-27f0a575' (jit:27f0a575)
+step	other	51fcef315	39710b3b	epic:lead-friction	+40	Merge branch 'worktree-agent-39710b3b' (jit:39710b3b)
+step	other	354542941	58282882	epic:greenfield-cutover	-8	Merge branch 'worktree-agent-58282882' (jit:58282882)
+step	epic	be0d9ab53	27f0a575	epic:rust-code-quality	+0	Merge branch 'worktree-agent-27f0a575' (jit:27f0a575 doctest fix)
+step	other	c43d94a07	ec190bd5	epic:greenfield-cutover	-12	Merge branch 'worktree-agent-ec190bd5' (jit:ec190bd5)
+step	other	0e4632421	69af08af	epic:greenfield-cutover	-93	Merge branch 'worktree-agent-69af08af' (jit:69af08af)
+step	other	f73f8c362	58282882	epic:greenfield-cutover	-27	Merge branch 'worktree-agent-58282882' (jit:58282882)
+step	other	d0cec81b3	f866d9d8	epic:lead-friction	-2	Merge branch 'worktree-agent-f866d9d8' (jit:f866d9d8 rework 1)
+step	epic	b1df0b2f4	2f15d48d	epic:rust-code-quality	+55	Merge branch 'worktree-agent-2f15d48d' (jit:2f15d48d)
+step	other	a4759a3ec	287eef78	epic:greenfield-cutover	+1	Merge branch 'worktree-agent-287eef78' (jit:287eef78)
+step	other	3c849ae3c	ea5f4536	epic:greenfield-cutover	-124	Merge branch 'worktree-agent-ea5f4536' (jit:ea5f4536)
+step	other	087ae5c5c	5179374d	epic:lead-friction	-603	Merge branch 'worktree-agent-5179374d' (jit:5179374d)
+step	other	062ed9b7e	86d3625d	epic:greenfield-cutover	-71	Merge branch 'worktree-agent-86d3625d' (jit:86d3625d)
+step	other	6bceb1ad3	a3dd995a	epic:test-topology	+34	Merge branch 'worktree-agent-a3dd995a' (jit:a3dd995a)
+step	epic	12d718456	9fa12e75	epic:rust-code-quality	+28	Merge branch 'worktree-agent-9fa12e75' (jit:9fa12e75)
+step	other	522219079	0973ed93	epic:test-topology	+31	Merge branch 'worktree-agent-0973ed93' (jit:0973ed93)
+step	epic	ce437049d	9fa12e75	epic:rust-code-quality	+18	Merge branch 'worktree-agent-9fa12e75' (jit:9fa12e75 review fix)
+step	other	8c2837ad5	2b49f95b	epic:test-topology	+145	Merge branch 'worktree-agent-2b49f95b' (jit:2b49f95b)
+step	other	e7935f974	d35c610b	epic:test-topology	+5	Merge branch 'worktree-agent-d35c610b' (jit:d35c610b)
+step	other	99a610baa	0bf97911	epic:test-topology	+46	Merge branch 'worktree-agent-0bf97911' (jit:0bf97911)
+step	other	5f3e8140d	0e3b69fc	epic:greenfield-cutover	+8	Merge branch 'worktree-agent-0e3b69fc' (jit:0e3b69fc)
+step	other	855ccd2d9	3f217dd2	epic:lead-friction	-13	Merge branch 'worktree-agent-3f217dd2' (jit:3f217dd2)
+step	other	bfd2077fc	4a82ed46	epic:test-topology	+18	Merge branch 'worktree-agent-4a82ed46' (jit:4a82ed46)
+step	other	0bba22f71	0bf97911,4a82ed46	epic:test-topology	+7	Merge branch 'worktree-agent-0bf97911' (jit:0bf97911 jit:4a82ed46 rework 1)
+step	other	6bd8ca136	b4929342	epic:greenfield-cutover	-2	Merge branch 'worktree-agent-b4929342' (jit:b4929342)
+step	epic	145091232	9cc3056a	epic:rust-code-quality	+14	Merge branch 'worktree-agent-9cc3056a' (jit:9cc3056a)
+step	other	109e944f6	63c11d08	epic:greenfield-cutover	-16	Merge branch worktree-agent-63c11d08 (jit:63c11d08)
+step	other	39002df00	22355a56	epic:test-topology	+3	Merge product-initialized memory fixture recovery (jit:22355a56)
+step	other	148648d78	368df0c1	epic:test-topology	+5	Share pure available-work filtering and ordering (jit:368df0c1)
+step	epic	8cf19175a	d4373d07	epic:rust-code-quality	+40	Merge branch 'worktree-agent-d4373d07' (jit:d4373d07)
+step	epic	8c6d518bc	d4373d07	epic:rust-code-quality	+0	Merge branch 'worktree-agent-d4373d07' (jit:d4373d07 rework 1)
+step	epic	10fde232e	2e7e1348	epic:rust-code-quality	-4	Merge branch 'worktree-agent-2e7e1348' (jit:2e7e1348)
+step	epic	853d1cfc8	a807e699	epic:rust-code-quality	+12	Merge branch 'worktree-agent-a807e699' (jit:a807e699)
+step	other	7ef7e8dc9	3d93442b	epic:git-cli-module	-38	merge(jit:3d93442b): hook installation targets the selected repository's common directory
+step	other	2c9575022	7aafec83	epic:git-cli-module	+170	merge(jit:7aafec83): shared git repository and counting stand-in test fixtures
+step	epic	b834fcbae	a807e699	epic:rust-code-quality	+11	Merge branch 'worktree-agent-a807e699' (jit:a807e699 rework 1)
+step	other	9de4fe221	7aafec83	epic:git-cli-module	+19	merge(jit:7aafec83): resolve the stand-in's real git to an absolute path
+step	other	54a683471	81664a6a	epic:git-cli-module	+102	merge(jit:81664a6a): storage-owned git module with a one-process probe
+step	epic	46a747fc2	5d0a9a90	epic:rust-code-quality	+8	Merge branch 'worktree-agent-5d0a9a90' (jit:5d0a9a90)
+step	other	c3ad7fda0	81664a6a	epic:git-cli-module	+1	merge(jit:81664a6a): name layout detection as the tracked git-module exception
+step	epic	1d998db27	5d0a9a90	epic:rust-code-quality	+0	Merge branch 'worktree-agent-5d0a9a90' (jit:5d0a9a90 fix)
+step	other	e1c13e5af	3e353abd	epic:semantic-types	+74	Merge worktree-agent-3e353abd (validated issue id and staging bridge) (jit:3e353abd)
+step	other	1a8ef7fe6	df505379	epic:test-topology	+34	Merge typed list envelopes (jit:df505379)
+step	other	54607cd8d	1f6d3754	epic:semantic-types	-58	Merge worktree-agent-1f6d3754 (thiserror-derived artifact-plan errors) (jit:1f6d3754)
+step	other	a8840ea66	62a0085a	epic:semantic-types	-4	Merge worktree-agent-62a0085a (one HierarchyConfig constructor from declarations) (jit:62a0085a)
+step	other	9bf26a880	3f026bb1	epic:semantic-types	+39	Merge worktree-agent-3f026bb1 (wire-vocabulary macro proven on GateStatus) (jit:3f026bb1)
+step	other	e86d642f4	5c232305	epic:semantic-types	+4	Merge worktree-agent-5c232305 (ProfileId in the domain layer) (jit:5c232305)
+step	other	d61be780b	f8523c62	epic:semantic-types	+8	Merge worktree-agent-f8523c62 (query assignee filters parse to an Assignee) (jit:f8523c62)
+step	other	aed72daa9	80fe846e	epic:semantic-types	-76	Merge worktree-agent-80fe846e (artifact-plan codes through the vocabulary macro) (jit:80fe846e)
+step	other	9dfa245a5	3ae2293a	epic:semantic-types	-58	Merge worktree-agent-3ae2293a (gate stage and mode through the vocabulary macro) (jit:3ae2293a)
+step	other	864f1e570	b8506ce7	epic:semantic-types	-14	Merge worktree-agent-b8506ce7 (store-divergence vocabularies through the macro) (jit:b8506ce7)
+step	other	0c12fdf03	c400730c	epic:semantic-types	+41	Merge worktree-agent-c400730c (IssueIdPrefix owns prefix parsing and resolution typing) (jit:c400730c)
+step	other	119cb147d	7383f4ea	epic:semantic-types	-3	Merge worktree-agent-7383f4ea (template transform kind typed at load) (jit:7383f4ea)
+step	other	858770cd8	6e8b9f31	epic:semantic-types	+12	Merge worktree-agent-6e8b9f31 (system actors as named Assignee constants) (jit:6e8b9f31)
+step	other	d3da16bff	2ac50581	epic:semantic-types	-47	Merge worktree-agent-2ac50581 (lifecycle state tokens from one declaration) (jit:2ac50581)
+step	other	700526e7a	b3fcd297	epic:semantic-types	+39	Merge worktree-agent-b3fcd297 (schema paths from one VirtualPath constructor) (jit:b3fcd297)
+step	other	64af1bee6	6add7ca6	epic:semantic-types	-21	Merge worktree-agent-6add7ca6 (projection mode and style reach output typed) (jit:6add7ca6)
+step	other	cd66ab69e	6826f966	epic:semantic-types	-14	Merge worktree-agent-6826f966 (rule severity and scope from one declaration) (jit:6826f966)
+step	other	9035d85a5	a50e9be9	epic:semantic-types	+15	Merge worktree-agent-a50e9be9 (resolved agent identity is an Assignee) (jit:a50e9be9)
+step	other	c6792e5dd	cccfd407	epic:semantic-types	+13	Merge worktree-agent-cccfd407 (one VirtualPath predicate for reserved application targets) (jit:cccfd407)
+step	other	a909be010	428646c5	epic:semantic-types	+3	Merge worktree-agent-428646c5 (profile dependency resolution compares ProfileId values) (jit:428646c5)
+step	other	82a7de2ad	8cfbf19d	epic:semantic-types	+817	Merge worktree-agent-8cfbf19d (lease and worktree ids are dedicated types) (jit:8cfbf19d)
+step	other	2e73295a9	18dc6e3e	epic:semantic-types	+13	Merge worktree-agent-18dc6e3e (well-known files through VirtualPath constants in repository-state) (jit:18dc6e3e)
+step	other	36f5146c1	256c8eb1	epic:semantic-types	-171	Merge worktree-agent-256c8eb1 (error codes from one declaration) (jit:256c8eb1)
+step	other	50b2cbd87	98404e0c	epic:semantic-types	-4	Merge worktree-agent-98404e0c (lease records name their issue by IssueId) (jit:98404e0c)
+step	other	87a236499	179dcef9	epic:semantic-types	+9	Merge worktree-agent-179dcef9 (repository action owners are one enum) (jit:179dcef9)
+step	other	60ed71c0e	945f65f3	epic:semantic-types	+69	Merge worktree-agent-945f65f3 (well-known files through VirtualPath constants in commands) (jit:945f65f3)
+step	other	32a1bc74c	b48d7b2a	epic:semantic-types	+63	Merge worktree-agent-b48d7b2a (rule patterns compile at declaration load) (jit:b48d7b2a)
+step	other	0b7bffe00	96bb0941	epic:semantic-types	-43	Merge worktree-agent-96bb0941 (validation strictness typed at load) (jit:96bb0941)
+step	other	72605a3bf	bc1955a8	epic:semantic-types	+1	Merge worktree-agent-bc1955a8 (item kinds hold their id pattern as IdPattern) (jit:bc1955a8)
+step	other	59036bddf	a4b94a17	epic:semantic-types	-20	Merge worktree-agent-a4b94a17 (type-hierarchy and label-uniqueness rule options typed) (jit:a4b94a17)
+step	other	686c819b5	42bcaa6e	epic:semantic-types	-47	Merge worktree-agent-42bcaa6e (content format typed at load) (jit:42bcaa6e)
+step	other	4746d263b	af9c277d	epic:semantic-types	+14	Merge worktree-agent-af9c277d (label-reference assertions typed at load) (jit:af9c277d)
+step	other	3cb22ddbe	b4fe7887	epic:semantic-types	-42	Merge worktree-agent-b4fe7887 (item-kind scope has one enum) (jit:b4fe7887)
+step	other	dd0be05f4	faa19def	epic:semantic-types	-4	Merge worktree-agent-faa19def (gate-run actors are Assignee values) (jit:faa19def)
+step	other	fbb155e28	5613ef50	epic:semantic-types	+26	Merge worktree-agent-5613ef50 (dependency-shape assertions typed at load) (jit:5613ef50)
+step	other	9bfc09496	7e8f1525	epic:semantic-types	-54	Merge worktree-agent-7e8f1525 (label-coverage assertions typed and compiled at load) (jit:7e8f1525)
+step	other	aa24dad2c	72dfc0d7	epic:semantic-types	+41	Merge worktree-agent-72dfc0d7 (built-in gate findings use closed severity and disposition enums) (jit:72dfc0d7)
+step	other	7c25482d4	acb38457	epic:semantic-types	-19	Merge worktree-agent-acb38457 (graph traits yield dependency ids as string views) (jit:acb38457)
+step	other	2bc59073b	18bcafb8	epic:semantic-types	-39	Merge worktree-agent-18bcafb8 (production event matchers read events through a body view) (jit:18bcafb8)
+step	other	425c9b045	182350ce	epic:semantic-types	-40	Merge worktree-agent-182350ce (priority tokens from one declaration) (jit:182350ce)
+step	other	d760f5954	bf87bbdb	epic:semantic-types	+64	Merge worktree-agent-bf87bbdb (graph queries return nodes rather than id strings) (jit:bf87bbdb)
+step	other	62662baf6	3625b18b	epic:semantic-types	+1	Merge worktree-agent-3625b18b (unit tests match events through the body view) (jit:3625b18b)
+step	other	8f87a9a8c	5d5c5514	epic:semantic-types	-13	Merge worktree-agent-5d5c5514 (validation projections hold typed state and priority) (jit:5d5c5514)
+step	other	0522511f9	30923ea1	epic:semantic-types	-4	Merge worktree-agent-30923ea1 (priority orders by rank through Ord) (jit:30923ea1)
+step	other	e97478bc7	1622756a	epic:semantic-types	-7	Merge worktree-agent-1622756a (human output renders vocabulary tokens) (jit:1622756a)
+step	other	8ea09d8b4	e1a6c8c2	epic:semantic-types	+238	Merge worktree-agent-e1a6c8c2 (storage and configuration name well-known files through VirtualPath constants) (jit:e1a6c8c2)
+step	other	f7ec0192c	5491edd0	epic:semantic-types	+24	Merge worktree-agent-5491edd0 (worktree and server files have VirtualPath constants) (jit:5491edd0)
+step	other	1ecace042	d72bf093	epic:semantic-types	-127	Merge worktree-agent-d72bf093 (event becomes an envelope around a tagged body) (jit:d72bf093)
+step	other	ed6bc27c3	e98ae5a4	epic:semantic-types	-51	merge(jit:e98ae5a4): event tags declare their wire spelling once
+step	other	68394e37a	91081bd3	epic:semantic-types	+57	merge(jit:91081bd3): the CLI resolves each issue-id argument once at entry
+step	other	fd0c40adf	f265e748	epic:semantic-types	+5	merge(jit:f265e748): event issue accessor returns an optional IssueId
+step	other	f523a1cfe	1c5da41d	epic:semantic-types	-2	merge(jit:1c5da41d): validation carries typed issue ids
+step	other	a0b4733ee	1590d056,1d52a376,2f717d93,2f95b4f6,33be0c83,58dbb1a0,7995aa5c,b612cde1,b90b1660,d9598a97	epic:test-topology	+87	Merge shared-fixture adoptions (jit:1590d056, jit:2f95b4f6, jit:33be0c83, jit:b90b1660, jit:d9598a97, jit:58dbb1a0, jit:b612cde1, jit:2f717d93, jit:1d52a376, jit:7995aa5c)
+step	other	8a105a0fc	5876e131,74b2a0d3,9964af3f,b511222f,e21ca76d	epic:test-topology	-31	Merge command-layer fixture adoptions (jit:74b2a0d3, jit:9964af3f, jit:b511222f, jit:5876e131, partial jit:e21ca76d)
+step	other	3e0e87e1f	19136324,53f78490,e21ca76d	epic:test-topology	+106	Merge shipped item kinds, domain fixture and list envelopes (jit:e21ca76d, jit:19136324, jit:53f78490)
+step	other	76a3af872	8acca4f4	epic:semantic-types	+19	Merge errors, output and visualization typed issue ids (jit:8acca4f4)
+step	other	535a3b136	07f4b1d4,717f9c2f,b93687b3	epic:test-topology	-31	Merge profiled-fixture key and cli_item_validate spawn migrations (jit:07f4b1d4, jit:b93687b3, jit:717f9c2f)
+step	other	1ef4d50c4	ad1e6d0e	epic:test-topology	+9	Merge memory executor declarations (jit:ad1e6d0e)
+step	direct	022a46af6	-	-	+10	fix(jit:c780514e): a minted in-memory root is removed when its last store clone drops
+step	other	7aa7ed622	55e3d3fd	epic:-	+26	Merge document-scoped captures for recover and validate (jit:55e3d3fd)
+step	other	631967da3	10ae7776	epic:semantic-types	+35	Merge declared vocabularies are never restated (jit:10ae7776)
+step	other	eef4f5ae8	b7078f0d	epic:test-topology	+15	Merge shared memory declarations after initialization (jit:b7078f0d rework 2)
+step	other	12ef29ca5	529f621d	epic:test-topology	+1	Merge pure-domain auto-transition (jit:529f621d)
+step	other	34a960123	2a6bc44c	epic:test-topology	-161	Merge fixture setup inside the suite (jit:2a6bc44c)
+step	other	a29e64c1d	3f15b95c,ea5ffaba	epic:test-topology	+24	Merge domain query-all owners and query suite reduction (jit:ea5ffaba, jit:3f15b95c)
+step	other	e3be5cb24	55043636	epic:test-topology	-61	Merge tests never change process-wide state (jit:55043636)
+step	other	8b1d10d66	2c9badcd	epic:test-topology	-18	Merge shared IssueStore conformance suite (jit:2c9badcd)
+step	other	c66663dc8	0af95f14	epic:semantic-types	+14	Merge unit tests take canonical issue ids from one fixture (jit:0af95f14)
+step	other	3558721b0	2d342676,3ca153c7,5001b556,7208e568,f0bee761	epic:test-topology	+15	Merge fast_* memory seeding, fixture absent/wrapping seams and id-from-JSON fixes (jit:2d342676, jit:3ca153c7, jit:f0bee761, jit:5001b556, jit:7208e568)
+step	other	43e860862	2916a306,55cd1ae4,9a313a88	epic:test-topology	+29	Merge exit-code suite cases moved beside their owners (jit:2916a306, jit:9a313a88, jit:55cd1ae4)
+step	other	7af3dc393	5fac48b8	epic:semantic-types	+34	Merge issue drafts carry their pre-derived identifier (jit:5fac48b8)
+step	other	5aa792397	f71504cd	epic:-	+220	Merge link checks read only the documents they scan (jit:f71504cd)
+step	other	c8a4675e0	641bd14e	epic:semantic-types	+13	Merge repository-state mutations carry typed issue ids (jit:641bd14e)
+step	other	e0e6f0922	89e7a273	epic:semantic-types	+16	Merge storage trait and backends take issue ids as IssueId (jit:89e7a273)
+step	other	a8fcab6f5	c797b59b	epic:semantic-types	+1	Merge the shared integration harness carries typed issue ids (jit:c797b59b)
+step	other	81f508e0c	3ee3a4d1	epic:semantic-types	+50	Merge domain types carry issue ids as IssueId (jit:3ee3a4d1)
+step	other	58aac7985	7abcc22d	epic:semantic-types	+47	Merge IssueId becomes the validated newtype (jit:7abcc22d)
+step	other	6f55c6391	83413035	epic:semantic-types	+6	Merge resolved hierarchy facts carry typed issue ids (jit:83413035)
+step	other	227cb7be8	0102769f	epic:semantic-types	-14	Merge issue record paths come from a VirtualPath constructor (jit:0102769f)
+step	other	81b32fb42	955aaa9a	epic:test-topology	+66	Merge cold fixture builds no longer time out their waiters (jit:955aaa9a)
+step	other	69f1b2ae3	6f9f5d1e,94bbdbd6,955ee89e	epic:test-topology	+28	Merge in-memory reads from store state, backend test cuts and init/profile fixtures (jit:94bbdbd6 jit:6f9f5d1e jit:955ee89e)
+step	other	da36851af	855d027d	epic:semantic-types	-9	Merge commands take issue record paths from the VirtualPath constructor (jit:855d027d)
+step	other	4a38232a3	2ac34492	epic:semantic-types	-55	Merge criteria checks bind through check labels only (jit:2ac34492)
+step	other	d9cf2fa92	488eb3c1	epic:semantic-types	+74	Merge gate keys are a validated GateKey (jit:488eb3c1)
+step	other	0a24aec20	79aa3aa7	epic:semantic-types	+59	Merge gate runs are identified by a validated GateRunId (jit:79aa3aa7)
+step	other	f45ab1df0	417be079	epic:semantic-types	+56	Merge issue gate fields are keyed by GateKey (jit:417be079)
+step	other	522ff70a2	1a3db2c3	epic:semantic-types	-16	Merge the dependency graph carries typed node ids (jit:1a3db2c3)
+step	other	25515e0f5	2f63adec,955aaa9a,c882f1f8	epic:test-topology	-17	Merge input-keyed recorded-failure corpus, fixture failure handoff and self-test shim fix (jit:2f63adec jit:955aaa9a jit:c882f1f8)
+step	other	368a53b50	64420cff	epic:semantic-types	-2	Merge commands carry assignees as Assignee (jit:64420cff)
+step	other	11bac8093	592d663e	epic:semantic-types	-20	Merge a profile has one identity type (jit:592d663e)
+step	other	ebdf38996	12a0a694	epic:lead-friction	-8	Merge short-id label target validation fix (jit:12a0a694)
+step	other	6321325d5	28a7bde1,8d64ffae,955aaa9a	epic:test-topology	+24	Merge fixture failure records per key, exit-code and envelope owners, digest self-check removal (jit:955aaa9a jit:8d64ffae jit:28a7bde1)
+step	other	175a7a0cb	14c08f51,952ed1e7	epic:test-topology	+152	Merge package drift as a gate and tests off the live tracker (jit:14c08f51 jit:952ed1e7)
+step	other	7875db519	8d64ffae,955aaa9a	epic:test-topology	-86	Merge deletion of the fixture failure handoff and remaining envelope re-proofs (jit:955aaa9a jit:8d64ffae)
+step	other	7abf2f2ff	e7d98542	epic:test-topology	-528	Merge one copy of the dogfood package's declarations (jit:e7d98542)
+step	other	320ad24fe	7984d807	epic:test-topology	-5	Merge git guards acting on the repository they serve (jit:7984d807)
+step	other	8a71fbc38	87d5fd34	epic:test-topology	+17	Merge the suite passing when tests share a process (jit:87d5fd34)
+step	other	b3347b996	87d5fd34	epic:test-topology	-4	Merge one executable helper with an interpreter where a test allows it (jit:87d5fd34)
+step	other	5165747bf	d5966ba2	epic:lead-friction	+128	Merge derived-document archival (jit:d5966ba2)
+step	other	f0beca0be	abe963dd	epic:lead-friction	-262	Merge one profile selection per invocation (jit:abe963dd)
+step	other	30aa04a9e	07663984,3a3b86cf,81664a6a	epic:git-cli-module	-11	Merge the dirty-path query and one-probe layout detection (jit:3a3b86cf jit:07663984 jit:81664a6a)
+step	other	d37662aeb	ddca5431	epic:lead-friction	-13	Merge evaluate advancing a gated issue to done (jit:ddca5431)
+step	other	d59fcce0b	30eb0496	epic:one-validation-report	+4	Merge retired profile_applied tag fix (jit:30eb0496)
+step	other	3ff7246e7	5f71a48d	epic:v1-release	+26	Merge reject-reason refusal, loud label removal, validate --fix agreement (jit:5f71a48d)
+step	other	b0ce9a116	5f82e09a	epic:lead-friction	+92	Merge refusing a profile apply over uncommitted targets (jit:5f82e09a)
+step	other	da05d38aa	5f82e09a	epic:lead-friction	+5	Merge judging each written path by its checkout (jit:5f82e09a)
+step	other	5a0ad74fa	9c008d2d	epic:lead-friction	+9	Merge validation reporting a promotion the graph demands (jit:9c008d2d)
+step	other	868b55b50	da12ad66	epic:lead-friction	+11	Merge one rejection command form (jit:da12ad66)
+step	other	56f95bcfb	da12ad66	epic:lead-friction	+37	Merge the closed update-state vocabulary (jit:da12ad66)
+step	other	c82fd86a5	1b0c2b75,5c0bd3ad,ab797eed	epic:lead-friction	+70	Merge registry replacement, preview refusals and complete report targets (jit:5c0bd3ad jit:1b0c2b75 jit:ab797eed)
+step	other	0ea91b1a7	aeafc378	epic:lead-friction	+41	Merge the write-lock primitive and landing script (jit:aeafc378)
+step	other	7f274ebc8	c47d78c8,d7cce445	epic:git-cli-module,epic:lead-friction	-287	Merge dropping the HEAD read tier and deriving membership from issue files (jit:d7cce445 jit:c47d78c8)
+step	other	661c51e71	0dcabcca,56b89d9a,a5fbec12	epic:lead-friction	-185	Merge dependent-wins composition, entry-point pruning and one result type (jit:0dcabcca jit:56b89d9a jit:a5fbec12)
+step	other	eb1bad666	c47d78c8	epic:lead-friction	+9	Merge exactly one index format and the retired-tag removal (jit:c47d78c8)
+step	other	4376939f5	c47d78c8	epic:lead-friction	-1	Merge the cutover code's remaining format sites (jit:c47d78c8)
+step	other	f27fe3edd	0dcabcca	epic:lead-friction	-2	Merge a dependent's stated value winning a disagreement (jit:0dcabcca)
+step	other	f00e71007	17fbcf25	epic:lead-friction	-36	Merge one lease rule and the hook's lease-check removal (jit:17fbcf25)
+step	other	26530d5a8	17fbcf25	epic:lead-friction	+11	Merge the lease table's reclassification and gate remove's check (jit:17fbcf25)
+step	other	e2292171d	cba1bff8	epic:lead-friction	+5	Merge rejection promoting its dependents (jit:cba1bff8)
+step	other	d2da90a4d	cba1bff8	epic:lead-friction	+56	Merge atomic rejection with dependent promotion (jit:cba1bff8)
+step	other	0e02052cd	03ce8d2c,0838348a,2ded6cd5	epic:lead-friction	-92	Merge gate update's lease check, update_issue_state's removal and loud listings (jit:2ded6cd5 jit:0838348a jit:03ce8d2c)
+step	other	38db58be4	0a6fd04e	epic:one-validation-report	+59	Merge branch 'worktree-agent-0a6fd04e'
+step	other	95ed1fb57	665bb4e1,9e703435,d721ab14	epic:lead-friction	-16	Merge derived conflict serialization, package-only conflict parties and one registry declaration (jit:9e703435 jit:d721ab14 jit:665bb4e1)
+step	other	029490b72	024b98b1,04ece1e2,0f648627,1eab392b,376afd01	epic:lead-friction	-229	Merge one graph error, one package type and bare package paths (jit:0f648627 jit:04ece1e2 jit:376afd01 jit:1eab392b jit:024b98b1)
+step	other	a9e1ac051	216f70b4,536a48ef,6e65a501,9a3a9f1e,dbbfcd6c	epic:lead-friction	-299	Merge target-set show, one canonical JSON, semver versions, domain ids and the unreachable code's removal (jit:536a48ef jit:6e65a501 jit:216f70b4 jit:dbbfcd6c jit:9a3a9f1e)
+step	other	a0c3144ba	edc8544d	epic:lead-friction	+17	Merge derived documents on every issue surface (jit:edc8544d)
+step	other	0163a6520	edc8544d	epic:lead-friction	+10	Merge derived documents on the issue list read (jit:edc8544d)
+step	other	ec6b76cbe	998eedbc	epic:lead-friction	-3	Merge removing the applied-profile path namespace (jit:998eedbc)
+step	other	24fe909c4	c4e07f6d	epic:-	+40	Merge branch 'worktree-agent-c4e07f6d'
+step	other	8a5be865a	7dd59ebf	epic:-	+15	Merge branch 'worktree-agent-7dd59ebf'
+step	epic	99b8ae0dd	d84a7bfa	epic:rust-code-quality	+18	Merge branch 'worktree-agent-d84a7bfa'
+step	epic	55e6ce46f	1002524a	epic:rust-code-quality	+14	Merge branch 'worktree-agent-1002524a'
+step	other	54d018a34	7a8773ca	epic:history-independent-reads	+13	Merge branch 'worktree-agent-7a8773ca'
+step	other	79898c89a	cc6ef886	epic:history-independent-reads	+65	Merge branch 'worktree-agent-cc6ef886'
+step	other	d4de5ceb5	803b107c	epic:history-independent-reads	+18	Merge branch 'worktree-agent-803b107c'
+step	other	9906d5cbd	84e1e27a	epic:history-independent-reads	-59	Merge branch 'worktree-agent-84e1e27a'
+step	other	78c537797	b32a720e	epic:history-independent-reads	-6	Merge branch 'worktree-agent-b32a720e'
+step	epic	0fbd890c3	083c9a91	epic:rust-code-quality	+12	Merge branch 'worktree-agent-083c9a91'
+step	other	38a9c67e3	63de0883	epic:history-independent-reads	-30	Merge branch 'worktree-agent-63de0883'
+step	other	0d35bbaea	becea20a	epic:history-independent-reads	-69	Merge branch 'worktree-agent-becea20a'
+step	epic	18a5a57b0	a015dcbb	epic:rust-code-quality	+16	Merge branch 'worktree-agent-a015dcbb'
+step	other	abde9902c	f9bf70a5	epic:history-independent-reads	+13	Merge branch 'worktree-agent-f9bf70a5'
+step	other	9bbc8a237	becea20a	epic:history-independent-reads	+11	Merge branch 'worktree-agent-becea20a'
+step	epic	d7729e1ca	6f49f3b3	epic:rust-code-quality	+52	Merge branch 'worktree-agent-6f49f3b3'
+step	epic	6f110c219	f79d2510	epic:rust-code-quality	+17	Merge branch 'worktree-agent-f79d2510'
+step	epic	876eae0af	7a7d0bfe	epic:rust-code-quality	+19	Merge branch 'worktree-agent-7a7d0bfe'
+step	epic	3aa8182c5	985c2b15	epic:rust-code-quality	+33	Merge branch 'worktree-agent-985c2b15'
+step	epic	58b9b90dc	fd2073b7	epic:rust-code-quality	+34	Merge branch 'worktree-agent-fd2073b7'
+step	epic	226db21cc	93aaba24	epic:rust-code-quality	+21	Merge branch 'worktree-agent-93aaba24'
+step	epic	8b4ca7956	dbd05242	epic:rust-code-quality	+11	Merge branch 'worktree-agent-dbd05242'
+step	epic	7f257f027	5962427b	epic:rust-code-quality	+36	Merge branch 'worktree-agent-5962427b'
+step	epic	67df5d08a	a24b11aa	epic:rust-code-quality	+10	Merge branch 'worktree-agent-a24b11aa'
+step	other	5a36ad2ea	c3e3e2ff	epic:history-independent-reads	-6	Merge branch 'worktree-agent-c3e3e2ff'
+step	other	aed03c60a	5b0e3d63	epic:history-independent-reads	+7	Merge branch 'worktree-agent-5b0e3d63'
+step	epic	fbbaa2ba4	334c12e7	epic:rust-code-quality	+16	Merge branch 'worktree-agent-334c12e7'
+step	epic	92858ba2d	d05b5639	epic:rust-code-quality	+33	Merge branch 'worktree-agent-d05b5639'
+step	epic	2f76a56e7	a3a99cf8	epic:rust-code-quality	-131	Merge branch 'worktree-agent-a3a99cf8'
+step	epic	d28cc53a8	8b7f2973	epic:rust-code-quality	+16	Merge branch 'worktree-agent-8b7f2973'
+step	epic	5934d9658	1539da29	epic:rust-code-quality	+43	Merge branch 'worktree-agent-1539da29'
+step	other	5b0f29b68	dd53527f	epic:history-independent-reads	+331	Merge branch 'worktree-agent-dd53527f'
+step	epic	788a891f3	1539da29	epic:rust-code-quality	+0	Merge branch 'worktree-agent-1539da29'
+step	other	a506691d8	dd53527f	epic:history-independent-reads	-13	Merge branch 'worktree-agent-dd53527f'
+step	epic	d11ed6ed8	22189592	epic:rust-code-quality	-5	Merge branch 'worktree-agent-22189592'
+step	other	34fb03c4b	5582e39e	epic:history-independent-reads	-2	Merge branch 'worktree-agent-5582e39e'
+step	other	06c42b2ee	7eb443b2	epic:one-validation-report	+8	Merge branch 'worktree-agent-7eb443b2'
+step	other	9b74a37cb	6100b960	epic:one-validation-report	+110	Merge branch 'worktree-agent-6100b960'
+step	other	73595f9ca	d40d6f74	epic:one-validation-report	-5	Merge branch 'worktree-agent-d40d6f74'
+step	epic	968119b03	abe555e9	epic:rust-code-quality	+133	Merge branch 'worktree-agent-abe555e9'
+step	other	b38318255	70ac98fc	epic:one-validation-report	+9	Merge branch 'worktree-agent-70ac98fc'
+step	epic	6c0549aba	2e0f276b	epic:rust-code-quality	+70	Merge branch 'worktree-agent-2e0f276b'
+step	other	2a55def17	cf49da17	epic:one-validation-report	+6	Merge branch 'worktree-agent-cf49da17'
+step	epic	e106ff343	abe555e9	epic:rust-code-quality	-5	Merge branch 'worktree-agent-abe555e9'
+step	other	e1930dbed	dd53527f	epic:history-independent-reads	-33	Merge branch 'worktree-agent-dd53527f'
+step	other	10c8e3847	15009590	epic:history-independent-reads	-77	Merge branch 'worktree-agent-15009590'
+step	other	bdc0fd571	c92f4011	epic:one-validation-report	-26	Merge branch 'worktree-agent-c92f4011'
+step	other	b1017884c	ea843d26	epic:one-validation-report	+4	Merge branch 'worktree-agent-ea843d26'
+step	other	5e0ca8825	977d01d8	epic:one-validation-report	-7	Merge branch 'worktree-agent-977d01d8'
+step	other	9b6397f43	b3a768b3	epic:one-validation-report	+7	Merge branch 'worktree-agent-b3a768b3'
+step	other	55438f664	2117739f	epic:history-independent-reads	+21	Merge branch 'worktree-agent-2117739f'
+step	other	107ee1810	f968dfe1	epic:one-validation-report	-46	Merge branch 'worktree-agent-f968dfe1'
+step	other	108f53d99	c92f4011	epic:one-validation-report	+25	Merge branch 'worktree-agent-c92f4011'
+step	other	dd2af2679	5b37a806	epic:v1-release	+97	Merge branch 'worktree-agent-5b37a806'
+step	other	63d2efdd7	2117739f	epic:history-independent-reads	+1	Merge branch 'worktree-agent-2117739f'
+step	other	9da1c873a	ccd6e1fb	epic:one-validation-report	+12	Merge branch 'worktree-agent-ccd6e1fb'
+step	other	6baeaed6f	a7314585	epic:history-independent-reads	-29	Merge branch 'worktree-agent-a7314585'
+step	other	308aa9485	5d5a1794	epic:one-validation-report	+14	Merge branch 'worktree-agent-5d5a1794'
+step	other	fc7035a25	93b7f1dd	epic:history-independent-reads	+14	Merge branch 'worktree-agent-93b7f1dd'
+step	other	3e5bfcbe7	8b56c215	epic:one-validation-report	+18	Merge branch 'worktree-agent-8b56c215'
+step	other	8c2d71556	0bd2c797	epic:history-independent-reads	-10	Merge branch 'worktree-agent-0bd2c797'
+step	other	5d4e0a254	2f563673	epic:history-independent-reads	+89	Merge branch 'worktree-agent-2f563673'
+step	other	9f219fcdf	5d5a1794	epic:one-validation-report	-10	Merge branch 'worktree-agent-5d5a1794'
+step	other	5be376e07	db9bcf12	epic:history-independent-reads	+151	Merge branch 'worktree-agent-db9bcf12'
+step	other	74bd20bc3	97f5f2b7	epic:history-independent-reads	-43	Merge branch 'worktree-agent-97f5f2b7'
+step	other	70f80ae6f	03c59566	epic:one-validation-report	-24	Merge branch 'worktree-agent-03c59566'
+step	other	96be25331	2f563673	epic:history-independent-reads	-615	Merge branch 'worktree-agent-2f563673'
+step	other	07baa8b46	001a9c46	epic:one-validation-report	+79	Merge branch 'worktree-agent-001a9c46'
+step	other	fffae260f	b33ed7eb	epic:history-independent-reads	+154	Merge branch 'worktree-agent-b33ed7eb'
+step	other	b2d830044	7fc08dff	epic:history-independent-reads	-11	Merge branch 'worktree-agent-7fc08dff'
+step	other	b607a1d7c	6c0f8739	epic:history-independent-reads	+6	Merge branch 'worktree-agent-6c0f8739'
+step	epic	7663d7dc3	b23faa59	epic:rust-code-quality	-7	Merge branch 'worktree-agent-b23faa59'
+step	other	92aa09e0c	6ba4f623	epic:one-validation-report	-32	Merge branch 'worktree-agent-6ba4f623'
+step	epic	114986b73	1eb949a5	epic:rust-code-quality	+0	Merge branch 'worktree-agent-1eb949a5'
+step	other	4efbde39b	0851fae4	epic:history-independent-reads	-56	Merge branch 'worktree-agent-0851fae4'
+step	epic	ab2dced07	b23faa59	epic:rust-code-quality	+7	Merge branch 'worktree-agent-b23faa59'
+step	other	7b2cfcdef	3acaa5a3	epic:one-validation-report	+3	Merge branch 'worktree-agent-3acaa5a3'
+step	other	d4b15ec3e	5e1ba005	epic:history-independent-reads	+23	Merge branch 'worktree-agent-5e1ba005'
+step	other	d712d8b17	2b5f452c	epic:one-validation-report	+60	Merge branch 'worktree-agent-2b5f452c'
+step	other	1077419b1	3acaa5a3	epic:one-validation-report	+7	Merge branch 'worktree-agent-3acaa5a3'
+step	other	6d4a8b704	2b5f452c	epic:one-validation-report	+60	Merge branch 'worktree-agent-2b5f452c'
+step	other	b67342fec	e2082ba9	epic:one-validation-report	+20	Merge branch 'worktree-agent-e2082ba9'
+step	epic	4ec8f06cc	e5d618ee	epic:rust-code-quality	+0	Merge branch 'worktree-agent-e5d618ee'
+step	other	cfdc0340e	1630015d	epic:history-independent-reads	+44	Merge branch 'worktree-agent-1630015d'
+step	epic	d735276b5	e5d618ee	epic:rust-code-quality	+0	Merge branch 'worktree-agent-e5d618ee'
+step	epic	4baff2cb3	12c0f3fb	epic:rust-code-quality	+166	Merge branch 'worktree-agent-12c0f3fb'
+step	other	f70dcdf40	3acaa5a3	epic:one-validation-report	-1	Merge branch 'worktree-agent-3acaa5a3'
+step	other	88ce303a1	2b5f452c	epic:one-validation-report	+3	Merge branch 'worktree-agent-2b5f452c'
+step	epic	59257f573	8a14e8e9	epic:rust-code-quality	+0	Merge branch 'worktree-agent-8a14e8e9'
+step	epic	1e2d11ebf	8a14e8e9	epic:rust-code-quality	+0	Merge branch 'worktree-agent-8a14e8e9'
+step	epic	d51cddd0a	8a14e8e9	epic:rust-code-quality	+0	Merge branch 'worktree-agent-8a14e8e9'
+step	other	c6c3cceb8	2b5f452c	epic:one-validation-report	+26	Merge branch 'worktree-agent-2b5f452c'
+step	epic	f2e1aefd6	e5d618ee	epic:rust-code-quality	+6	Merge branch 'worktree-agent-e5d618ee'
+step	epic	a476a2d42	153c9851	epic:rust-code-quality	+33	Merge branch 'worktree-agent-153c9851'
+step	epic	f1e434642	9529b9ac	epic:rust-code-quality	+56	Merge branch 'worktree-agent-9529b9ac'
+step	other	aa6ea4aa0	614a6f97	epic:history-independent-reads	-10	Merge branch 'worktree-agent-614a6f97'
+step	epic	27a9330b5	9529b9ac	epic:rust-code-quality	+4	Merge branch 'worktree-agent-9529b9ac'
+step	epic	7f785b006	c9103fcf	epic:rust-code-quality	-31	Merge branch 'worktree-agent-c9103fcf'
+step	other	9cd3c9138	612ee9d4	epic:one-validation-report	+286	Merge branch 'worktree-agent-612ee9d4'
+step	other	c1c48d55c	7244ecb2	epic:history-independent-reads	+51	Merge branch 'worktree-agent-7244ecb2'
+step	other	e5de11a49	725af076	epic:history-independent-reads	-13	Merge branch 'worktree-agent-725af076'
+step	epic	f0ed97f2e	b51291e4	epic:rust-code-quality	+0	Merge branch 'worktree-agent-b51291e4'
+step	epic	2283280fa	b51291e4	epic:rust-code-quality	+0	Merge branch 'worktree-agent-b51291e4'
+step	epic	e03e459d1	d952d057	epic:rust-code-quality	+0	Merge branch 'worktree-agent-d952d057'
+step	other	87b38351c	2c8c13b2	epic:one-validation-report	-166	Merge branch 'worktree-agent-2c8c13b2'
+step	epic	dbbb1cb8b	b51291e4	epic:rust-code-quality	+0	Merge branch 'worktree-agent-b51291e4'
+step	other	97776928d	09ca911e	epic:history-independent-reads	+136	Merge branch 'worktree-agent-09ca911e'
+step	epic	992072bb4	d952d057	epic:rust-code-quality	+0	Merge branch 'worktree-agent-d952d057'
+step	other	9af61dd1f	1f24e3e9	epic:one-validation-report	-61	Merge branch 'worktree-agent-1f24e3e9'
+step	other	7af823110	09ca911e	epic:history-independent-reads	-2	Merge branch 'worktree-agent-09ca911e'
+step	other	6c94d48c4	86f7e6eb	epic:one-validation-report	-5	Merge branch 'worktree-agent-86f7e6eb'
+step	other	7fedf7f93	208edf4c	epic:one-validation-report	-100	Merge branch 'worktree-agent-208edf4c'
+step	epic	c5a125d74	06ee9b67,0fe46027,1a4f2ebd,20fc3b92,3cf69ecf,52110fb4,66790c84,71f5296c,8c46fc85,8e91126b,8f297e60,98cc2097,b25c2e54,f930acf2	epic:rust-code-quality	+306	Merge branch 'worktree-agent-w7batch'
+step	other	77e9b4337	a106d1be	epic:one-validation-report	-195	Merge branch 'worktree-agent-a106d1be'
+step	other	abc9b6d89	2f12d920	epic:one-validation-report	+17	Merge branch 'worktree-agent-2f12d920'
+step	direct	96dfde725	-	-	+5	fix(jit:78d897a2): gate-preset reference prose lives in its source render
+step	epic	a5e36ed48	06ee9b67	epic:rust-code-quality	+0	Merge branch 'worktree-agent-06ee9b67'
+step	other	662a9252a	6ac41880	epic:one-validation-report	-245	Merge branch 'worktree-agent-6ac41880'
+step	epic	f1aa105be	182f4c03	epic:rust-code-quality	+25	Merge branch 'worktree-agent-182f4c03'
+step	epic	f0fc5542b	10751360	epic:rust-code-quality	+3	Merge branch 'worktree-agent-10751360'
+step	epic	86c39dff8	cd8e04cc	epic:rust-code-quality	-15	Merge branch 'worktree-agent-cd8e04cc'
+step	epic	98a98a2d1	cd8e04cc	epic:rust-code-quality	+6	Merge branch 'worktree-agent-cd8e04cc'
+step	epic	b81fe9705	66790c84	epic:rust-code-quality	+0	Merge branch 'worktree-agent-66790c84'
+step	other	42373fb82	f22147ec	epic:one-validation-report	-124	Merge branch 'worktree-agent-f22147ec'
+step	epic	a4685218e	1a4f2ebd	epic:rust-code-quality	+0	Merge branch 'worktree-agent-1a4f2ebd'
+step	epic	860d8207e	1ac651c7	epic:rust-code-quality	-24	Merge branch 'worktree-agent-1ac651c7'
+step	epic	a6ec3caa3	cc4ea8a9	epic:rust-code-quality	-74	Merge branch 'worktree-agent-cc4ea8a9'
+step	epic	cfd894128	1a4f2ebd	epic:rust-code-quality	-5	Merge branch 'worktree-agent-1a4f2ebd'
+step	epic	bd41c168f	4a01ccba	epic:rust-code-quality	+12	Merge branch 'worktree-agent-4a01ccba'
+step	other	d1c20647a	7516ed50	epic:one-validation-report	-2	Merge branch 'worktree-agent-7516ed50'
+step	epic	9182cf938	4a01ccba	epic:rust-code-quality	+0	Merge branch 'worktree-agent-4a01ccba'
+step	epic	a1e738ccb	f82a2e4a	epic:rust-code-quality	-60	Merge branch 'worktree-agent-f82a2e4a'
+step	epic	db15b3915	4a01ccba	epic:rust-code-quality	+0	Merge branch 'worktree-agent-4a01ccba'
+step	other	6a2f5e116	f56bad8d	epic:one-mutation-path	+29	Merge branch 'worktree-agent-f56bad8d'
+step	other	4ac979229	f7a59f5f	epic:one-mutation-path	+42	Merge branch 'worktree-agent-f7a59f5f'
+step	epic	86b4360d9	3b696589	epic:rust-code-quality	+0	Merge branch 'worktree-agent-3b696589'
+step	epic	fc511300c	4a01ccba	epic:rust-code-quality	+16	Merge branch 'worktree-agent-4a01ccba'
+step	epic	baa3a76ba	10fdad38	epic:rust-code-quality	-221	Merge branch 'worktree-agent-10fdad38'
+step	epic	3afea694e	9be5b0de	epic:rust-code-quality	-23	Merge branch 'worktree-agent-9be5b0de'
+step	epic	3494915bf	3b696589	epic:rust-code-quality	+0	Merge branch 'worktree-agent-3b696589'
+step	epic	b64962ffa	4a01ccba	epic:rust-code-quality	+0	Merge branch 'worktree-agent-4a01ccba'
+step	epic	0d17458ef	8fbf8c43	epic:rust-code-quality	-31	Merge branch 'worktree-agent-8fbf8c43'
+step	other	29011b07d	1ade3e6f	epic:one-mutation-path	-191	Merge branch 'worktree-agent-1ade3e6f'
+step	other	71f0ca9bd	ceaaf0ab	epic:one-mutation-path	+19	Merge branch 'worktree-agent-ceaaf0ab'
+step	epic	af1d0b839	24a982b7	epic:rust-code-quality	-8	Merge branch 'worktree-agent-24a982b7'
+step	other	e11254c35	5d09e74b	epic:one-mutation-path	+27	Merge branch 'worktree-agent-5d09e74b'
+step	epic	b7ebfe569	f87f9b00	epic:rust-code-quality	-114	Merge branch 'worktree-agent-f87f9b00'
+step	epic	ae99aaa66	24a982b7	epic:rust-code-quality	+35	Merge branch 'worktree-agent-24a982b7'
+step	epic	9ea35b033	f87f9b00	epic:rust-code-quality	+0	Merge branch 'worktree-agent-f87f9b00'
+step	other	e7ee64d8f	d58f80c9	epic:one-mutation-path	+31	Merge branch 'worktree-agent-d58f80c9'
+step	epic	b319c484a	3f816619	epic:rust-code-quality	-105	Merge branch 'worktree-agent-3f816619'
+step	other	75afd6c96	01a88d32	epic:one-mutation-path	-1	Merge branch 'worktree-agent-01a88d32'
+step	epic	93e9844b7	b23b1bf3	epic:rust-code-quality	-53	Merge branch 'worktree-agent-b23b1bf3'
+step	other	0e34a581a	945f9181	epic:one-mutation-path	+4	Merge branch 'worktree-agent-945f9181'
+step	epic	b8b8be033	5687e281	epic:rust-code-quality	-175	Merge branch 'worktree-agent-5687e281'
+step	other	973bb01b6	c517b88b	epic:one-mutation-path	+129	Merge branch 'worktree-agent-c517b88b'
+step	epic	b1a624617	da30b92a	epic:rust-code-quality	-8	Merge branch 'worktree-agent-da30b92a'
+step	other	d9dd56247	c517b88b	epic:one-mutation-path	+1	Merge branch 'worktree-agent-c517b88b'
+step	other	529fc3e8e	b674382e	epic:one-mutation-path	+21	Merge branch 'worktree-agent-b674382e'
+step	epic	d43510d02	ae3f4f8b	epic:rust-code-quality	-13	Merge branch 'worktree-agent-ae3f4f8b'
+step	other	9e886af5c	eaca3f52	epic:one-mutation-path	+248	Merge branch 'worktree-agent-eaca3f52'
+step	epic	b8b4a0854	0bc448fb	epic:rust-code-quality	+31	Merge branch 'worktree-agent-0bc448fb'
+step	epic	87938c3d3	8b3cce62	epic:rust-code-quality	-106	Merge branch 'worktree-agent-8b3cce62'
+step	other	ce7406bbd	635f23c7	epic:one-mutation-path	-99	Merge branch 'worktree-agent-635f23c7'
+step	other	56626345e	578ed10d	epic:one-mutation-path	+79	Merge branch 'worktree-agent-578ed10d'
+step	epic	fad481d3e	6acd7a05	epic:rust-code-quality	+4	Merge branch 'worktree-agent-6acd7a05'
+step	epic	e1b2bf52b	8b3cce62	epic:rust-code-quality	-21	Merge branch 'worktree-agent-8b3cce62'
+step	other	c4b617ff9	578ed10d	epic:one-mutation-path	+4	Merge branch 'worktree-agent-578ed10d'
+step	epic	f004e7cd3	6acd7a05	epic:rust-code-quality	+0	Merge branch 'worktree-agent-6acd7a05'
+step	epic	437c7ccfd	f855d631	epic:rust-code-quality	+0	Merge branch 'worktree-agent-f855d631'
+step	epic	acabe5453	5f12265a	epic:rust-code-quality	+0	Merge branch 'worktree-agent-5f12265a'
+step	epic	61cdc4ec4	5f12265a	epic:rust-code-quality	+0	Merge branch 'worktree-agent-5f12265a'
+step	epic	649d398b3	75b46be9	epic:rust-code-quality	+0	Merge branch 'worktree-agent-75b46be9'
+step	epic	7620257ab	b22aabce	epic:rust-code-quality	+0	Merge branch 'worktree-agent-b22aabce'
+step	epic	70457e502	fb38bf1f	epic:rust-code-quality	+37	Merge branch 'worktree-agent-fb38bf1f'
+step	epic	7e86df856	487f45a9	epic:rust-code-quality	-1	Merge branch 'worktree-agent-487f45a9'
+step	other	72a8a8d83	4d844e61	epic:-	-43	Merge branch 'retire-mcp-4d844e61'
+step	epic	6d9a1ed76	f35c86de	epic:rust-code-quality	-3	Merge branch 'worktree-agent-f35c86de'
+step	other	8854c45a2	4ba18af4	epic:git-cli-module	+45	Merge branch 'worktree-agent-4ba18af4'
+step	other	876f41a81	db094cac	epic:-	+17	Merge branch 'fix-db094cac'
+step	epic	6d471aa22	c06daf50	epic:rust-code-quality	+0	Merge branch 'worktree-agent-c06daf50'
+step	epic	05b00219f	487f45a9	epic:rust-code-quality	+0	Merge branch 'worktree-agent-487f45a9'
+step	other	734d7bdb4	46a89061	epic:git-cli-module	+17	Merge branch 'worktree-agent-46a89061'
+step	other	dc2f5d6b1	8c67b21a	epic:-	+7	Merge branch 'worktree-agent-8c67b21a'
+step	other	ad4a28ae7	24d3b460	epic:git-cli-module	+54	Merge branch 'worktree-agent-24d3b460'
+step	other	72aa0fa7c	1d2235b1	epic:frontends-share-core	+15	Merge branch 'worktree-agent-1d2235b1'
+step	epic	67f4514c3	ab168296	epic:rust-code-quality	+0	Merge branch 'worktree-agent-ab168296'
+step	other	74d539f68	4ba18af4	epic:git-cli-module	+64	Merge branch 'worktree-agent-4ba18af4'
+step	epic	97d00504e	0eca332a	epic:rust-code-quality	-21	Merge branch 'worktree-agent-0eca332a'
+step	ambiguous	0d980ee38	dc048377	epic:-	+38	Merge branch 'worktree-agent-dc048377'
+step	other	f4b981345	437907da	epic:git-cli-module	+48	Merge branch 'worktree-agent-437907da'
+step	other	cf705252e	9c3eb2bf	epic:frontends-share-core	+60	Merge branch 'worktree-agent-9c3eb2bf'
+step	epic	da2245869	f9977efd	epic:rust-code-quality	+0	Merge branch 'worktree-agent-f9977efd'
+step	other	81a024bf5	cc9f213e	epic:git-cli-module	+66	Merge branch 'worktree-agent-cc9f213e'
+step	epic	e2925fcd8	755964b2	epic:rust-code-quality	+0	Merge branch 'worktree-agent-755964b2'
+step	other	ab946ec36	bb5040a8	epic:git-cli-module	+22	Merge branch 'worktree-agent-bb5040a8'
+step	epic	49c2582ea	0546fc82	epic:rust-code-quality	+1	Merge branch 'worktree-agent-0546fc82'
+step	epic	33e7e2d93	fe3ad1b0	epic:rust-code-quality	+0	Merge branch 'worktree-agent-fe3ad1b0'
+step	other	9fe1e7344	4d8791fb	epic:frontends-share-core	+107	Merge branch 'worktree-agent-4d8791fb'
+step	epic	3ed24cd50	46fe7593	epic:rust-code-quality	+0	Merge branch 'worktree-agent-46fe7593'
+step	other	3a1e7a96c	c16c834c	epic:git-cli-module	-2	Merge branch 'worktree-agent-c16c834c'
+step	other	3e51590fb	09974ad1	epic:git-cli-module	+47	Merge branch 'worktree-agent-09974ad1'
+step	other	79c3bb520	732f7afb	epic:git-cli-module	-11	Merge branch 'worktree-agent-732f7afb'
+step	other	b946e7187	f6eaba42	epic:git-cli-module	-25	Merge branch 'worktree-agent-f6eaba42'
+step	other	524e7b6f5	d48e28bf	epic:git-cli-module	+290	Merge branch 'worktree-agent-d48e28bf'
+step	other	aa31a16ec	9de4c09c	epic:git-cli-module	-6	Merge branch 'worktree-agent-9de4c09c'
+step	other	833a71908	f649c144	epic:git-cli-module	-12	Merge branch 'worktree-agent-f649c144'
+step	other	4aa3d7cf9	e3c38fea	epic:git-cli-module	-58	Merge branch 'worktree-agent-e3c38fea'
+step	other	084db8cc5	d68150e2	epic:git-cli-module	+75	Merge branch 'worktree-agent-d68150e2'
+step	other	28f74142e	dcf88b6f	epic:git-cli-module	-147	Merge branch 'worktree-agent-dcf88b6f'
+step	other	abaa6bdf8	6326532e	epic:frontends-share-core	+135	Merge branch 'worktree-agent-6326532e'
+step	other	8c91ded5f	ea4b7363	epic:git-cli-module	-8	Merge branch 'worktree-agent-ea4b7363'
+step	other	e0b02683a	83c8632f	epic:git-cli-module	-30	Merge branch 'worktree-agent-83c8632f'
+step	other	9df9fe2fc	3f8da8c4	epic:git-cli-module	-22	Merge branch 'worktree-agent-3f8da8c4'
+step	other	5363b6b99	92afc5d8	epic:git-cli-module	-8	Merge branch 'worktree-agent-92afc5d8'
+step	other	0757e05ba	47d62472	epic:git-cli-module	-20	Merge branch 'worktree-agent-47d62472'
+step	other	270f4894b	9ecde705	epic:git-cli-module	+13	Merge branch 'worktree-agent-9ecde705'
+step	other	e552fbb2c	fb5e8e8d	epic:git-cli-module	-43	Merge branch 'worktree-agent-fb5e8e8d'
+step	other	81965e397	fc2403fb	epic:-	+91	Merge branch 'worktree-agent-fc2403fb'
+step	other	ee9e410db	12064c7b	epic:one-mutation-path	-13	Merge branch 'worktree-agent-12064c7b'
+step	other	daaca4bc5	783b33fa	epic:git-cli-module	+18	Merge branch 'worktree-agent-783b33fa'
+step	other	6672a5e01	c2b3cefa	epic:one-mutation-path	+43	Merge branch 'worktree-agent-c2b3cefa'
+step	other	7c6855d8a	f6477007	epic:one-mutation-path	-17	Merge branch 'worktree-agent-f6477007'
+step	other	1f838b61b	0723860e	epic:-	+148	Merge branch 'worktree-agent-0723860e'
+step	other	3e09960b9	4334df62	epic:one-mutation-path	-39	Merge branch 'worktree-agent-4334df62'
+step	other	92cd305b1	9a2563fd	epic:one-mutation-path	+232	Merge branch 'worktree-agent-9a2563fd'
+step	other	97b29b93d	c2b3cefa	epic:one-mutation-path	+16	Merge branch 'worktree-agent-c2b3cefa'
+step	other	64bcda104	c2b3cefa	epic:one-mutation-path	-1	Merge branch 'worktree-agent-c2b3cefa'
+step	other	6d175420a	4d834432	epic:one-mutation-path	+88	Merge branch 'worktree-agent-4d834432'
+step	other	ae2c096fb	1a737bb4	epic:one-mutation-path	-152	Merge branch 'worktree-agent-1a737bb4'
+step	other	959d41bf2	905364c1	epic:one-mutation-path	+23	Merge branch 'worktree-agent-905364c1'
+step	other	42cc13bf9	d2acb105	epic:one-mutation-path	+265	Merge branch 'worktree-agent-d2acb105'
+step	other	9e41fc856	7fefd776	epic:one-mutation-path	+13	Merge branch 'worktree-agent-7fefd776'
+step	other	a652f3dff	5046408a	epic:git-cli-module	+1112	Merge branch 'worktree-agent-5046408a'
+step	other	30ee6a814	fe9147fa	epic:one-mutation-path	-76	Merge branch 'worktree-agent-fe9147fa'
+step	other	8ae117d30	a273667c	epic:git-cli-module	+21	Merge branch 'worktree-agent-a273667c'
+step	other	9272c3b78	cfc87a55	epic:one-mutation-path	-35	Merge branch 'worktree-agent-cfc87a55'
+step	other	e6793674f	1b7f58ae	epic:one-mutation-path	+61	Merge branch 'worktree-agent-1b7f58ae'
+step	other	71dae3d3f	1acfa592	epic:git-cli-module	-42	Merge branch 'worktree-agent-1acfa592'
+step	other	8649dd5d1	693a2fdd	epic:one-mutation-path	+28	Merge branch 'worktree-agent-693a2fdd'
+step	other	7945cf103	693a2fdd	epic:one-mutation-path	+14	Merge branch 'worktree-agent-693a2fdd'
+step	other	df02f5271	c140921c	epic:git-cli-module	+29	Merge branch 'worktree-agent-c140921c'
+step	other	f7879709a	d9ba0029	epic:git-cli-module	+12	Merge branch 'worktree-agent-d9ba0029'
+step	other	2ac42b754	700a96dd	epic:one-mutation-path	-67	Merge branch 'worktree-agent-700a96dd'
+step	other	620423931	d3c94dc5	epic:one-mutation-path	-3	Merge branch 'worktree-agent-d3c94dc5'
+step	other	8ea13203f	7cd27db8	epic:git-cli-module	+13	Merge branch 'worktree-agent-7cd27db8'
+step	other	5e653b29d	65aafaba	epic:one-mutation-path	-456	Merge branch 'worktree-agent-65aafaba'
+step	other	0e9b9f8d6	933ff852	epic:git-cli-module	+23	Merge branch 'worktree-agent-933ff852'
+step	other	78e22a5e1	e6ec58f3	epic:git-cli-module	-107	Merge branch 'worktree-agent-e6ec58f3'
+step	other	3feb4c1b5	30334066	epic:one-mutation-path	+80	Merge branch 'worktree-agent-30334066'
+step	other	aead6a535	850eaad3	epic:one-mutation-path	+35	Merge branch 'worktree-agent-850eaad3'
+step	other	6d406d1ba	850eaad3	epic:one-mutation-path	+6	Merge branch 'worktree-agent-850eaad3'
+step	other	419566b25	b2c28ec1	epic:one-mutation-path	+2	Merge branch 'worktree-agent-b2c28ec1'
+step	other	7b651bb94	030df4b1	epic:one-mutation-path	+164	Merge branch 'worktree-agent-030df4b1'
+step	other	ed94892e7	34851181	epic:git-cli-module	-9	Merge branch 'worktree-agent-34851181'
+step	other	9eaf8639d	9623fe6a	epic:one-mutation-path	-6	Merge branch 'worktree-agent-9623fe6a'
+step	other	e73757a5e	c0775a83	epic:one-mutation-path	+65	Merge branch 'worktree-agent-c0775a83' (jit:c0775a83)
+step	other	e736d46f0	d4172016	epic:frontends-share-core	-103	Merge branch 'worktree-agent-d4172016'
+step	other	0364936bc	f98f2353	epic:one-mutation-path	+3	Merge branch 'worktree-agent-f98f2353'
+step	other	375db7968	219b9df8	epic:one-mutation-path	+2	Merge branch 'worktree-agent-219b9df8'
+step	other	52e2ea4fc	1471c12a	epic:frontends-share-core	+1	Merge branch 'worktree-agent-1471c12a'
+step	other	2ccee5989	219b9df8	epic:one-mutation-path	+22	Merge branch 'worktree-agent-219b9df8'
+step	other	a3b0dcb12	42046050	epic:one-mutation-path	-282	Merge branch 'worktree-agent-42046050'
+step	other	6709aca16	42046050	epic:one-mutation-path	+23	Merge branch 'worktree-agent-42046050'
+step	epic	ae01461e7	0b35be66	epic:rust-code-quality	+122	Merge branch 'worktree-agent-0b35be66'
+step	other	44e5708cc	4e2bed35	epic:one-mutation-path	+16	Merge branch 'worktree-agent-4e2bed35'
+step	epic	bed5d7f2a	afd2d573	epic:rust-code-quality	+0	Merge branch 'worktree-agent-afd2d573'
+step	other	e52ab0fa3	e73ad8bc	epic:one-mutation-path	-45	Merge branch 'worktree-agent-e73ad8bc'
+step	epic	2318609d5	7909527f	epic:rust-code-quality	+0	Merge branch 'worktree-agent-7909527f'
+step	other	32cdcc1e4	a2153a6f	epic:one-mutation-path	+17	Merge branch 'worktree-agent-a2153a6f'
+step	epic	48c408716	f487aeef	epic:rust-code-quality	+0	Merge branch 'worktree-agent-f487aeef'
+step	other	692bf622e	82f1647f	epic:one-mutation-path	+18	Merge branch 'worktree-agent-82f1647f'
+step	epic	c24f83489	f487aeef	epic:rust-code-quality	+0	Merge branch 'worktree-agent-f487aeef'
+step	epic	ba3d2b076	fba8d478	epic:rust-code-quality	+0	Merge branch 'worktree-agent-fba8d478'
+step	epic	38670c86b	fba8d478	epic:rust-code-quality	+0	Merge branch 'worktree-agent-fba8d478'
+sum	epic	steps=125	delta=+306
+sum	ambiguous	steps=1	delta=+38
+sum	other	steps=557	delta=-3458
+sum	direct	steps=2273	delta=+15
+sum	total	base=78801	final=75702	delta=-3099	class-sum=-3099
+# attr	module	class	merge	issues	epics	module-delta	subject
+attr	main	epic	e84318f92	9ca31c64	epic:rust-code-quality	-1	Merge branch 'worktree-agent-9ca31c64' (jit:9ca31c64)
+attr	main	other	4d409adf3	bedf0962	epic:audit-correctness	-10	Merge branch 'worktree-agent-bedf0962' (jit:bedf0962)
+attr	main	epic	e20c3b743	1874e265	epic:rust-code-quality	-421	Merge branch 'worktree-agent-1874e265' (jit:1874e265)
+attr	main	other	2707c8924	c0d0c8bf	epic:audit-correctness	-10	Merge branch 'worktree-agent-c0d0c8bf' (jit:c0d0c8bf)
+attr	main	other	203c67fd2	72d89161	epic:lead-friction	-31	Merge branch 'worktree-agent-72d89161' (jit:72d89161)
+attr	main	other	f1c74fa1b	d759d606	epic:greenfield-cutover	-12	Merge branch 'worktree-agent-d759d606' (jit:d759d606)
+attr	main	epic	40aaec181	719a5501	epic:rust-code-quality	-35	Merge branch 'worktree-agent-719a5501' (jit:719a5501)
+attr	main	other	77cfcd1f4	24268b05	epic:lead-friction	-128	Merge branch 'worktree-agent-24268b05' (jit:24268b05)
+attr	main	other	a8bf89160	8673dc5e	epic:lead-friction	+7	Merge branch 'worktree-agent-8673dc5e' (jit:8673dc5e)
+attr	main	other	7e0e58cd2	16d63038	epic:audit-correctness	+9	Merge branch 'worktree-agent-16d63038' (jit:16d63038 rework 1)
+attr	main	other	f84732b2f	c998dfd3	epic:greenfield-cutover	-1	Merge branch 'worktree-agent-c998dfd3' (jit:c998dfd3)
+attr	main	other	bc13fc9eb	af9a5509	epic:greenfield-cutover	-53	Merge branch 'worktree-agent-af9a5509' (jit:af9a5509)
+attr	main	epic	988b20792	650e6a56	epic:rust-code-quality	-46	Merge branch 'worktree-agent-650e6a56' (jit:650e6a56)
+attr	main	other	07c2bdd2c	2dd6b833	epic:lead-friction	-52	Merge branch 'worktree-agent-2dd6b833' (jit:2dd6b833)
+attr	main	other	32225f790	3754095f	epic:lead-friction	+17	Merge branch 'worktree-agent-3754095f' (jit:3754095f)
+attr	main	other	629f3194a	459bb995	epic:greenfield-cutover	-51	Merge branch 'worktree-agent-459bb995' (jit:459bb995)
+attr	main	other	f059dee4e	1a989754	epic:lead-friction	-36	Merge branch 'worktree-agent-1a989754' (jit:1a989754)
+attr	main	other	e608637c4	2492ab29	epic:greenfield-cutover	-23	Merge branch 'worktree-agent-2492ab29' (jit:2492ab29)
+attr	main	epic	f767033dc	d8176fd3	epic:rust-code-quality	-93	Merge branch 'worktree-agent-d8176fd3' (jit:d8176fd3)
+attr	main	other	b80cd0da6	f866d9d8	epic:lead-friction	-19	Merge branch 'worktree-agent-f866d9d8' (jit:f866d9d8)
+attr	main	other	cef1cd74e	fe761000	epic:greenfield-cutover	-5	Merge branch 'worktree-agent-fe761000' (jit:fe761000)
+attr	main	epic	d144d3d84	27f0a575	epic:rust-code-quality	+9	Merge branch 'worktree-agent-27f0a575' (jit:27f0a575)
+attr	main	epic	b1df0b2f4	2f15d48d	epic:rust-code-quality	+4	Merge branch 'worktree-agent-2f15d48d' (jit:2f15d48d)
+attr	main	other	3c849ae3c	ea5f4536	epic:greenfield-cutover	-11	Merge branch 'worktree-agent-ea5f4536' (jit:ea5f4536)
+attr	main	epic	12d718456	9fa12e75	epic:rust-code-quality	+11	Merge branch 'worktree-agent-9fa12e75' (jit:9fa12e75)
+attr	main	epic	ce437049d	9fa12e75	epic:rust-code-quality	+18	Merge branch 'worktree-agent-9fa12e75' (jit:9fa12e75 review fix)
+attr	main	epic	145091232	9cc3056a	epic:rust-code-quality	-34	Merge branch 'worktree-agent-9cc3056a' (jit:9cc3056a)
+attr	main	other	109e944f6	63c11d08	epic:greenfield-cutover	+1	Merge branch worktree-agent-63c11d08 (jit:63c11d08)
+attr	main	epic	8cf19175a	d4373d07	epic:rust-code-quality	-24	Merge branch 'worktree-agent-d4373d07' (jit:d4373d07)
+attr	main	epic	10fde232e	2e7e1348	epic:rust-code-quality	-30	Merge branch 'worktree-agent-2e7e1348' (jit:2e7e1348)
+attr	main	epic	853d1cfc8	a807e699	epic:rust-code-quality	-157	Merge branch 'worktree-agent-a807e699' (jit:a807e699)
+attr	main	other	7ef7e8dc9	3d93442b	epic:git-cli-module	+7	merge(jit:3d93442b): hook installation targets the selected repository's common directory
+attr	main	epic	b834fcbae	a807e699	epic:rust-code-quality	-1	Merge branch 'worktree-agent-a807e699' (jit:a807e699 rework 1)
+attr	main	epic	46a747fc2	5d0a9a90	epic:rust-code-quality	+8	Merge branch 'worktree-agent-5d0a9a90' (jit:5d0a9a90)
+attr	main	other	1a8ef7fe6	df505379	epic:test-topology	-1	Merge typed list envelopes (jit:df505379)
+attr	main	other	dd0be05f4	faa19def	epic:semantic-types	+3	Merge worktree-agent-faa19def (gate-run actors are Assignee values) (jit:faa19def)
+attr	main	other	e97478bc7	1622756a	epic:semantic-types	-5	Merge worktree-agent-1622756a (human output renders vocabulary tokens) (jit:1622756a)
+attr	main	other	8ea09d8b4	e1a6c8c2	epic:semantic-types	+5	Merge worktree-agent-e1a6c8c2 (storage and configuration name well-known files through VirtualPath constants) (jit:e1a6c8c2)
+attr	main	other	68394e37a	91081bd3	epic:semantic-types	+148	merge(jit:91081bd3): the CLI resolves each issue-id argument once at entry
+attr	main	other	76a3af872	8acca4f4	epic:semantic-types	+5	Merge errors, output and visualization typed issue ids (jit:8acca4f4)
+attr	main	other	631967da3	10ae7776	epic:semantic-types	-7	Merge declared vocabularies are never restated (jit:10ae7776)
+attr	main	other	34a960123	2a6bc44c	epic:test-topology	-8	Merge fixture setup inside the suite (jit:2a6bc44c)
+attr	main	other	58aac7985	7abcc22d	epic:semantic-types	+18	Merge IssueId becomes the validated newtype (jit:7abcc22d)
+attr	main	other	f45ab1df0	417be079	epic:semantic-types	+37	Merge issue gate fields are keyed by GateKey (jit:417be079)
+attr	main	other	368a53b50	64420cff	epic:semantic-types	+17	Merge commands carry assignees as Assignee (jit:64420cff)
+attr	main	other	f0beca0be	abe963dd	epic:lead-friction	+11	Merge one profile selection per invocation (jit:abe963dd)
+attr	main	other	868b55b50	da12ad66	epic:lead-friction	+11	Merge one rejection command form (jit:da12ad66)
+attr	main	other	56f95bcfb	da12ad66	epic:lead-friction	-11	Merge the closed update-state vocabulary (jit:da12ad66)
+attr	main	other	c82fd86a5	1b0c2b75,5c0bd3ad,ab797eed	epic:lead-friction	+3	Merge registry replacement, preview refusals and complete report targets (jit:5c0bd3ad jit:1b0c2b75 jit:ab797eed)
+attr	main	other	0ea91b1a7	aeafc378	epic:lead-friction	+10	Merge the write-lock primitive and landing script (jit:aeafc378)
+attr	main	other	661c51e71	0dcabcca,56b89d9a,a5fbec12	epic:lead-friction	-41	Merge dependent-wins composition, entry-point pruning and one result type (jit:0dcabcca jit:56b89d9a jit:a5fbec12)
+attr	main	other	f00e71007	17fbcf25	epic:lead-friction	+8	Merge one lease rule and the hook's lease-check removal (jit:17fbcf25)
+attr	main	other	26530d5a8	17fbcf25	epic:lead-friction	+3	Merge the lease table's reclassification and gate remove's check (jit:17fbcf25)
+attr	main	other	0e02052cd	03ce8d2c,0838348a,2ded6cd5	epic:lead-friction	+3	Merge gate update's lease check, update_issue_state's removal and loud listings (jit:2ded6cd5 jit:0838348a jit:03ce8d2c)
+attr	main	other	a9e1ac051	216f70b4,536a48ef,6e65a501,9a3a9f1e,dbbfcd6c	epic:lead-friction	+4	Merge target-set show, one canonical JSON, semver versions, domain ids and the unreachable code's removal (jit:536a48ef jit:6e65a501 jit:216f70b4 jit:dbbfcd6c jit:9a3a9f1e)
+attr	main	other	a0c3144ba	edc8544d	epic:lead-friction	-28	Merge derived documents on every issue surface (jit:edc8544d)
+attr	main	epic	55e6ce46f	1002524a	epic:rust-code-quality	+1	Merge branch 'worktree-agent-1002524a'
+attr	main	epic	0fbd890c3	083c9a91	epic:rust-code-quality	-14	Merge branch 'worktree-agent-083c9a91'
+attr	main	epic	d7729e1ca	6f49f3b3	epic:rust-code-quality	+13	Merge branch 'worktree-agent-6f49f3b3'
+attr	main	epic	6f110c219	f79d2510	epic:rust-code-quality	+3	Merge branch 'worktree-agent-f79d2510'
+attr	main	epic	876eae0af	7a7d0bfe	epic:rust-code-quality	+10	Merge branch 'worktree-agent-7a7d0bfe'
+attr	main	epic	3aa8182c5	985c2b15	epic:rust-code-quality	+11	Merge branch 'worktree-agent-985c2b15'
+attr	main	epic	58b9b90dc	fd2073b7	epic:rust-code-quality	+5	Merge branch 'worktree-agent-fd2073b7'
+attr	main	epic	226db21cc	93aaba24	epic:rust-code-quality	+4	Merge branch 'worktree-agent-93aaba24'
+attr	main	epic	7f257f027	5962427b	epic:rust-code-quality	+5	Merge branch 'worktree-agent-5962427b'
+attr	main	epic	fbbaa2ba4	334c12e7	epic:rust-code-quality	-10	Merge branch 'worktree-agent-334c12e7'
+attr	main	epic	92858ba2d	d05b5639	epic:rust-code-quality	-1	Merge branch 'worktree-agent-d05b5639'
+attr	main	epic	2f76a56e7	a3a99cf8	epic:rust-code-quality	-98	Merge branch 'worktree-agent-a3a99cf8'
+attr	main	epic	5934d9658	1539da29	epic:rust-code-quality	-221	Merge branch 'worktree-agent-1539da29'
+attr	main	other	a506691d8	dd53527f	epic:history-independent-reads	-26	Merge branch 'worktree-agent-dd53527f'
+attr	main	epic	6c0549aba	2e0f276b	epic:rust-code-quality	+1	Merge branch 'worktree-agent-2e0f276b'
+attr	main	other	e1930dbed	dd53527f	epic:history-independent-reads	-33	Merge branch 'worktree-agent-dd53527f'
+attr	main	other	10c8e3847	15009590	epic:history-independent-reads	-17	Merge branch 'worktree-agent-15009590'
+attr	main	other	dd2af2679	5b37a806	epic:v1-release	+7	Merge branch 'worktree-agent-5b37a806'
+attr	main	other	308aa9485	5d5a1794	epic:one-validation-report	+6	Merge branch 'worktree-agent-5d5a1794'
+attr	main	other	fc7035a25	93b7f1dd	epic:history-independent-reads	+6	Merge branch 'worktree-agent-93b7f1dd'
+attr	main	other	7487595a9	5d5a1794	epic:one-validation-report	-21	Merge branch 'worktree-agent-5d5a1794'
+attr	main	other	5d4e0a254	2f563673	epic:history-independent-reads	+1	Merge branch 'worktree-agent-2f563673'
+attr	main	other	9f219fcdf	5d5a1794	epic:one-validation-report	-8	Merge branch 'worktree-agent-5d5a1794'
+attr	main	other	70f80ae6f	03c59566	epic:one-validation-report	-6	Merge branch 'worktree-agent-03c59566'
+attr	main	other	96be25331	2f563673	epic:history-independent-reads	-2	Merge branch 'worktree-agent-2f563673'
+attr	main	epic	7663d7dc3	b23faa59	epic:rust-code-quality	-55	Merge branch 'worktree-agent-b23faa59'
+attr	main	other	92aa09e0c	6ba4f623	epic:one-validation-report	-6	Merge branch 'worktree-agent-6ba4f623'
+attr	main	epic	4baff2cb3	12c0f3fb	epic:rust-code-quality	-14	Merge branch 'worktree-agent-12c0f3fb'
+attr	main	epic	a476a2d42	153c9851	epic:rust-code-quality	-165	Merge branch 'worktree-agent-153c9851'
+attr	main	other	aa6ea4aa0	614a6f97	epic:history-independent-reads	+17	Merge branch 'worktree-agent-614a6f97'
+attr	main	epic	27a9330b5	9529b9ac	epic:rust-code-quality	+1	Merge branch 'worktree-agent-9529b9ac'
+attr	main	epic	7f785b006	c9103fcf	epic:rust-code-quality	-460	Merge branch 'worktree-agent-c9103fcf'
+attr	main	other	87b38351c	2c8c13b2	epic:one-validation-report	+7	Merge branch 'worktree-agent-2c8c13b2'
+attr	main	other	9af61dd1f	1f24e3e9	epic:one-validation-report	-29	Merge branch 'worktree-agent-1f24e3e9'
+attr	main	other	6c94d48c4	86f7e6eb	epic:one-validation-report	+7	Merge branch 'worktree-agent-86f7e6eb'
+attr	main	epic	c5a125d74	06ee9b67,0fe46027,1a4f2ebd,20fc3b92,3cf69ecf,52110fb4,66790c84,71f5296c,8c46fc85,8e91126b,8f297e60,98cc2097,b25c2e54,f930acf2	epic:rust-code-quality	-2080	Merge branch 'worktree-agent-w7batch'
+attr	main	epic	f1aa105be	182f4c03	epic:rust-code-quality	-50	Merge branch 'worktree-agent-182f4c03'
+attr	main	epic	f0fc5542b	10751360	epic:rust-code-quality	-431	Merge branch 'worktree-agent-10751360'
+attr	main	epic	86c39dff8	cd8e04cc	epic:rust-code-quality	-146	Merge branch 'worktree-agent-cd8e04cc'
+attr	main	epic	860d8207e	1ac651c7	epic:rust-code-quality	-701	Merge branch 'worktree-agent-1ac651c7'
+attr	main	epic	a6ec3caa3	cc4ea8a9	epic:rust-code-quality	-359	Merge branch 'worktree-agent-cc4ea8a9'
+attr	main	epic	af1d0b839	24a982b7	epic:rust-code-quality	-306	Merge branch 'worktree-agent-24a982b7'
+attr	main	epic	b7ebfe569	f87f9b00	epic:rust-code-quality	-560	Merge branch 'worktree-agent-f87f9b00'
+attr	main	epic	b319c484a	3f816619	epic:rust-code-quality	-592	Merge branch 'worktree-agent-3f816619'
+attr	main	epic	93e9844b7	b23b1bf3	epic:rust-code-quality	-324	Merge branch 'worktree-agent-b23b1bf3'
+attr	main	epic	b8b8be033	5687e281	epic:rust-code-quality	-290	Merge branch 'worktree-agent-5687e281'
+attr-sum	main	epic=-7615	ambiguous=+0	other=-313	direct=+0
+attr	dispatch	epic	968119b03	abe555e9	epic:rust-code-quality	+52	Merge branch 'worktree-agent-abe555e9'
+attr	dispatch	epic	7663d7dc3	b23faa59	epic:rust-code-quality	+32	Merge branch 'worktree-agent-b23faa59'
+attr	dispatch	epic	4baff2cb3	12c0f3fb	epic:rust-code-quality	+143	Merge branch 'worktree-agent-12c0f3fb'
+attr	dispatch	epic	a476a2d42	153c9851	epic:rust-code-quality	+69	Merge branch 'worktree-agent-153c9851'
+attr	dispatch	epic	f1e434642	9529b9ac	epic:rust-code-quality	+13	Merge branch 'worktree-agent-9529b9ac'
+attr	dispatch	epic	7f785b006	c9103fcf	epic:rust-code-quality	+173	Merge branch 'worktree-agent-c9103fcf'
+attr	dispatch	epic	c5a125d74	06ee9b67,0fe46027,1a4f2ebd,20fc3b92,3cf69ecf,52110fb4,66790c84,71f5296c,8c46fc85,8e91126b,8f297e60,98cc2097,b25c2e54,f930acf2	epic:rust-code-quality	+1287	Merge branch 'worktree-agent-w7batch'
+attr	dispatch	epic	f1aa105be	182f4c03	epic:rust-code-quality	+42	Merge branch 'worktree-agent-182f4c03'
+attr	dispatch	epic	f0fc5542b	10751360	epic:rust-code-quality	+245	Merge branch 'worktree-agent-10751360'
+attr	dispatch	epic	86c39dff8	cd8e04cc	epic:rust-code-quality	+54	Merge branch 'worktree-agent-cd8e04cc'
+attr	dispatch	epic	860d8207e	1ac651c7	epic:rust-code-quality	+358	Merge branch 'worktree-agent-1ac651c7'
+attr	dispatch	epic	a6ec3caa3	cc4ea8a9	epic:rust-code-quality	+135	Merge branch 'worktree-agent-cc4ea8a9'
+attr	dispatch	epic	a1e738ccb	f82a2e4a	epic:rust-code-quality	-13	Merge branch 'worktree-agent-f82a2e4a'
+attr	dispatch	epic	3afea694e	9be5b0de	epic:rust-code-quality	-6	Merge branch 'worktree-agent-9be5b0de'
+attr	dispatch	epic	0d17458ef	8fbf8c43	epic:rust-code-quality	-31	Merge branch 'worktree-agent-8fbf8c43'
+attr	dispatch	epic	af1d0b839	24a982b7	epic:rust-code-quality	+184	Merge branch 'worktree-agent-24a982b7'
+attr	dispatch	epic	b7ebfe569	f87f9b00	epic:rust-code-quality	+206	Merge branch 'worktree-agent-f87f9b00'
+attr	dispatch	epic	b319c484a	3f816619	epic:rust-code-quality	+368	Merge branch 'worktree-agent-3f816619'
+attr	dispatch	epic	93e9844b7	b23b1bf3	epic:rust-code-quality	+127	Merge branch 'worktree-agent-b23b1bf3'
+attr	dispatch	epic	b8b8be033	5687e281	epic:rust-code-quality	+68	Merge branch 'worktree-agent-5687e281'
+attr	dispatch	epic	d43510d02	ae3f4f8b	epic:rust-code-quality	-13	Merge branch 'worktree-agent-ae3f4f8b'
+attr	dispatch	epic	87938c3d3	8b3cce62	epic:rust-code-quality	+84	Merge branch 'worktree-agent-8b3cce62'
+attr	dispatch	other	56626345e	578ed10d	epic:one-mutation-path	-1	Merge branch 'worktree-agent-578ed10d'
+attr	dispatch	epic	e1b2bf52b	8b3cce62	epic:rust-code-quality	-3	Merge branch 'worktree-agent-8b3cce62'
+attr	dispatch	epic	70457e502	fb38bf1f	epic:rust-code-quality	+6	Merge branch 'worktree-agent-fb38bf1f'
+attr	dispatch	epic	7e86df856	487f45a9	epic:rust-code-quality	-1	Merge branch 'worktree-agent-487f45a9'
+attr	dispatch	epic	6d9a1ed76	f35c86de	epic:rust-code-quality	-70	Merge branch 'worktree-agent-f35c86de'
+attr	dispatch	epic	97d00504e	0eca332a	epic:rust-code-quality	+18	Merge branch 'worktree-agent-0eca332a'
+attr	dispatch	ambiguous	0d980ee38	dc048377	epic:-	+15	Merge branch 'worktree-agent-dc048377'
+attr	dispatch	other	abaa6bdf8	6326532e	epic:frontends-share-core	+4	Merge branch 'worktree-agent-6326532e'
+attr	dispatch	other	81965e397	fc2403fb	epic:-	+1	Merge branch 'worktree-agent-fc2403fb'
+attr	dispatch	other	64bcda104	c2b3cefa	epic:one-mutation-path	-1	Merge branch 'worktree-agent-c2b3cefa'
+attr	dispatch	other	a652f3dff	5046408a	epic:git-cli-module	+92	Merge branch 'worktree-agent-5046408a'
+attr	dispatch	other	7b651bb94	030df4b1	epic:one-mutation-path	+9	Merge branch 'worktree-agent-030df4b1'
+attr	dispatch	other	9eaf8639d	9623fe6a	epic:one-mutation-path	+7	Merge branch 'worktree-agent-9623fe6a'
+attr	dispatch	other	e736d46f0	d4172016	epic:frontends-share-core	+1	Merge branch 'worktree-agent-d4172016'
+attr	dispatch	other	a3b0dcb12	42046050	epic:one-mutation-path	+8	Merge branch 'worktree-agent-42046050'
+attr	dispatch	other	32cdcc1e4	a2153a6f	epic:one-mutation-path	-1	Merge branch 'worktree-agent-a2153a6f'
+attr-sum	dispatch	epic=+3527	ambiguous=+15	other=+119	direct=+0
+attr	output	other	2fb6b59b0	0ec8b001	epic:greenfield-cutover	-80	Merge branch 'worktree-agent-0ec8b001' (jit:0ec8b001)
+attr	output	epic	e20c3b743	1874e265	epic:rust-code-quality	+432	Merge branch 'worktree-agent-1874e265' (jit:1874e265)
+attr	output	other	b9a0d249d	0ec8b001	epic:greenfield-cutover	+1	Merge branch 'worktree-agent-0ec8b001' (jit:0ec8b001)
+attr	output	other	203c67fd2	72d89161	epic:lead-friction	-5	Merge branch 'worktree-agent-72d89161' (jit:72d89161)
+attr	output	other	77cfcd1f4	24268b05	epic:lead-friction	-4	Merge branch 'worktree-agent-24268b05' (jit:24268b05)
+attr	output	epic	6d24ab6ee	f7f01654	epic:rust-code-quality	-43	Merge branch 'worktree-agent-f7f01654' (jit:f7f01654)
+attr	output	epic	988b20792	650e6a56	epic:rust-code-quality	-37	Merge branch 'worktree-agent-650e6a56' (jit:650e6a56)
+attr	output	other	32225f790	3754095f	epic:lead-friction	-7	Merge branch 'worktree-agent-3754095f' (jit:3754095f)
+attr	output	other	74394675c	8673dc5e	epic:lead-friction	-3	Merge branch 'worktree-agent-8673dc5e' (jit:8673dc5e rework 2)
+attr	output	other	629f3194a	459bb995	epic:greenfield-cutover	+21	Merge branch 'worktree-agent-459bb995' (jit:459bb995)
+attr	output	epic	f767033dc	d8176fd3	epic:rust-code-quality	+5	Merge branch 'worktree-agent-d8176fd3' (jit:d8176fd3)
+attr	output	other	b80cd0da6	f866d9d8	epic:lead-friction	-3	Merge branch 'worktree-agent-f866d9d8' (jit:f866d9d8)
+attr	output	other	cef1cd74e	fe761000	epic:greenfield-cutover	-4	Merge branch 'worktree-agent-fe761000' (jit:fe761000)
+attr	output	epic	b1df0b2f4	2f15d48d	epic:rust-code-quality	+51	Merge branch 'worktree-agent-2f15d48d' (jit:2f15d48d)
+attr	output	epic	12d718456	9fa12e75	epic:rust-code-quality	+17	Merge branch 'worktree-agent-9fa12e75' (jit:9fa12e75)
+attr	output	other	5f3e8140d	0e3b69fc	epic:greenfield-cutover	+1	Merge branch 'worktree-agent-0e3b69fc' (jit:0e3b69fc)
+attr	output	epic	145091232	9cc3056a	epic:rust-code-quality	+48	Merge branch 'worktree-agent-9cc3056a' (jit:9cc3056a)
+attr	output	other	109e944f6	63c11d08	epic:greenfield-cutover	+4	Merge branch worktree-agent-63c11d08 (jit:63c11d08)
+attr	output	epic	10fde232e	2e7e1348	epic:rust-code-quality	+26	Merge branch 'worktree-agent-2e7e1348' (jit:2e7e1348)
+attr	output	other	1a8ef7fe6	df505379	epic:test-topology	+17	Merge typed list envelopes (jit:df505379)
+attr	output	other	9bf26a880	3f026bb1	epic:semantic-types	-2	Merge worktree-agent-3f026bb1 (wire-vocabulary macro proven on GateStatus) (jit:3f026bb1)
+attr	output	other	9dfa245a5	3ae2293a	epic:semantic-types	-3	Merge worktree-agent-3ae2293a (gate stage and mode through the vocabulary macro) (jit:3ae2293a)
+attr	output	other	36f5146c1	256c8eb1	epic:semantic-types	-171	Merge worktree-agent-256c8eb1 (error codes from one declaration) (jit:256c8eb1)
+attr	output	other	dd0be05f4	faa19def	epic:semantic-types	+1	Merge worktree-agent-faa19def (gate-run actors are Assignee values) (jit:faa19def)
+attr	output	other	76a3af872	8acca4f4	epic:semantic-types	+20	Merge errors, output and visualization typed issue ids (jit:8acca4f4)
+attr	output	other	631967da3	10ae7776	epic:semantic-types	+7	Merge declared vocabularies are never restated (jit:10ae7776)
+attr	output	other	58aac7985	7abcc22d	epic:semantic-types	-1	Merge IssueId becomes the validated newtype (jit:7abcc22d)
+attr	output	other	f45ab1df0	417be079	epic:semantic-types	+5	Merge issue gate fields are keyed by GateKey (jit:417be079)
+attr	output	other	522ff70a2	1a3db2c3	epic:semantic-types	+2	Merge the dependency graph carries typed node ids (jit:1a3db2c3)
+attr	output	other	368a53b50	64420cff	epic:semantic-types	+11	Merge commands carry assignees as Assignee (jit:64420cff)
+attr	output	other	b0ce9a116	5f82e09a	epic:lead-friction	+24	Merge refusing a profile apply over uncommitted targets (jit:5f82e09a)
+attr	output	other	eb1bad666	c47d78c8	epic:lead-friction	+2	Merge exactly one index format and the retired-tag removal (jit:c47d78c8)
+attr	output	other	029490b72	024b98b1,04ece1e2,0f648627,1eab392b,376afd01	epic:lead-friction	+3	Merge one graph error, one package type and bare package paths (jit:0f648627 jit:04ece1e2 jit:376afd01 jit:1eab392b jit:024b98b1)
+attr	output	other	a9e1ac051	216f70b4,536a48ef,6e65a501,9a3a9f1e,dbbfcd6c	epic:lead-friction	-10	Merge target-set show, one canonical JSON, semver versions, domain ids and the unreachable code's removal (jit:536a48ef jit:6e65a501 jit:216f70b4 jit:dbbfcd6c jit:9a3a9f1e)
+attr	output	epic	5934d9658	1539da29	epic:rust-code-quality	+228	Merge branch 'worktree-agent-1539da29'
+attr	output	other	a506691d8	dd53527f	epic:history-independent-reads	-5	Merge branch 'worktree-agent-dd53527f'
+attr	output	epic	d11ed6ed8	22189592	epic:rust-code-quality	+3	Merge branch 'worktree-agent-22189592'
+attr	output	epic	968119b03	abe555e9	epic:rust-code-quality	+62	Merge branch 'worktree-agent-abe555e9'
+attr	output	other	10c8e3847	15009590	epic:history-independent-reads	-6	Merge branch 'worktree-agent-15009590'
+attr	output	other	55438f664	2117739f	epic:history-independent-reads	+7	Merge branch 'worktree-agent-2117739f'
+attr	output	other	7487595a9	5d5a1794	epic:one-validation-report	+6	Merge branch 'worktree-agent-5d5a1794'
+attr	output	epic	7663d7dc3	b23faa59	epic:rust-code-quality	+20	Merge branch 'worktree-agent-b23faa59'
+attr	output	epic	4baff2cb3	12c0f3fb	epic:rust-code-quality	+10	Merge branch 'worktree-agent-12c0f3fb'
+attr	output	epic	f2e1aefd6	e5d618ee	epic:rust-code-quality	+6	Merge branch 'worktree-agent-e5d618ee'
+attr	output	epic	a476a2d42	153c9851	epic:rust-code-quality	+85	Merge branch 'worktree-agent-153c9851'
+attr	output	epic	f1e434642	9529b9ac	epic:rust-code-quality	+22	Merge branch 'worktree-agent-9529b9ac'
+attr	output	epic	27a9330b5	9529b9ac	epic:rust-code-quality	+4	Merge branch 'worktree-agent-9529b9ac'
+attr	output	epic	7f785b006	c9103fcf	epic:rust-code-quality	+269	Merge branch 'worktree-agent-c9103fcf'
+attr	output	epic	c5a125d74	06ee9b67,0fe46027,1a4f2ebd,20fc3b92,3cf69ecf,52110fb4,66790c84,71f5296c,8c46fc85,8e91126b,8f297e60,98cc2097,b25c2e54,f930acf2	epic:rust-code-quality	+1056	Merge branch 'worktree-agent-w7batch'
+attr	output	epic	f1aa105be	182f4c03	epic:rust-code-quality	+19	Merge branch 'worktree-agent-182f4c03'
+attr	output	epic	f0fc5542b	10751360	epic:rust-code-quality	+247	Merge branch 'worktree-agent-10751360'
+attr	output	epic	86c39dff8	cd8e04cc	epic:rust-code-quality	+67	Merge branch 'worktree-agent-cd8e04cc'
+attr	output	epic	860d8207e	1ac651c7	epic:rust-code-quality	+319	Merge branch 'worktree-agent-1ac651c7'
+attr	output	epic	a6ec3caa3	cc4ea8a9	epic:rust-code-quality	+131	Merge branch 'worktree-agent-cc4ea8a9'
+attr	output	epic	cfd894128	1a4f2ebd	epic:rust-code-quality	-5	Merge branch 'worktree-agent-1a4f2ebd'
+attr	output	epic	a1e738ccb	f82a2e4a	epic:rust-code-quality	-47	Merge branch 'worktree-agent-f82a2e4a'
+attr	output	epic	3afea694e	9be5b0de	epic:rust-code-quality	-17	Merge branch 'worktree-agent-9be5b0de'
+attr	output	epic	af1d0b839	24a982b7	epic:rust-code-quality	+167	Merge branch 'worktree-agent-24a982b7'
+attr	output	epic	b7ebfe569	f87f9b00	epic:rust-code-quality	+244	Merge branch 'worktree-agent-f87f9b00'
+attr	output	epic	ae99aaa66	24a982b7	epic:rust-code-quality	+24	Merge branch 'worktree-agent-24a982b7'
+attr	output	epic	b319c484a	3f816619	epic:rust-code-quality	+148	Merge branch 'worktree-agent-3f816619'
+attr	output	epic	93e9844b7	b23b1bf3	epic:rust-code-quality	+158	Merge branch 'worktree-agent-b23b1bf3'
+attr	output	epic	b8b8be033	5687e281	epic:rust-code-quality	-7	Merge branch 'worktree-agent-5687e281'
+attr	output	other	973bb01b6	c517b88b	epic:one-mutation-path	+1	Merge branch 'worktree-agent-c517b88b'
+attr	output	epic	87938c3d3	8b3cce62	epic:rust-code-quality	+19	Merge branch 'worktree-agent-8b3cce62'
+attr	output	epic	e1b2bf52b	8b3cce62	epic:rust-code-quality	-19	Merge branch 'worktree-agent-8b3cce62'
+attr	output	epic	70457e502	fb38bf1f	epic:rust-code-quality	-406	Merge branch 'worktree-agent-fb38bf1f'
+attr	output	epic	7e86df856	487f45a9	epic:rust-code-quality	-2	Merge branch 'worktree-agent-487f45a9'
+attr	output	epic	97d00504e	0eca332a	epic:rust-code-quality	-41	Merge branch 'worktree-agent-0eca332a'
+attr	output	ambiguous	0d980ee38	dc048377	epic:-	+20	Merge branch 'worktree-agent-dc048377'
+attr	output	other	abaa6bdf8	6326532e	epic:frontends-share-core	+12	Merge branch 'worktree-agent-6326532e'
+attr	output	other	81965e397	fc2403fb	epic:-	+26	Merge branch 'worktree-agent-fc2403fb'
+attr	output	other	1f838b61b	0723860e	epic:-	+12	Merge branch 'worktree-agent-0723860e'
+attr	output	other	a652f3dff	5046408a	epic:git-cli-module	+12	Merge branch 'worktree-agent-5046408a'
+attr	output	other	9eaf8639d	9623fe6a	epic:one-mutation-path	+1	Merge branch 'worktree-agent-9623fe6a'
+attr-sum	output	epic=+3263	ambiguous=+20	other=-108	direct=+0
+attr	commands	other	76db712c5	aa423d02	epic:audit-correctness	+11	Merge branch 'worktree-agent-aa423d02' (jit:aa423d02)
+attr	commands	other	a51913ccd	ae2e3739	epic:lead-friction	+4	Merge branch 'worktree-agent-ae2e3739' (jit:ae2e3739)
+attr	commands	other	78684701c	d6bbe05f	epic:lead-friction	-212	Merge branch 'worktree-agent-d6bbe05f' (jit:d6bbe05f)
+attr	commands	other	4bbd04626	f11514dd	epic:greenfield-cutover	-11	Merge branch 'worktree-agent-f11514dd' (jit:f11514dd)
+attr	commands	other	4d409adf3	bedf0962	epic:audit-correctness	-16	Merge branch 'worktree-agent-bedf0962' (jit:bedf0962)
+attr	commands	other	428147948	66986f88	epic:lead-friction	+8	Merge branch 'worktree-agent-66986f88' (jit:66986f88)
+attr	commands	other	471b998f7	05d1b34e	epic:audit-correctness	+5	Merge branch 'worktree-agent-05d1b34e' (jit:05d1b34e)
+attr	commands	other	94b072c04	05d1b34e	epic:audit-correctness	+7	Merge branch 'worktree-agent-05d1b34e' (jit:05d1b34e rework 1)
+attr	commands	other	203c67fd2	72d89161	epic:lead-friction	-44	Merge branch 'worktree-agent-72d89161' (jit:72d89161)
+attr	commands	other	7f4b74e92	866bdde0	epic:greenfield-cutover	-317	Merge branch 'worktree-agent-866bdde0' (jit:866bdde0)
+attr	commands	other	80088964d	c0d0c8bf	epic:audit-correctness	-30	Merge branch 'worktree-agent-c0d0c8bf' (jit:c0d0c8bf rework 1)
+attr	commands	other	f1c74fa1b	d759d606	epic:greenfield-cutover	-35	Merge branch 'worktree-agent-d759d606' (jit:d759d606)
+attr	commands	other	6672b0d65	84745746	epic:greenfield-cutover	-200	Merge branch 'worktree-agent-84745746' (jit:84745746)
+attr	commands	other	1d8eca5b9	16d63038	epic:audit-correctness	-116	Merge branch 'worktree-agent-16d63038' (jit:16d63038)
+attr	commands	other	77cfcd1f4	24268b05	epic:lead-friction	-433	Merge branch 'worktree-agent-24268b05' (jit:24268b05)
+attr	commands	other	abe42b563	71b0af0e	epic:greenfield-cutover	-11	Merge branch 'worktree-agent-71b0af0e' (jit:71b0af0e)
+attr	commands	other	a8bf89160	8673dc5e	epic:lead-friction	+32	Merge branch 'worktree-agent-8673dc5e' (jit:8673dc5e)
+attr	commands	other	7e0e58cd2	16d63038	epic:audit-correctness	+139	Merge branch 'worktree-agent-16d63038' (jit:16d63038 rework 1)
+attr	commands	other	a3d36f0fb	9aa54649	epic:greenfield-cutover	-9	Merge branch 'worktree-agent-9aa54649' (jit:9aa54649)
+attr	commands	other	8849930aa	8673dc5e	epic:lead-friction	+5	Merge branch 'worktree-agent-8673dc5e' (jit:8673dc5e rework 1)
+attr	commands	other	bc13fc9eb	af9a5509	epic:greenfield-cutover	-6	Merge branch 'worktree-agent-af9a5509' (jit:af9a5509)
+attr	commands	epic	988b20792	650e6a56	epic:rust-code-quality	-11	Merge branch 'worktree-agent-650e6a56' (jit:650e6a56)
+attr	commands	other	07c2bdd2c	2dd6b833	epic:lead-friction	-95	Merge branch 'worktree-agent-2dd6b833' (jit:2dd6b833)
+attr	commands	other	6a430a7c4	f37d228e	epic:lead-friction	-12	Merge branch 'worktree-agent-f37d228e' (jit:f37d228e)
+attr	commands	other	74394675c	8673dc5e	epic:lead-friction	-1	Merge branch 'worktree-agent-8673dc5e' (jit:8673dc5e rework 2)
+attr	commands	other	537da82c0	e1af39db	epic:greenfield-cutover	-4	Merge branch 'worktree-agent-e1af39db' (jit:e1af39db)
+attr	commands	other	629f3194a	459bb995	epic:greenfield-cutover	-2	Merge branch 'worktree-agent-459bb995' (jit:459bb995)
+attr	commands	other	b964b98bb	d125490a	epic:greenfield-cutover	-36	Merge branch 'worktree-agent-d125490a' (jit:d125490a)
+attr	commands	other	4568aea4f	459bb995	epic:greenfield-cutover	-86	Merge branch 'worktree-agent-459bb995' (jit:459bb995)
+attr	commands	other	f059dee4e	1a989754	epic:lead-friction	-98	Merge branch 'worktree-agent-1a989754' (jit:1a989754)
+attr	commands	other	e608637c4	2492ab29	epic:greenfield-cutover	-121	Merge branch 'worktree-agent-2492ab29' (jit:2492ab29)
+attr	commands	other	282827ce9	fbb661f2	epic:greenfield-cutover	-17	Merge branch 'worktree-agent-fbb661f2' (jit:fbb661f2)
+attr	commands	other	12f6a06aa	fbb661f2	epic:greenfield-cutover	+1	Merge branch 'worktree-agent-fbb661f2' (jit:fbb661f2)
+attr	commands	other	b80cd0da6	f866d9d8	epic:lead-friction	-2	Merge branch 'worktree-agent-f866d9d8' (jit:f866d9d8)
+attr	commands	other	cef1cd74e	fe761000	epic:greenfield-cutover	-5	Merge branch 'worktree-agent-fe761000' (jit:fe761000)
+attr	commands	other	a1fd176cb	34361448	epic:greenfield-cutover	-4	Merge branch 'worktree-agent-34361448' (jit:34361448)
+attr	commands	epic	d144d3d84	27f0a575	epic:rust-code-quality	+33	Merge branch 'worktree-agent-27f0a575' (jit:27f0a575)
+attr	commands	other	51fcef315	39710b3b	epic:lead-friction	+33	Merge branch 'worktree-agent-39710b3b' (jit:39710b3b)
+attr	commands	other	a4759a3ec	287eef78	epic:greenfield-cutover	+1	Merge branch 'worktree-agent-287eef78' (jit:287eef78)
+attr	commands	other	3c849ae3c	ea5f4536	epic:greenfield-cutover	-22	Merge branch 'worktree-agent-ea5f4536' (jit:ea5f4536)
+attr	commands	other	087ae5c5c	5179374d	epic:lead-friction	-259	Merge branch 'worktree-agent-5179374d' (jit:5179374d)
+attr	commands	other	062ed9b7e	86d3625d	epic:greenfield-cutover	-7	Merge branch 'worktree-agent-86d3625d' (jit:86d3625d)
+attr	commands	other	800ed79c6	22355a56	epic:test-topology	+6	Merge branch 'worktree-agent-22355a56' (jit:22355a56)
+attr	commands	direct	cf274f369	-	-	-6	Revert "Merge branch 'worktree-agent-22355a56' (jit:22355a56)"
+attr	commands	other	109e944f6	63c11d08	epic:greenfield-cutover	+3	Merge branch worktree-agent-63c11d08 (jit:63c11d08)
+attr	commands	other	39002df00	22355a56	epic:test-topology	+13	Merge product-initialized memory fixture recovery (jit:22355a56)
+attr	commands	other	148648d78	368df0c1	epic:test-topology	-14	Share pure available-work filtering and ordering (jit:368df0c1)
+attr	commands	epic	8cf19175a	d4373d07	epic:rust-code-quality	+64	Merge branch 'worktree-agent-d4373d07' (jit:d4373d07)
+attr	commands	epic	853d1cfc8	a807e699	epic:rust-code-quality	+157	Merge branch 'worktree-agent-a807e699' (jit:a807e699)
+attr	commands	other	7ef7e8dc9	3d93442b	epic:git-cli-module	-45	merge(jit:3d93442b): hook installation targets the selected repository's common directory
+attr	commands	epic	b834fcbae	a807e699	epic:rust-code-quality	+13	Merge branch 'worktree-agent-a807e699' (jit:a807e699 rework 1)
+attr	commands	other	a8840ea66	62a0085a	epic:semantic-types	-3	Merge worktree-agent-62a0085a (one HierarchyConfig constructor from declarations) (jit:62a0085a)
+attr	commands	other	e86d642f4	5c232305	epic:semantic-types	+1	Merge worktree-agent-5c232305 (ProfileId in the domain layer) (jit:5c232305)
+attr	commands	other	0c12fdf03	c400730c	epic:semantic-types	+2	Merge worktree-agent-c400730c (IssueIdPrefix owns prefix parsing and resolution typing) (jit:c400730c)
+attr	commands	other	119cb147d	7383f4ea	epic:semantic-types	-8	Merge worktree-agent-7383f4ea (template transform kind typed at load) (jit:7383f4ea)
+attr	commands	other	9035d85a5	a50e9be9	epic:semantic-types	+1	Merge worktree-agent-a50e9be9 (resolved agent identity is an Assignee) (jit:a50e9be9)
+attr	commands	other	c6792e5dd	cccfd407	epic:semantic-types	+1	Merge worktree-agent-cccfd407 (one VirtualPath predicate for reserved application targets) (jit:cccfd407)
+attr	commands	other	a909be010	428646c5	epic:semantic-types	+3	Merge worktree-agent-428646c5 (profile dependency resolution compares ProfileId values) (jit:428646c5)
+attr	commands	other	82a7de2ad	8cfbf19d	epic:semantic-types	+20	Merge worktree-agent-8cfbf19d (lease and worktree ids are dedicated types) (jit:8cfbf19d)
+attr	commands	other	50b2cbd87	98404e0c	epic:semantic-types	-30	Merge worktree-agent-98404e0c (lease records name their issue by IssueId) (jit:98404e0c)
+attr	commands	other	60ed71c0e	945f65f3	epic:semantic-types	+69	Merge worktree-agent-945f65f3 (well-known files through VirtualPath constants in commands) (jit:945f65f3)
+attr	commands	other	dd0be05f4	faa19def	epic:semantic-types	-8	Merge worktree-agent-faa19def (gate-run actors are Assignee values) (jit:faa19def)
+attr	commands	other	9bfc09496	7e8f1525	epic:semantic-types	+4	Merge worktree-agent-7e8f1525 (label-coverage assertions typed and compiled at load) (jit:7e8f1525)
+attr	commands	other	aa24dad2c	72dfc0d7	epic:semantic-types	-4	Merge worktree-agent-72dfc0d7 (built-in gate findings use closed severity and disposition enums) (jit:72dfc0d7)
+attr	commands	other	425c9b045	182350ce	epic:semantic-types	-34	Merge worktree-agent-182350ce (priority tokens from one declaration) (jit:182350ce)
+attr	commands	other	d760f5954	bf87bbdb	epic:semantic-types	+38	Merge worktree-agent-bf87bbdb (graph queries return nodes rather than id strings) (jit:bf87bbdb)
+attr	commands	other	e97478bc7	1622756a	epic:semantic-types	-3	Merge worktree-agent-1622756a (human output renders vocabulary tokens) (jit:1622756a)
+attr	commands	other	8ea09d8b4	e1a6c8c2	epic:semantic-types	+82	Merge worktree-agent-e1a6c8c2 (storage and configuration name well-known files through VirtualPath constants) (jit:e1a6c8c2)
+attr	commands	other	f7ec0192c	5491edd0	epic:semantic-types	+6	Merge worktree-agent-5491edd0 (worktree and server files have VirtualPath constants) (jit:5491edd0)
+attr	commands	other	1ecace042	d72bf093	epic:semantic-types	+23	Merge worktree-agent-d72bf093 (event becomes an envelope around a tagged body) (jit:d72bf093)
+attr	commands	other	ed6bc27c3	e98ae5a4	epic:semantic-types	+1	merge(jit:e98ae5a4): event tags declare their wire spelling once
+attr	commands	other	68394e37a	91081bd3	epic:semantic-types	-111	merge(jit:91081bd3): the CLI resolves each issue-id argument once at entry
+attr	commands	other	3e0e87e1f	19136324,53f78490,e21ca76d	epic:test-topology	+1	Merge shipped item kinds, domain fixture and list envelopes (jit:e21ca76d, jit:19136324, jit:53f78490)
+attr	commands	other	1ef4d50c4	ad1e6d0e	epic:test-topology	+9	Merge memory executor declarations (jit:ad1e6d0e)
+attr	commands	other	7aa7ed622	55e3d3fd	epic:-	+40	Merge document-scoped captures for recover and validate (jit:55e3d3fd)
+attr	commands	other	eef4f5ae8	b7078f0d	epic:test-topology	+15	Merge shared memory declarations after initialization (jit:b7078f0d rework 2)
+attr	commands	other	12ef29ca5	529f621d	epic:test-topology	-7	Merge pure-domain auto-transition (jit:529f621d)
+attr	commands	other	a29e64c1d	3f15b95c,ea5ffaba	epic:test-topology	-5	Merge domain query-all owners and query suite reduction (jit:ea5ffaba, jit:3f15b95c)
+attr	commands	other	c66663dc8	0af95f14	epic:semantic-types	-3	Merge unit tests take canonical issue ids from one fixture (jit:0af95f14)
+attr	commands	other	3558721b0	2d342676,3ca153c7,5001b556,7208e568,f0bee761	epic:test-topology	+15	Merge fast_* memory seeding, fixture absent/wrapping seams and id-from-JSON fixes (jit:2d342676, jit:3ca153c7, jit:f0bee761, jit:5001b556, jit:7208e568)
+attr	commands	other	7af3dc393	5fac48b8	epic:semantic-types	+21	Merge issue drafts carry their pre-derived identifier (jit:5fac48b8)
+attr	commands	other	5aa792397	f71504cd	epic:-	+86	Merge link checks read only the documents they scan (jit:f71504cd)
+attr	commands	other	81f508e0c	3ee3a4d1	epic:semantic-types	-8	Merge domain types carry issue ids as IssueId (jit:3ee3a4d1)
+attr	commands	other	58aac7985	7abcc22d	epic:semantic-types	-4	Merge IssueId becomes the validated newtype (jit:7abcc22d)
+attr	commands	other	6f55c6391	83413035	epic:semantic-types	-3	Merge resolved hierarchy facts carry typed issue ids (jit:83413035)
+attr	commands	other	69f1b2ae3	6f9f5d1e,94bbdbd6,955ee89e	epic:test-topology	+5	Merge in-memory reads from store state, backend test cuts and init/profile fixtures (jit:94bbdbd6 jit:6f9f5d1e jit:955ee89e)
+attr	commands	other	da36851af	855d027d	epic:semantic-types	-10	Merge commands take issue record paths from the VirtualPath constructor (jit:855d027d)
+attr	commands	other	d9cf2fa92	488eb3c1	epic:semantic-types	+11	Merge gate keys are a validated GateKey (jit:488eb3c1)
+attr	commands	other	0a24aec20	79aa3aa7	epic:semantic-types	+30	Merge gate runs are identified by a validated GateRunId (jit:79aa3aa7)
+attr	commands	other	f45ab1df0	417be079	epic:semantic-types	+1	Merge issue gate fields are keyed by GateKey (jit:417be079)
+attr	commands	other	522ff70a2	1a3db2c3	epic:semantic-types	-29	Merge the dependency graph carries typed node ids (jit:1a3db2c3)
+attr	commands	other	368a53b50	64420cff	epic:semantic-types	-15	Merge commands carry assignees as Assignee (jit:64420cff)
+attr	commands	other	ebdf38996	12a0a694	epic:lead-friction	-9	Merge short-id label target validation fix (jit:12a0a694)
+attr	commands	other	175a7a0cb	14c08f51,952ed1e7	epic:test-topology	+27	Merge package drift as a gate and tests off the live tracker (jit:14c08f51 jit:952ed1e7)
+attr	commands	other	320ad24fe	7984d807	epic:test-topology	+9	Merge git guards acting on the repository they serve (jit:7984d807)
+attr	commands	other	5165747bf	d5966ba2	epic:lead-friction	+60	Merge derived-document archival (jit:d5966ba2)
+attr	commands	other	f0beca0be	abe963dd	epic:lead-friction	-274	Merge one profile selection per invocation (jit:abe963dd)
+attr	commands	other	d37662aeb	ddca5431	epic:lead-friction	-13	Merge evaluate advancing a gated issue to done (jit:ddca5431)
+attr	commands	other	3ff7246e7	5f71a48d	epic:v1-release	+14	Merge reject-reason refusal, loud label removal, validate --fix agreement (jit:5f71a48d)
+attr	commands	other	b0ce9a116	5f82e09a	epic:lead-friction	+68	Merge refusing a profile apply over uncommitted targets (jit:5f82e09a)
+attr	commands	other	da05d38aa	5f82e09a	epic:lead-friction	-8	Merge judging each written path by its checkout (jit:5f82e09a)
+attr	commands	other	c82fd86a5	1b0c2b75,5c0bd3ad,ab797eed	epic:lead-friction	+24	Merge registry replacement, preview refusals and complete report targets (jit:5c0bd3ad jit:1b0c2b75 jit:ab797eed)
+attr	commands	other	0ea91b1a7	aeafc378	epic:lead-friction	+23	Merge the write-lock primitive and landing script (jit:aeafc378)
+attr	commands	other	7f274ebc8	c47d78c8,d7cce445	epic:git-cli-module,epic:lead-friction	-150	Merge dropping the HEAD read tier and deriving membership from issue files (jit:d7cce445 jit:c47d78c8)
+attr	commands	other	661c51e71	0dcabcca,56b89d9a,a5fbec12	epic:lead-friction	-127	Merge dependent-wins composition, entry-point pruning and one result type (jit:0dcabcca jit:56b89d9a jit:a5fbec12)
+attr	commands	other	f00e71007	17fbcf25	epic:lead-friction	-56	Merge one lease rule and the hook's lease-check removal (jit:17fbcf25)
+attr	commands	other	26530d5a8	17fbcf25	epic:lead-friction	+8	Merge the lease table's reclassification and gate remove's check (jit:17fbcf25)
+attr	commands	other	e2292171d	cba1bff8	epic:lead-friction	+5	Merge rejection promoting its dependents (jit:cba1bff8)
+attr	commands	other	d2da90a4d	cba1bff8	epic:lead-friction	+56	Merge atomic rejection with dependent promotion (jit:cba1bff8)
+attr	commands	other	0e02052cd	03ce8d2c,0838348a,2ded6cd5	epic:lead-friction	-115	Merge gate update's lease check, update_issue_state's removal and loud listings (jit:2ded6cd5 jit:0838348a jit:03ce8d2c)
+attr	commands	other	38db58be4	0a6fd04e	epic:one-validation-report	+24	Merge branch 'worktree-agent-0a6fd04e'
+attr	commands	other	029490b72	024b98b1,04ece1e2,0f648627,1eab392b,376afd01	epic:lead-friction	-108	Merge one graph error, one package type and bare package paths (jit:0f648627 jit:04ece1e2 jit:376afd01 jit:1eab392b jit:024b98b1)
+attr	commands	other	a9e1ac051	216f70b4,536a48ef,6e65a501,9a3a9f1e,dbbfcd6c	epic:lead-friction	-3	Merge target-set show, one canonical JSON, semver versions, domain ids and the unreachable code's removal (jit:536a48ef jit:6e65a501 jit:216f70b4 jit:dbbfcd6c jit:9a3a9f1e)
+attr	commands	other	a0c3144ba	edc8544d	epic:lead-friction	+45	Merge derived documents on every issue surface (jit:edc8544d)
+attr	commands	other	0163a6520	edc8544d	epic:lead-friction	+10	Merge derived documents on the issue list read (jit:edc8544d)
+attr	commands	other	8a5be865a	7dd59ebf	epic:-	+2	Merge branch 'worktree-agent-7dd59ebf'
+attr	commands	epic	99b8ae0dd	d84a7bfa	epic:rust-code-quality	+18	Merge branch 'worktree-agent-d84a7bfa'
+attr	commands	epic	55e6ce46f	1002524a	epic:rust-code-quality	+13	Merge branch 'worktree-agent-1002524a'
+attr	commands	other	d4de5ceb5	803b107c	epic:history-independent-reads	+1	Merge branch 'worktree-agent-803b107c'
+attr	commands	epic	0fbd890c3	083c9a91	epic:rust-code-quality	+26	Merge branch 'worktree-agent-083c9a91'
+attr	commands	other	38a9c67e3	63de0883	epic:history-independent-reads	+3	Merge branch 'worktree-agent-63de0883'
+attr	commands	epic	18a5a57b0	a015dcbb	epic:rust-code-quality	+16	Merge branch 'worktree-agent-a015dcbb'
+attr	commands	other	abde9902c	f9bf70a5	epic:history-independent-reads	-2	Merge branch 'worktree-agent-f9bf70a5'
+attr	commands	other	9bbc8a237	becea20a	epic:history-independent-reads	+7	Merge branch 'worktree-agent-becea20a'
+attr	commands	epic	d7729e1ca	6f49f3b3	epic:rust-code-quality	+32	Merge branch 'worktree-agent-6f49f3b3'
+attr	commands	epic	6f110c219	f79d2510	epic:rust-code-quality	+14	Merge branch 'worktree-agent-f79d2510'
+attr	commands	epic	876eae0af	7a7d0bfe	epic:rust-code-quality	+9	Merge branch 'worktree-agent-7a7d0bfe'
+attr	commands	epic	3aa8182c5	985c2b15	epic:rust-code-quality	+22	Merge branch 'worktree-agent-985c2b15'
+attr	commands	epic	58b9b90dc	fd2073b7	epic:rust-code-quality	+28	Merge branch 'worktree-agent-fd2073b7'
+attr	commands	epic	226db21cc	93aaba24	epic:rust-code-quality	+17	Merge branch 'worktree-agent-93aaba24'
+attr	commands	epic	8b4ca7956	dbd05242	epic:rust-code-quality	+11	Merge branch 'worktree-agent-dbd05242'
+attr	commands	epic	7f257f027	5962427b	epic:rust-code-quality	+31	Merge branch 'worktree-agent-5962427b'
+attr	commands	epic	67df5d08a	a24b11aa	epic:rust-code-quality	+12	Merge branch 'worktree-agent-a24b11aa'
+attr	commands	other	5a36ad2ea	c3e3e2ff	epic:history-independent-reads	-13	Merge branch 'worktree-agent-c3e3e2ff'
+attr	commands	other	aed03c60a	5b0e3d63	epic:history-independent-reads	+4	Merge branch 'worktree-agent-5b0e3d63'
+attr	commands	epic	fbbaa2ba4	334c12e7	epic:rust-code-quality	+26	Merge branch 'worktree-agent-334c12e7'
+attr	commands	epic	92858ba2d	d05b5639	epic:rust-code-quality	+34	Merge branch 'worktree-agent-d05b5639'
+attr	commands	epic	2f76a56e7	a3a99cf8	epic:rust-code-quality	-22	Merge branch 'worktree-agent-a3a99cf8'
+attr	commands	epic	d28cc53a8	8b7f2973	epic:rust-code-quality	+9	Merge branch 'worktree-agent-8b7f2973'
+attr	commands	epic	5934d9658	1539da29	epic:rust-code-quality	+24	Merge branch 'worktree-agent-1539da29'
+attr	commands	other	5b0f29b68	dd53527f	epic:history-independent-reads	-11	Merge branch 'worktree-agent-dd53527f'
+attr	commands	other	a506691d8	dd53527f	epic:history-independent-reads	-5	Merge branch 'worktree-agent-dd53527f'
+attr	commands	epic	d11ed6ed8	22189592	epic:rust-code-quality	-8	Merge branch 'worktree-agent-22189592'
+attr	commands	other	34fb03c4b	5582e39e	epic:history-independent-reads	-2	Merge branch 'worktree-agent-5582e39e'
+attr	commands	other	73595f9ca	d40d6f74	epic:one-validation-report	-135	Merge branch 'worktree-agent-d40d6f74'
+attr	commands	epic	6c0549aba	2e0f276b	epic:rust-code-quality	+45	Merge branch 'worktree-agent-2e0f276b'
+attr	commands	other	10c8e3847	15009590	epic:history-independent-reads	+1	Merge branch 'worktree-agent-15009590'
+attr	commands	other	bdc0fd571	c92f4011	epic:one-validation-report	-8	Merge branch 'worktree-agent-c92f4011'
+attr	commands	other	5e0ca8825	977d01d8	epic:one-validation-report	-3	Merge branch 'worktree-agent-977d01d8'
+attr	commands	other	9b6397f43	b3a768b3	epic:one-validation-report	-39	Merge branch 'worktree-agent-b3a768b3'
+attr	commands	other	55438f664	2117739f	epic:history-independent-reads	+14	Merge branch 'worktree-agent-2117739f'
+attr	commands	other	107ee1810	f968dfe1	epic:one-validation-report	-50	Merge branch 'worktree-agent-f968dfe1'
+attr	commands	other	108f53d99	c92f4011	epic:one-validation-report	-3	Merge branch 'worktree-agent-c92f4011'
+attr	commands	other	dd2af2679	5b37a806	epic:v1-release	+1	Merge branch 'worktree-agent-5b37a806'
+attr	commands	other	63d2efdd7	2117739f	epic:history-independent-reads	+1	Merge branch 'worktree-agent-2117739f'
+attr	commands	other	308aa9485	5d5a1794	epic:one-validation-report	+8	Merge branch 'worktree-agent-5d5a1794'
+attr	commands	other	fc7035a25	93b7f1dd	epic:history-independent-reads	+3	Merge branch 'worktree-agent-93b7f1dd'
+attr	commands	other	3e5bfcbe7	8b56c215	epic:one-validation-report	-2	Merge branch 'worktree-agent-8b56c215'
+attr	commands	other	8c2d71556	0bd2c797	epic:history-independent-reads	-10	Merge branch 'worktree-agent-0bd2c797'
+attr	commands	other	7487595a9	5d5a1794	epic:one-validation-report	+18	Merge branch 'worktree-agent-5d5a1794'
+attr	commands	other	5d4e0a254	2f563673	epic:history-independent-reads	+6	Merge branch 'worktree-agent-2f563673'
+attr	commands	other	5be376e07	db9bcf12	epic:history-independent-reads	+38	Merge branch 'worktree-agent-db9bcf12'
+attr	commands	other	70f80ae6f	03c59566	epic:one-validation-report	-18	Merge branch 'worktree-agent-03c59566'
+attr	commands	other	96be25331	2f563673	epic:history-independent-reads	-55	Merge branch 'worktree-agent-2f563673'
+attr	commands	other	fffae260f	b33ed7eb	epic:history-independent-reads	+39	Merge branch 'worktree-agent-b33ed7eb'
+attr	commands	other	b2d830044	7fc08dff	epic:history-independent-reads	+34	Merge branch 'worktree-agent-7fc08dff'
+attr	commands	other	b607a1d7c	6c0f8739	epic:history-independent-reads	+47	Merge branch 'worktree-agent-6c0f8739'
+attr	commands	other	92aa09e0c	6ba4f623	epic:one-validation-report	-4	Merge branch 'worktree-agent-6ba4f623'
+attr	commands	epic	ab2dced07	b23faa59	epic:rust-code-quality	+1	Merge branch 'worktree-agent-b23faa59'
+attr	commands	other	7b2cfcdef	3acaa5a3	epic:one-validation-report	+5	Merge branch 'worktree-agent-3acaa5a3'
+attr	commands	other	d4b15ec3e	5e1ba005	epic:history-independent-reads	+15	Merge branch 'worktree-agent-5e1ba005'
+attr	commands	other	d712d8b17	2b5f452c	epic:one-validation-report	+14	Merge branch 'worktree-agent-2b5f452c'
+attr	commands	other	1077419b1	3acaa5a3	epic:one-validation-report	+7	Merge branch 'worktree-agent-3acaa5a3'
+attr	commands	other	b67342fec	e2082ba9	epic:one-validation-report	-28	Merge branch 'worktree-agent-e2082ba9'
+attr	commands	other	cfdc0340e	1630015d	epic:history-independent-reads	+16	Merge branch 'worktree-agent-1630015d'
+attr	commands	other	f70dcdf40	3acaa5a3	epic:one-validation-report	-1	Merge branch 'worktree-agent-3acaa5a3'
+attr	commands	other	88ce303a1	2b5f452c	epic:one-validation-report	+3	Merge branch 'worktree-agent-2b5f452c'
+attr	commands	epic	a476a2d42	153c9851	epic:rust-code-quality	+44	Merge branch 'worktree-agent-153c9851'
+attr	commands	other	aa6ea4aa0	614a6f97	epic:history-independent-reads	+3	Merge branch 'worktree-agent-614a6f97'
+attr	commands	epic	27a9330b5	9529b9ac	epic:rust-code-quality	-1	Merge branch 'worktree-agent-9529b9ac'
+attr	commands	epic	7f785b006	c9103fcf	epic:rust-code-quality	+5	Merge branch 'worktree-agent-c9103fcf'
+attr	commands	other	9cd3c9138	612ee9d4	epic:one-validation-report	-53	Merge branch 'worktree-agent-612ee9d4'
+attr	commands	other	c1c48d55c	7244ecb2	epic:history-independent-reads	+5	Merge branch 'worktree-agent-7244ecb2'
+attr	commands	other	e5de11a49	725af076	epic:history-independent-reads	-10	Merge branch 'worktree-agent-725af076'
+attr	commands	other	87b38351c	2c8c13b2	epic:one-validation-report	-173	Merge branch 'worktree-agent-2c8c13b2'
+attr	commands	other	9af61dd1f	1f24e3e9	epic:one-validation-report	-40	Merge branch 'worktree-agent-1f24e3e9'
+attr	commands	other	6c94d48c4	86f7e6eb	epic:one-validation-report	-12	Merge branch 'worktree-agent-86f7e6eb'
+attr	commands	other	7fedf7f93	208edf4c	epic:one-validation-report	-108	Merge branch 'worktree-agent-208edf4c'
+attr	commands	epic	c5a125d74	06ee9b67,0fe46027,1a4f2ebd,20fc3b92,3cf69ecf,52110fb4,66790c84,71f5296c,8c46fc85,8e91126b,8f297e60,98cc2097,b25c2e54,f930acf2	epic:rust-code-quality	+73	Merge branch 'worktree-agent-w7batch'
+attr	commands	other	77e9b4337	a106d1be	epic:one-validation-report	-195	Merge branch 'worktree-agent-a106d1be'
+attr	commands	other	abc9b6d89	2f12d920	epic:one-validation-report	+4	Merge branch 'worktree-agent-2f12d920'
+attr	commands	other	662a9252a	6ac41880	epic:one-validation-report	-205	Merge branch 'worktree-agent-6ac41880'
+attr	commands	other	42373fb82	f22147ec	epic:one-validation-report	-76	Merge branch 'worktree-agent-f22147ec'
+attr	commands	epic	a6ec3caa3	cc4ea8a9	epic:rust-code-quality	+6	Merge branch 'worktree-agent-cc4ea8a9'
+attr	commands	other	d1c20647a	7516ed50	epic:one-validation-report	-2	Merge branch 'worktree-agent-7516ed50'
+attr	commands	epic	fc511300c	4a01ccba	epic:rust-code-quality	+16	Merge branch 'worktree-agent-4a01ccba'
+attr	commands	epic	baa3a76ba	10fdad38	epic:rust-code-quality	-209	Merge branch 'worktree-agent-10fdad38'
+attr	commands	other	29011b07d	1ade3e6f	epic:one-mutation-path	-96	Merge branch 'worktree-agent-1ade3e6f'
+attr	commands	epic	af1d0b839	24a982b7	epic:rust-code-quality	-11	Merge branch 'worktree-agent-24a982b7'
+attr	commands	other	e11254c35	5d09e74b	epic:one-mutation-path	+1	Merge branch 'worktree-agent-5d09e74b'
+attr	commands	epic	b7ebfe569	f87f9b00	epic:rust-code-quality	+16	Merge branch 'worktree-agent-f87f9b00'
+attr	commands	epic	ae99aaa66	24a982b7	epic:rust-code-quality	+11	Merge branch 'worktree-agent-24a982b7'
+attr	commands	other	e7ee64d8f	d58f80c9	epic:one-mutation-path	-2	Merge branch 'worktree-agent-d58f80c9'
+attr	commands	epic	b319c484a	3f816619	epic:rust-code-quality	+11	Merge branch 'worktree-agent-3f816619'
+attr	commands	other	0e34a581a	945f9181	epic:one-mutation-path	-34	Merge branch 'worktree-agent-945f9181'
+attr	commands	other	973bb01b6	c517b88b	epic:one-mutation-path	+20	Merge branch 'worktree-agent-c517b88b'
+attr	commands	other	529fc3e8e	b674382e	epic:one-mutation-path	+21	Merge branch 'worktree-agent-b674382e'
+attr	commands	other	9e886af5c	eaca3f52	epic:one-mutation-path	+54	Merge branch 'worktree-agent-eaca3f52'
+attr	commands	epic	b8b4a0854	0bc448fb	epic:rust-code-quality	+31	Merge branch 'worktree-agent-0bc448fb'
+attr	commands	other	ce7406bbd	635f23c7	epic:one-mutation-path	-64	Merge branch 'worktree-agent-635f23c7'
+attr	commands	other	56626345e	578ed10d	epic:one-mutation-path	+66	Merge branch 'worktree-agent-578ed10d'
+attr	commands	other	c4b617ff9	578ed10d	epic:one-mutation-path	+4	Merge branch 'worktree-agent-578ed10d'
+attr	commands	epic	70457e502	fb38bf1f	epic:rust-code-quality	+426	Merge branch 'worktree-agent-fb38bf1f'
+attr	commands	other	72a8a8d83	4d844e61	epic:-	+13	Merge branch 'retire-mcp-4d844e61'
+attr	commands	epic	6d9a1ed76	f35c86de	epic:rust-code-quality	+67	Merge branch 'worktree-agent-f35c86de'
+attr	commands	other	876f41a81	db094cac	epic:-	+10	Merge branch 'fix-db094cac'
+attr	commands	other	dc2f5d6b1	8c67b21a	epic:-	+7	Merge branch 'worktree-agent-8c67b21a'
+attr	commands	other	cf705252e	9c3eb2bf	epic:frontends-share-core	+6	Merge branch 'worktree-agent-9c3eb2bf'
+attr	commands	other	9fe1e7344	4d8791fb	epic:frontends-share-core	+64	Merge branch 'worktree-agent-4d8791fb'
+attr	commands	other	79c3bb520	732f7afb	epic:git-cli-module	-11	Merge branch 'worktree-agent-732f7afb'
+attr	commands	other	b946e7187	f6eaba42	epic:git-cli-module	-12	Merge branch 'worktree-agent-f6eaba42'
+attr	commands	other	aa31a16ec	9de4c09c	epic:git-cli-module	-6	Merge branch 'worktree-agent-9de4c09c'
+attr	commands	other	833a71908	f649c144	epic:git-cli-module	-12	Merge branch 'worktree-agent-f649c144'
+attr	commands	other	4aa3d7cf9	e3c38fea	epic:git-cli-module	-55	Merge branch 'worktree-agent-e3c38fea'
+attr	commands	other	084db8cc5	d68150e2	epic:git-cli-module	+3	Merge branch 'worktree-agent-d68150e2'
+attr	commands	other	abaa6bdf8	6326532e	epic:frontends-share-core	+6	Merge branch 'worktree-agent-6326532e'
+attr	commands	other	8c91ded5f	ea4b7363	epic:git-cli-module	-6	Merge branch 'worktree-agent-ea4b7363'
+attr	commands	other	e0b02683a	83c8632f	epic:git-cli-module	-28	Merge branch 'worktree-agent-83c8632f'
+attr	commands	other	9df9fe2fc	3f8da8c4	epic:git-cli-module	+7	Merge branch 'worktree-agent-3f8da8c4'
+attr	commands	other	5363b6b99	92afc5d8	epic:git-cli-module	-8	Merge branch 'worktree-agent-92afc5d8'
+attr	commands	other	0757e05ba	47d62472	epic:git-cli-module	-20	Merge branch 'worktree-agent-47d62472'
+attr	commands	other	270f4894b	9ecde705	epic:git-cli-module	+9	Merge branch 'worktree-agent-9ecde705'
+attr	commands	other	e552fbb2c	fb5e8e8d	epic:git-cli-module	-40	Merge branch 'worktree-agent-fb5e8e8d'
+attr	commands	other	81965e397	fc2403fb	epic:-	+64	Merge branch 'worktree-agent-fc2403fb'
+attr	commands	other	daaca4bc5	783b33fa	epic:git-cli-module	+18	Merge branch 'worktree-agent-783b33fa'
+attr	commands	other	6672a5e01	c2b3cefa	epic:one-mutation-path	+11	Merge branch 'worktree-agent-c2b3cefa'
+attr	commands	other	7c6855d8a	f6477007	epic:one-mutation-path	-15	Merge branch 'worktree-agent-f6477007'
+attr	commands	other	1f838b61b	0723860e	epic:-	+28	Merge branch 'worktree-agent-0723860e'
+attr	commands	other	92cd305b1	9a2563fd	epic:one-mutation-path	-4	Merge branch 'worktree-agent-9a2563fd'
+attr	commands	other	97b29b93d	c2b3cefa	epic:one-mutation-path	+16	Merge branch 'worktree-agent-c2b3cefa'
+attr	commands	other	ae2c096fb	1a737bb4	epic:one-mutation-path	-39	Merge branch 'worktree-agent-1a737bb4'
+attr	commands	other	959d41bf2	905364c1	epic:one-mutation-path	+24	Merge branch 'worktree-agent-905364c1'
+attr	commands	other	42cc13bf9	d2acb105	epic:one-mutation-path	+265	Merge branch 'worktree-agent-d2acb105'
+attr	commands	other	a652f3dff	5046408a	epic:git-cli-module	+178	Merge branch 'worktree-agent-5046408a'
+attr	commands	other	30ee6a814	fe9147fa	epic:one-mutation-path	-76	Merge branch 'worktree-agent-fe9147fa'
+attr	commands	other	9272c3b78	cfc87a55	epic:one-mutation-path	+4	Merge branch 'worktree-agent-cfc87a55'
+attr	commands	other	e6793674f	1b7f58ae	epic:one-mutation-path	-3	Merge branch 'worktree-agent-1b7f58ae'
+attr	commands	other	71dae3d3f	1acfa592	epic:git-cli-module	-42	Merge branch 'worktree-agent-1acfa592'
+attr	commands	other	8649dd5d1	693a2fdd	epic:one-mutation-path	+22	Merge branch 'worktree-agent-693a2fdd'
+attr	commands	other	7945cf103	693a2fdd	epic:one-mutation-path	+14	Merge branch 'worktree-agent-693a2fdd'
+attr	commands	other	df02f5271	c140921c	epic:git-cli-module	-13	Merge branch 'worktree-agent-c140921c'
+attr	commands	other	f7879709a	d9ba0029	epic:git-cli-module	+12	Merge branch 'worktree-agent-d9ba0029'
+attr	commands	other	2ac42b754	700a96dd	epic:one-mutation-path	-67	Merge branch 'worktree-agent-700a96dd'
+attr	commands	other	620423931	d3c94dc5	epic:one-mutation-path	-1	Merge branch 'worktree-agent-d3c94dc5'
+attr	commands	other	8ea13203f	7cd27db8	epic:git-cli-module	+13	Merge branch 'worktree-agent-7cd27db8'
+attr	commands	other	5e653b29d	65aafaba	epic:one-mutation-path	-197	Merge branch 'worktree-agent-65aafaba'
+attr	commands	other	0e9b9f8d6	933ff852	epic:git-cli-module	+23	Merge branch 'worktree-agent-933ff852'
+attr	commands	other	3feb4c1b5	30334066	epic:one-mutation-path	+57	Merge branch 'worktree-agent-30334066'
+attr	commands	other	aead6a535	850eaad3	epic:one-mutation-path	+35	Merge branch 'worktree-agent-850eaad3'
+attr	commands	other	6d406d1ba	850eaad3	epic:one-mutation-path	+6	Merge branch 'worktree-agent-850eaad3'
+attr	commands	other	419566b25	b2c28ec1	epic:one-mutation-path	+11	Merge branch 'worktree-agent-b2c28ec1'
+attr	commands	other	7b651bb94	030df4b1	epic:one-mutation-path	+143	Merge branch 'worktree-agent-030df4b1'
+attr	commands	other	9eaf8639d	9623fe6a	epic:one-mutation-path	-13	Merge branch 'worktree-agent-9623fe6a'
+attr	commands	other	e73757a5e	c0775a83	epic:one-mutation-path	+65	Merge branch 'worktree-agent-c0775a83' (jit:c0775a83)
+attr	commands	other	e736d46f0	d4172016	epic:frontends-share-core	-96	Merge branch 'worktree-agent-d4172016'
+attr	commands	other	a3b0dcb12	42046050	epic:one-mutation-path	-188	Merge branch 'worktree-agent-42046050'
+attr	commands	other	44e5708cc	4e2bed35	epic:one-mutation-path	+11	Merge branch 'worktree-agent-4e2bed35'
+attr	commands	other	e52ab0fa3	e73ad8bc	epic:one-mutation-path	-17	Merge branch 'worktree-agent-e73ad8bc'
+attr	commands	other	32cdcc1e4	a2153a6f	epic:one-mutation-path	+45	Merge branch 'worktree-agent-a2153a6f'
+attr	commands	other	692bf622e	82f1647f	epic:one-mutation-path	+18	Merge branch 'worktree-agent-82f1647f'
+attr-sum	commands	epic=+1099	ambiguous=+0	other=-3047	direct=-6
+attr	profile	other	e7ca0af72	756ec5ec	epic:greenfield-cutover	-111	Merge branch 'worktree-agent-756ec5ec' (jit:756ec5ec)
+attr	profile	other	77cfcd1f4	24268b05	epic:lead-friction	-283	Merge branch 'worktree-agent-24268b05' (jit:24268b05)
+attr	profile	epic	6d24ab6ee	f7f01654	epic:rust-code-quality	-8	Merge branch 'worktree-agent-f7f01654' (jit:f7f01654)
+attr	profile	other	07c2bdd2c	2dd6b833	epic:lead-friction	-282	Merge branch 'worktree-agent-2dd6b833' (jit:2dd6b833)
+attr	profile	other	f059dee4e	1a989754	epic:lead-friction	-2	Merge branch 'worktree-agent-1a989754' (jit:1a989754)
+attr	profile	other	b80cd0da6	f866d9d8	epic:lead-friction	-105	Merge branch 'worktree-agent-f866d9d8' (jit:f866d9d8)
+attr	profile	other	087ae5c5c	5179374d	epic:lead-friction	-112	Merge branch 'worktree-agent-5179374d' (jit:5179374d)
+attr	profile	other	e86d642f4	5c232305	epic:semantic-types	-56	Merge worktree-agent-5c232305 (ProfileId in the domain layer) (jit:5c232305)
+attr	profile	other	2e73295a9	18dc6e3e	epic:semantic-types	+5	Merge worktree-agent-18dc6e3e (well-known files through VirtualPath constants in repository-state) (jit:18dc6e3e)
+attr	profile	other	8ea09d8b4	e1a6c8c2	epic:semantic-types	+2	Merge worktree-agent-e1a6c8c2 (storage and configuration name well-known files through VirtualPath constants) (jit:e1a6c8c2)
+attr	profile	other	7abf2f2ff	e7d98542	epic:test-topology	-519	Merge one copy of the dogfood package's declarations (jit:e7d98542)
+attr	profile	other	f0beca0be	abe963dd	epic:lead-friction	-2	Merge one profile selection per invocation (jit:abe963dd)
+attr	profile	other	c82fd86a5	1b0c2b75,5c0bd3ad,ab797eed	epic:lead-friction	+12	Merge registry replacement, preview refusals and complete report targets (jit:5c0bd3ad jit:1b0c2b75 jit:ab797eed)
+attr	profile	other	661c51e71	0dcabcca,56b89d9a,a5fbec12	epic:lead-friction	-17	Merge dependent-wins composition, entry-point pruning and one result type (jit:0dcabcca jit:56b89d9a jit:a5fbec12)
+attr	profile	other	95ed1fb57	665bb4e1,9e703435,d721ab14	epic:lead-friction	+4	Merge derived conflict serialization, package-only conflict parties and one registry declaration (jit:9e703435 jit:d721ab14 jit:665bb4e1)
+attr	profile	other	029490b72	024b98b1,04ece1e2,0f648627,1eab392b,376afd01	epic:lead-friction	-113	Merge one graph error, one package type and bare package paths (jit:0f648627 jit:04ece1e2 jit:376afd01 jit:1eab392b jit:024b98b1)
+attr	profile	other	a9e1ac051	216f70b4,536a48ef,6e65a501,9a3a9f1e,dbbfcd6c	epic:lead-friction	-266	Merge target-set show, one canonical JSON, semver versions, domain ids and the unreachable code's removal (jit:536a48ef jit:6e65a501 jit:216f70b4 jit:dbbfcd6c jit:9a3a9f1e)
+attr	profile	other	e11254c35	5d09e74b	epic:one-mutation-path	+1	Merge branch 'worktree-agent-5d09e74b'
+attr	profile	other	3e09960b9	4334df62	epic:one-mutation-path	-72	Merge branch 'worktree-agent-4334df62'
+attr	profile	other	419566b25	b2c28ec1	epic:one-mutation-path	+6	Merge branch 'worktree-agent-b2c28ec1'
+attr-sum	profile	epic=-8	ambiguous=+0	other=-1910	direct=+0
