@@ -3,8 +3,10 @@
   "claimed_at": "2026-11-08T13:24:55.526423653Z",
   "context": {},
   "created_at": "2026-11-08T13:24:26.893985008Z",
-  "dependencies": [],
-  "description": "Make registry-first item queries take their TOML sources from the captured image, so `jit item` reads no declaration file outside its capture.\n\n## Background\n\n- `crates/jit/src/commands/item.rs` ~255: for a registry-first kind, the item query reads `gates.toml`, `rules.toml` or `invariants.toml` through `storage.read_repo_file` after capturing declarations, so a concurrent replacement makes the query consume bytes outside its image.\n- Story `d675102c` sol re-checkpoint review (commit `cea13616e`), finding 1. Steward ruling (just-in-time-d5, 2026-11-08): read the sources from the captured image's bytes and delete the `read_repo_file` path rather than keeping both.\n- Epic criterion: `b697a3f7` REQ-10 (read paths take declarations from a captured image).\n\n## Success Criteria\n\n- [hard] REQ-01: Registry-first item queries (`jit item show`, `search`, `list`) obtain each kind's TOML source from the captured image the query reads; the `read_repo_file` path in `commands/item.rs` is removed.\n- [hard] REQ-02: One test owns \"item queries read registry-first sources from the captured image\", observing that a source replaced after capture does not reach the query's result.\n- [hard] REQ-03: Item query output is unchanged for an unchanged repository.\n",
+  "dependencies": [
+    "86a183c2-2a26-42db-bf8a-84f17cd7a3aa"
+  ],
+  "description": "Make registry-first item queries take their TOML sources from the captured image, so `jit item` reads no declaration file outside its capture.\n\n## Background\n\n- `crates/jit/src/commands/item.rs` ~255: for a registry-first kind, the item query reads `gates.toml`, `rules.toml` or `invariants.toml` through `storage.read_repo_file` after capturing declarations, so a concurrent replacement makes the query consume bytes outside its image.\n- Story `d675102c` sol re-checkpoint review (commit `cea13616e`), finding 1. Steward ruling (just-in-time-d5, 2026-11-08): read the sources from the captured image's bytes and delete the `read_repo_file` path rather than keeping both.\n- Epic criterion: `b697a3f7` REQ-10 (read paths take declarations from a captured image).\n\n## Success Criteria\n\n- [hard] REQ-01: Registry-first item queries (`jit item show`, `search`, `list`) obtain each kind's TOML source from the captured image the query reads; the `read_repo_file` path in `commands/item.rs` is removed.\n- [hard] REQ-02: One test owns \"item queries read registry-first sources from the captured image\", observing that a source replaced after capture does not reach the query's result.\n- [hard] REQ-03: Item query output is unchanged for an unchanged repository.\n\n\n- Steward ruling (just-in-time-d5, 2026-11-08): local reworks of this task's parse behaviour stop after two code-review failures on parse-once findings; the reparse closes through `86a183c2`'s shared `DeclarationMemo` (dependency added). The captured-bytes behaviour stays landed; code-review reruns after `86a183c2` lands.\n",
   "documents": [],
   "first_ready_at": "2026-11-08T13:24:26.893985008Z",
   "gates_required": [
@@ -38,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Registry-first item queries read their sources from the captured image",
-  "updated_at": "2026-11-08T13:49:48.528641833Z"
+  "updated_at": "2026-11-08T13:50:27.083562338Z"
 }
