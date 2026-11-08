@@ -248,6 +248,20 @@
           "title": "Archive destinations drop the short-id fallback",
           "status": "done",
           "note": "landed e52ab0fa3 (36e3fb973); cargo-ci passed; code-review passed run f8b9c7df"
+        },
+        {
+          "id": "dd95bd9d",
+          "short_id": "dd95bd9d",
+          "title": "Archive citation warnings are an advisory report beside the plan, from one index per command",
+          "status": "in_progress",
+          "note": "opus"
+        },
+        {
+          "id": "82f1647f",
+          "short_id": "82f1647f",
+          "title": "Snapshot export reserves the paths it stages from the captured image",
+          "status": "in_progress",
+          "note": "sonnet"
         }
       ]
     },
@@ -321,7 +335,9 @@
       "blocks": [
         "d675102c"
       ]
-    }
+    },
+    "dd95bd9d",
+    "82f1647f"
   ],
   "escalations": [
     {
@@ -483,6 +499,11 @@
       "at": "05:3x",
       "decision": "Five private captured-gate-registry parses (gate_check.rs, gate.rs, mod.rs, template.rs, validate.rs) folded into a869900b as REQ-04, with a Rulings note on non-regular-file behaviour; dep a869900b→c31c2e57 added with --reduce (dropped d675102c→c31c2e57)",
       "by": "invoker just-in-time-d5"
+    },
+    {
+      "at": "05:4x",
+      "decision": "19404174 checkpoint F1 -> dd95bd9d (option b: citation warnings leave ArtifactPlan; advisory report from one index per command; removes per-candidate citation cost; before 45d0a971). F2 -> 82f1647f (reserve copy_jit_state paths). Both under 19404174.",
+      "by": "invoker just-in-time-d5"
     }
   ],
   "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",
@@ -598,6 +619,14 @@
       "effort": "high",
       "verdict": "pass",
       "run": "f8b9c7df"
+    },
+    {
+      "issue": "19404174",
+      "review": "story checkpoint (non-gate)",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "REQ-02/03 met; REQ-01 unmet (F1 live citation scan in plan), REQ-04 unmet (F2 snapshot staging overwrite); ruling requested from invoker"
     }
   ]
 }
