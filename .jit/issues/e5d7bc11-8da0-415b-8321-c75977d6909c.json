@@ -21,9 +21,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "22742408-7a47-48e0-a983-18db21fd4239",
+      "run_id": "c0abf947-f41a-4114-b889-86861d94617b",
       "status": "failed",
-      "updated_at": "2026-11-08T13:49:48.528641833Z",
+      "updated_at": "2026-11-08T14:24:51.263897830Z",
       "updated_by": "auto:executor"
     }
   },
@@ -40,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Registry-first item queries read their sources from the captured image",
-  "updated_at": "2026-11-08T13:50:27.083562338Z"
+  "updated_at": "2026-11-08T14:24:51.263897830Z"
 }

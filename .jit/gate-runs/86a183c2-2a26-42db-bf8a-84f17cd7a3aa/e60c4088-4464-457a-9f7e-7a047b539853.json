@@ -1,0 +1,67 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3d0e3f4c3338a57e2569695eb3443b39ce39690d",
+  "completed_at": "2026-11-08T14:20:55.923893601Z",
+  "duration_ms": 374255,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/bootstrap.rs",
+        "id": "F1",
+        "line": 101,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/86a183c2/requirement/REQ-01",
+          "@/issue/86a183c2/requirement/REQ-02"
+        ],
+        "severity": "medium",
+        "summary": "Bootstrap retries create a fresh store and memo, reparsing identical configuration bytes within one command."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/config.rs",
+        "id": "F2",
+        "line": 269,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/86a183c2/requirement/REQ-01",
+          "@/issue/86a183c2/requirement/REQ-02"
+        ],
+        "severity": "medium",
+        "summary": "Configuration editing, initialization, and profile composition retain direct assembly calls that bypass the shared memo."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/declarations/memo.rs",
+        "id": "F3",
+        "line": 184,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/86a183c2/requirement/REQ-01"
+        ],
+        "severity": "medium",
+        "summary": "The four-entry eviction bound reparses intermediate declaration sources when a larger profile selection revisits them."
+      }
+    ],
+    "summary": "Three remaining paths violate command-wide parse reuse; the recorded performance smoke passes.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "86a183c2-2a26-42db-bf8a-84f17cd7a3aa",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e60c4088-4464-457a-9f7e-7a047b539853",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T14:14:41.668230352Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9172 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1bb82-ebb5-7281-a480-3f5e461605e6\n--------\nuser\n--- 9159 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:86a183c2` — 1190374e, bcae3c65, 6c75253c, aa72dc55, e43d02eb, 33df6c14, f07211c0, 53f34398, 34315d5e, beab241c, bb9a8795, c41d3b54; uncommitted changes excluded.\nPolicy sources: AGENTS.md; .jit/config.toml namespace and item-kind declarations.\nResolved items: @/issue/86a183c2/requirement/REQ-01, @/issue/86a183c2/requirement/REQ-02, @/issue/86a183c2/requirement/REQ-03, @/issue/86a183c2/requirement/REQ-04 → .jit/issues/86a183c2-2a26-42db-bf8a-84f17cd7a3aa.json; @/issue/b697a3f7/requirement/REQ-10, @/issue/b697a3f7/requirement/REQ-22 → .jit/issues/b697a3f7-ef84-4452-9b13-c8274f6abe4a.json; @/charter/D-19, @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/convention-convergence → .jit/invariants.toml; @/gate/jit-validate → .jit/gates.toml.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T14:12:42.045601831+00:00; wrapper ancestry confirms run commit 3d0e3f4c covers all twelve tagged commits. Live code-review projection pending; prior structured review: none. Passing gate not rerun.\nTruncation recovery: initial combined-output truncation recovered through narrower configuration, commit-statistic, and per-path patch reads; historical dependency diagnostic stdout excluded under the records-of-the-past policy.\n\n1. **F1 — Bootstrap retries replace the command’s memo** — **medium; blocking; issue-impact.** [bootstrap.rs:101](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/bootstrap.rs:101) uses the store’s memo, but line 84 constructs that store inside the retry closure; [json.rs:471](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:471) initializes a fresh memo. If an unrelated commit invalidates selection admission after configuration capture, the next attempt reparses identical configuration bytes within the same command. Preserve the memo across bootstrap retries. This leaves REQ-01 and REQ-02 unmet.\n\n2. **F2 — Direct configuration assembly still bypasses the memo** — **medium; blocking; issue-impact.** [config.rs:269](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/config.rs:269) parses the edited configuration directly; line 362 then hands identical edited bytes to discovery, which parses them through the memo. Similar bypasses remain in `commands/init.rs:259`, `repository_state/initialize.rs:215`, and `repository_state/profile_apply.rs:1381`. For example, initialization with an existing configuration parses it during resolution and again during scaffold construction. Route these handoffs through the shared memo or pass their parsed result onward. REQ-01 and REQ-02 remain unmet.\n\n3. **F3 — Eviction permits repeated parsing within one command** — **medium; blocking; issue-impact.** [memo.rs:184](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/declarations/memo.rs:184) retains only four parses per source kind. A profile selection with five members adding distinct gates produces five intermediate gate documents in `repository_state/initialize.rs:958`. The preview and final derivations (`commands/profile.rs:1069` and `:1107`) revisit those documents; the first has already been evicted and parses again. Retain every distinct source for the command’s lifetime, and extend the existing owning test with this boundary case. This violates REQ-01.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three remaining paths violate command-wide parse reuse; the recorded performance smoke passes.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Bootstrap retries create a fresh store and memo, reparsing identical configuration bytes within one command.\",\"file\":\"crates/jit/src/commands/bootstrap.rs\",\"line\":101,\"references\":[\"@/issue/86a183c2/requirement/REQ-01\",\"@/issue/86a183c2/requirement/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Configuration editing, initialization, and profile composition retain direct assembly calls that bypass the shared memo.\",\"file\":\"crates/jit/src/commands/config.rs\",\"line\":269,\"references\":[\"@/issue/86a183c2/requirement/REQ-01\",\"@/issue/86a183c2/requirement/REQ-02\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The four-entry eviction bound reparses intermediate declaration sources when a larger profile selection revisits them.\",\"file\":\"crates/jit/src/declarations/memo.rs\",\"line\":184,\"references\":[\"@/issue/86a183c2/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

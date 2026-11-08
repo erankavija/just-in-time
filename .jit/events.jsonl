@@ -26102,3 +26102,6 @@
 {"fields":["dependencies"],"id":"8abd12b6-8897-477e-819f-21b1135fb71b","issue_id":"e5d7bc11-8da0-415b-8321-c75977d6909c","timestamp":"2026-11-08T13:50:26.870741213Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["description"],"id":"5afe8b7d-665f-430f-9e36-6d13cf4b1029","issue_id":"86a183c2-2a26-42db-bf8a-84f17cd7a3aa","timestamp":"2026-11-08T13:50:26.976798993Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["description"],"id":"44d49577-984d-497c-95c5-b28bd9fbfbc0","issue_id":"e5d7bc11-8da0-415b-8321-c75977d6909c","timestamp":"2026-11-08T13:50:27.083562338Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"cargo-ci","id":"2f3dfdd4-f49a-4d87-a422-c4987ac94836","issue_id":"86a183c2-2a26-42db-bf8a-84f17cd7a3aa","timestamp":"2026-11-08T14:14:41.562354580Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"82f37757-ac35-44fd-ac87-e8365d097bc6","issue_id":"86a183c2-2a26-42db-bf8a-84f17cd7a3aa","timestamp":"2026-11-08T14:20:55.925597370Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"be81c9cf-03b3-4a8b-b3ea-8cdbfe9e8cc3","issue_id":"e5d7bc11-8da0-415b-8321-c75977d6909c","timestamp":"2026-11-08T14:24:51.263897830Z","type":"gate_failed","updated_by":"auto:executor"}
