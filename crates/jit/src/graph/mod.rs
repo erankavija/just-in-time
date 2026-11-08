@@ -65,6 +65,50 @@ pub enum GraphError<Id> {
     NodeNotFound { id: Id },
 }
 
+/// The depth-first walk under [`DependencyGraph::traverse`], over any
+/// adjacency: `neighbours` yields an id's neighbours in adjacency order,
+/// `resolve` the node an id names, and `admits` whether a resolved node is
+/// reached. Each reached node is returned once, in preorder, without `start`;
+/// an id that resolves to no node or to one `admits` rejects is neither
+/// reached nor walked through. `max_depth` counts edges from `start`, 0 being
+/// unlimited.
+pub fn traverse_with<'n, Id: Eq + Hash + ?Sized, N>(
+    start: &'n Id,
+    max_depth: u32,
+    neighbours: impl Fn(&Id) -> Vec<&'n Id>,
+    resolve: impl Fn(&Id) -> Option<N>,
+    admits: impl Fn(&N) -> bool,
+) -> Vec<N> {
+    let frontier = |id: &Id, depth: u32| -> Vec<(&'n Id, u32)> {
+        neighbours(id)
+            .into_iter()
+            .rev()
+            .map(|id| (id, depth))
+            .collect()
+    };
+
+    // Reverse-push so the stack pops neighbours in adjacency order; seeding
+    // `visited` with `start` keeps the root out of its own result.
+    let mut stack = frontier(start, 1);
+    let mut visited: HashSet<&Id> = HashSet::from([start]);
+    let mut reached = Vec::new();
+
+    while let Some((id, depth)) = stack.pop() {
+        if !visited.insert(id) {
+            continue;
+        }
+        let Some(node) = resolve(id).filter(|node| admits(node)) else {
+            continue;
+        };
+        reached.push(node);
+        if max_depth == 0 || depth < max_depth {
+            stack.extend(frontier(id, depth + 1));
+        }
+    }
+
+    reached
+}
+
 /// Generic dependency graph with cycle detection and traversal
 ///
 /// Provides DAG enforcement and graph operations for any type implementing `GraphNode`.
@@ -143,34 +187,13 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// At `max_depth = 0` and [`Direction::Dependencies`] this returns the same
     /// nodes as [`get_transitive_dependencies`](Self::get_transitive_dependencies).
     pub fn traverse(&self, start: &T::Id, direction: Direction, max_depth: u32) -> Vec<&'a T> {
-        let frontier = |id: &T::Id, depth: u32| -> Vec<(&'a T::Id, u32)> {
-            self.neighbors(id, direction)
-                .into_iter()
-                .rev()
-                .map(|id| (id, depth))
-                .collect()
-        };
-
-        // Reverse-push so the stack pops neighbours in adjacency order; seeding
-        // `visited` with `start` keeps the root out of its own result.
-        let mut stack = frontier(start, 1);
-        let mut visited: HashSet<&T::Id> = HashSet::from([start]);
-        let mut reached = Vec::new();
-
-        while let Some((id, depth)) = stack.pop() {
-            if !visited.insert(id) {
-                continue;
-            }
-            let Some(node) = self.nodes.get(id).copied() else {
-                continue;
-            };
-            reached.push(node);
-            if max_depth == 0 || depth < max_depth {
-                stack.extend(frontier(id, depth + 1));
-            }
-        }
-
-        reached
+        traverse_with(
+            start,
+            max_depth,
+            |id| self.neighbors(id, direction),
+            |id| self.nodes.get(id).copied(),
+            |_| true,
+        )
     }
 
     /// Unfold the graph from `start` in `direction` into a tree, stopping at

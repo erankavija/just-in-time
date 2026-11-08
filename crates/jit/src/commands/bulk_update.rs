@@ -187,7 +187,8 @@ struct BulkDerivation<'a> {
     operations: &'a UpdateOperations,
     force: bool,
     prechecks: &'a [BulkPrecheck],
-    image: &'a crate::repository_state::RepositoryImage,
+    /// The session image's comparison of precheck evidence.
+    comparison: &'a super::gate_check::EvidenceComparison<'a>,
     graph: &'a CapturedGraphEvidence<'a>,
     context: &'a crate::repository_state::MutationContext,
 }
@@ -235,7 +236,7 @@ impl BulkDerivation<'_> {
             record_captured_prechecks(
                 precheck.map(|precheck| &precheck.cached),
                 precheck.map(|precheck| &precheck.captured),
-                self.image,
+                self.comparison,
                 &planned,
                 registry,
             )
@@ -447,11 +448,12 @@ impl<S: IssueStore> IssueOps<'_, S> {
         result.matched = matched.clone();
         let graph = CapturedGraphEvidence::capture(base.declarations()?, image, &issues, context)?;
         let enforcement_mode = graph.declarations.config().enforcement_mode();
+        let comparison = super::gate_check::EvidenceComparison::new(image);
         let derivation = BulkDerivation {
             operations,
             force,
             prechecks,
-            image,
+            comparison: &comparison,
             graph: &graph,
             context,
         };
@@ -1631,19 +1633,50 @@ severity = "warn"
 assert = { label-reference = { from = "implements", to = "req", scope = "linked" } }
 "#;
 
-    /// The issue-index reads of a bulk update completing two blockers, each
-    /// with one `Backlog` dependent, beside `filler` unrelated issues, and the
-    /// number of graph-rule warnings it reported.
-    fn bulk_completion_index_reads(
+    /// A repository a bulk update matches in: its declarations and the state
+    /// the update moves each matched issue to.
+    struct CostScenario {
+        rules: Option<&'static str>,
+        /// The whole-repository precheck each matched issue requires, if any.
+        precheck: Option<crate::declarations::GateChecker>,
+        target: State,
+    }
+
+    /// The repository reads of a bulk update moving `matches` `Ready` issues,
+    /// each with one `Backlog` dependent, beside `filler` unrelated issues, and
+    /// the number of graph-rule warnings it reported.
+    fn bulk_update_reads(
+        scenario: &CostScenario,
         filler: u128,
-        rules: Option<&str>,
-    ) -> (crate::domain::queries::IndexReads, usize) {
+        matches: u128,
+    ) -> (crate::domain::queries::RepositoryReads, usize) {
         use crate::commands::test_helpers::{memory_executor, seed_issue};
+        use crate::declarations::{GateDefinition, GateMode, GateRegistry, GateStage};
         use crate::test_utils::issue_id;
 
         let storage = crate::storage::InMemoryStorage::new();
-        if let Some(rules) = rules {
+        if let Some(rules) = scenario.rules {
             storage.add_data_file("rules.toml", rules);
+        }
+        let gate: GateKey = "whole-repository".parse().unwrap();
+        if let Some(checker) = &scenario.precheck {
+            let mut registry = GateRegistry::default();
+            registry.gates.insert(
+                gate.clone(),
+                GateDefinition {
+                    version: 1,
+                    key: gate.clone(),
+                    title: "Issue validation".to_string(),
+                    description: String::new(),
+                    stage: GateStage::Precheck,
+                    mode: GateMode::Auto,
+                    checker: Some(checker.clone()),
+                    priority: 1,
+                    reserved: std::collections::HashMap::new(),
+                    inputs: None,
+                },
+            );
+            crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
         }
         seed_issue(
             &storage,
@@ -1654,40 +1687,80 @@ assert = { label-reference = { from = "implements", to = "req", scope = "linked"
             issue.dependencies = vec![issue_id(1)];
             seed_issue(&storage, issue);
         });
-        (0..2).for_each(|n| {
-            seed_issue(
-                &storage,
-                create_test_issue(&issue_id(0x2000 + n), State::Ready, vec!["implements:a"]),
-            );
+        (0..matches).for_each(|n| {
+            let mut matched =
+                create_test_issue(&issue_id(0x2000 + n), State::Ready, vec!["implements:a"]);
+            if scenario.precheck.is_some() {
+                matched.gates_required = vec![gate.clone()];
+            }
+            seed_issue(&storage, matched);
             let mut dependent = create_test_issue(&issue_id(0x3000 + n), State::Backlog, vec![]);
             dependent.dependencies = vec![issue_id(0x2000 + n)];
             seed_issue(&storage, dependent);
         });
         let executor = memory_executor(storage);
-        let (result, reads) = crate::domain::queries::count_index_reads(|| {
+        let (result, reads) = crate::domain::queries::count_repository_reads(|| {
             executor.issues().apply_bulk_update(
                 &QueryFilter::parse("state:ready").unwrap(),
                 &UpdateOperations {
-                    state: Some(State::Done),
+                    state: Some(scenario.target),
                     ..Default::default()
                 },
                 false,
             )
         });
         let result = result.unwrap();
-        assert_eq!(result.modified.len(), 2);
+        assert_eq!(
+            result.modified.len() as u128,
+            matches,
+            "{:?}",
+            result.errors
+        );
         (reads, result.warnings.len())
     }
 
     #[test]
     fn test_apply_bulk_update_per_match_issue_reads_are_keyed_and_independent_of_repository_size() {
-        for rules in [None, Some(GRAPH_RULES)] {
-            let (small, _) = bulk_completion_index_reads(4, rules);
-            let (large, warnings) = bulk_completion_index_reads(256, rules);
+        use crate::declarations::GateChecker;
 
-            assert_eq!(rules.is_some(), warnings > 0, "the graph rule did not fire");
-            assert_eq!(large.scans, 0, "a matched change scanned the issue list");
-            assert_eq!(small, large);
+        let scenarios = [
+            CostScenario {
+                rules: None,
+                precheck: None,
+                target: State::Done,
+            },
+            CostScenario {
+                rules: Some(GRAPH_RULES),
+                precheck: None,
+                target: State::Done,
+            },
+            CostScenario {
+                rules: Some(GRAPH_RULES),
+                precheck: Some(GateChecker::IssueValidation),
+                target: State::InProgress,
+            },
+            // A hand-written rule set is derived-state drift, which whole
+            // repository validation fails.
+            CostScenario {
+                rules: None,
+                precheck: Some(GateChecker::RepositoryValidation),
+                target: State::InProgress,
+            },
+        ];
+        for scenario in scenarios {
+            // The reads one more matched issue adds.
+            let per_match = |filler| {
+                let (two, _) = bulk_update_reads(&scenario, filler, 2);
+                let (three, warnings) = bulk_update_reads(&scenario, filler, 3);
+                assert_eq!(
+                    scenario.rules.is_some(),
+                    warnings > 0,
+                    "no graph rule fired"
+                );
+                three - two
+            };
+            // A pass over the repository per match would grow with the filler.
+            assert_eq!(per_match(4), per_match(256));
         }
     }
 
