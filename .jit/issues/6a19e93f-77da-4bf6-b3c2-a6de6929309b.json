@@ -11,7 +11,14 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "465fd262-91ab-4cd0-8226-16d6eb21239e",
+      "status": "passed",
+      "updated_at": "2026-11-08T07:01:46.388721263Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6a19e93f-77da-4bf6-b3c2-a6de6929309b",
   "labels": [
     "component:core",
@@ -27,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Bulk update's per-match cost is independent of repository size",
-  "updated_at": "2026-11-08T06:16:26.013719810Z"
+  "updated_at": "2026-11-08T07:01:46.388721263Z"
 }
