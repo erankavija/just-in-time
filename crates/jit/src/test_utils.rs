@@ -2429,3 +2429,29 @@ mod tests {
         }));
     }
 }
+
+/// The rule set the captured declaration parse yields for an example
+/// directory's `rules.toml` and `schemas/`, copied into a fresh repository.
+pub fn example_rule_set(example_dir: &Path) -> Result<crate::declarations::rules::RuleSet> {
+    let repo = TempDir::new()?;
+    let schemas = repo.path().join(".jit/schemas");
+    fs::create_dir_all(&schemas)?;
+    fs::copy(
+        example_dir.join("rules.toml"),
+        repo.path().join(".jit/rules.toml"),
+    )?;
+    match fs::read_dir(example_dir.join("schemas")) {
+        Ok(entries) => entries.into_iter().try_for_each(|entry| -> Result<()> {
+            let entry = entry?;
+            fs::copy(entry.path(), schemas.join(entry.file_name()))?;
+            Ok(())
+        })?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    Ok(file_executor(repo.path())?
+        .config()
+        .captured_declarations()?
+        .rules()
+        .clone())
+}

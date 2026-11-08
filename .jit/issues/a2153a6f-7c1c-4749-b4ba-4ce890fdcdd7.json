@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-08T00:29:38.157946372Z",
+  "dependencies": [],
+  "description": "Delete the live-file gate registry reader and route its callers onto the captured image's declarations, so no command reads `gates.toml` outside an admitted capture.\n\n## Background\n\n- `load_gate_registry` (`crates/jit/src/storage/gate_store.rs`) probes `path.exists()` and reads the live `gates.toml` with `std::fs::read`, with no commit admission.\n- Its non-test callers: `crates/jit/src/commands/gate.rs` (`self.exec.storage.load_gate_registry()` at ~812, ~966, ~987, ~1265) and `crates/jit/src/commands/gate_check.rs` (~1381, ~1426), reached through the `IssueStore` storage method of the same name.\n- Story `d675102c` sol checkpoint review, finding 1. Invoker ruling: delete the reader, keep no second reader for tests (`@/charter/D-18`).\n- Epic criteria: `b697a3f7` REQ-10 (read paths take declarations from a captured image) and REQ-12 (each evaluation resolves its registry once per captured image).\n\n## Success Criteria\n\n- [hard] REQ-01: `load_gate_registry` and the storage method that exposes it no longer exist, and no code outside `crates/jit/src/storage/` reads `gates.toml` from the filesystem.\n- [hard] REQ-02: Each former caller in `commands/gate.rs` and `commands/gate_check.rs` takes the gate registry from the declarations of the captured image its command already reads, or captures one, and a gate evaluation resolves its registry once per captured image.\n- [hard] REQ-03: The registry's absent-file and duplicate-key behaviour each keep one owning test at the captured-declaration parse; tests that seeded or read the registry through the deleted reader use the captured path or are deleted as duplicates.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-08T00:29:38.157946372Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "a2153a6f-7c1c-4749-b4ba-4ce890fdcdd7",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:configuration",
+    "component:core",
+    "component:gates",
+    "per:@/charter/D-20",
+    "per:@/charter/D-18",
+    "satisfies:b697a3f7/REQ-10",
+    "satisfies:b697a3f7/REQ-12"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Gate registry reads come from the captured image; the live-file reader is gone",
+  "updated_at": "2026-11-08T00:29:55.884055133Z"
+}

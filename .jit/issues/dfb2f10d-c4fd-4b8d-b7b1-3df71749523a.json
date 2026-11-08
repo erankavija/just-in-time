@@ -11,8 +11,9 @@
     "f6477007-09ab-4d53-8fec-ca4741c3cf78",
     "f98f2353-eec3-4473-8c83-811cdcdcea5f"
   ],
-  "description": "Aggregate the layering fixes and the one-form convergences: domain purity and typed domain errors, and each duplicated primitive or rule listed by the epic reduced to one form.\n\n## Success Criteria\n\n- [hard] REQ-01: The domain layer imports nothing from `repository_state`, returns typed errors, and reports layout violations through a domain type matched exhaustively.\n- [hard] REQ-02: Process liveness, safe relative paths, issue scopes and type extraction each have one form.\n- [hard] REQ-03: Adopter documentation states the issue scope grammar as the code now behaves.\n",
+  "description": "Aggregate the layering fixes and the one-form convergences: domain purity and typed domain errors, and each duplicated primitive or rule listed by the epic reduced to one form.\n\n## Success Criteria\n\n- [hard] REQ-01: The domain layer imports nothing from `repository_state`, returns typed errors, and reports layout violations through a domain type matched exhaustively.\n- [hard] REQ-02: Process liveness, safe relative paths, issue scopes and type extraction each have one form.\n- [hard] REQ-03: Adopter documentation states the issue scope grammar as the code now behaves.\n\n\n## Rulings\n\n- `crates/server/src/embedded.rs` `is_forbidden_route` is a URL route filter over a static embedded set, not a filesystem path validator; out of REQ-02 scope (steward ruling, just-in-time-d5, 2026-11-08, on the sol checkpoint review round 3).\n",
   "documents": [],
+  "done_at": "2026-11-08T00:11:01.591597966Z",
   "first_ready_at": "2026-11-06T06:08:37.311372129Z",
   "gates_required": [],
   "gates_status": {},
@@ -31,7 +32,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Layering and duplicated primitives converge on one form",
-  "updated_at": "2026-11-08T00:02:46.749549235Z"
+  "updated_at": "2026-11-08T00:11:01.591597966Z"
 }

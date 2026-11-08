@@ -5,8 +5,6 @@
 
 use crate::domain::item::KindScope;
 use crate::domain::vocabulary::wire_vocabulary;
-#[cfg(test)]
-use crate::repository_state::VirtualPath;
 use crate::runtime_defaults::{MAX_INDEFINITE_LEASES_PER_AGENT, MAX_INDEFINITE_LEASES_PER_REPO};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -97,7 +95,8 @@ impl VersionConfig {
 /// The sole home for the project's canonical, human-editable name — not
 /// `index.json`, which carries only machine metadata
 /// (`schema_version`/`deleted_ids`) and is not meant to be hand-edited.
-/// Resolve a present value with [`JitConfig::project_name`].
+/// Resolve a present value with
+/// [`project_name_from_config`](crate::config_manager::project_name_from_config).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectConfig {
@@ -1400,116 +1399,6 @@ impl EffectiveConfig {
 mod tests {
     use super::*;
 
-    fn assemble(
-        config: Option<&str>,
-        templates: Option<&str>,
-        invariants: Option<&str>,
-    ) -> std::result::Result<JitConfig, crate::declarations::ConfigurationAssemblyError> {
-        crate::declarations::assemble_configuration(
-            config.map(str::as_bytes),
-            templates.map(str::as_bytes),
-            invariants.map(str::as_bytes),
-        )
-    }
-
-    /// The assembly error of `config.toml` alone, with its source chain.
-    fn config_error(config: &str) -> String {
-        format!(
-            "{:#}",
-            anyhow::Error::from(assemble(Some(config), None, None).unwrap_err())
-        )
-    }
-
-    #[test]
-    fn test_load_templates_when_config_absent() {
-        // A repo with `.jit/templates.toml` but NO `.jit/config.toml` must still
-        // load the registry (the absent-config path), not silently return empty.
-        let config = assemble(
-            None,
-            Some(
-                r#"
-[[template]]
-name = "plan"
-applies_to = ["epic"]
-[[template.nodes]]
-role = "planning"
-type = "planning"
-doc = "dev/active/{container.id}-plan.md"
-[[template.nodes]]
-role = "breakdown"
-type = "breakdown"
-depends_on = ["planning"]
-"#,
-            ),
-            None,
-        )
-        .unwrap();
-        let plan = config
-            .templates
-            .get("plan")
-            .expect("templates.toml is loaded even without config.toml");
-        let roles = &config.templates.roles;
-        assert_eq!(plan.planning_type(roles), Some("planning"));
-        assert_eq!(plan.breakdown_type(roles), Some("breakdown"));
-        assert_eq!(config.templates.breakable_types(), vec!["epic".to_string()]);
-    }
-
-    #[test]
-    fn test_load_invariants_when_config_absent() {
-        // A repo with `.jit/invariants.toml` but NO `.jit/config.toml` must still
-        // load the registry (the config-absent early-return path).
-        let config = assemble(
-            None,
-            None,
-            Some(
-                r#"
-[[invariants]]
-id = "sample-invariant"
-statement = "Every dependency edge stays acyclic."
-kind = "enforced"
-enforced-by = "dag-no-cycles"
-"#,
-            ),
-        )
-        .unwrap();
-        assert_eq!(config.invariants.invariants.len(), 1);
-        let inv = &config.invariants.invariants[0];
-        assert_eq!(inv.id, "sample-invariant");
-        assert_eq!(
-            inv.kind,
-            crate::declarations::invariants::InvariantKind::Enforced
-        );
-        assert_eq!(inv.enforced_by.as_deref(), Some("dag-no-cycles"));
-    }
-
-    #[test]
-    fn test_load_invariants_when_config_present() {
-        // With BOTH `config.toml` and `invariants.toml`, assembly keeps each.
-        let config = assemble(
-            Some("[type_hierarchy]\ntypes = { task = 1 }\n"),
-            None,
-            Some("[[invariants]]\nid = \"second-invariant\"\nstatement = \"s\"\nkind = \"advisory\"\n"),
-        )
-        .unwrap();
-        assert!(config.type_hierarchy.is_some());
-        assert_eq!(config.invariants.invariants.len(), 1);
-        assert_eq!(config.invariants.invariants[0].id, "second-invariant");
-    }
-
-    #[test]
-    fn test_load_invariants_absent_file_is_empty_on_both_paths() {
-        // No `invariants.toml` → empty registry, whether or not config.toml exists.
-        [None, Some("[type_hierarchy]\ntypes = { task = 1 }\n")]
-            .into_iter()
-            .for_each(|config| {
-                assert!(assemble(config, None, None)
-                    .unwrap()
-                    .invariants
-                    .invariants
-                    .is_empty());
-            });
-    }
-
     #[test]
     fn test_documentation_config_unauthored_table_classifies_no_area() {
         // A table whose keys are all absent declares no classification, so no
@@ -1749,23 +1638,6 @@ enforced-by = "dag-no-cycles"
     }
 
     #[test]
-    fn test_load_invalid_invariant_fails_config_load_both_paths() {
-        // A malformed invariant entry fails assembly with an error naming its
-        // file, whether or not config.toml exists.
-        let bad = "[[invariants]]\nid = \"sample-invariant\"\nkind = \"advisory\"\n"; // missing statement
-        [None, Some("[type_hierarchy]\ntypes = { task = 1 }\n")]
-            .into_iter()
-            .for_each(|config| {
-                let err = assemble(config, None, Some(bad)).unwrap_err();
-                assert!(
-                    err.to_string()
-                        .contains(VirtualPath::INVARIANTS.relative().as_str()),
-                    "{err}"
-                );
-            });
-    }
-
-    #[test]
     fn test_parse_minimal_config() {
         let config_toml = r#"
 [type_hierarchy]
@@ -1864,19 +1736,9 @@ default_type = "task"
         }
     }
 
+    /// Every table of `config.toml` rejects an undeclared key by name.
     #[test]
-    fn test_invalid_strictness_fails_configuration_assembly() {
-        // The eager rejection also fires through assembly, so a committed
-        // config.toml with a bad strictness never resolves silently.
-        let chain = config_error("[validation]\nstrictness = \"banana\"\n");
-        assert!(chain.contains("banana"), "{chain}");
-        assert!(chain.contains("strictness"), "{chain}");
-    }
-
-    /// Every table of `config.toml` rejects an undeclared key, named in the
-    /// assembly error's top-level message.
-    #[test]
-    fn test_load_rejects_unknown_key_by_name_in_every_table() {
+    fn test_parse_rejects_unknown_key_by_name_in_every_table() {
         let key = "undeclared_key";
         for fragment in [
             format!("{key} = 1\n"),
@@ -1894,25 +1756,14 @@ default_type = "task"
             format!("[worktree]\n{key} = 1\n"),
             format!("[coordination]\n{key} = 1\n"),
         ] {
-            let message = assemble(Some(&fragment), None, None)
-                .expect_err("an unknown key must fail to assemble")
+            let message = toml::from_str::<JitConfig>(&fragment)
+                .expect_err("an unknown key must fail to deserialize")
                 .to_string();
             assert!(
                 message.contains(&format!("unknown field `{key}`")),
                 "{fragment}: {message}"
             );
         }
-    }
-
-    #[test]
-    fn test_load_existing_config() {
-        let config = assemble(
-            Some("[type_hierarchy]\ntypes = { epic = 1, task = 2 }\n"),
-            None,
-            None,
-        )
-        .unwrap();
-        assert_eq!(config.type_hierarchy.unwrap().types.len(), 2);
     }
 
     #[test]
@@ -2122,22 +1973,6 @@ section = "success_criteria"
         }
     }
 
-    #[test]
-    fn test_item_kinds_load_rejects_partial_declaration() {
-        // The required-six rule fires through configuration assembly.
-        let msg = config_error(
-            "[item_kinds.custom-decision]\nsection = \"decisions\"\nid-pattern = \"DEC-\\\\d+\"\n",
-        );
-        assert!(
-            msg.contains("custom-decision"),
-            "error names the kind: {msg}"
-        );
-        assert!(
-            msg.contains("markers"),
-            "error names a missing field: {msg}"
-        );
-    }
-
     /// A complete `[item_kinds.X]` table body with the six required fields, so a
     /// test can focus on the `aliases` behavior under study.
     fn complete_kind_body() -> &'static str {
@@ -2218,20 +2053,6 @@ section = "success_criteria"
             }
             other => panic!("expected AliasCollision, got {other:?}"),
         }
-    }
-
-    #[test]
-    fn test_item_kinds_alias_collision_rejected_through_load() {
-        // The alias-collision guard fires through configuration assembly, the
-        // same path that rejects a partial `[item_kinds]` declaration.
-        let body = complete_kind_body();
-        let msg = config_error(&format!(
-            "[item_kinds.custom-requirement]\n{body}aliases = [\"custom-requirement\"]\n"
-        ));
-        assert!(
-            msg.contains("custom-requirement"),
-            "error names the token: {msg}"
-        );
     }
 
     #[test]
@@ -2603,7 +2424,7 @@ max_indefinite_leases_per_agent = 3
             .chain(EnforcementMode::ALL.map(|mode| explicit(mode.as_str())))
             .collect::<Vec<_>>();
         for repo in &states {
-            let config = assemble(Some(repo), None, None).unwrap();
+            let config: JitConfig = toml::from_str(repo).unwrap();
             let enforced = config.enforcement_mode();
             let reported = EffectiveConfig::new(config).enforcement_mode();
             assert_eq!(reported, enforced, "repo {repo:?}");
@@ -2630,7 +2451,7 @@ max_indefinite_leases_per_agent = 3
             (both(Some(3), Some(12)), Some(3), Some(12)),
         ];
         for (repo, agent, repo_limit) in states {
-            let config = assemble(Some(&repo), None, None).unwrap();
+            let config: JitConfig = toml::from_str(&repo).unwrap();
             let enforced = config.coordination();
             let reported = EffectiveConfig::new(config).coordination();
             assert_eq!(reported, enforced, "repo {repo:?}");
@@ -2717,24 +2538,10 @@ max_indefinite_leases_per_agent = 3
     }
 
     #[test]
-    fn test_assemble_configuration_parses_valid_project_table() {
-        let config = assemble(Some("[project]\nname = \"just-in-time\"\n"), None, None).unwrap();
-        assert_eq!(
-            config
-                .project
-                .as_ref()
-                .unwrap()
-                .name
-                .as_ref()
-                .unwrap()
-                .as_str(),
-            "just-in-time"
-        );
-    }
-
-    #[test]
-    fn test_assemble_configuration_rejects_invalid_project_name() {
-        let msg = config_error("[project]\nname = \"Bad_Name\"\n");
+    fn test_parse_rejects_invalid_project_name_at_deserialize() {
+        let msg = toml::from_str::<JitConfig>("[project]\nname = \"Bad_Name\"\n")
+            .unwrap_err()
+            .to_string();
         assert!(
             msg.contains("Bad_Name"),
             "error must name the offending value: {msg}"

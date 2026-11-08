@@ -202,13 +202,13 @@
      "id": "42046050",
      "short_id": "42046050",
      "title": "The executor holds no disk-backed configuration; ConfigManager and JitConfig::load are gone",
-     "status": "in_progress"
+     "status": "done"
     },
     {
      "id": "4e2bed35",
      "short_id": "4e2bed35",
      "title": "Container marker and destination evidence are declared once",
-     "status": "in_progress"
+     "status": "partial: REQ-01..03 code complete, preserved as abfaee440 (wip) on worktree-agent-4e2bed35; worker cargo-ci at 01:31 failed on clippy (tests passed); resume after 04:30: fix clippy, squash into feat commit, cargo-ci, land, gates"
     }
    ]
   },
@@ -221,6 +221,37 @@
      "title": "Cost evidence: the epic's four cost reductions against the base binary",
      "status": "pending",
      "note": "after 04:30 quiet window; coordinate with df129d9e fba8d478 quiet-host trials"
+    }
+   ]
+  },
+  {
+   "wave_number": 11,
+   "issues": [
+    {
+     "id": "a2153a6f",
+     "short_id": "a2153a6f",
+     "title": "Gate registry reads come from the captured image; the live-file reader is gone",
+     "status": "pending",
+     "note": "after 04:30; opus"
+    },
+    {
+     "id": "c31c2e57",
+     "short_id": "c31c2e57",
+     "title": "A mutation attempt parses its configuration once per captured image",
+     "status": "pending",
+     "note": "after 04:30; opus"
+    }
+   ]
+  },
+  {
+   "wave_number": 12,
+   "issues": [
+    {
+     "id": "a869900b",
+     "short_id": "a869900b",
+     "title": "A gate evaluation resolves checker documents and validation from its own captured image",
+     "status": "pending",
+     "note": "after a2153a6f (shared gate_check.rs); opus"
     }
    ]
   }
@@ -257,6 +288,30 @@
    "depends_on": [],
    "blocks": [
     "dfb2f10d"
+   ]
+  },
+  {
+   "id": "a2153a6f",
+   "short_id": "a2153a6f",
+   "reason": "d675102c sol checkpoint finding 1; invoker approved",
+   "blocks": [
+    "d675102c"
+   ]
+  },
+  {
+   "id": "c31c2e57",
+   "short_id": "c31c2e57",
+   "reason": "d675102c sol checkpoint finding 2; invoker approved",
+   "blocks": [
+    "d675102c"
+   ]
+  },
+  {
+   "id": "a869900b",
+   "short_id": "a869900b",
+   "reason": "d675102c sol checkpoint finding 3 narrowed to REQ-04; invoker approved",
+   "blocks": [
+    "d675102c"
    ]
   }
  ],
@@ -313,7 +368,7 @@
   "b2c28ec1": 2,
   "030df4b1": 1,
   "219b9df8": 1,
-  "42046050": 1
+  "42046050": 2
  },
  "surfaced_pitfalls": [
   {
@@ -374,7 +429,10 @@
  "notes": [
   "Wave 1 leaves 12064c7b, 4334df62, 9a2563fd, c2b3cefa, f6477007, 4d834432 done; worktrees reclaimed. 1a737bb4 (W1b) and wave 2 (d2acb105, 7fefd776, 905364c1) in flight; dispatched together because all are dependency-ready and their shared files are in disjoint functions.",
   "Session 2026-11-08 (lead invoked by just-in-time-d5): c0775a83 resumed in its worktree after a lead-preserve WIP commit and a rebase onto main; host quiet window 03:30-04:30 Helsinki, no cargo from 03:15; coordinating crates/jit edits with df129d9e lead just-in-time-55. Pending pitfall: output.rs IssueScope (graph traversal key) shares its name with domain IssueScope; not a REQ-20 violation, raise in holistic review if it matters.",
-  "Trap: dispatch-worker-worktree.sh's default TMPDIR (/tmp/lead-worker-tmp/<repo-path>/agent-<id>) is too long for unix sockets; profile::package socket test fails with SUN_LEN. Briefs must set a short TMPDIR such as /tmp/lw-<id>."
+  "Trap: dispatch-worker-worktree.sh's default TMPDIR (/tmp/lead-worker-tmp/<repo-path>/agent-<id>) is too long for unix sockets; profile::package socket test fails with SUN_LEN. Briefs must set a short TMPDIR such as /tmp/lw-<id>.",
+  "Trap: in zsh an unquoted $VAR holding several flags is one argument; build flag lists as arrays and expand with \"${ARR[@]}\". Trap: checkpoint briefs that ask the reviewer to list every instance must tie each instance to the criterion's exact wording (invoker process note).",
+  "Trap: `jit <cmd> --json >/dev/null && echo ok` hides refusals; jit dep add refused a non-reduced edge (VALIDATION_FAILED) yet the echo ran. Check the JSON error field or the resulting graph; use `jit dep add --reduce` when the new edge makes a parent edge redundant.",
+  "03:14 quiet-window stop: all workers idle, no cargo running, host load ~0.2. Resume after the invoker's all-clear (gf2-16 benchmark at 04:00). Next: 4e2bed35 clippy fix and land; wave 11 a2153a6f + c31c2e57 (opus); then a869900b; e73ad8bc after 4e2bed35; 45d0a971 after df129d9e's fba8d478 quiet-host trials."
  ],
  "story_checkpoints": [
   {
@@ -386,6 +444,11 @@
    "story": "93e3f1ad",
    "result": "done",
    "evidence": "main sweep: no read-form lease caller (only refuse_foreign_leases rule + refuse_foreign_leases_held remain), no check_auto_transitions/AutoReady/AutoBacklog, no bulk preview, refusal text only in ForeignLeaseError Display; children d2acb105, fe9147fa, c2b3cefa, 905364c1, d3c94dc5, 693a2fdd done"
+  },
+  {
+   "story": "dfb2f10d",
+   "result": "done",
+   "evidence": "sol checkpoint reviews r1-r3; remediation b0dc019f, f98f2353, 219b9df8 done; r3: REQ-01/03 MET, REQ-02 MET with steward ruling that embedded.rs is_forbidden_route is a URL route filter, out of scope"
   }
  ],
  "decisions": [
@@ -467,6 +530,40 @@
    "effort": "high",
    "verdict": "pass",
    "run": "007fb972"
+  },
+  {
+   "issue": "dfb2f10d",
+   "review": "story checkpoint round 3 (non-gate)",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "1 finding ruled out of scope by steward"
+  },
+  {
+   "issue": "42046050",
+   "review": "code-review gate",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "fail F1-F3 -> rework 2",
+   "run": "3d12cea3"
+  },
+  {
+   "issue": "42046050",
+   "review": "code-review gate (rework 2)",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "pass; advisory stale comment fixed by lead in d51af4034",
+   "run": "48c3040d"
+  },
+  {
+   "issue": "d675102c",
+   "review": "story checkpoint (non-gate)",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "REQ-01 met; 3 blocking -> a2153a6f, c31c2e57, a869900b"
   }
  ]
 }

@@ -685,9 +685,25 @@
           "short_id": "0b35be66",
           "title": "Bring the tests the enforced limits flagged under their per-test limits",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "rework-margin",
           "model_tier": "opus",
-          "tier_reason": "proptest/coverage-preserving cost cuts across five modules"
+          "tier_reason": "proptest/coverage-preserving cost cuts across five modules",
+          "branch_head": "948212c82",
+          "production_delta": 100,
+          "rework_note": "event_tail 1.694s and dogfood 1.715s cut below 1s; sent 04:32"
+        },
+        {
+          "key": "bootstrap-over-limit",
+          "id": "afd2d573-6c56-471a-b8ac-84d5d4d3bb99",
+          "short_id": "afd2d573",
+          "title": "Bring the bootstrap audit-replay test under the unit limit",
+          "classification": "implementation",
+          "status": "in_progress",
+          "model_tier": "sonnet",
+          "tier_reason": "single-test cost cut reusing 0b35be66 mechanism",
+          "dispatched": "2026-11-08T04:33+02:00",
+          "worktree": ".agents/worktrees/agent-afd2d573",
+          "branch": "worktree-agent-afd2d573"
         }
       ]
     },
@@ -863,6 +879,11 @@
       "id": "0b35be66",
       "reason": "f487aeef enforcement flagged 10 tests over 2s/6s limits on a quiet host; blocks f487aeef",
       "date": "2026-11-08"
+    },
+    {
+      "id": "afd2d573",
+      "reason": "0b35be66 after2 run: bootstrap audit-replay test 3.443 s > 2 s; blocks f487aeef",
+      "date": "2026-11-08"
     }
   ],
   "escalations": [
@@ -970,6 +991,13 @@
       "issue": "f487aeef",
       "summary": "user lifted timing hold (session 15)",
       "status": "resolved: run chain"
+    },
+    {
+      "date": "2026-11-08",
+      "kind": "guard-interpretation",
+      "issue": "0b35be66",
+      "summary": "redo_conformance FileBackend Unsynced adapter setting",
+      "status": "resolved by d5: accept adapter-level setting; condition (redo_apply Full-durability sync assertions) verified at 948212c82: test_redo_applier_apply_syncs_a_parent_its_puts_share_once uses RedoApplier::new (Full)"
     }
   ],
   "rework_counts": {
@@ -1022,7 +1050,8 @@
     "ab168296": 0,
     "755964b2": 1,
     "fe3ad1b0": 1,
-    "f487aeef": 1
+    "f487aeef": 1,
+    "0b35be66": 1
   },
   "surfaced_pitfalls": [
     {
@@ -2336,5 +2365,10 @@
       "fe3ad1b0",
       "46fe7593"
     ]
-  }
+  },
+  "open_items": [
+    {
+      "item": "0b35be66 margin: event_tail 1.694s, dogfood 1.715s at load 2.13; cut further after 04:30"
+    }
+  ]
 }

@@ -1,0 +1,63 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a3b0dcb12bbd0aa2d8aaca128cd348864ec62f55",
+  "completed_at": "2026-11-08T00:09:39.902055117Z",
+  "duration_ms": 240789,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/config.rs",
+        "id": "F1",
+        "line": 1500,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "medium",
+        "summary": "Migrated configuration tests re-prove properties owned by existing assembler and deserialization tests."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/fast_docs_templates/research_bracket_tests.rs",
+        "id": "F2",
+        "line": 53,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/shared-test-contracts",
+          "@/invariant/convention-convergence"
+        ],
+        "severity": "medium",
+        "summary": "The replacement example fixture duplicates repository and schema setup across three suites instead of sharing one implementation."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/config.rs",
+        "id": "F3",
+        "line": 100,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "ProjectConfig rustdoc still links to the removed JitConfig::project_name method."
+      }
+    ],
+    "summary": "The production cutover is implemented, but duplicated test ownership, copied fixture setup, and a broken rustdoc link remain.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "42046050-895f-42bb-a486-383a47e39649",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3d12cea3-de7a-4f1c-90cb-4da30f7eadda",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T00:05:39.112407627Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7858 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1b879-9957-7681-b3bd-3cad578186ce\n--------\nuser\n--- 7845 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:42046050` — `0746209d`, `db93f29f`, `9d4c2a9f`, `8cea1e86`; individual patches inspected; uncommitted tracker changes excluded.\nPolicy sources: `AGENTS.md` (no applicable nested policy).\nResolved items: `.jit/invariants.toml` — @/invariant/canonical-cutover, @/invariant/architecture-dependency-direction, @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/domain-agnostic, @/invariant/single-source-prose; `dev/vision/9db27a3a-charter.md` — @/charter/D-20; issue `b697a3f7` description — @/issue/b697a3f7/requirement/REQ-10, @/issue/b697a3f7/requirement/REQ-20; `.jit/gates.toml` — @/gate/cargo-ci, @/gate/jit-validate.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T00:04:00.184633963+00:00; wrapper confirms `a3b0dcb1` contains all four attributable commits; code-review pending, no recorded run; no gates rerun.\nTruncation recovery: narrower commit/path reads, JSON description comparison, file-specific searches, and source ranges recovered relevant omitted evidence; none outstanding.\n\n1. **F1 — medium; blocking; issue-impact:** The migrated tests duplicate existing ownership. At [config.rs:1500](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:1500), the config-present case now calls the same assembler with the same inputs and checks the same empty invariant registry as `declarations/mod.rs:167`. Likewise, `config.rs:1868` repeats the invalid-strictness assertions already owned at `:1851`, without testing assembly-specific error context. Consolidate the configuration-presence matrix in its owning assembler test and remove redundant rejection assertions. References: @/invariant/orthogonal-tests.\n\n2. **F2 — medium; blocking; issue-impact:** The replacement example fixture introduces the same temporary-repository creation, rules copying, schema copying, and captured loading implementation three times: [research_bracket_tests.rs:53](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/fast_docs_templates/research_bracket_tests.rs:53), `sdd_bracket_tests.rs:45`, and `example_rulesets_tests.rs:42`. Previously these wrappers delegated filesystem loading to one shared loader; the change distributes substantial fixture setup across independent copies. Extract one shared example fixture so subsequent capture or schema changes have one owner. References: @/invariant/shared-test-contracts, @/invariant/convention-convergence.\n\n3. **F3 — low; blocking; issue-impact:** Removing `JitConfig::project_name` leaves [config.rs:100](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:100) linking to that nonexistent method. The rustdoc now directs users to a removed API and contains an unresolved intra-doc link. Point it to `crate::config_manager::project_name_from_config`.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The production cutover is implemented, but duplicated test ownership, copied fixture setup, and a broken rustdoc link remain.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Migrated configuration tests re-prove properties owned by existing assembler and deserialization tests.\",\"file\":\"crates/jit/src/config.rs\",\"line\":1500,\"references\":[\"@/invariant/orthogonal-tests\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The replacement example fixture duplicates repository and schema setup across three suites instead of sharing one implementation.\",\"file\":\"crates/jit/tests/fast_docs_templates/research_bracket_tests.rs\",\"line\":53,\"references\":[\"@/invariant/shared-test-contracts\",\"@/invariant/convention-convergence\"]},{\"id\":\"F3\",\"severity\":\"low\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"ProjectConfig rustdoc still links to the removed JitConfig::project_name method.\",\"file\":\"crates/jit/src/config.rs\",\"line\":100,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
