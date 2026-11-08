@@ -392,7 +392,9 @@
     "b2c28ec1": 2,
     "030df4b1": 1,
     "219b9df8": 1,
-    "42046050": 2
+    "42046050": 2,
+    "c31c2e57": 1,
+    "dd95bd9d": 1
   },
   "surfaced_pitfalls": [
     {
@@ -459,7 +461,9 @@
     "03:14 quiet-window stop: all workers idle, no cargo running, host load ~0.2. Resume after the invoker's all-clear (gf2-16 benchmark at 04:00). Next: 4e2bed35 clippy fix and land; wave 11 a2153a6f + c31c2e57 (opus); then a869900b; e73ad8bc after 4e2bed35; 45d0a971 after df129d9e's fba8d478 quiet-host trials.",
     "05:15 resumed after invoker all-clear. 4e2bed35 landed and closed. Wave 11: a2153a6f, c31c2e57 (opus), e73ad8bc (sonnet). Coordination: df129d9e 7909527f will touch two gate_check.rs tests (overlaps a2153a6f); it announces before landing. Trap: worktree script default tmp root is long; give workers TMPDIR=/tmp/lw-<id>.",
     "Coordination protocol with df129d9e (agreed 05:2x): each lead messages before a land and waits for the other OK; no merge onto main while the other lead has a gate judging main.",
-    "If c31c2e57 review flags a captured gate-registry parse site, cite a869900b REQ-04 as owner; do not rework c31c2e57 (invoker)."
+    "If c31c2e57 review flags a captured gate-registry parse site, cite a869900b REQ-04 as owner; do not rework c31c2e57 (invoker).",
+    "c31c2e57 lead review FAIL r1: validate --fix derive_fixes reparses (capture_validation drops discovery parse; validation_declarations_from_image again) - REQ-01 literal.",
+    "06:00-07:00 host held clear for df129d9e fba8d478 trials; c31c2e57 r1 and dd95bd9d r1 editing only, cargo held."
   ],
   "story_checkpoints": [
     {
@@ -503,6 +507,11 @@
     {
       "at": "05:4x",
       "decision": "19404174 checkpoint F1 -> dd95bd9d (option b: citation warnings leave ArtifactPlan; advisory report from one index per command; removes per-candidate citation cost; before 45d0a971). F2 -> 82f1647f (reserve copy_jit_state paths). Both under 19404174.",
+      "by": "invoker just-in-time-d5"
+    },
+    {
+      "at": "06:1x",
+      "decision": "dd95bd9d REQ-03 amended (steward): index built by the existing whole-path citation scanner with Markdown link targets via resolve_link; Markdown-only narrowing rejected under D-9. Rework 1 dispatched.",
       "by": "invoker just-in-time-d5"
     }
   ],
