@@ -668,15 +668,17 @@ proptest! {
 
         backend.commit(&record);
 
-        let complete = std::fs::read(backend.record_path()).unwrap();
-        for written in 0..complete.len() {
-            std::fs::write(backend.record_path(), &complete[..written]).unwrap();
+        let complete = std::fs::metadata(backend.record_path()).unwrap().len();
+        // Cutting the committed file back leaves exactly each shorter prefix.
+        let record = std::fs::OpenOptions::new().write(true).open(backend.record_path()).unwrap();
+        for written in (0..complete).rev() {
+            record.set_len(written).unwrap();
             prop_assert_eq!(
                 backend.published(),
                 old.clone(),
                 "a commit interrupted after {} of {} bytes reached the repository",
                 written,
-                complete.len()
+                complete
             );
         }
     }
