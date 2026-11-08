@@ -1107,7 +1107,8 @@
     {
       "source": "abe555e9 worker",
       "summary": "jit --schema output order is nondeterministic run to run: CommandSchema.commands, types and subcommands are HashMaps (pre-existing). Schema identity checks must compare with sorted keys; byte-stable output would need BTreeMap.",
-      "disposition": "reconcile against da30b92a / 46fe7593 schema criteria before container gates"
+      "disposition": "reconcile against da30b92a / 46fe7593 schema criteria before container gates",
+      "status": "reconciled 2026-11-08: no epic criterion names schema byte order (REQ-05/09/17 are about derivation and semantics); still reproduces (3 runs, 3 digests; sorted-key digest stable). Pre-existing; recorded in post_release_followups"
     },
     {
       "id": "inherited-landing-lock",
@@ -1127,7 +1128,7 @@
     {
       "id": "pool-runner-timeouts",
       "summary": "cargo-pool-run waits for a jobserver token inside nextest's per-test timer, so millisecond tests TIMEOUT at 20 s under parallel load. Not content failures; land-one retries TIMEOUT-only failures. f487aeef must not tighten limits until settled (D-43).",
-      "status": "User keeps dynamic sharing and defers timing enforcement; no host edits"
+      "status": "resolved: user lifted the hold (2026-11-08); f487aeef enforces 2 s/6 s with TIMEOUT-at-load exit 75; fba8d478 trials: 3/3 concurrent pairs pass, lock removed"
     },
     "Advisory whole-suite runs under the shared host lock starve behind a long chain of the lead's exclusive gate runs (cd8e04cc waited >1 h). Space gate chains or accept branch CI as the whole-tree evidence.",
     "close-issue.sh globbed format-3 gate-run paths; fixed to .jit/gate-runs/<id>-*/ for format 4.",
@@ -1259,7 +1260,12 @@
     "7": "b23faa59 lands first as pathfinder; the remaining handler issues fan out after it, copying its glue. 1eb949a5 measures while the host is quiet. Fan-out slipped past the 03:30 gf2 hold because the pathfinder landing deadlocked on an inherited lock; it dispatches after 6a releases the host. Fan-out also waits for b23faa59 rework 2: both code-review findings sit in the shared form (schema naming of a registered alias, the emitter's human findings line). Session 12 (lead 7c): one Claude Opus integrator on w7batch fixes the three cli_issue failures as per-issue fix commits (06ee9b67, 71f5296c, 20fc3b92) and merges main with the 614a6f97 claim port (66790c84); per-branch main merges conflict on registration lines, so fixes go on the batch. Each counts as one rework. Integrator (Opus) finished at 4ad4175c1: fix commits e21e28fe8 (06ee9b67), 287c3bbd9 (71f5296c, interim INVALID_ARGUMENT per steward; 487f45a9 ends it), 9160ec574 (20fc3b92), merge 1f50f71c5 (66790c84 claim port), dccad565d (06ee9b67), 4ad4175c1 (66790c84). Lead review PASS; batch merges cleanly with main. REQ-10: batch takes main+dispatch+output from 9248 to 9503 (+255). Landing queue after batch gating: 182f4c03, 10751360, cd8e04cc, 1ac651c7, cc4ea8a9 (all lead-reviewed; Claude workers could not run whole-tree suites under the shared lock, branch CI is the evidence)."
   },
   "post_release_followups": [
-    "Implement 8c67b21a after wave 7 settles, then delete the private dispatch.sh copy."
+    "Implement 8c67b21a after wave 7 settles, then delete the private dispatch.sh copy.",
+    {
+      "subject": "jit --schema byte order is nondeterministic (HashMap-backed CommandSchema)",
+      "origin": "surfaced pitfall, pre-existing",
+      "suggested": "BTreeMap in CommandSchema for byte-stable output"
+    }
   ],
   "issues": {
     "b23faa59": {
@@ -2406,9 +2412,5 @@
       "46fe7593"
     ]
   },
-  "open_items": [
-    {
-      "item": "0b35be66 margin: event_tail 1.694s, dogfood 1.715s at load 2.13; cut further after 04:30"
-    }
-  ]
+  "open_items": []
 }
