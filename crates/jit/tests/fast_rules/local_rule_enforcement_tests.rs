@@ -1060,10 +1060,6 @@ impl IssueStore for FailingMutationStorage {
         self.inner.list_issues()
     }
 
-    fn load_gate_registry(&self) -> anyhow::Result<jit::declarations::GateRegistry> {
-        self.inner.load_gate_registry()
-    }
-
     fn read_events(&self) -> anyhow::Result<Vec<Event>> {
         self.inner.read_events()
     }

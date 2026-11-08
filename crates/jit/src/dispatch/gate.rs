@@ -23,7 +23,6 @@ use crate::output::{
     GateEvaluateManyResponse, GateEvaluateManyResult, GateFindingsResponse, GateFlatReportResponse,
     GateListResponse, GatePresetListResponse, GateRunHistoryResponse, GateRunSummary,
 };
-use crate::storage::IssueStore;
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -190,7 +189,7 @@ fn add<S: HandlerStore>(
     )
 }
 
-fn list<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<GateListResponse> {
+fn list<S: HandlerStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<GateListResponse> {
     let gates = ctx.executor.gates().list_gates()?;
     let message = count_message(gates.len(), "", " gate definition(s)");
     Ok(Outcome::success_with(
@@ -199,7 +198,7 @@ fn list<S: IssueStore>(ctx: &CommandContext<'_, S>) -> HandlerResult<GateListRes
     ))
 }
 
-fn show<S: IssueStore>(
+fn show<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     key: String,
 ) -> HandlerResult<GateDefinitionResponse> {
@@ -342,7 +341,7 @@ fn tail_lines(text: &str, tail: Option<usize>) -> String {
 
 /// `id` resolved to an issue; a gate key in its place with an issue in the
 /// gate position is reported as transposed.
-fn resolve_status_issue<S: IssueStore>(
+fn resolve_status_issue<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     id: &str,
     gate_key: &str,
@@ -371,7 +370,7 @@ fn never_run(key: GateKey, issue_id: IssueId) -> Outcome<GateStatusOutput> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn gate_status<S: IssueStore>(
+fn gate_status<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     id: String,
     gate_key: Option<String>,
@@ -473,7 +472,7 @@ fn gate_status<S: IssueStore>(
     })
 }
 
-fn status_all<S: IssueStore>(
+fn status_all<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     id: String,
     full: bool,
@@ -728,7 +727,7 @@ mod tests {
     /// An executor whose one issue requires the manual gate `tests`; returns the issue id.
     fn requiring_manual_gate() -> (CommandExecutor<InMemoryStorage>, String) {
         let executor = memory_executor(InMemoryStorage::new());
-        let mut registry = executor.storage().load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         let key: GateKey = "tests".parse().unwrap();
         registry.gates.insert(
             key.clone(),
@@ -843,7 +842,7 @@ mod tests {
             if corrupt_registry {
                 seed_memory_repository_file(executor.storage(), ".jit/gates.toml", "gates = [");
             } else {
-                let mut registry = executor.storage().load_gate_registry().unwrap();
+                let mut registry = executor.captured_declarations().unwrap().gates().clone();
                 registry.gates.clear();
                 seed_gate_registry(executor.storage(), &registry);
             }

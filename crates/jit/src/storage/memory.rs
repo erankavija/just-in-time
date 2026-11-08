@@ -4,7 +4,6 @@
 //! test execution compared to JSON file I/O. Thread-safe for concurrent access.
 
 use super::gate_run_reader::TreeNode;
-use crate::declarations::{parse_gate_registry, GateRegistry};
 use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::{GateRunId, IssueId};
 use crate::domain::relative_path::RootRelativePath;
@@ -901,13 +900,6 @@ impl IssueStore for InMemoryStorage {
         Self::load_issues(&*self.read_repository_state()?)
     }
 
-    fn load_gate_registry(&self) -> Result<GateRegistry> {
-        match Self::data_entry_bytes(&*self.read_repository_state()?, &VirtualPath::GATES) {
-            Some(bytes) => Ok(parse_gate_registry(&bytes)?),
-            None => Ok(GateRegistry::default()),
-        }
-    }
-
     fn read_events(&self) -> Result<Vec<Event>> {
         Self::load_events(&*self.read_repository_state()?)
     }
@@ -1000,7 +992,6 @@ mod tests {
             let errors = [
                 reader.load_issue(&id).unwrap_err(),
                 reader.resolve_issue_id(&prefix).unwrap_err(),
-                reader.load_gate_registry().unwrap_err(),
                 reader.read_events().unwrap_err(),
             ];
             tx.send(errors).unwrap();

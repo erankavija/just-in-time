@@ -169,7 +169,7 @@ fn search<S: IssueStore>(
     Ok(Outcome::success_with(results, message))
 }
 
-fn status<S: IssueStore>(
+fn status<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     ids: Vec<String>,
 ) -> HandlerResult<IssueStatusOutput> {
@@ -188,7 +188,7 @@ fn status<S: IssueStore>(
     Ok(output.into())
 }
 
-fn children<S: IssueStore>(
+fn children<S: HandlerStore>(
     ctx: &CommandContext<'_, S>,
     id: String,
 ) -> HandlerResult<IssueChildrenResponse> {

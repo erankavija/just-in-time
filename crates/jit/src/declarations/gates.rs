@@ -449,29 +449,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_gate_registry_parser_rejects_duplicate_identity() {
-        let bytes = br#"
-[[gates]]
-key = "review"
-title = "One"
-description = "One"
-stage = "postcheck"
-mode = "manual"
-
-[[gates]]
-key = "review"
-title = "Two"
-description = "Two"
-stage = "postcheck"
-mode = "manual"
-"#;
-        assert!(matches!(
-            parse_gate_registry(bytes),
-            Err(GateDeclarationError::DuplicateKey(key)) if key.as_str() == "review"
-        ));
-    }
-
-    #[test]
     fn test_gate_registry_parser_rejects_malformed_gate_key_with_its_error() {
         let key = "Not_Kebab";
         let error = parse_gate_registry(

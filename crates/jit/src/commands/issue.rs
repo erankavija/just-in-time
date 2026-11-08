@@ -694,7 +694,10 @@ impl<S: IssueStore> IssueOps<'_, S> {
     pub fn issue_status_response(
         &self,
         issue: Issue,
-    ) -> Result<crate::commands::IssueStatusResponse> {
+    ) -> Result<crate::commands::IssueStatusResponse>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let enriched_deps = self.get_dependencies_enriched(&issue);
         let (gate_runs, _) = self.exec.gates().get_last_gate_runs_for_issue(&issue.id)?;
         let show = crate::commands::IssueShowResponse::from_issue(issue, enriched_deps, &gate_runs);
@@ -771,7 +774,10 @@ impl<S: IssueStore> IssueOps<'_, S> {
     /// assert_eq!(response.items[0].title, "Child");
     /// assert!(response.extras.dangling.is_empty());
     /// ```
-    pub fn issue_children(&self, id: &IssueId) -> Result<crate::commands::IssueChildrenResponse> {
+    pub fn issue_children(&self, id: &IssueId) -> Result<crate::commands::IssueChildrenResponse>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let container = self.show_issue(id)?;
         let (children, dangling) = self.resolve_direct_children(&container)?;
 
@@ -1505,7 +1511,7 @@ mod tests {
         );
 
         // Define a manual precheck gate (TDD reminder)
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "tdd-reminder".parse().unwrap(),
             GateDefinition {
@@ -1574,7 +1580,7 @@ mod tests {
         );
 
         // Define a manual precheck gate
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "tdd-reminder".parse().unwrap(),
             GateDefinition {
@@ -1852,7 +1858,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     fn test_claim_rechecks_ready_precheck_classification_after_preflight_race() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
-        let mut registry = storage.load_gate_registry().unwrap();
+        let mut registry = crate::declarations::GateRegistry::default();
         registry.gates.insert(
             "manual-start".parse().unwrap(),
             GateDefinition {

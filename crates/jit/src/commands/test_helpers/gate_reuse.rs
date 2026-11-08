@@ -2,7 +2,7 @@ use crate::commands::CommandExecutor;
 use crate::declarations::{GateChecker, GateMode, GateStage};
 use crate::domain::identity::{GateKey, IssueId};
 use crate::domain::GateRunResult;
-use crate::storage::{IssueStore, JsonFileStorage};
+use crate::storage::JsonFileStorage;
 use std::collections::HashMap;
 
 pub(crate) fn seed_gate_issue(
@@ -50,9 +50,10 @@ impl ReuseFixture {
         let log = self.repo.path().join("executions.log");
         let mut registry = self
             .executor
-            .storage
-            .load_gate_registry()
-            .expect("the seeded registry");
+            .captured_declarations()
+            .expect("the seeded registry")
+            .gates()
+            .clone();
         registry.gates.insert(
             self.gate_key.clone(),
             crate::declarations::GateDefinition {
@@ -128,9 +129,10 @@ impl ReuseFixture {
     pub(crate) fn rewrite_checker_command(&self, command: &str) {
         let mut registry = self
             .executor
-            .storage
-            .load_gate_registry()
-            .expect("the registry loads");
+            .captured_declarations()
+            .expect("the registry loads")
+            .gates()
+            .clone();
         let gate = registry
             .gates
             .get_mut(&self.gate_key)

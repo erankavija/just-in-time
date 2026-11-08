@@ -145,17 +145,20 @@ fn type_of(issue: &Issue) -> Option<String> {
 fn test_renamed_bindings_complete_the_bracket_flow_end_to_end() {
     let storage = InMemoryStorage::new();
     let unchecked_hierarchy: [&str; 0] = [];
-    for template in jit::templates::TemplateRegistry::from_toml_str(
+    let gate_keys: Vec<_> = jit::templates::TemplateRegistry::from_toml_str(
         RENAMED_BINDINGS_TEMPLATE,
         &unchecked_hierarchy,
     )
     .expect("the template registry parses")
     .templates
-    {
-        jit::test_harness::seed_memory_template_gates(&storage, &template);
-    }
+    .iter()
+    .flat_map(jit::test_harness::template_gate_keys)
+    .collect();
     let gates_toml = String::from_utf8(
-        jit::declarations::serialize_gate_registry(&storage.load_gate_registry().unwrap()).unwrap(),
+        jit::declarations::serialize_gate_registry(&jit::test_harness::manual_gate_registry(
+            &gate_keys,
+        ))
+        .unwrap(),
     )
     .unwrap();
     let executor = memory_executor_declaring(
@@ -233,17 +236,20 @@ fn test_renamed_bindings_complete_the_bracket_flow_end_to_end() {
 fn test_absent_bindings_reproduce_the_shipped_names_end_to_end() {
     let storage = InMemoryStorage::new();
     let unchecked_hierarchy: [&str; 0] = [];
-    for template in jit::templates::TemplateRegistry::from_toml_str(
+    let gate_keys: Vec<_> = jit::templates::TemplateRegistry::from_toml_str(
         DEFAULT_BINDINGS_TEMPLATE,
         &unchecked_hierarchy,
     )
     .expect("the template registry parses")
     .templates
-    {
-        jit::test_harness::seed_memory_template_gates(&storage, &template);
-    }
+    .iter()
+    .flat_map(jit::test_harness::template_gate_keys)
+    .collect();
     let gates_toml = String::from_utf8(
-        jit::declarations::serialize_gate_registry(&storage.load_gate_registry().unwrap()).unwrap(),
+        jit::declarations::serialize_gate_registry(&jit::test_harness::manual_gate_registry(
+            &gate_keys,
+        ))
+        .unwrap(),
     )
     .unwrap();
     let executor = memory_executor_declaring(
