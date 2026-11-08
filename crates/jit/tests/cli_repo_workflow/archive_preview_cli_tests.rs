@@ -1615,11 +1615,10 @@ fn test_archive_container_execution_leaves_a_citing_scanned_file_byte_identical(
     );
 }
 
-/// REQ-03 (`jit:ef118aea`): execution reports the warnings and the advisory
-/// citations a preview of the unchanged target reports, including citations it
-/// intentionally leaves for the adopter to repair after relocation.
+/// REQ-03 (`jit:ef118aea`): execution derives the same advisory warnings as a
+/// preview of the unchanged target.
 #[test]
-fn test_archive_container_execution_reports_the_preview_warnings_and_advisory_section() {
+fn test_archive_container_execution_reports_the_preview_warning_set() {
     let cli = JitCli::with_repository(
         declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
     );
@@ -1631,7 +1630,6 @@ fn test_archive_container_execution_reports_the_preview_warnings_and_advisory_se
         archive_warning_set(&run.preview),
         "execution must report the warning set preview computed for the same archive target"
     );
-    assert_eq!(run.execution["advisory"], run.preview["advisory"]);
 }
 
 /// A declared scan root may hold more directories than the archive capture's

@@ -255,9 +255,11 @@ citations a relocation would break in an advisory section beside the plan,
 JSON `advisory.citations` and human `Advisory citations`, read from the
 declared `citation_scan_roots` universe — the repository-relative directories
 and files whose text the scan reads, which need not lie under the development
-root ([Citation scan roots](configuration.md#citation-scan-roots)). A command
-scans that universe once, after planning settles, over every artifact of its
-final plans, and looks each artifact up in the result. Only a relocating artifact is reported: each entry names its
+root ([Citation scan roots](configuration.md#citation-scan-roots)). A preview
+or a candidate listing scans that universe once, after planning settles, over
+every artifact of its final plans; an execution scans it once per attempt, over
+that attempt's plan, before it writes anything. Each looks every artifact up in
+the result. Only a relocating artifact is reported: each entry names its
 `artifact` source and lists every citation in `locations`, spelled
 `<citing path>:<line>:<column>` with a 1-based line and column. A citation is
 text naming the moving path whole, so text naming a longer path that ends with
@@ -272,12 +274,11 @@ plan's captured snapshot, so the plan never depends on it, and eligibility,
 `--execute`, and issue transitions all behave as they would with no citation
 present. Execution relocates bytes and relinks document records while rewriting
 no document content, so a citing file survives byte for byte and keeps a stale
-citation until an adopter edits it. Execution scans after its run, over the
-plan it applied, reading the citation roots as they stood before it: a citing
-file the run relocated is read at its destination under its source path, and a
-file the run created is skipped. Execution therefore reports the section a
-preview reports over the same live files, including the stale citations the
-run leaves.
+citation until an adopter edits it. Because execution scans before its run,
+it reports the section a preview reports over the same live files, including
+the stale citations the run leaves. A scan that fails, for example on a file
+name that is not UTF-8 under a citation root, fails the command, and an
+execution then writes nothing.
 
 `jit archive candidates` is the read-only container report. It lists every
 effectively terminal issue — `Done`, `Rejected`, or `Archived` from one of those

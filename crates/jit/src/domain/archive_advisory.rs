@@ -105,57 +105,6 @@ impl CitationIndex {
     }
 }
 
-/// What an applied archive execution changed among repository files, so a
-/// scan after it reads the citation roots as they stood before it.
-///
-/// Execution rewrites no content, so a removed source survives byte for byte
-/// at its destination.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct AppliedChanges {
-    /// Destinations this execution created.
-    created: BTreeSet<String>,
-    /// Each source this execution removed, with the destination holding its bytes.
-    moved: BTreeMap<String, String>,
-}
-
-impl AppliedChanges {
-    /// The changes `result` reports for the execution of `plan`. A
-    /// publication adopting identical content creates nothing.
-    pub fn of(plan: &ArtifactPlan, result: &ArchiveExecutionResult) -> Self {
-        Self {
-            created: result
-                .publications
-                .iter()
-                .filter(|publication| !publication.adopted)
-                .map(|publication| publication.destination.clone())
-                .collect(),
-            moved: result
-                .deleted_sources
-                .iter()
-                .filter_map(|source| {
-                    plan.artifacts()
-                        .iter()
-                        .find(|artifact| artifact.source() == source)
-                        .and_then(|artifact| artifact.destination())
-                        .map(|destination| (source.clone(), destination.to_string()))
-                })
-                .collect(),
-        }
-    }
-
-    /// Whether `path` did not exist before the execution.
-    pub fn is_created(&self, path: &str) -> bool {
-        self.created.contains(path)
-    }
-
-    /// Each removed source with the destination now holding its bytes.
-    pub fn moved(&self) -> impl Iterator<Item = (&str, &str)> {
-        self.moved
-            .iter()
-            .map(|(source, destination)| (source.as_str(), destination.as_str()))
-    }
-}
-
 /// Every artifact source of `plans`: the pattern set one index scan covers.
 pub fn planned_sources<'a>(plans: impl IntoIterator<Item = &'a ArtifactPlan>) -> BTreeSet<String> {
     plans
