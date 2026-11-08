@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "873126a1-e4ce-476c-ba2f-50c5da35a6de",
+      "status": "passed",
+      "updated_at": "2026-11-08T07:05:49.256489411Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2ed81f0e-7051-4e3a-9aed-d95c16a75052",
+      "status": "failed",
+      "updated_at": "2026-11-08T07:09:01.011003819Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "75a90224-e9dd-43d2-99c0-3d79d7f1284c",
   "labels": [
     "epic:rust-code-quality",
@@ -22,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Validation checks report failures on stdout with a one-line stderr summary",
-  "updated_at": "2026-11-08T06:53:05.102761609Z"
+  "updated_at": "2026-11-08T07:09:01.011003819Z"
 }
