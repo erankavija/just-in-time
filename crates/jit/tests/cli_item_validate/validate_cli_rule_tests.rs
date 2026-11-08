@@ -4,7 +4,6 @@
 //! parity for the new positional + flag.
 
 use assert_cmd::prelude::*;
-use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::test_cli::JitCli;
 use jit::test_utils::profiled_repository_fixture;
 use predicates::prelude::*;
@@ -101,13 +100,13 @@ fn test_config_writes_and_validate_fix_restore_defaults_in_custom_only_file() {
         cli.command(args).assert().success();
         let restored = fs::read_to_string(&rules_path).unwrap();
         assert!(restored.starts_with(EPIC_NEEDS_COMPONENT));
-        let executor = jit::test_utils::file_executor(cli.root()).unwrap();
-        assert!(executor
-            .rules()
-            .unwrap()
-            .rules
-            .iter()
-            .any(|r| r.name == "label-format" && r.origin.as_deref() == Some("default")));
+        assert!(
+            jit::declarations::rules::RuleSet::parse(&restored, None, std::iter::empty())
+                .unwrap()
+                .rules
+                .iter()
+                .any(|r| r.name == "label-format" && r.origin.as_deref() == Some("default"))
+        );
     }
 }
 

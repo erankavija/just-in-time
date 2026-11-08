@@ -42,7 +42,6 @@ pub mod redo_record;
 pub mod reference;
 pub mod repo_lock;
 pub mod repository_state_store;
-pub mod ruleset_store;
 pub mod temp_cleanup;
 #[cfg(feature = "test-support")]
 mod test_support;

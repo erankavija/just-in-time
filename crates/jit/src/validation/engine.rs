@@ -195,29 +195,17 @@ impl SchemaEngine {
     ///     .with_keyword("x-jit-non-empty", |_p, _s, _l| Ok(Box::new(NonEmpty)));
     /// assert_eq!(engine.registered_keywords(), vec!["x-jit-non-empty".to_string()]);
     ///
-    /// let dir = tempfile::tempdir().unwrap();
-    /// let layout = jit::test_utils::repository_layout_for_data_root(dir.path());
-    /// let schemas = layout.resolve(&jit::repository_state::VirtualPath::SCHEMAS).unwrap();
-    /// std::fs::create_dir_all(&schemas).unwrap();
-    /// std::fs::write(
-    ///     schemas.join("t.json"),
-    ///     r#"{ "type": "object",
-    ///          "properties": { "title": { "type": "string", "x-jit-non-empty": true } } }"#,
-    /// )
-    /// .unwrap();
     /// let toml = r#"
     /// [[rules]]
     /// name = "title-non-empty"
     /// assert = { json-schema = "schemas/t.json" }
     /// "#;
-    /// std::fs::write(
-    ///     layout.resolve(&jit::repository_state::VirtualPath::RULES).unwrap(),
+    /// let schema = br#"{ "type": "object",
+    ///     "properties": { "title": { "type": "string", "x-jit-non-empty": true } } }"#;
+    /// let set = jit::declarations::rules::RuleSet::parse(
     ///     toml,
-    /// )
-    /// .unwrap();
-    /// let set = jit::storage::ruleset_store::load_ruleset(
-    ///     &layout,
-    ///     &toml::from_str::<jit::config::JitConfig>("").unwrap(),
+    ///     None,
+    ///     [("schemas/t.json".to_string(), schema.to_vec())],
     /// )
     /// .unwrap();
     ///
@@ -789,30 +777,27 @@ mod tests {
     use super::*;
     use crate::declarations::rules::RuleSet;
     use crate::domain::{Priority, State};
-    use tempfile::TempDir;
 
-    /// Build a `RuleSet` from a single `json-schema` rule whose schema file holds
-    /// `schema_json`. Returns the temp dir (kept alive) and the set.
-    fn rule_set_with_schema(name: &str, severity: &str, schema_json: &str) -> (TempDir, RuleSet) {
-        let dir = tempfile::tempdir().unwrap();
-        let schemas = dir.path().join("schemas");
-        std::fs::create_dir_all(&schemas).unwrap();
-        std::fs::write(schemas.join("s.json"), schema_json).unwrap();
+    /// Build a `RuleSet` from a single `json-schema` rule whose schema holds
+    /// `schema_json`.
+    fn rule_set_with_schema(name: &str, severity: &str, schema_json: &str) -> RuleSet {
         let toml = format!(
             "[[rules]]\nname = \"{name}\"\nseverity = \"{severity}\"\nassert = {{ json-schema = \"schemas/s.json\" }}\n"
         );
-        std::fs::write(dir.path().join("rules.toml"), &toml).unwrap();
-        let set = crate::storage::ruleset_store::load_ruleset(
-            &crate::test_utils::repository_layout_for_data_root(dir.path()),
-            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        RuleSet::parse(
+            &toml,
+            None,
+            [(
+                "schemas/s.json".to_string(),
+                schema_json.as_bytes().to_vec(),
+            )],
         )
-        .unwrap();
-        (dir, set)
+        .unwrap()
     }
 
     #[test]
     fn test_validate_passing_projection_yields_no_findings() {
-        let (_dir, set) = rule_set_with_schema(
+        let set = rule_set_with_schema(
             "needs-state",
             "error",
             r#"{ "type": "object", "required": ["state"] }"#,
@@ -825,7 +810,7 @@ mod tests {
 
     #[test]
     fn test_validate_failing_projection_carries_rule_and_severity() {
-        let (_dir, set) = rule_set_with_schema(
+        let set = rule_set_with_schema(
             "needs-state",
             "error",
             r#"{ "type": "object", "required": ["state"] }"#,
@@ -841,7 +826,7 @@ mod tests {
 
     #[test]
     fn test_severity_warn_is_carried_into_finding() {
-        let (_dir, set) = rule_set_with_schema(
+        let set = rule_set_with_schema(
             "needs-state",
             "warn",
             r#"{ "type": "object", "required": ["state"] }"#,
@@ -856,7 +841,7 @@ mod tests {
     #[test]
     fn test_multiple_violations_yield_multiple_findings() {
         // Two required properties both absent => two findings.
-        let (_dir, set) = rule_set_with_schema(
+        let set = rule_set_with_schema(
             "needs-both",
             "error",
             r#"{ "type": "object", "required": ["state", "priority"] }"#,
@@ -898,7 +883,7 @@ mod tests {
             }
         })
         .to_string();
-        let (_dir, set) = rule_set_with_schema("state-priority-shape", "error", &schema_json);
+        let set = rule_set_with_schema("state-priority-shape", "error", &schema_json);
         let engine = SchemaEngine::new();
 
         let valid = serde_json::json!({ "state": "ready", "priority": "high" });
@@ -934,7 +919,7 @@ assert = { require-label = { label = "type:*" } }
 
     #[test]
     fn test_invalid_schema_surfaces_compile_error() {
-        let (_dir, set) = rule_set_with_schema("bad", "error", r#"{ "type": "not-a-real-type" }"#);
+        let set = rule_set_with_schema("bad", "error", r#"{ "type": "not-a-real-type" }"#);
         let engine = SchemaEngine::new();
         let result = engine.validate(&set.rules[0], &serde_json::json!({}));
         match result {
@@ -948,7 +933,7 @@ assert = { require-label = { label = "type:*" } }
         // The compiled validator for a rule must be compiled at most once: the
         // cached Arc is pointer-identical across repeated lookups, and the cache
         // holds exactly one entry no matter how many times we validate.
-        let (_dir, set) = rule_set_with_schema(
+        let set = rule_set_with_schema(
             "cached",
             "error",
             r#"{ "type": "object", "required": ["state"] }"#,
@@ -991,11 +976,6 @@ assert = { require-label = { label = "type:*" } }
     fn test_distinct_rules_get_distinct_validators() {
         // Two rules carrying *different* schemas must each compile their own
         // validator, so the cache ends with two entries.
-        let dir = tempfile::tempdir().unwrap();
-        let schemas = dir.path().join("schemas");
-        std::fs::create_dir_all(&schemas).unwrap();
-        std::fs::write(schemas.join("a.json"), r#"{ "type": "object" }"#).unwrap();
-        std::fs::write(schemas.join("b.json"), r#"{ "type": "array" }"#).unwrap();
         let toml = r#"
 [[rules]]
 name = "rule-a"
@@ -1005,10 +985,19 @@ assert = { json-schema = "schemas/a.json" }
 name = "rule-b"
 assert = { json-schema = "schemas/b.json" }
 "#;
-        std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
-        let set = crate::storage::ruleset_store::load_ruleset(
-            &crate::test_utils::repository_layout_for_data_root(dir.path()),
-            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        let set = RuleSet::parse(
+            toml,
+            None,
+            [
+                (
+                    "schemas/a.json".to_string(),
+                    r#"{ "type": "object" }"#.as_bytes().to_vec(),
+                ),
+                (
+                    "schemas/b.json".to_string(),
+                    r#"{ "type": "array" }"#.as_bytes().to_vec(),
+                ),
+            ],
         )
         .unwrap();
         let engine = SchemaEngine::new();
@@ -1023,11 +1012,6 @@ assert = { json-schema = "schemas/b.json" }
         // Two distinct rules carrying the *same* schema must share a single
         // compiled validator: keying by schema identity collapses them to one
         // cache entry (still satisfying "no per-call recompile").
-        let dir = tempfile::tempdir().unwrap();
-        let schemas = dir.path().join("schemas");
-        std::fs::create_dir_all(&schemas).unwrap();
-        std::fs::write(schemas.join("a.json"), r#"{ "type": "object" }"#).unwrap();
-        std::fs::write(schemas.join("b.json"), r#"{ "type": "object" }"#).unwrap();
         let toml = r#"
 [[rules]]
 name = "rule-a"
@@ -1037,10 +1021,19 @@ assert = { json-schema = "schemas/a.json" }
 name = "rule-b"
 assert = { json-schema = "schemas/b.json" }
 "#;
-        std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
-        let set = crate::storage::ruleset_store::load_ruleset(
-            &crate::test_utils::repository_layout_for_data_root(dir.path()),
-            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        let set = RuleSet::parse(
+            toml,
+            None,
+            [
+                (
+                    "schemas/a.json".to_string(),
+                    r#"{ "type": "object" }"#.as_bytes().to_vec(),
+                ),
+                (
+                    "schemas/b.json".to_string(),
+                    r#"{ "type": "object" }"#.as_bytes().to_vec(),
+                ),
+            ],
         )
         .unwrap();
         let engine = SchemaEngine::new();
@@ -1172,7 +1165,7 @@ assert = { json-schema = "schemas/b.json" }
 
     #[test]
     fn test_contains_min_contains_passes_with_hard_item() {
-        let (_dir, set) = rule_set_with_schema("hard-criteria", "error", hard_criterion_schema());
+        let set = rule_set_with_schema("hard-criteria", "error", hard_criterion_schema());
         let engine = SchemaEngine::new();
         let projection = serde_json::json!({
             "sections": {
@@ -1190,7 +1183,7 @@ assert = { json-schema = "schemas/b.json" }
 
     #[test]
     fn test_contains_min_contains_fails_without_hard_item() {
-        let (_dir, set) = rule_set_with_schema("hard-criteria", "error", hard_criterion_schema());
+        let set = rule_set_with_schema("hard-criteria", "error", hard_criterion_schema());
         let engine = SchemaEngine::new();
         let projection = serde_json::json!({
             "sections": {
@@ -1223,7 +1216,7 @@ assert = { json-schema = "schemas/b.json" }
   },
   "required": ["items"]
 }"#;
-        let (_dir, set) = rule_set_with_schema("at-most-one-hard", "error", schema);
+        let set = rule_set_with_schema("at-most-one-hard", "error", schema);
         let engine = SchemaEngine::new();
 
         let ok = serde_json::json!({ "items": ["[hard] one", "[soft] two"] });
@@ -1240,7 +1233,7 @@ assert = { json-schema = "schemas/b.json" }
         // finding: jsonschema 0.46 treats unknown keywords as annotations and the
         // core adds no strict-keyword rejection (custom keywords are task 33f23ec7).
         let schema = r#"{ "type": "object", "x-jit-custom": { "anything": true } }"#;
-        let (_dir, set) = rule_set_with_schema("annotation", "warn", schema);
+        let set = rule_set_with_schema("annotation", "warn", schema);
         let engine = SchemaEngine::new();
         let findings = engine
             .validate(&set.rules[0], &serde_json::json!({ "state": "ready" }))

@@ -867,10 +867,6 @@ assert = { require-section = { heading = "Success Criteria" } }
     fn test_invalid_schema_surfaces_error() {
         // A raw schema file that is not a valid JSON Schema must surface as an
         // evaluation error rather than silently passing.
-        let dir = tempfile::tempdir().unwrap();
-        let schemas = dir.path().join("schemas");
-        std::fs::create_dir_all(&schemas).unwrap();
-        std::fs::write(schemas.join("bad.json"), r#"{ "type": "not-a-type" }"#).unwrap();
         let toml = r#"
 [[rules]]
 name = "bad"
@@ -879,10 +875,13 @@ severity = "error"
 enforce = true
 assert = { json-schema = "schemas/bad.json" }
 "#;
-        std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
-        let rules = crate::storage::ruleset_store::load_ruleset(
-            &crate::test_utils::repository_layout_for_data_root(dir.path()),
-            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        let rules = crate::declarations::rules::RuleSet::parse(
+            toml,
+            None,
+            [(
+                "schemas/bad.json".to_string(),
+                br#"{ "type": "not-a-type" }"#.to_vec(),
+            )],
         )
         .unwrap();
         let err = evaluate_local(&epic_without_req(), &rules, ContentFormat::Markdown).unwrap_err();

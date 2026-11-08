@@ -1704,23 +1704,11 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
     }
 
     fn seed_rule_validation_rules(executor: &CommandExecutor<InMemoryStorage>) {
-        std::fs::write(
-            executor.storage.root().join("rules.toml"),
-            rule_validation_test_rules(),
-        )
-        .unwrap();
         seed_memory_repository_file(
             &executor.storage,
             ".jit/rules.toml",
             &rule_validation_test_rules(),
         );
-        let rules_path = executor
-            .storage
-            .repository_layout()
-            .resolve(&crate::repository_state::VirtualPath::RULES)
-            .unwrap();
-        std::fs::create_dir_all(rules_path.parent().unwrap()).unwrap();
-        std::fs::write(rules_path, rule_validation_test_rules()).unwrap();
     }
 
     fn prior_run(
@@ -3457,12 +3445,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
             crate::test_utils::shipped_item_kind_tables(&["requirement"])
         );
-        let config_path = executor
-            .repository_layout()
-            .unwrap()
-            .resolve(&crate::repository_state::VirtualPath::CONFIG)
-            .unwrap();
-        std::fs::write(config_path, &config).unwrap();
         seed_memory_repository_file(&executor.storage, ".jit/config.toml", &config);
         seed_rule_validation_rules(&executor);
 

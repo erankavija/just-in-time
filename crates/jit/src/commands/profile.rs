@@ -3443,8 +3443,9 @@ template = true
 
         assert_eq!(
             reloaded
-                .cached_config()
+                .captured_declarations()
                 .unwrap()
+                .config()
                 .namespaces
                 .as_ref()
                 .unwrap()[namespace]
