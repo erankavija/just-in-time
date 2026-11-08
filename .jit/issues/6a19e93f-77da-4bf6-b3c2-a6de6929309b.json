@@ -1,11 +1,10 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-08T05:53:47.070645856Z",
   "context": {},
   "created_at": "2026-11-08T05:50:57.638527715Z",
-  "dependencies": [
-    "e7635f2f-98c6-42a0-bd48-e582b43ffb8b"
-  ],
-  "description": "Make bulk update's per-match cost independent of repository size, so `jit issue bulk-update` at a fixed match count no longer grows with the number of issues.\n\n## Background\n\n- The 45d0a971 cost harness (scenario (a)) measures the tip slope ratio s(2000)/s(500) at 4.17 (threshold ≤ 1.5; base 3.83). The tip is 25x cheaper per match than base `369d35a42` (0.37 / 1.56 ms against 9.2 / 35.2 ms), but its per-match cost still grows with N.\n- Invoker ruling: profile first. If the growth is graph rule evaluation scanning the issue list per match, this task is epic `16c53cc2` REQ-07 (\"Graph rule evaluation, scoped-bracket resolution and issue deletion resolve neighbours through id and reverse-dependency indexes. None scans the full issue list per visited node or per dependent.\") over the reverse-dependency index of the preceding task. If the cause is something else, name it in the commit and apply the same shape: one derived index per session, looked up per match.\n- Epic criterion: `b697a3f7` REQ-22 (story `0672b087`).\n\n## Success Criteria\n\n- [hard] REQ-01: The work bulk update does per matched issue reads neighbours and state through indexes built once per session; no per-match step scans the full issue list. The commit names the profiled cause.\n- [hard] REQ-02: One test owns REQ-01 at the cheapest layer that observes it (for example, a per-match lookup count independent of repository size); no per-command duplicate.\n- [hard] REQ-03: Scenario (a) of the 45d0a971 harness reports tip s(2000)/s(500) ≤ 1.5 in a smoke run; the lead records the run's numbers.\n\n## Notes\n\n- Labelled for `16c53cc2` REQ-07 on the expected cause; the lead relabels if profiling names another cause.\n",
+  "dependencies": [],
+  "description": "Make bulk update's per-match cost independent of repository size, so `jit issue bulk-update` at a fixed match count no longer grows with the number of issues.\n\n## Background\n\n- The 45d0a971 cost harness (scenario (a)) measures the tip slope ratio s(2000)/s(500) at 4.17 (threshold ≤ 1.5; base 3.83). The tip is 25x cheaper per match than base `369d35a42` (0.37 / 1.56 ms against 9.2 / 35.2 ms), but its per-match cost still grows with N.\n- Invoker ruling: profile first; if graph rule evaluation is the cause, this is epic `16c53cc2` REQ-07, otherwise name the cause and apply one derived index per session, looked up per match. The profile names another cause (Rulings).\n- Epic criterion: `b697a3f7` REQ-22 (story `0672b087`).\n\n## Success Criteria\n\n- [hard] REQ-01: The work bulk update does per matched issue reads neighbours and state through indexes built once per session; no per-match step scans the full issue list. The commit names the profiled cause.\n- [hard] REQ-02: One test owns REQ-01 at the cheapest layer that observes it (for example, a per-match lookup count independent of repository size); no per-command duplicate.\n- [hard] REQ-03: Scenario (a) of the 45d0a971 harness reports tip s(2000)/s(500) ≤ 1.5 in a smoke run; the lead records the run's numbers.\n\n\n\n## Rulings\n\n- Profiled cause (45d0a971 callgrind, N = 2000, 11.4M instructions per extra match): `BulkDerivation::derive` → `derive_prechecked_field_update` (`crates/jit/src/commands/mod.rs` ~2022) → `derive_dependent_readiness` (~1735) → `derive_readiness_intents` (~1653) and `domain::queries::derive_readiness_corrections` (`crates/jit/src/domain/queries.rs` ~127). Each match rebuilds a `HashMap<IssueId, &Issue>` over all issues, clones the issue list, and re-runs `parse_issue_records` / `inspect_capability_path` over the captured set: O(N) per match, in memory. This is not graph rule evaluation, so per the invoker ruling the `16c53cc2` REQ-07 label and the dependency on e7635f2f are removed, and the fix is one derived index and one parsed issue set per session, read per match.\n\n",
   "documents": [],
   "first_ready_at": "2026-11-08T05:50:57.638527715Z",
   "gates_required": [
@@ -16,7 +15,6 @@
   "id": "6a19e93f-77da-4bf6-b3c2-a6de6929309b",
   "labels": [
     "component:core",
-    "satisfies:16c53cc2/REQ-07",
     "per:@/charter/D-20",
     "type:task",
     "epic:one-mutation-path",
@@ -26,7 +24,7 @@
     "per:@/charter/D-19"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Bulk update's per-match cost is independent of repository size",
-  "updated_at": "2026-11-08T05:51:08.739868728Z"
+  "updated_at": "2026-11-08T05:53:47.070645856Z"
 }
