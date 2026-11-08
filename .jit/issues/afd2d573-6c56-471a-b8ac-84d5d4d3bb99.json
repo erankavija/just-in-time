@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-08T02:32:08.532292096Z",
+  "context": {},
+  "created_at": "2026-11-08T00:51:48.851341972Z",
+  "dependencies": [],
+  "description": "Slow tests are refactored, never excused. 0b35be66's final whole-workspace run flagged one more unit test over the 2 s limit, which f487aeef would turn into a failing cargo-ci.\n\n## Background\n\nThe limits are the per-layer values in `dev/benchmarks/per-test-durations-1eb949a5/README.md`: 2 s for lib and bin targets, 6 s for `crates/*/tests/*` targets. In 0b35be66's run `after2` (2026-11-08 02:07, 1-minute load 2.13), `commands::bootstrap::tests::test_open_repository_replays_original_audit_before_recovered_write_policy` took 3.443 s; earlier runs measured 1.79 s and 1.84 s. The method and evidence format are in `dev/benchmarks/per-test-durations-1eb949a5/remeasure-0b35be66/README.md`.\n\n## Success Criteria\n\n- [hard] REQ-01: The test runs under the 2 s unit limit in a whole-workspace nextest run on a quiet host (1-minute load below 4), and a committed note under `dev/benchmarks/per-test-durations-1eb949a5/` records its measured duration before and after with the run's load.\n- [hard] REQ-02: The refactored test does not sleep or wait on wall-clock time to observe the property it owns.\n- [hard] REQ-03: The test still owns the property it owned before, at the same or a cheaper layer, with no weakened assertion, no ignored test and no deletion without the property moving to another owning test.\n\n## Notes\n\nIf the test cannot meet the limit without losing its property, report it as a blocking concern rather than raising the limit.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-08T00:51:48.851341972Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "afd2d573-6c56-471a-b8ac-84d5d4d3bb99",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:build-hygiene",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "in_progress",
+  "title": "Bring the bootstrap audit-replay test under the unit limit",
+  "updated_at": "2026-11-08T02:32:08.532292096Z"
+}

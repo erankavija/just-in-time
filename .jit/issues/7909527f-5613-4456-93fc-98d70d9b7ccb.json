@@ -1,0 +1,29 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-08T02:39:17.123891852Z",
+  "context": {},
+  "created_at": "2026-11-08T02:38:59.419133243Z",
+  "dependencies": [
+    "0b35be66-d62d-443d-ac86-91c906a6efea"
+  ],
+  "description": "Slow tests are refactored, never excused. 0b35be66's final whole-workspace run put three more unit tests within 25 % of the 2 s limit, close enough that f487aeef's enforced limits would fail cargo-ci at a load just under its loaded-host threshold.\n\n## Background\n\nThe limits are the per-layer values in `dev/benchmarks/per-test-durations-1eb949a5/README.md`: 2 s for lib and bin targets. In 0b35be66's run `after3` (2026-11-08 04:37, 1-minute load 3.93):\n\n- `storage::claim_coordinator::proptests::test_sequence_numbers_monotonic`: 1.739 s\n- `commands::gate_check::tests::test_repository_validation_records_a_repository_judged_wrong_as_a_failed_run`: 1.648 s\n- `commands::gate_check::tests::test_capture_gate_evaluation_image_holds_only_the_evaluated_issues_named_runs`: 1.620 s\n\n0b35be66 adds the shared mechanisms to reuse: a zero lock wait for contended claim proptests, and unsynced `JsonFileStorage` fixtures (`setup_unsynced_test_repo_with_config`, `unsynced_file_executor`). The method and evidence format are in `dev/benchmarks/per-test-durations-1eb949a5/remeasure-0b35be66/README.md`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the three tests runs under 1.5 s in a whole-workspace nextest run on a quiet host (1-minute load below 4), and a committed note under `dev/benchmarks/per-test-durations-1eb949a5/` records each one's duration before and after with the run's load.\n- [hard] REQ-02: No refactored test sleeps or waits on wall-clock time to observe the property it owns.\n- [hard] REQ-03: Each test still owns the property it owned before, at the same or a cheaper layer, with no weakened assertion, no reduced case count or generator range, no ignored test, and no deletion unless the property moves to another owning test.\n\n## Notes\n\nIf a test cannot meet the target without losing its property, report it as a blocking concern rather than raising a limit.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-08T02:38:59.419133243Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "7909527f-5613-4456-93fc-98d70d9b7ccb",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:build-hygiene",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Bring the three near-limit unit tests under 1.5 s",
+  "updated_at": "2026-11-08T02:39:17.123891852Z"
+}
