@@ -6,11 +6,13 @@
 
 use crate::domain::identity::GateKey;
 use crate::domain::identity::IssueId;
+use crate::domain::identity::IssueIdPrefix;
 use crate::domain::{
     is_dependency_met, Assignee, GateStatus, Issue, Priority, ReadinessCorrection, State,
 };
+use crate::graph::{DependencyGraph, Direction};
 use std::cmp::Reverse;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 /// Optional restrictions on all issues; every supplied filter must match.
 #[derive(Debug, Default, Clone)]
@@ -107,6 +109,389 @@ pub fn query_ready(issues: &[Issue]) -> Vec<Issue> {
         .collect()
 }
 
+/// Captured issues keyed by id over the session's [`DependencyGraph`], whose
+/// reverse index answers dependents, and by label, so a derivation over a few
+/// issues reads their neighbours and label holders without scanning the issue
+/// list. Records replaced since capture shadow the captured ones.
+pub struct IssueIndex<'a> {
+    captured: &'a [Issue],
+    positions: HashMap<IssueId, usize>,
+    /// Captured positions in id order, which is also normalised-id order, so
+    /// an id prefix resolves by binary search.
+    ordered: Vec<usize>,
+    graph: DependencyGraph<'a, Issue>,
+    replaced: HashMap<IssueId, Issue>,
+    /// Ids absent from the capture, in insertion order.
+    added: Vec<IssueId>,
+    /// Dependents gained by replaced records' dependency lists, which the
+    /// graph, built over the capture, lacks.
+    relinked: HashMap<IssueId, BTreeSet<IssueId>>,
+    /// Captured positions by label `(namespace, value)`, built on first use.
+    labels: std::cell::OnceCell<BTreeMap<(String, String), BTreeSet<usize>>>,
+    /// Holders gained by replaced records' labels, which `labels` lacks.
+    relabelled: BTreeMap<(String, String), BTreeSet<IssueId>>,
+}
+
+/// `label` split as `(namespace, value)`.
+fn label_parts(label: &str) -> Option<(&str, &str)> {
+    label.split_once(':')
+}
+
+impl<'a> IssueIndex<'a> {
+    pub fn new(captured: &'a [Issue]) -> Self {
+        let mut ordered = (0..captured.len()).collect::<Vec<_>>();
+        ordered.sort_by(|&left, &right| captured[left].id.cmp(&captured[right].id));
+        Self {
+            ordered,
+            captured,
+            positions: captured
+                .iter()
+                .enumerate()
+                .map(|(position, issue)| (issue.id.clone(), position))
+                .collect(),
+            graph: DependencyGraph::new(&captured.iter().collect::<Vec<_>>()),
+            replaced: HashMap::new(),
+            added: Vec::new(),
+            relinked: HashMap::new(),
+            labels: std::cell::OnceCell::new(),
+            relabelled: BTreeMap::new(),
+        }
+    }
+
+    /// Every issue: the captured ones in capture order, then the added ones.
+    pub fn issues(&self) -> impl Iterator<Item = &Issue> + '_ {
+        note_index_scan();
+        self.captured
+            .iter()
+            .map(|issue| self.replaced.get(&issue.id).unwrap_or(issue))
+            .chain(self.added.iter().filter_map(|id| self.replaced.get(id)))
+    }
+
+    pub fn get(&self, id: &IssueId) -> Option<&Issue> {
+        note_index_lookup();
+        self.replaced.get(id).or_else(|| self.captured_record(id))
+    }
+
+    fn captured_record(&self, id: &IssueId) -> Option<&'a Issue> {
+        self.positions
+            .get(id)
+            .map(|&position| &self.captured[position])
+    }
+
+    /// Insert `issue`, or replace the record with its id.
+    pub fn replace(&mut self, issue: Issue) {
+        let captured = self.captured_record(&issue.id);
+        issue
+            .dependencies
+            .iter()
+            .filter(|id| captured.is_none_or(|captured| !captured.dependencies.contains(id)))
+            .for_each(|id| {
+                self.relinked
+                    .entry(id.clone())
+                    .or_default()
+                    .insert(issue.id.clone());
+            });
+        issue
+            .labels
+            .iter()
+            .filter(|label| captured.is_none_or(|captured| !captured.labels.contains(label)))
+            .filter_map(|label| label_parts(label))
+            .for_each(|(namespace, value)| {
+                self.relabelled
+                    .entry((namespace.to_string(), value.to_string()))
+                    .or_default()
+                    .insert(issue.id.clone());
+            });
+        if captured.is_none() && !self.replaced.contains_key(&issue.id) {
+            self.added.push(issue.id.clone());
+        }
+        self.replaced.insert(issue.id.clone(), issue);
+    }
+
+    /// This index as it stands.
+    pub fn view(&self) -> IssueView<'_> {
+        self.with(&[])
+    }
+
+    /// This index with `replaced` records, the last for an id winning, in place
+    /// of or beside its own.
+    pub fn with<'v>(&'v self, replaced: &'v [Issue]) -> IssueView<'v> {
+        IssueView {
+            index: self,
+            replaced,
+        }
+    }
+
+    /// Ids that have depended on `id` in some record: a superset, since
+    /// [`IssueView::dependents`] rechecks each current record.
+    fn candidate_dependents(&self, id: &IssueId) -> impl Iterator<Item = &IssueId> + '_ {
+        self.graph
+            .get_dependents(id)
+            .into_iter()
+            .map(|issue| &issue.id)
+            .chain(self.relinked.get(id).into_iter().flatten())
+    }
+
+    /// Ids that have carried `namespace:value` (any value in `namespace` when
+    /// `value` is `None`) in some record: a superset, since
+    /// [`IssueView::labelled`] rechecks each current record.
+    fn candidate_holders(&self, namespace: &str, value: Option<&str>) -> Vec<&IssueId> {
+        let captured = self.labels.get_or_init(|| {
+            self.captured.iter().enumerate().fold(
+                BTreeMap::new(),
+                |mut holders, (position, issue)| {
+                    issue
+                        .labels
+                        .iter()
+                        .filter_map(|label| label_parts(label))
+                        .for_each(|(namespace, value)| {
+                            holders
+                                .entry((namespace.to_string(), value.to_string()))
+                                .or_default()
+                                .insert(position);
+                        });
+                    holders
+                },
+            )
+        });
+        let in_scope = |key_namespace: &str, key_value: &str| {
+            key_namespace == namespace && value.is_none_or(|value| key_value == value)
+        };
+        let start = (namespace.to_string(), value.unwrap_or_default().to_string());
+        let relabelled = self
+            .relabelled
+            .range(start.clone()..)
+            .take_while(|((key_namespace, key_value), _)| in_scope(key_namespace, key_value))
+            .flat_map(|(_, ids)| ids);
+        captured
+            .range(start..)
+            .take_while(|((key_namespace, key_value), _)| in_scope(key_namespace, key_value))
+            .flat_map(|(_, positions)| {
+                positions
+                    .iter()
+                    .map(|&position| &self.captured[position].id)
+            })
+            .chain(relabelled)
+            .collect()
+    }
+}
+
+/// An [`IssueIndex`] read through a few replaced records, which cost each read
+/// at most a pass over them.
+#[derive(Clone, Copy)]
+pub struct IssueView<'a> {
+    index: &'a IssueIndex<'a>,
+    replaced: &'a [Issue],
+}
+
+impl<'a> IssueView<'a> {
+    pub fn index(&self) -> &'a IssueIndex<'a> {
+        self.index
+    }
+
+    pub fn replaced(&self) -> &'a [Issue] {
+        self.replaced
+    }
+
+    pub fn get(&self, id: &IssueId) -> Option<&'a Issue> {
+        self.replaced
+            .iter()
+            .rev()
+            .find(|issue| &issue.id == id)
+            .or_else(|| self.index.get(id))
+    }
+
+    /// Every issue: the index's in its order, then the replaced records it
+    /// lacks.
+    pub fn issues(&self) -> impl Iterator<Item = &'a Issue> + 'a {
+        let view = *self;
+        let added = self
+            .replaced
+            .iter()
+            .enumerate()
+            .filter(move |(position, issue)| {
+                !view.index.positions.contains_key(&issue.id)
+                    && !view.index.replaced.contains_key(&issue.id)
+                    && !view.replaced[position + 1..]
+                        .iter()
+                        .any(|later| later.id == issue.id)
+            })
+            .map(|(_, issue)| issue);
+        self.index
+            .issues()
+            .filter_map(move |issue| view.get(&issue.id))
+            .chain(added)
+    }
+
+    /// The ids of the issues whose dependency list names `id`.
+    pub fn dependents(&self, id: &IssueId) -> BTreeSet<&'a IssueId> {
+        note_index_lookup();
+        let view = *self;
+        let depends = move |issue: &Issue| issue.dependencies.contains(id);
+        self.index
+            .candidate_dependents(id)
+            .filter(|dependent| view.get(dependent).is_some_and(depends))
+            .chain(
+                self.replaced
+                    .iter()
+                    .filter(|issue| depends(issue))
+                    .map(|issue| &issue.id),
+            )
+            .collect()
+    }
+
+    /// The issues `prefix` names, in id order.
+    pub fn resolve_prefix(&self, prefix: &IssueIdPrefix) -> Vec<&'a Issue> {
+        note_index_lookup();
+        let index = self.index;
+        let wanted = prefix.normalised().as_bytes();
+        let start = index.ordered.partition_point(|&position| {
+            index.captured[position]
+                .id
+                .as_str()
+                .bytes()
+                .filter(|byte| *byte != b'-')
+                .take(wanted.len())
+                .lt(wanted.iter().copied())
+        });
+        index.ordered[start..]
+            .iter()
+            .map(|&position| &index.captured[position].id)
+            .take_while(|id| prefix.matches(id))
+            .chain(index.added.iter().filter(|id| prefix.matches(id)))
+            .chain(
+                self.replaced
+                    .iter()
+                    .map(|issue| &issue.id)
+                    .filter(|id| prefix.matches(id)),
+            )
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .filter_map(|id| self.get(id))
+            .collect()
+    }
+
+    /// The issues `start` reaches along dependency edges in `direction`, each
+    /// once and without `start`; a reached issue `admits` rejects is dropped
+    /// and not walked through.
+    pub fn reach<'s>(
+        &self,
+        start: &'s IssueId,
+        direction: Direction,
+        admits: impl Fn(&Issue) -> bool,
+    ) -> Vec<&'a Issue>
+    where
+        'a: 's,
+    {
+        let neighbours = |id: &IssueId| -> Vec<&'a IssueId> {
+            match direction {
+                Direction::Dependencies => self
+                    .get(id)
+                    .map(|issue| issue.dependencies.iter().collect())
+                    .unwrap_or_default(),
+                Direction::Dependents => self.dependents(id).into_iter().collect(),
+            }
+        };
+        let mut visited = HashSet::<&'s IssueId>::from([start]);
+        let mut stack = neighbours(start);
+        let mut reached = Vec::new();
+        while let Some(id) = stack.pop() {
+            if !visited.insert(id) {
+                continue;
+            }
+            if let Some(issue) = self.get(id).filter(|issue| admits(issue)) {
+                reached.push(issue);
+                stack.extend(neighbours(id));
+            }
+        }
+        reached
+    }
+
+    /// The issues carrying `namespace:value`, or any label in `namespace` when
+    /// `value` is `None`, in id order.
+    pub fn labelled(&self, namespace: &str, value: Option<&str>) -> Vec<&'a Issue> {
+        note_index_lookup();
+        let carries = |issue: &Issue| {
+            issue
+                .labels
+                .iter()
+                .filter_map(|label| label_parts(label))
+                .any(|(key_namespace, key_value)| {
+                    key_namespace == namespace && value.is_none_or(|value| key_value == value)
+                })
+        };
+        self.index
+            .candidate_holders(namespace, value)
+            .into_iter()
+            .chain(self.replaced.iter().map(|issue| &issue.id))
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .filter_map(|id| self.get(id))
+            .filter(|issue| carries(issue))
+            .collect()
+    }
+
+    /// `issue`'s dependencies that resolve to an issue, keyed by id.
+    pub fn resolve_dependencies(&self, issue: &Issue) -> HashMap<IssueId, &'a Issue> {
+        issue
+            .dependencies
+            .iter()
+            .filter_map(|id| self.get(id).map(|dependency| (id.clone(), dependency)))
+            .collect()
+    }
+}
+
+/// [`IssueIndex`] reads on the current thread: keyed lookups, and passes over
+/// every indexed issue.
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct IndexReads {
+    pub(crate) lookups: usize,
+    pub(crate) scans: usize,
+}
+
+#[cfg(test)]
+thread_local! {
+    static INDEX_READS: std::cell::Cell<IndexReads> = const {
+        std::cell::Cell::new(IndexReads { lookups: 0, scans: 0 })
+    };
+}
+
+/// `run`'s result and the [`IssueIndex`] reads it made on this thread.
+#[cfg(test)]
+pub(crate) fn count_index_reads<T>(run: impl FnOnce() -> T) -> (T, IndexReads) {
+    let before = INDEX_READS.with(std::cell::Cell::get);
+    let value = run();
+    let after = INDEX_READS.with(std::cell::Cell::get);
+    (
+        value,
+        IndexReads {
+            lookups: after.lookups - before.lookups,
+            scans: after.scans - before.scans,
+        },
+    )
+}
+
+fn note_index_lookup() {
+    #[cfg(test)]
+    INDEX_READS.with(|reads| {
+        reads.set(IndexReads {
+            lookups: reads.get().lookups + 1,
+            ..reads.get()
+        })
+    });
+}
+
+fn note_index_scan() {
+    #[cfg(test)]
+    INDEX_READS.with(|reads| {
+        reads.set(IndexReads {
+            scans: reads.get().scans + 1,
+            ..reads.get()
+        })
+    });
+}
+
 /// The issues [`derive_readiness_corrections`] re-derives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadinessScope {
@@ -129,31 +514,85 @@ pub fn derive_readiness_corrections(
     after: &[Issue],
     scope: ReadinessScope,
 ) -> Vec<(IssueId, ReadinessCorrection)> {
-    let prior = build_issue_map(before);
-    let resolved = build_issue_map(after);
-    let is_retired_or_reopened = |id: &IssueId| match (prior.get(id), resolved.get(id)) {
-        (Some(old), Some(new)) => old.effective_terminal_state() != new.effective_terminal_state(),
-        (Some(_), None) => true,
-        (None, _) => false,
-    };
-    let is_admitted = |issue: &Issue| {
-        scope == ReadinessScope::All
-            || prior.get(&issue.id).is_none_or(|old| {
-                old.dependencies != issue.dependencies
-                    || issue.dependencies.iter().any(is_retired_or_reopened)
-            })
-    };
-    let mut corrections = after
-        .iter()
-        .filter(|issue| is_admitted(issue))
-        .filter_map(|issue| {
-            issue
-                .derive_readiness_correction(&resolved)
-                .map(|correction| (issue.id.clone(), correction))
+    derive_indexed_readiness_corrections(before, IssueIndex::new(after).view(), scope)
+}
+
+/// [`derive_readiness_corrections`] over an indexed `after`.
+pub fn derive_indexed_readiness_corrections(
+    before: &[Issue],
+    after: IssueView<'_>,
+    scope: ReadinessScope,
+) -> Vec<(IssueId, ReadinessCorrection)> {
+    match scope {
+        ReadinessScope::All => correct_readiness(
+            after,
+            after
+                .issues()
+                .map(|issue| issue.id.clone())
+                .collect::<BTreeSet<_>>(),
+        ),
+        ReadinessScope::Affected => {
+            let prior = build_issue_map(before);
+            let current = after
+                .issues()
+                .map(|issue| (&issue.id, prior.get(&issue.id).copied()));
+            let removed = before
+                .iter()
+                .filter(|issue| after.get(&issue.id).is_none())
+                .map(|issue| (&issue.id, Some(issue)));
+            derive_changed_readiness_corrections(after, current.chain(removed))
+        }
+    }
+}
+
+/// The readiness corrections `after` demands once each `(id, prior)` change
+/// replaced `prior`, the record it held (`None` for a new issue), with
+/// `after`'s record for `id` (none for a removed issue), ordered by issue id.
+///
+/// Each change re-derives its issue when it is new or its dependency list
+/// changed, and its direct dependents when its effective terminal state changed
+/// or it was removed, so the work is bounded by the changes' neighbourhoods.
+pub fn derive_changed_readiness_corrections<'p>(
+    after: IssueView<'_>,
+    changes: impl IntoIterator<Item = (&'p IssueId, Option<&'p Issue>)>,
+) -> Vec<(IssueId, ReadinessCorrection)> {
+    let admitted = changes
+        .into_iter()
+        .flat_map(|(id, prior)| {
+            let current = after.get(id);
+            let rederives_issue = current.is_some_and(|current| {
+                prior.is_none_or(|prior| prior.dependencies != current.dependencies)
+            });
+            let rederives_dependents = prior.is_some_and(|prior| {
+                current.is_none_or(|current| {
+                    prior.effective_terminal_state() != current.effective_terminal_state()
+                })
+            });
+            rederives_issue.then(|| id.clone()).into_iter().chain(
+                rederives_dependents
+                    .then(|| after.dependents(id))
+                    .into_iter()
+                    .flatten()
+                    .cloned(),
+            )
         })
-        .collect::<Vec<_>>();
-    corrections.sort_by(|(left, _), (right, _)| left.cmp(right));
-    corrections
+        .collect::<BTreeSet<_>>();
+    correct_readiness(after, admitted)
+}
+
+fn correct_readiness(
+    after: IssueView<'_>,
+    admitted: BTreeSet<IssueId>,
+) -> Vec<(IssueId, ReadinessCorrection)> {
+    admitted
+        .into_iter()
+        .filter_map(|id| {
+            let issue = after.get(&id)?;
+            issue
+                .derive_readiness_correction(&after.resolve_dependencies(issue))
+                .map(|correction| (id, correction))
+        })
+        .collect()
 }
 
 /// A typed reason explaining why an issue is blocked.
@@ -1548,7 +1987,143 @@ mod tests {
         }
     }
 
+    /// The ids `start` reaches in `issues` along `direction`, by fixpoint.
+    fn reference_closure<'a>(
+        issues: &'a [Issue],
+        start: &IssueId,
+        direction: Direction,
+    ) -> BTreeSet<&'a IssueId> {
+        let linked = |from: &IssueId, to: &Issue| match direction {
+            Direction::Dependencies => issues
+                .iter()
+                .any(|issue| &issue.id == from && issue.dependencies.contains(&to.id)),
+            Direction::Dependents => to.dependencies.contains(from),
+        };
+        let mut reached: BTreeSet<&'a IssueId> = BTreeSet::new();
+        loop {
+            let next = issues
+                .iter()
+                .filter(|issue| &issue.id != start)
+                .filter(|issue| {
+                    linked(start, issue) || reached.iter().any(|from| linked(from, issue))
+                })
+                .map(|issue| &issue.id)
+                .collect::<BTreeSet<_>>();
+            if next == reached {
+                return reached;
+            }
+            reached = next;
+        }
+    }
+
     proptest! {
+        #[test]
+        fn test_issue_index_read_through_replacements_agrees_with_the_records_it_stands_for(
+            nodes in proptest::collection::vec(
+                (
+                    0..State::ALL.len(),
+                    0..State::ALL.len(),
+                    proptest::collection::vec(0usize..16, 0..4),
+                ),
+                1..12,
+            ),
+            edits in proptest::collection::vec(
+                (0u8..3, 0usize..16, 0usize..16, 0..State::ALL.len(), any::<bool>()),
+                1..4,
+            ),
+            relabels in proptest::collection::vec(0usize..4, 12),
+        ) {
+            let label = |n: usize| format!("ns{}:v{}", n % 2, n % 3);
+            let before = coherent_issues(&nodes)
+                .into_iter()
+                .enumerate()
+                .map(|(index, issue)| Issue { labels: vec![label(index)], ..issue })
+                .collect::<Vec<_>>();
+            let after = edits
+                .into_iter()
+                .fold(before.clone(), |issues, edit| edit_issues(issues, edit).0)
+                .into_iter()
+                .zip(&relabels)
+                .map(|(issue, &relabel)| match relabel {
+                    0 => Issue { labels: vec![label(relabel + 4)], ..issue },
+                    _ => issue,
+                })
+                .collect::<Vec<_>>();
+            let prior = build_issue_map(&before);
+            let replaced = after
+                .iter()
+                .filter(|issue| prior.get(&issue.id) != Some(issue))
+                .cloned()
+                .collect::<Vec<_>>();
+            let base = IssueIndex::new(&before);
+            let mut owned = IssueIndex::new(&before);
+            replaced
+                .iter()
+                .for_each(|issue| owned.replace(issue.clone()));
+            let expected =
+                derive_readiness_corrections(&before, &after, ReadinessScope::Affected);
+
+            for view in [base.with(&replaced), owned.view()] {
+                prop_assert_eq!(view.issues().collect::<Vec<_>>(), after.iter().collect::<Vec<_>>());
+                for target in &before {
+                    let dependents = after
+                        .iter()
+                        .filter(|issue| issue.dependencies.contains(&target.id))
+                        .map(|issue| &issue.id)
+                        .collect::<BTreeSet<_>>();
+                    prop_assert_eq!(view.dependents(&target.id), dependents);
+                    for direction in [Direction::Dependencies, Direction::Dependents] {
+                        let reached = view
+                            .reach(&target.id, direction, |_| true)
+                            .into_iter()
+                            .map(|issue| &issue.id)
+                            .collect::<BTreeSet<_>>();
+                        prop_assert_eq!(reached, reference_closure(&after, &target.id, direction));
+                    }
+                    for (namespace, value) in [("ns0", None), ("ns1", Some("v1")), ("ns0", Some("v2"))] {
+                        let carriers = after
+                            .iter()
+                            .filter(|issue| {
+                                issue.labels.iter().any(|label| {
+                                    label.split_once(':').is_some_and(|(key, held)| {
+                                        key == namespace && value.is_none_or(|value| held == value)
+                                    })
+                                })
+                            })
+                            .map(|issue| &issue.id)
+                            .collect::<BTreeSet<_>>();
+                        prop_assert_eq!(
+                            view.labelled(namespace, value)
+                                .into_iter()
+                                .map(|issue| &issue.id)
+                                .collect::<BTreeSet<_>>(),
+                            carriers
+                        );
+                    }
+                    let prefix = IssueIdPrefix::try_from(&target.id.as_str()[..10]).unwrap();
+                    let named = after
+                        .iter()
+                        .filter(|issue| prefix.matches(&issue.id))
+                        .map(|issue| &issue.id)
+                        .collect::<BTreeSet<_>>();
+                    prop_assert_eq!(
+                        view.resolve_prefix(&prefix)
+                            .into_iter()
+                            .map(|issue| &issue.id)
+                            .collect::<BTreeSet<_>>(),
+                        named
+                    );
+                }
+                let changes = replaced
+                    .iter()
+                    .map(|issue| (&issue.id, prior.get(&issue.id).copied()));
+                prop_assert_eq!(
+                    &derive_changed_readiness_corrections(view, changes),
+                    &expected
+                );
+            }
+        }
+
         #[test]
         fn test_derive_readiness_corrections_affected_scope_restores_coherence_after_one_edit(
             nodes in proptest::collection::vec(

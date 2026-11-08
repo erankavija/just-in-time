@@ -13,7 +13,7 @@
 //!   declared somewhere in a configurable scope.
 //! - **`dependency-shape`** — issues matching a rule's selector must (or should)
 //!   depend on at least one issue matching a target selector, evaluated over the
-//!   dependency DAG via [`DependencyGraph`].
+//!   dependency DAG through the [`IssueView`] neighbour index.
 //! - **`gate-recency`** — an issue's recorded gate results must be no older than
 //!   a configured age, computed against `GateState.updated_at` and an injected
 //!   `now` (the engine never reads wall-clock).
@@ -47,11 +47,12 @@ use crate::domain::item::{
     parse_kind_segmented_address, text_after_checkbox, AddressScope, PROJECT_SCOPE_SENTINEL,
 };
 use crate::domain::projection::project;
+use crate::domain::queries::{IssueIndex, IssueView};
 use crate::domain::type_taxonomy::{
     validate_orphans, validate_strategic_labels, HierarchyConfig, ValidationWarning,
 };
 use crate::domain::{ContentFormat, Issue};
-use crate::graph::DependencyGraph;
+use crate::graph::Direction;
 use std::collections::HashMap;
 
 use crate::declarations::rules::{
@@ -290,8 +291,9 @@ pub fn evaluate_graph(
     now: DateTime<Utc>,
     plan_content: &HashMap<IssueId, String>,
 ) -> Vec<GraphFinding> {
+    let index = IssueIndex::new(issues);
     let context = GraphEvaluationContext {
-        graph_context: issues,
+        issues: index.view(),
         hierarchy,
         repo_default_format,
         now,
@@ -357,10 +359,11 @@ pub fn select_graph_rule<'a>(
 }
 
 /// Repository context supplied to pure graph evaluation.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct GraphEvaluationContext<'a> {
-    /// Issues available to relationship and declaration-aware assertions.
-    pub graph_context: &'a [Issue],
+    /// Issues available to relationship and declaration-aware assertions,
+    /// whose neighbours resolve through the index.
+    pub issues: IssueView<'a>,
     /// Repository hierarchy used by type-hierarchy assertions.
     pub hierarchy: &'a HierarchyConfig,
     /// Default content format used for criteria parsing.
@@ -382,15 +385,15 @@ fn evaluate_one(
             rule,
             config,
             firing_issues,
-            context.graph_context,
+            context.issues,
             context.repo_default_format,
             context.plan_content,
         ),
         Assertion::LabelReference { config } => {
-            evaluate_label_reference(rule, config, firing_issues, context.graph_context)
+            evaluate_label_reference(rule, config, firing_issues, context.issues)
         }
         Assertion::DependencyShape { config } => {
-            evaluate_dependency_shape(rule, config, firing_issues, context.graph_context)
+            evaluate_dependency_shape(rule, config, firing_issues, context.issues)
         }
         Assertion::GateRecency {
             max_age_hours,
@@ -580,7 +583,7 @@ fn evaluate_label_coverage(
     rule: &Rule,
     config: &LabelCoverageConfig,
     firing_issues: &[Issue],
-    graph_context: &[Issue],
+    graph_context: IssueView<'_>,
     repo_default_format: ContentFormat,
     plan_content: &HashMap<IssueId, String>,
 ) -> Vec<GraphFinding> {
@@ -671,8 +674,13 @@ fn evaluate_label_coverage(
                 Ok(ids) => ids,
                 Err(err) => return vec![config_error(rule, &source.id, err.to_string())],
             };
-            let candidates: Vec<&Issue> =
-                children_of(container, graph_context, child_link, &exclude_types);
+            let candidates: Vec<&Issue> = children_of(
+                container,
+                graph_context,
+                child_link,
+                &exclude_types,
+                satisfies_ns,
+            );
             criteria
                 .into_iter()
                 .filter(move |id| {
@@ -774,7 +782,7 @@ fn type_is_excluded(issue: &Issue, excluded: &BTreeSet<String>) -> bool {
 /// The candidate child issues for a source under the given link semantics,
 /// walked **transitively** through the dependency DAG.
 ///
-/// For the directional links the walk is a breadth-first closure: from `source`
+/// For the directional links the walk is a transitive closure: from `source`
 /// it follows dependency edges in the link's direction (`Dependents` = issues
 /// that depend on the frontier; `Dependencies` = issues the frontier depends on)
 /// and keeps descending. This lets a `label-coverage` rule credit a satisfying
@@ -788,59 +796,26 @@ fn type_is_excluded(issue: &Issue, excluded: &BTreeSet<String>) -> bool {
 /// `type:breakdown` node, so coverage collects exactly the impl interior between
 /// the container and the breakdown node.
 ///
-/// `ChildLink::Any` has no traversal notion — it returns every other issue as a
-/// candidate — but excluded types are still dropped from the candidate set.
+/// `ChildLink::Any` has no traversal notion: it returns every other issue
+/// carrying a label in `credit_namespace`, the only issues that can credit a
+/// criterion, and still drops excluded types.
 fn children_of<'a>(
     source: &Issue,
-    issues: &'a [Issue],
+    issues: IssueView<'a>,
     link: ChildLink,
     exclude_types: &BTreeSet<String>,
+    credit_namespace: &str,
 ) -> Vec<&'a Issue> {
-    if link == ChildLink::Any {
-        return issues
-            .iter()
-            .filter(|i| i.id != source.id && !type_is_excluded(i, exclude_types))
-            .collect();
+    let admits = |issue: &Issue| !type_is_excluded(issue, exclude_types);
+    match link {
+        ChildLink::Any => issues
+            .labelled(credit_namespace, None)
+            .into_iter()
+            .filter(|issue| issue.id != source.id && admits(issue))
+            .collect(),
+        ChildLink::Dependents => issues.reach(&source.id, Direction::Dependents, admits),
+        ChildLink::Dependencies => issues.reach(&source.id, Direction::Dependencies, admits),
     }
-
-    // Index issues by id for O(1) neighbour resolution during the walk.
-    let by_id: HashMap<&IssueId, &Issue> = issues.iter().map(|i| (&i.id, i)).collect();
-
-    // Neighbours of `node` in the link's direction.
-    let neighbours = |node: &Issue| -> Vec<&'a Issue> {
-        match link {
-            ChildLink::Dependents => issues
-                .iter()
-                .filter(|i| i.dependencies.contains(&node.id))
-                .collect(),
-            ChildLink::Dependencies => node
-                .dependencies
-                .iter()
-                .filter_map(|dep| by_id.get(dep).copied())
-                .collect(),
-            ChildLink::Any => Vec::new(), // handled above
-        }
-    };
-
-    let mut visited: BTreeSet<&IssueId> = BTreeSet::new();
-    visited.insert(&source.id);
-    let mut frontier: Vec<&Issue> = neighbours(source);
-    let mut candidates: Vec<&Issue> = Vec::new();
-
-    while let Some(node) = frontier.pop() {
-        if !visited.insert(&node.id) {
-            continue;
-        }
-        // An excluded-type node is neither a candidate nor a path to descend
-        // through: it is the traversal boundary.
-        if type_is_excluded(node, exclude_types) {
-            continue;
-        }
-        candidates.push(node);
-        frontier.extend(neighbours(node));
-    }
-
-    candidates
 }
 
 // ---------------------------------------------------------------------------
@@ -857,30 +832,29 @@ fn evaluate_label_reference(
     rule: &Rule,
     config: &LabelReferenceConfig,
     firing_issues: &[Issue],
-    graph_context: &[Issue],
+    graph_context: IssueView<'_>,
 ) -> Vec<GraphFinding> {
     let (from_ns, to_ns, scope) = (&config.from, &config.to, config.scope());
-
-    // Globally declared source ids (the `to` namespace values across all issues).
-    let global_sources: BTreeSet<&str> = graph_context
-        .iter()
-        .flat_map(|i| values_in_namespace(i, to_ns))
-        .collect();
 
     firing_issues
         .iter()
         .filter(|issue| rule.when.matches(issue))
         .flat_map(|issue| {
-            let allowed: BTreeSet<&str> = if scope == LabelReferenceScope::Linked {
-                linked_issues(issue, graph_context)
+            let linked: BTreeSet<&str> = match scope {
+                LabelReferenceScope::Linked => linked_issues(issue, graph_context)
                     .into_iter()
                     .flat_map(|i| values_in_namespace(i, to_ns))
-                    .collect()
-            } else {
-                global_sources.clone()
+                    .collect(),
+                LabelReferenceScope::Global => BTreeSet::new(),
+            };
+            let is_declared = move |value: &str| match scope {
+                LabelReferenceScope::Linked => linked.contains(value),
+                LabelReferenceScope::Global => {
+                    !graph_context.labelled(to_ns, Some(value)).is_empty()
+                }
             };
             values_in_namespace(issue, from_ns)
-                .filter(move |value| !allowed.contains(value))
+                .filter(move |value| !is_declared(value))
                 .map(move |value| {
                     issue_finding(
                         rule,
@@ -912,12 +886,12 @@ enum ContainerMatch<'a> {
 /// ([`Scope::parse`](crate::domain::item::Scope::parse)). Two issues sharing a
 /// short id are ambiguous: the `brackets:<C-short-id>` convention must surface
 /// a collision, never silently resolve the first match.
-fn resolve_container<'a>(value: &str, issues: &'a [Issue]) -> ContainerMatch<'a> {
+fn resolve_container<'a>(value: &str, issues: IssueView<'a>) -> ContainerMatch<'a> {
     let Ok(crate::domain::item::Scope::Issue(prefix)) = crate::domain::item::Scope::parse(value)
     else {
         return ContainerMatch::None;
     };
-    let mut matches = issues.iter().filter(|i| prefix.matches(&i.id));
+    let mut matches = issues.resolve_prefix(&prefix).into_iter();
     match (matches.next(), matches.next()) {
         (Some(c), None) => ContainerMatch::Unique(c),
         (Some(_), Some(_)) => ContainerMatch::Ambiguous,
@@ -935,14 +909,15 @@ fn values_in_namespace<'a>(issue: &'a Issue, namespace: &'a str) -> impl Iterato
 }
 
 /// Issues linked to `issue` by a dependency edge in either direction.
-fn linked_issues<'a>(issue: &Issue, issues: &'a [Issue]) -> Vec<&'a Issue> {
-    issues
+fn linked_issues<'a>(issue: &Issue, issues: IssueView<'a>) -> Vec<&'a Issue> {
+    issue
+        .dependencies
         .iter()
-        .filter(|other| {
-            other.id != issue.id
-                && (issue.dependencies.contains(&other.id)
-                    || other.dependencies.contains(&issue.id))
-        })
+        .chain(issues.dependents(&issue.id))
+        .filter(|id| **id != issue.id)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .filter_map(|id| issues.get(id))
         .collect()
 }
 
@@ -963,25 +938,15 @@ fn evaluate_dependency_shape(
     rule: &Rule,
     config: &DependencyShapeConfig,
     firing_issues: &[Issue],
-    graph_context: &[Issue],
+    graph_context: IssueView<'_>,
 ) -> Vec<GraphFinding> {
     let target = &config.target;
     let transitive = config.is_transitive();
 
-    // Set of issue ids matching the target selector.
-    let target_ids: BTreeSet<&IssueId> = graph_context
-        .iter()
-        .filter(|i| target.matches(i))
-        .map(|i| &i.id)
-        .collect();
-
-    let node_refs: Vec<&Issue> = graph_context.iter().collect();
-    let graph = DependencyGraph::new(&node_refs);
-
     firing_issues
         .iter()
         .filter(|source| rule.when.matches(source))
-        .filter(|source| !depends_on_target(source, &target_ids, transitive, &graph))
+        .filter(|source| !depends_on_target(source, target, transitive, graph_context))
         .map(|source| {
             issue_finding(
                 rule,
@@ -996,25 +961,25 @@ fn evaluate_dependency_shape(
         .collect()
 }
 
-/// Whether `source` depends on any target id, directly or (when `transitive`)
-/// through the dependency DAG.
+/// Whether `source` depends on an issue `target` matches, directly or (when
+/// `transitive`) through the dependency DAG.
 fn depends_on_target(
     source: &Issue,
-    target_ids: &BTreeSet<&IssueId>,
+    target: &crate::declarations::rules::Selector,
     transitive: bool,
-    graph: &DependencyGraph<'_, Issue>,
+    issues: IssueView<'_>,
 ) -> bool {
-    if source.dependencies.iter().any(|d| target_ids.contains(d)) {
-        return true;
+    match transitive {
+        false => source
+            .dependencies
+            .iter()
+            .filter_map(|id| issues.get(id))
+            .any(|dependency| target.matches(dependency)),
+        true => issues
+            .reach(&source.id, Direction::Dependencies, |_| true)
+            .into_iter()
+            .any(|dependency| target.matches(dependency)),
     }
-    if !transitive {
-        return false;
-    }
-    // A transitive dependency of `source` is, in this graph, an issue for which
-    // `source` is a transitive dependent.
-    target_ids
-        .iter()
-        .any(|target| !graph.find_shortest_path(&source.id, target).is_empty())
 }
 
 // ---------------------------------------------------------------------------

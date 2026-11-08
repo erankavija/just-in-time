@@ -805,7 +805,7 @@ impl<'a> CapturedGraphEvidence<'a> {
         &self,
         rules: &[&crate::declarations::rules::Rule],
         firing_issues: &[Issue],
-        issues: &[Issue],
+        issues: crate::domain::queries::IssueView<'_>,
     ) -> Result<Vec<crate::validation::graph::GraphFinding>> {
         let config = self.declarations.config();
         let namespaces = crate::config_manager::namespaces_from_config(config);
@@ -815,7 +815,7 @@ impl<'a> CapturedGraphEvidence<'a> {
             rules,
             firing_issues,
             &crate::validation::graph::GraphEvaluationContext {
-                graph_context: issues,
+                issues,
                 hierarchy: &hierarchy,
                 repo_default_format: config.content_format(),
                 now: self.context.timestamp(),
@@ -826,7 +826,7 @@ impl<'a> CapturedGraphEvidence<'a> {
 }
 
 struct CapturedTransitionEvidence<'a> {
-    issues: &'a [Issue],
+    issues: crate::domain::queries::IssueView<'a>,
     graph: &'a CapturedGraphEvidence<'a>,
 }
 
@@ -1088,10 +1088,8 @@ fn derive_state_target(
     if requested != State::Done || !issue.has_unpassed_gates() {
         return Ok((requested, None));
     }
-    let blockers = issue::blocking_dependencies(
-        issue,
-        &crate::domain::queries::build_issue_map(evidence.issues),
-    );
+    let blockers =
+        issue::blocking_dependencies(issue, &evidence.issues.resolve_dependencies(issue));
     if !blockers.is_empty() {
         return Err(crate::errors::TransitionBlockedError::dependencies(
             issue.id.clone(),
@@ -1464,10 +1462,8 @@ fn derive_state_transition(
     }
 
     if matches!(target, State::Ready | State::Done) {
-        let blockers = issue::blocking_dependencies(
-            &issue,
-            &crate::domain::queries::build_issue_map(evidence.issues),
-        );
+        let blockers =
+            issue::blocking_dependencies(&issue, &evidence.issues.resolve_dependencies(&issue));
         if !blockers.is_empty() {
             return Err(crate::errors::TransitionBlockedError::dependencies(
                 issue.id.clone(),
@@ -1503,35 +1499,19 @@ fn derive_state_transition(
             .filter(|rule| rule.when.matches(&projected))
             .collect::<Vec<_>>();
         if !rules.is_empty() {
-            let refs = evidence.issues.iter().collect::<Vec<_>>();
-            let graph = DependencyGraph::new(&refs);
-            let mut ids = HashSet::from([projected.id.clone()]);
-            ids.extend(
-                graph
-                    .get_transitive_dependents(&projected.id)
-                    .into_iter()
-                    .map(|candidate| candidate.id.clone()),
-            );
-            ids.extend(
-                graph
-                    .get_transitive_dependencies(&projected.id)
-                    .into_iter()
-                    .map(|candidate| candidate.id.clone()),
-            );
-            let projected_issues = evidence
+            use crate::graph::Direction;
+
+            let replaced = evidence
                 .issues
+                .replaced()
                 .iter()
-                .map(|candidate| {
-                    if candidate.id == projected.id {
-                        projected.clone()
-                    } else {
-                        candidate.clone()
-                    }
-                })
+                .chain(std::iter::once(&projected))
+                .cloned()
                 .collect::<Vec<_>>();
-            let slice = projected_issues
-                .iter()
-                .filter(|candidate| ids.contains(&candidate.id))
+            let projected_issues = evidence.issues.index().with(&replaced);
+            let slice = std::iter::once(&projected)
+                .chain(projected_issues.reach(&projected.id, Direction::Dependents, |_| true))
+                .chain(projected_issues.reach(&projected.id, Direction::Dependencies, |_| true))
                 .cloned()
                 .collect::<Vec<_>>();
             let strictness = evidence.graph.declarations.config().strictness();
@@ -1542,7 +1522,7 @@ fn derive_state_transition(
                 .collect::<HashSet<_>>();
             let findings = evidence
                 .graph
-                .evaluate_graph(&rules, &slice, &projected_issues)?;
+                .evaluate_graph(&rules, &slice, projected_issues)?;
             let mut blocking = Vec::new();
             for finding in findings {
                 let config_error = finding.is_config_error();
@@ -1647,38 +1627,46 @@ impl DerivedReadiness {
     }
 }
 
-/// Map readiness corrections to intents for `scope`. Promotions pass graph
-/// rules; refusals record `transition_blocked` and keep the record, while
-/// demotions apply directly.
+/// Map readiness corrections to intents for `scope`.
 fn derive_readiness_intents(
     base: &[Issue],
     projected: &[Issue],
     graph: &CapturedGraphEvidence<'_>,
     scope: ReadinessScope,
 ) -> Result<DerivedReadiness> {
-    use crate::domain::queries::derive_readiness_corrections;
+    let index = crate::domain::queries::IssueIndex::new(projected);
+    let corrections =
+        crate::domain::queries::derive_indexed_readiness_corrections(base, index.view(), scope);
+    derive_corrected_readiness(index.view(), corrections, graph)
+}
+
+/// Map `corrections` of `projected` to intents. Promotions pass graph rules;
+/// refusals record `transition_blocked` and keep the record, while demotions
+/// apply directly.
+fn derive_corrected_readiness(
+    projected: crate::domain::queries::IssueView<'_>,
+    corrections: Vec<(IssueId, ReadinessCorrection)>,
+    graph: &CapturedGraphEvidence<'_>,
+) -> Result<DerivedReadiness> {
     use crate::repository_state::MutationIntent;
 
-    let mut issues = projected.to_vec();
+    let mut corrected_issues = projected.replaced().to_vec();
     let mut events = Vec::new();
     let mut updates = Vec::new();
     let mut error_after_apply = None;
-    for (id, correction) in derive_readiness_corrections(base, projected, scope) {
-        let position = issues
-            .iter()
-            .position(|issue| issue.id == id)
+    for (id, correction) in corrections {
+        let issues = projected.index().with(&corrected_issues);
+        let issue = issues
+            .get(&id)
+            .cloned()
             .ok_or_else(|| anyhow!("corrected issue {id} is not projected"))?;
-        let issue = issues[position].clone();
         let corrected = match correction {
             ReadinessCorrection::Promote => {
                 match derive_state_transition(
                     issue,
                     State::Ready,
                     false,
-                    CapturedTransitionEvidence {
-                        issues: &issues,
-                        graph,
-                    },
+                    CapturedTransitionEvidence { issues, graph },
                 )? {
                     DerivedStateTransition::Applied {
                         issue,
@@ -1710,7 +1698,7 @@ fn derive_readiness_intents(
             }
         };
         if let Some(corrected) = corrected {
-            issues[position] = corrected.clone();
+            corrected_issues.push(corrected.clone());
             updates.push(MutationIntent::UpdateIssue {
                 issue: Box::new(corrected),
             });
@@ -1730,24 +1718,25 @@ fn derive_readiness_intents(
     })
 }
 
-/// The readiness corrections replacing `updated`'s captured record in `base`
-/// demands of the issues that change affects.
+/// The readiness corrections replacing `updated`'s record in `base` demands
+/// of the issues that change affects, read through `base`'s index.
 fn derive_dependent_readiness(
-    base: &[Issue],
+    base: crate::domain::queries::IssueView<'_>,
     updated: &Issue,
     graph: &CapturedGraphEvidence<'_>,
 ) -> Result<DerivedReadiness> {
-    let projected = base
+    let replaced = base
+        .replaced()
         .iter()
-        .map(|issue| {
-            if issue.id == updated.id {
-                updated.clone()
-            } else {
-                issue.clone()
-            }
-        })
+        .chain(std::iter::once(updated))
+        .cloned()
         .collect::<Vec<_>>();
-    derive_readiness_intents(base, &projected, graph, ReadinessScope::Affected)
+    let projected = base.index().with(&replaced);
+    let corrections = crate::domain::queries::derive_changed_readiness_corrections(
+        projected,
+        [(&updated.id, base.get(&updated.id))],
+    );
+    derive_corrected_readiness(projected, corrections, graph)
 }
 
 /// The new issues of `projected`, those absent from `base`, the readiness
@@ -3014,7 +3003,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .iter()
                 .chain(
                     graph
-                        .evaluate_graph(&rules, &issues, &issues)?
+                        .evaluate_graph(
+                            &rules,
+                            &issues,
+                            crate::domain::queries::IssueIndex::new(&issues).view(),
+                        )?
                         .iter()
                         .filter(|finding| finding.issue_id.as_ref() == Some(&issue_id))
                         .map(|finding| &finding.finding),
@@ -3349,13 +3342,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                     &mut cached_precheck,
                 );
             }
+            let index = crate::domain::queries::IssueIndex::new(issues.as_slice());
             let mut derived = derive_prechecked_field_update(
                 issue,
                 projected,
                 recorded,
                 &effective_request,
                 CapturedTransitionEvidence {
-                    issues,
+                    issues: index.view(),
                     graph: &graph,
                 },
             )?;
@@ -3563,8 +3557,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
             let prechecks_changed = !recorded.runs.is_empty();
             let graph = CapturedGraphEvidence::capture(declarations, image, issues, &context)?;
+            let index = crate::domain::queries::IssueIndex::new(issues.as_slice());
             let evidence = CapturedTransitionEvidence {
-                issues,
+                issues: index.view(),
                 graph: &graph,
             };
             let (target, gate_error) =
@@ -3634,7 +3629,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let changed = update.is_some();
             let readiness = update
                 .as_ref()
-                .map(|updated| derive_dependent_readiness(issues, updated, &graph))
+                .map(|updated| derive_dependent_readiness(index.view(), updated, &graph))
                 .transpose()?;
             let (readiness, readiness_error) = readiness
                 .map(|readiness| (readiness.intents, readiness.error_after_apply))
@@ -3888,7 +3883,7 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
                 State::InProgress,
                 false,
                 CapturedTransitionEvidence {
-                    issues: &issues,
+                    issues: crate::domain::queries::IssueIndex::new(issues.as_slice()).view(),
                     graph: &graph,
                 },
             )
@@ -3952,7 +3947,7 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
             crate::domain::State::InProgress,
             false,
             CapturedTransitionEvidence {
-                issues: &issues,
+                issues: crate::domain::queries::IssueIndex::new(&issues[..]).view(),
                 graph: &graph,
             },
         )
