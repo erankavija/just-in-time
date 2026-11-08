@@ -22,7 +22,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Decide whether concurrent cargo-ci runs can drop the host lock",
-  "updated_at": "2026-11-03T22:39:33.543799353Z"
+  "updated_at": "2026-11-08T03:57:58.738561960Z"
 }

@@ -11,6 +11,7 @@
   ],
   "description": "A per-test limit names the slow test, where a suite total only says the suite got slower. This makes the per-layer limits the enforced bound, and in the same change removes the suite-duration budget they replace, so test speed is never left unenforced.\n\n## Background\n\n`.config/nextest.toml` holds the per-test timeout. `scripts/rust-build-budget.sh` enforces `MAX_TEST_SUITE_SECONDS=30` over a suite clock that `scripts/cargo-ci.sh` measures and passes as `--test-suite-ms`. `scripts/cargo-ci.sh`'s exit-classification header treats a suite-duration-only overrun at high load as environment-sensitive. The budget is also described in:\n- the `cargo-ci` gate description in `.jit/gates.toml`, and its projection in `docs/reference/rules-and-gates.md`;\n- `dev/TESTING.md`;\n- the suite clock row in `dev/benchmarks/rust-build-budgets/README.md`.\nIt is tested by the self-tests in `scripts/rust-build-budget.sh` and `scripts/cargo-ci-selftest.sh`, and by `crates/jit/tests/scratch_build/build_profile_policy_tests.rs`.\n\nA cold doctest compile inside the suite clock is among the false failures this removes: on 2026-11-04 ceaaf0ab's landing overran the 30 s suite budget at 38.9 s because its doctest step took 25 s cold (3 s warm), with every test passing.\n\n## Success Criteria\n\n- [hard] REQ-01: The nextest configuration enforces the per-layer limits recorded in the per-test benchmark note, using test-kind or filter overrides, so a test over its layer's limit fails the run and is named in the output.\n- [hard] REQ-02: The whole-suite duration budget is gone: `MAX_TEST_SUITE_SECONDS`, the suite-duration check and the `--test-suite-ms` input in `scripts/rust-build-budget.sh`, the suite clock in `scripts/cargo-ci.sh` that feeds it, and the suite-duration clauses of `cargo-ci.sh`'s exit-classification header. The integration-target, executable-byte, profile and dependency-feature budgets stay.\n- [hard] REQ-03: The self-tests and Rust tests that owned the suite-duration policy are removed or rewritten to own the per-test limit, with no test left asserting the retired budget.\n- [hard] REQ-04: The `cargo-ci` gate description in `.jit/gates.toml` (and its generated projection), `dev/TESTING.md` and the suite clock row of `dev/benchmarks/rust-build-budgets/README.md` describe the per-test limits. No live prose, comment or open criterion outside archived history and recorded benchmark output cites the 30 s suite budget.\n- [hard] REQ-05: A test of the nextest configuration or the budget tooling shows that a test over its layer's limit fails the run.\n\n## Decisions\n\n- D-01: The whole-suite duration budget is retired in favour of the per-test limits (user ruling, 2026-11-03; charter D-18).\n\n## Notes\n\nA per-test timeout at high host load keeps its existing environment-sensitive classification. Recorded benchmark runs, archived epics and the changelog are history and stay as written.\n",
   "documents": [],
+  "done_at": "2026-11-08T03:57:58.738561960Z",
   "first_ready_at": "2026-11-03T22:39:27.516378679Z",
   "gates_required": [
     "cargo-ci",
@@ -18,15 +19,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "07dadc43-8fff-43ae-b09e-c513f2f9b5b8",
+      "run_id": "bffa3cc7-31c9-4448-a099-3d6dbe77cf04",
       "status": "passed",
-      "updated_at": "2026-11-08T03:41:20.646789128Z",
+      "updated_at": "2026-11-08T03:54:39.566075680Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "84694380-da57-4310-ac2f-c6318e19869a",
-      "status": "failed",
-      "updated_at": "2026-11-08T03:45:17.615269997Z",
+      "run_id": "09628adc-2c2b-4a7f-9db0-f9c8272e3ecd",
+      "status": "passed",
+      "updated_at": "2026-11-08T03:57:45.580521348Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,7 +40,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Enforce the per-test limits and retire the whole-suite budget",
-  "updated_at": "2026-11-08T03:45:17.615269997Z"
+  "updated_at": "2026-11-08T03:57:58.738561960Z"
 }
