@@ -446,7 +446,7 @@
     "c31c2e57": 2,
     "dd95bd9d": 3,
     "6a19e93f": 3,
-    "86a183c2": 0
+    "86a183c2": 1
   },
   "surfaced_pitfalls": [
     {
@@ -524,7 +524,8 @@
     "Process (invoker): every non-gate sol brief states before the criteria: Report only defects that violate the quoted criterion text or a cited invariant, each with a reachable failure scenario. Do not extend a criterion to cases it does not name; list such observations separately as non-blocking. Sort output by that split before acting.",
     "11:45-11:56 A/B quiet runs, alternating, 5 samples: be754ee04 tip 0.796 / 0.857 pass; fb38ed248 tip 1.328 / 1.133 pass (base ~3.75). Earlier be754ee04 1.71/1.72 = variance; per-match instructions/syscalls/cycles identical (worker profile). Metric spread for new binary 0.80-1.72 across quiet runs: near-threshold risk for 45d0a971 tip record.",
     "Process (d5, after a869900b and df129d9e stalls on lost worker notifications): every worker dispatch gets a fallback deadline of expected duration + 30 min, implemented as a background `sleep` timer; when it fires, inspect the worktree commits and status directly instead of waiting.",
-    "a869900b landed 34b33911e, cargo-ci + code-review passed, closed. d675102c re-checkpoint (sol gpt-6.1-sol, effort high, read-only) dispatched on bb9a8795f. 86a183c2 dispatched (opus) on bb9a8795f with fallback deadline 2h30m."
+    "a869900b landed 34b33911e, cargo-ci + code-review passed, closed. d675102c re-checkpoint (sol gpt-6.1-sol, effort high, read-only) dispatched on bb9a8795f. 86a183c2 dispatched (opus) on bb9a8795f with fallback deadline 2h30m.",
+    "86a183c2 lead review FAIL on 16450a564: REQ-02 fresh DeclarationMemo in load_configuration (claim, config show) and capture_initialized (config at_data_root); expect() panic in memo.rs. Rework 1 dispatched. Smoke run of scenario (c) on 16450a564 running as early signal; REQ-04 is recorded on the final commit."
   ],
   "story_checkpoints": [
     {
