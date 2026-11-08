@@ -866,9 +866,11 @@ fn test_apply_reports_a_planning_bracket_gate_no_preset_and_no_registry_entry_su
             "{key} must not resolve as a preset this repository never declared"
         );
         assert!(
-            !h.storage
-                .load_gate_registry()
-                .expect("an empty registry loads")
+            !h.executor
+                .config()
+                .captured_declarations()
+                .expect("the declarations parse")
+                .gates()
                 .gates
                 .contains_key(&key.parse::<jit::domain::identity::GateKey>().unwrap()),
             "{key} must not be a registry gate this repository never declared"

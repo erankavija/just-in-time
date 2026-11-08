@@ -809,8 +809,9 @@ impl<S: IssueStore> GateOps<'_, S> {
             .into());
         }
 
-        let registry = self.exec.storage.load_gate_registry()?;
-        let gate = registry
+        let declarations = self.exec.captured_declarations()?;
+        let gate = declarations
+            .gates()
             .gates
             .get(gate_key)
             .ok_or_else(|| crate::storage::GateNotFoundError::single(gate_key))?;
@@ -963,8 +964,13 @@ impl<S: IssueStore> GateOps<'_, S> {
         }
 
         // Check if gate is automated - reject manual pass/fail
-        let registry = self.exec.storage.load_gate_registry()?;
-        if let Some(gate) = registry.gates.get(gate_key) {
+        if let Some(gate) = self
+            .exec
+            .captured_declarations()?
+            .gates()
+            .gates
+            .get(gate_key)
+        {
             if gate.mode == GateMode::Auto {
                 return Err(anyhow!(
                     "Gate '{}' is automated and cannot be manually failed. Use 'jit gate evaluate {} {}' to run the checker.",
@@ -983,14 +989,26 @@ impl<S: IssueStore> GateOps<'_, S> {
         Ok(warnings)
     }
 
-    pub fn list_gates(&self) -> Result<Vec<GateDefinition>> {
-        let registry = self.exec.storage.load_gate_registry()?;
-        Ok(registry.gates.into_values().collect())
+    pub fn list_gates(&self) -> Result<Vec<GateDefinition>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        Ok(self
+            .exec
+            .captured_declarations()?
+            .gates()
+            .gates
+            .values()
+            .cloned()
+            .collect())
     }
 
     /// Whether `jit gate status <issue> <gate_key>` has its positionals swapped:
     /// `issue` names a registered gate and `gate_key` resolves to an issue.
-    pub fn are_gate_status_arguments_transposed(&self, issue: &str, gate_key: &str) -> bool {
+    pub fn are_gate_status_arguments_transposed(&self, issue: &str, gate_key: &str) -> bool
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         self.list_gates()
             .is_ok_and(|gates| gates.iter().any(|gate| gate.key.as_str() == issue))
             && gate_key
@@ -1261,9 +1279,13 @@ impl<S: IssueStore> GateOps<'_, S> {
         Ok(warnings)
     }
 
-    pub fn show_gate_definition(&self, key: &GateKey) -> Result<GateDefinition> {
-        let registry = self.exec.storage.load_gate_registry()?;
-        registry
+    pub fn show_gate_definition(&self, key: &GateKey) -> Result<GateDefinition>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        self.exec
+            .captured_declarations()?
+            .gates()
             .gates
             .get(key)
             .cloned()
@@ -1503,7 +1525,7 @@ impl<S: IssueStore> GateOps<'_, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::test_helpers::{seed_gate_registry, seed_issue, setup};
+    use crate::commands::test_helpers::{gate_registry_in, seed_gate_registry, seed_issue, setup};
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateChecker, GateMode, GateStage};
     use crate::domain::EventBody;
@@ -1556,17 +1578,17 @@ mod tests {
                      git rebase origin/main"
                 );
                 assert!(!executor
-                    .storage
-                    .load_gate_registry()
+                    .captured_declarations()
                     .unwrap()
+                    .gates()
                     .gates
                     .contains_key(&key));
             } else {
                 result.unwrap_or_else(|error| panic!("{scenario}: {error}"));
                 assert!(executor
-                    .storage
-                    .load_gate_registry()
+                    .captured_declarations()
                     .unwrap()
+                    .gates()
                     .gates
                     .contains_key(&key));
             }
@@ -1578,7 +1600,7 @@ mod tests {
         let executor = setup();
 
         // Define an automated gate that will pass
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "auto-gate".parse().unwrap(),
             GateDefinition {
@@ -1655,7 +1677,7 @@ mod tests {
 
     /// Register a simple manual gate so it can be added to issues in tests.
     fn define_manual_gate(executor: &CommandExecutor<InMemoryStorage>, key: &GateKey) {
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             key.clone(),
             GateDefinition {
@@ -1734,7 +1756,7 @@ mod tests {
         let executor = setup();
 
         // Define an automated gate that will fail
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "auto-gate".parse().unwrap(),
             GateDefinition {
@@ -1805,7 +1827,7 @@ mod tests {
             InMemoryStorage::new().with_mutation_interruption_view(counter.clone()),
         );
         let key: GateKey = "review".parse().unwrap();
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             key.clone(),
             GateDefinition {
@@ -1866,7 +1888,7 @@ mod tests {
         let executor = setup();
 
         // Define a manual gate
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "manual-gate".parse().unwrap(),
             GateDefinition {
@@ -2008,7 +2030,7 @@ mod tests {
                 .open_mutation_session(layout)
                 .expect("recovery converges"),
         );
-        assert!(recovered.load_gate_registry().unwrap().gates.is_empty());
+        assert!(gate_registry_in(&recovered).gates.is_empty());
         assert!(recovered.read_events().unwrap().is_empty());
     }
 
@@ -2043,7 +2065,7 @@ mod tests {
                 .open_mutation_session(layout)
                 .expect("recovery converges"),
         );
-        assert!(recovered.load_gate_registry().unwrap().gates.is_empty());
+        assert!(gate_registry_in(&recovered).gates.is_empty());
         assert!(recovered
             .load_issue(&issue_id)
             .unwrap()
@@ -2528,7 +2550,7 @@ mod tests {
         assert_eq!(event_bytes(&first_plan), event_bytes(&retry_plan));
         retry_session.apply(&retry_plan).unwrap();
 
-        let registry = storage.load_gate_registry().unwrap();
+        let registry = gate_registry_in(&storage);
         assert!(registry.gates.contains_key(&"ours".parse().unwrap()));
         assert!(registry.gates.contains_key(&"theirs".parse().unwrap()));
         let event = storage.read_events().unwrap().pop().unwrap();
@@ -2576,7 +2598,7 @@ mod tests {
     ) {
         let executor = crate::commands::test_helpers::setup_coordinated_with_enforcement(mode);
         let key: GateKey = "lease-gate".parse().unwrap();
-        let mut registry = executor.storage().load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             key.clone(),
             GateDefinition {
@@ -2609,7 +2631,7 @@ mod tests {
             for (mode, leased) in [("strict", true), ("warn", true), ("strict", false)] {
                 let (executor, _issue_id, key, holder) =
                     gate_definition_lease_fixture(mode, leased);
-                let before = executor.storage().load_gate_registry().unwrap();
+                let before = executor.captured_declarations().unwrap().gates().clone();
                 let result = match operation {
                     "update" => executor
                         .gates()
@@ -2633,7 +2655,10 @@ mod tests {
                             .is_some(),
                         "{error:#}"
                     );
-                    assert_eq!(executor.storage().load_gate_registry().unwrap(), before);
+                    assert_eq!(
+                        executor.captured_declarations().unwrap().gates().clone(),
+                        before
+                    );
                     assert!(executor.storage().read_events().unwrap().is_empty());
                 } else {
                     let warnings = result.unwrap();
@@ -2644,7 +2669,7 @@ mod tests {
                     } else {
                         assert!(warnings.is_empty());
                     }
-                    let updated = executor.storage().load_gate_registry().unwrap();
+                    let updated = executor.captured_declarations().unwrap().gates().clone();
                     if operation == "update" {
                         assert_eq!(updated.gates[&key].title, "Updated lease gate");
                     } else {

@@ -1,13 +1,11 @@
 //! JSON file-based storage implementation.
 //!
-//! Issues, the index, and events are read from a `.jit/` directory; the gate
-//! registry is parsed from `.jit/gates.toml` through
-//! [`crate::storage::gate_store`]. Repository-owned changes are published as
-//! redo records through [`RepositoryStateStore`]. The directory
-//! location can be overridden with the `JIT_DATA_DIR` environment variable.
+//! Issues, the index, and events are read from a `.jit/` directory.
+//! Repository-owned changes are published as redo records through
+//! [`RepositoryStateStore`]. The directory location can be overridden with the
+//! `JIT_DATA_DIR` environment variable.
 
 use super::gate_run_reader::TreeNode;
-use crate::declarations::GateRegistry;
 use crate::domain::event_log::parse_known_events;
 use crate::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
 use crate::domain::relative_path::RootRelativePath;
@@ -361,10 +359,8 @@ pub(crate) fn validate_captured_index(
 
 /// File-backed repository reader and mutation-session provider.
 ///
-/// This implementation stores each issue as a separate JSON file in `.jit/issues/`,
-/// events in `.jit/events.jsonl`, and gate definitions in `.jit/gates.toml` — a
-/// `[[gates]]` array-of-tables parsed through [`crate::storage::gate_store`].
-/// Publication is owned by its [`RepositoryStateStore`] implementation, which
+/// This implementation stores each issue as a separate JSON file in `.jit/issues/`
+/// and events in `.jit/events.jsonl`. Publication is owned by its [`RepositoryStateStore`] implementation, which
 /// applies complete repository deltas through one redo record.
 ///
 /// A mutation session retains the repository-sibling bootstrap lock followed by
@@ -1181,11 +1177,6 @@ impl IssueStore for JsonFileStorage {
                 .collect::<Vec<_>>();
             Ok(admit_read_sources(admissions)?.map(|()| result))
         })
-    }
-
-    fn load_gate_registry(&self) -> Result<GateRegistry> {
-        // Lock-free (`@/charter/D-22`): the registry is replaced by atomic rename.
-        crate::storage::gate_store::load_gate_registry(&self.path_layout()?)
     }
 
     fn read_events(&self) -> Result<Vec<Event>> {

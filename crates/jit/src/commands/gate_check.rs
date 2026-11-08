@@ -1375,10 +1375,14 @@ impl<S: IssueStore> GateOps<'_, S> {
     pub fn get_last_gate_runs_for_issue(
         &self,
         issue_id: &IssueId,
-    ) -> Result<(Vec<GateRunResult>, Vec<GateKey>)> {
+    ) -> Result<(Vec<GateRunResult>, Vec<GateKey>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = issue_id.clone();
         let issue = self.exec.storage.load_issue(&full_id)?;
-        let registry = self.exec.storage.load_gate_registry()?;
+        let declarations = self.exec.captured_declarations()?;
+        let registry = declarations.gates();
 
         let mut gates: Vec<_> = issue
             .gates_required
@@ -1420,10 +1424,14 @@ impl<S: IssueStore> GateOps<'_, S> {
     pub fn get_required_gate_statuses_for_issue(
         &self,
         issue_id: &IssueId,
-    ) -> Result<Vec<(GateKey, GateStatus)>> {
+    ) -> Result<Vec<(GateKey, GateStatus)>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         let full_id = issue_id.clone();
         let issue = self.exec.storage.load_issue(&full_id)?;
-        let registry = self.exec.storage.load_gate_registry()?;
+        let declarations = self.exec.captured_declarations()?;
+        let registry = declarations.gates();
 
         // Order by gate priority; a required key missing from the registry sorts
         // last but is still reported (so it is never silently treated as green).
@@ -1643,7 +1651,7 @@ mod tests {
         checker: GateChecker,
         labels: Vec<String>,
     ) -> IssueId {
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             gate_key.clone(),
             crate::declarations::GateDefinition {
@@ -1874,7 +1882,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
             &executor.require_worktree_paths().unwrap().shared_jit,
             &issue_id,
         );
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             key.clone(),
             crate::declarations::GateDefinition {
@@ -1966,7 +1974,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
         let executor = setup();
 
         // Define an automated gate
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "test-gate".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -2073,7 +2081,7 @@ assert = {{ label-reference = {{ from = "satisfies", to = "req" }} }}
     #[test]
     fn test_check_gate_twice_names_the_second_run_in_gate_state() {
         let executor = setup();
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "test-gate".parse().unwrap(),
             make_auto_gate(&"test-gate".parse().unwrap(), "exit 0"),
@@ -3329,7 +3337,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let gate_key: GateKey = "not-a-reserved-repository-key".parse().unwrap();
         std::fs::create_dir_all(repo.path().join("workspace")).unwrap();
         std::fs::write(repo.path().join("workspace/lib.rs"), "fn main() {}\n").unwrap();
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.get_mut(&gate_key).unwrap().inputs = Some(
             crate::domain::repository_inputs::RepositoryInputs::parse(&["workspace"], &[]).unwrap(),
         );
@@ -3681,7 +3689,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
 
         // Define an automated gate that fails
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "failing-gate".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -3739,7 +3747,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
 
         // Define a manual gate
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "manual-gate".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -3780,7 +3788,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
 
         // One auto gate (priority 10) and one manual gate (priority 20).
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "auto-gate".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -3897,7 +3905,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// An issue requiring the manual gate `review`, whose registry also declares
     /// the automated gate `tests`.
     fn seed_review_issue(executor: &CommandExecutor<InMemoryStorage>) -> IssueId {
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "review".parse().unwrap(),
             make_manual_gate(&"review".parse().unwrap()),
@@ -3987,7 +3995,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let mut issue = executor.storage.load_issue(&issue_id).unwrap();
         issue.gates_required.retain(|gate| gate != &key);
         seed_issue(executor.storage(), issue);
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.remove(&key);
         seed_gate_registry(executor.storage(), &registry);
         let runs = executor
@@ -4041,7 +4049,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[test]
     fn test_get_last_gate_runs_for_issue_agrees_with_required_gate_statuses() {
         let executor = setup();
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         let gates = [
             make_auto_gate(&"auto-pass".parse().unwrap(), "exit 0"),
             make_auto_gate(&"auto-fail".parse().unwrap(), "exit 1"),
@@ -4119,7 +4127,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let base = setup();
         let marker_dir = tempfile::tempdir().unwrap();
         let marker = marker_dir.path().join("b-started");
-        let mut registry = base.storage.load_gate_registry().unwrap();
+        let mut registry = base.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "auto".parse().unwrap(),
             make_auto_gate(
@@ -4338,7 +4346,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
 
         // Define two automated gates
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         for (key, exit_code) in [("gate-1", 0), ("gate-2", 0)]
             .map(|(key, code)| (key.parse::<GateKey>().unwrap(), code))
         {
@@ -4404,7 +4412,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     fn test_get_last_gate_runs_for_issue_reports_not_run_gates() {
         let executor = setup();
 
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         for key in ["gate-1", "gate-2"].map(|key| key.parse::<GateKey>().unwrap()) {
             registry
                 .gates
@@ -4444,7 +4452,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
 
         // Define a precheck gate
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "precheck".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -4579,7 +4587,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
 
         // Define a failing precheck gate
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "precheck-fail".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -4924,7 +4932,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         state: State,
         gates: &[(&str, &str)],
     ) -> IssueId {
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry
             .gates
             .extend(gates.iter().map(|(key, command)| -> (GateKey, _) {
@@ -5142,7 +5150,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
         let issue_id =
             seed_issue_requiring_exec_gates(&executor, State::Gated, &[("postcheck", "exit 0")]);
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         let gate = registry
             .gates
             .get_mut(&"postcheck".parse::<GateKey>().unwrap())
@@ -5182,7 +5190,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
 
         // Define a gate with pass_context that reads the context file
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "review".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -5263,7 +5271,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         );
 
         // Define a gate with prompt_file
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "review".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -5906,7 +5914,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
 
         // Define a gate with pass_context that always fails (exit 1) but outputs context
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "review".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -5993,7 +6001,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     fn test_prompt_file_path_traversal_rejected() {
         let executor = setup();
 
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "review".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -6044,7 +6052,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
 
         // Define a context-aware gate that always fails
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "review".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -6108,7 +6116,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .join("\n"); // 1100 lines of 100 chars = ~110KB
         seed_memory_repository_file(executor.storage(), "huge-prompt.md", &big_content);
 
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "review".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -6159,7 +6167,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
 
         // Define a normal gate without pass_context
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "test-gate".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -6209,7 +6217,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         // wired end to end through `check_gate` from `issue.documents`.
         let executor = setup();
 
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "test-gate".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -6277,7 +6285,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         // JIT_ISSUE_DOCS set, to an empty JSON array (never absent/unset).
         let executor = setup();
 
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "test-gate".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -6350,7 +6358,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         seed_issue(executor.storage(), main_issue);
 
         // Define a context-aware gate
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "review".parse().unwrap(),
             crate::declarations::GateDefinition {
@@ -6403,7 +6411,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
 
         // Define 3 auto gates with priorities 30, 10, 20
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         for (key, priority) in [("gate-p30", 30u32), ("gate-p10", 10), ("gate-p20", 20)]
             .map(|(key, priority)| (key.parse::<GateKey>().unwrap(), priority))
         {
@@ -6480,7 +6488,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let executor = setup();
 
         // Define 3 auto gates all with default priority 100
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         for key in ["alpha", "beta", "gamma"].map(|key| key.parse::<GateKey>().unwrap()) {
             registry.gates.insert(
                 key.clone(),
@@ -6592,7 +6600,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[test]
     fn test_get_last_gate_run_returns_none_when_no_runs() {
         let executor = setup();
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "g".parse().unwrap(),
             make_auto_gate(&"g".parse().unwrap(), "exit 0"),
@@ -6617,7 +6625,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[test]
     fn test_get_last_gate_run_returns_most_recent() {
         let executor = setup();
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "g".parse().unwrap(),
             make_auto_gate(&"g".parse().unwrap(), "exit 0"),
@@ -6653,7 +6661,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[test]
     fn test_get_last_gate_run_filters_by_gate_key() {
         let executor = setup();
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "gate-a".parse().unwrap(),
             make_auto_gate(&"gate-a".parse().unwrap(), "exit 0"),
@@ -6705,7 +6713,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     #[test]
     fn test_get_last_gate_run_shows_failure_details() {
         let executor = setup();
-        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let mut registry = executor.captured_declarations().unwrap().gates().clone();
         registry.gates.insert(
             "fail-gate".parse().unwrap(),
             make_auto_gate(&"fail-gate".parse().unwrap(), "echo 'oops' && exit 1"),

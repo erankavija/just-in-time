@@ -164,6 +164,17 @@ pub(crate) fn seed_gate_registry(storage: &InMemoryStorage, registry: &GateRegis
     );
 }
 
+/// The gate registry `storage` declares, read through a captured image.
+pub(crate) fn gate_registry_in(storage: &InMemoryStorage) -> GateRegistry {
+    CommandExecutor::new(storage.clone())
+        .with_layout(storage.repository_layout())
+        .expect("the memory layout is accepted")
+        .captured_declarations()
+        .expect("the declarations parse")
+        .gates()
+        .clone()
+}
+
 /// Count mutation-session opens ([`MutationPoint::SessionOpen`]) and read-session
 /// opens ([`MutationPoint::ReadSessionOpen`]) separately, injecting no failure.
 /// Each open crosses its point exactly once. Shared by tests that assert a
