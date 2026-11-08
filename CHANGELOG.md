@@ -14,7 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `error.details.integrity_error`; stderr, the JSON `error.message`, and the
   report's `message` carry a one-line summary. Every findings summary escapes
   any control character it would carry, such as a line break in a `jit gate
-  preset apply` preset name. See the
+  preset apply` preset name; that command's human report names the preset even
+  when every target failed. See the
   [failure contract](docs/reference/cli-commands.md#cli-json-contracts) and
   [`jit validate`](docs/reference/cli-commands.md#jit-validate).
 
