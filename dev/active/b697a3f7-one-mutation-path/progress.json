@@ -427,6 +427,12 @@
       "reason": "rework limit exceeded; repeated class (precheck per-match scans)",
       "to": "just-in-time-d5",
       "status": "closed: final attempt passed"
+    },
+    {
+      "to": "just-in-time-d5",
+      "issue": "d675102c",
+      "subject": "checkpoint r2 remediation scope: fold F2 into 86a183c2, new tasks for F1 and F3",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -844,6 +850,16 @@
       "effort": "high",
       "verdict": "pass",
       "run": "8e128773"
+    },
+    {
+      "issue": "d675102c",
+      "kind": "checkpoint-r2",
+      "vendor": "openai",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "sandbox": "read-only",
+      "commit": "cea13616e",
+      "verdict": "UNMET REQ-02, REQ-04; 3 blocking (item.rs:255 uncaptured registry reads; duplicate gate/rules parses in precheck/template/registry-edit; exec evaluation resolves documents twice)"
     }
   ]
 }
