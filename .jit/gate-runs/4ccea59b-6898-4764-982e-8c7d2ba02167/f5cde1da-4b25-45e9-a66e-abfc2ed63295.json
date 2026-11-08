@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "82a43418b810fc1f76d5faaf9bcaaea95ba7f5fb",
+  "completed_at": "2026-11-08T08:11:38.574790439Z",
+  "duration_ms": 149021,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied, every findings call site uses a constrained summary, and both prior blocking findings are resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4ccea59b-6898-4764-982e-8c7d2ba02167",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f5cde1da-4b25-45e9-a66e-abfc2ed63295",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T08:09:09.553742409Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:4ccea59b — 71564f8c1727, 49fe18e55c08, 4df3de15d930, f8e1d97a9491, a9efe77beaa7; individual patches inspected; uncommitted changes excluded.\nPolicy sources: AGENTS.md; dev/TESTING.md; no subtree AGENTS.md found.\nResolved items: .jit/issues/ issue descriptions — @/issue/4ccea59b/requirement/REQ-01, @/issue/4ccea59b/requirement/REQ-02, @/issue/4ccea59b/requirement/REQ-03, @/issue/4ccea59b/requirement/REQ-04, @/issue/df129d9e/decision/D-03, @/issue/df129d9e/requirement/REQ-09, @/issue/75a90224/decision/D-01; dev/vision/9db27a3a-charter.md — @/charter/D-13; .jit/invariants.toml — @/inv/semantic-types, @/inv/orthogonal-tests, @/inv/shared-test-contracts, @/inv/semantic-test-assertions, @/inv/essential-code-prose, @/inv/architecture-dependency-direction, @/inv/single-source-prose, @/inv/convention-convergence; .jit/gates.toml — @/gate/jit-validate.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T08:07:15.136311831+00:00; wrapper ancestry confirms 82a43418b810 covers all five tagged commits; latest prior code-review failed, exit 1, 2026-11-08T07:51:49.367826274Z; both prior findings resolved; no gates rerun.\nTruncation recovery: Recovered truncated patches and current-file output through narrower commit/path/line reads; abbreviated historical agent transcripts excluded because structured findings are authoritative.\n\nAll four hard criteria are satisfied. Integrity details remain on stdout and in `error.details.integrity_error`; summaries use `SummaryLine`, and exit classification is unchanged. Tests cover escaping, stream separation, drift alone, and drift with rule-error counts. Documentation and CHANGELOG describe the changes. There are no issue dependencies.\n\nBoth prior findings are resolved: `output/gate.rs:318` names the preset in all-failed reports, and `docs/reference/cli-commands.md:3381` limits the complete-cause-chain promise to propagated repair errors.\n\nThe required findings call-site audit is:\n\n| Dispatch call site | Verdict |\n|---|---|\n| `config.rs:47` | Pass |\n| `doc.rs:168` | Pass |\n| `gate.rs:318` | Pass |\n| `gate.rs:532` | Pass |\n| `gate.rs:664` | Pass |\n| `invariant.rs:12` | Pass |\n| `profile.rs:50` | Pass |\n| `test_group.rs:56` | Pass |\n| `test_group.rs:67` | Pass |\n| `validate.rs:104` | Pass |\n| `validate.rs:168` | Pass |\n| `validate.rs:226` | Pass |\n| `validate.rs:239` | Pass |\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied, every findings call site uses a constrained summary, and both prior blocking findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

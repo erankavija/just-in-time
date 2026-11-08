@@ -87,8 +87,34 @@
       "format": "markdown",
       "label": "Session 14: independent work complete; timing chain held",
       "path": "dev/active/df129d9e-rust-code-quality/handoff-14.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "907eb0dd1a68642ca5e2e63d5a1130bd97976ab48a89eb86af30ce31a90476d8",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "line-count-baseline.md",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/line-count-baseline.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "723c94a1b184f96b951dbe4fd95bfcec33eb20f90c04742b02b257c1a711c8f6",
+          "is_shared": false,
+          "mime_type": "text/plain",
+          "original_path": "ledger-final.txt",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/ledger-final.txt"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/df129d9e-rust-code-quality/completion-report.md"
     }
   ],
+  "done_at": "2026-11-08T08:20:29.662659800Z",
   "first_ready_at": "2026-07-27T20:07:37.084018691Z",
   "gates_required": [
     "repo-validate",
@@ -96,15 +122,15 @@
   ],
   "gates_status": {
     "holistic-review": {
-      "run_id": "d6e38705-9705-4162-97c0-56fdee0ad912",
-      "status": "failed",
-      "updated_at": "2026-11-08T07:28:16.226539685Z",
+      "run_id": "65f79d71-3a78-436b-a809-cf341e111fc3",
+      "status": "passed",
+      "updated_at": "2026-11-08T08:19:29.281076548Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
-      "run_id": "de9b9abe-e5fc-4e1d-a364-f1e1ac375cb0",
+      "run_id": "6273cd05-683a-4ff8-91fc-d54929a7061e",
       "status": "passed",
-      "updated_at": "2026-11-08T07:22:05.140965602Z",
+      "updated_at": "2026-11-08T08:11:42.397993522Z",
       "updated_by": "auto:executor"
     }
   },
@@ -119,7 +145,7 @@
     "per:@/charter/D-18"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Dispatch layering, executor surface, and build hygiene in crates/jit",
-  "updated_at": "2026-11-08T07:28:55.827690458Z"
+  "updated_at": "2026-11-08T08:20:39.573871007Z"
 }

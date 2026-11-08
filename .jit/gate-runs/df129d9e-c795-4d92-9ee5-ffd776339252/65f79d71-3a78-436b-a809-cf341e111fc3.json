@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a03fbf0f2ebe7079073e63fcc7dcd6b3f38de1fe",
+  "completed_at": "2026-11-08T08:19:29.277695899Z",
+  "duration_ms": 466860,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are verifiably met, the previous validation-summary finding is resolved, and no blocking incoherence remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "df129d9e-c795-4d92-9ee5-ffd776339252",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "65f79d71-3a78-436b-a809-cf341e111fc3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T08:11:42.417525406Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "All 21 hard criteria are supported by the current code, tests, git history, and recorded gate evidence. The previous multiline validation-summary finding is resolved.\n\nI independently reproduced all 125 reported merge deltas: **+306 lines**, with no mismatches. Subsequent epic merges add **42**, yielding **+348**, within the approved **+375** ceiling.\n\nThe latest recorded Cargo CI covers the current Rust tree: **5,168 tests passed**, formatting and clippy passed, and build budgets passed. The generated schema names typed responses for all **102 visible leaf commands**.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are verifiably met, the previous validation-summary finding is resolved, and no blocking incoherence remains.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
