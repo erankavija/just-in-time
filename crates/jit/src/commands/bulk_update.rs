@@ -1637,14 +1637,15 @@ assert = { label-reference = { from = "implements", to = "req", scope = "linked"
     /// the update moves each matched issue to.
     struct CostScenario {
         rules: Option<&'static str>,
-        /// The whole-repository precheck each matched issue requires, if any.
+        /// The precheck each matched issue requires, if any.
         precheck: Option<crate::declarations::GateChecker>,
         target: State,
     }
 
     /// The repository reads of a bulk update moving `matches` `Ready` issues,
-    /// each with one `Backlog` dependent, beside `filler` unrelated issues, and
-    /// the number of graph-rule warnings it reported.
+    /// each depending on one `Done` issue, labelled with it as its validation
+    /// target, and with one `Backlog` dependent, beside `filler` unrelated
+    /// issues, and the number of graph-rule warnings it reported.
     fn bulk_update_reads(
         scenario: &CostScenario,
         filler: u128,
@@ -1682,14 +1683,23 @@ assert = { label-reference = { from = "implements", to = "req", scope = "linked"
             &storage,
             create_test_issue(&issue_id(1), State::InProgress, vec![]),
         );
+        seed_issue(
+            &storage,
+            create_test_issue(&issue_id(2), State::Done, vec![]),
+        );
+        let target = format!("target:{}", issue_id(2));
         (0..filler).for_each(|n| {
             let mut issue = create_test_issue(&issue_id(0x1000 + n), State::Backlog, vec![]);
             issue.dependencies = vec![issue_id(1)];
             seed_issue(&storage, issue);
         });
         (0..matches).for_each(|n| {
-            let mut matched =
-                create_test_issue(&issue_id(0x2000 + n), State::Ready, vec!["implements:a"]);
+            let mut matched = create_test_issue(
+                &issue_id(0x2000 + n),
+                State::Ready,
+                vec!["implements:a", &target],
+            );
+            matched.dependencies = vec![issue_id(2)];
             if scenario.precheck.is_some() {
                 matched.gates_required = vec![gate.clone()];
             }
@@ -1744,6 +1754,26 @@ assert = { label-reference = { from = "implements", to = "req", scope = "linked"
             CostScenario {
                 rules: None,
                 precheck: Some(GateChecker::RepositoryValidation),
+                target: State::InProgress,
+            },
+            CostScenario {
+                rules: None,
+                precheck: Some(GateChecker::LabelTargetValidation {
+                    label_namespace: "target".to_string(),
+                }),
+                target: State::InProgress,
+            },
+            CostScenario {
+                rules: None,
+                precheck: Some(GateChecker::Exec {
+                    command: "true".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: std::collections::HashMap::new(),
+                    pass_context: true,
+                    prompt: Some("Judge the issue.".to_string()),
+                    prompt_file: None,
+                }),
                 target: State::InProgress,
             },
         ];

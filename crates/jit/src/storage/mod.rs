@@ -141,18 +141,25 @@ pub fn resolve_dependency_id(prefix: &IssueIdPrefix, dependencies: &[IssueId]) -
     })
 }
 
-/// The id of the one of `issues` that `prefix` names.
+/// The one of `issues` that `prefix` names, resolved through their id index.
 ///
 /// # Errors
 ///
 /// [`IssueNotFoundError`] for no match, or [`AmbiguousIdError`] for several.
-pub(crate) fn resolve_issue_id_among(prefix: &IssueIdPrefix, issues: &[Issue]) -> Result<IssueId> {
-    resolve_unique_issue_id(prefix, issues.iter().map(|issue| &issue.id), |id| {
-        issues
+pub(crate) fn resolve_issue_among<'a>(
+    prefix: &IssueIdPrefix,
+    issues: &'a crate::domain::queries::IndexedIssues,
+) -> Result<&'a Issue> {
+    let named = issues.named(prefix);
+    let id = resolve_unique_issue_id(prefix, named.iter().map(|issue| &issue.id), |id| {
+        named
             .iter()
             .find(|issue| &issue.id == id)
-            .map(describe_issue)
-    })
+            .map(|issue| describe_issue(issue))
+    })?;
+    issues
+        .get(&id)
+        .ok_or_else(|| IssueNotFoundError::new(id).into())
 }
 
 /// An ambiguous-match candidate as `short_id | title`.

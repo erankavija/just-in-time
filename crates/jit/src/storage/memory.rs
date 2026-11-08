@@ -890,10 +890,10 @@ impl IssueStore for InMemoryStorage {
         &self,
         prefix: &crate::domain::identity::IssueIdPrefix,
     ) -> Result<crate::domain::identity::IssueId> {
-        crate::storage::resolve_issue_id_among(
-            prefix,
-            &Self::load_issues(&*self.read_repository_state()?)?,
-        )
+        let issues = crate::domain::queries::IndexedIssues::new(Self::load_issues(
+            &*self.read_repository_state()?,
+        )?);
+        crate::storage::resolve_issue_among(prefix, &issues).map(|issue| issue.id.clone())
     }
 
     fn list_issues(&self) -> Result<Vec<Issue>> {

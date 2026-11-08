@@ -1117,8 +1117,9 @@ struct PrecheckPreflight {
     image: crate::repository_state::RepositoryImage,
     /// The configuration assembled from `image`.
     config: crate::config::JitConfig,
-    /// The active issues of `image`, parsed once for every preflight over it.
-    issues: std::sync::Arc<Vec<Issue>>,
+    /// The active issues of `image`, parsed and indexed once for every
+    /// preflight over it.
+    issues: std::sync::Arc<crate::domain::queries::IndexedIssues>,
     /// The validation report of `image` its built-in prechecks share.
     validation: std::sync::Arc<gate_check::SharedValidation>,
     issue: Issue,
@@ -2642,7 +2643,11 @@ fn discover_gate_records(
     Ok(())
 }
 
+/// `id` when `issues` holds it, by one pass over `issues`: the lookup of a
+/// command resolving a single target. Resolution per target, as a batch does,
+/// goes through [`crate::domain::queries::IdIndex`].
 fn require_issue_in_capture(issues: &[Issue], id: &IssueId) -> Result<IssueId> {
+    crate::domain::queries::note_repository_pass(issues.len());
     issues
         .iter()
         .find(|issue| &issue.id == id)
@@ -3134,7 +3139,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                 None => return Ok(None),
             },
         };
-        let issues = std::sync::Arc::new(captured_active_issues(&image)?);
+        let issues = std::sync::Arc::new(crate::domain::queries::IndexedIssues::new(
+            captured_active_issues(&image)?,
+        ));
         let repository = std::cell::OnceCell::new();
         let validation = std::sync::Arc::new(gate_check::SharedValidation::default());
         planned
