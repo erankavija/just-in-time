@@ -685,12 +685,13 @@
           "short_id": "0b35be66",
           "title": "Bring the tests the enforced limits flagged under their per-test limits",
           "classification": "implementation",
-          "status": "rework-margin",
+          "status": "done",
           "model_tier": "opus",
           "tier_reason": "proptest/coverage-preserving cost cuts across five modules",
-          "branch_head": "948212c82",
-          "production_delta": 100,
-          "rework_note": "event_tail 1.694s and dogfood 1.715s cut below 1s; sent 04:32"
+          "branch_head": "e80a62a9f",
+          "production_delta": 99,
+          "landed": "ae01461e7",
+          "gates": "cargo-ci passed, code-review passed (gpt-6.1-sol high, 0 findings)"
         },
         {
           "key": "bootstrap-over-limit",
@@ -698,12 +699,21 @@
           "short_id": "afd2d573",
           "title": "Bring the bootstrap audit-replay test under the unit limit",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "review",
           "model_tier": "sonnet",
           "tier_reason": "single-test cost cut reusing 0b35be66 mechanism",
           "dispatched": "2026-11-08T04:33+02:00",
           "worktree": ".agents/worktrees/agent-afd2d573",
-          "branch": "worktree-agent-afd2d573"
+          "branch": "worktree-agent-afd2d573",
+          "branch_head": "f89fe20ba"
+        },
+        {
+          "key": "near-limit-tests",
+          "id": "7909527f-5613-4456-93fc-98d70d9b7ccb",
+          "short_id": "7909527f",
+          "title": "Bring the three near-limit unit tests under 1.5 s",
+          "classification": "implementation",
+          "status": "ready"
         }
       ]
     },
@@ -883,6 +893,11 @@
     {
       "id": "afd2d573",
       "reason": "0b35be66 after2 run: bootstrap audit-replay test 3.443 s > 2 s; blocks f487aeef",
+      "date": "2026-11-08"
+    },
+    {
+      "id": "7909527f",
+      "reason": "0b35be66 after3 put three unit tests at 1.62-1.74 s against the 2 s limit; f487aeef depends on it",
       "date": "2026-11-08"
     }
   ],
@@ -1687,7 +1702,7 @@
         "criteria": {
           "REQ-01": "two jit suites; three workspace targets",
           "REQ-02": "exact normalized inventory5038;1684 renamed3354 unchanged",
-          "REQ-03": "3-target706MiB budgets;1177002600→673455960B",
+          "REQ-03": "3-target706MiB budgets;1177002600\u2192673455960B",
           "REQ-04": "normal libtest1180CLI+504contracts passes together; no test logic changes",
           "REQ-05": "guide and CI commands updated"
         },
@@ -2133,7 +2148,7 @@
         "scope": "current Git requirement docs consistent withD24; targeted links pass"
       }
     },
-    "count_correction": "487 worker−17 used optional flags; default committedb0c51b0e7 is73630 vs e47a08419 73631, therefore−1. All final counts use noflags.",
+    "count_correction": "487 worker\u221217 used optional flags; default committedb0c51b0e7 is73630 vs e47a08419 73631, therefore\u22121. All final counts use noflags.",
     "f35c86de": {
       "merge": "6d9a1ed76",
       "status": "done",
@@ -2267,7 +2282,7 @@
     },
     "f9977efd": {
       "status": "done",
-      "dependency_ruling": "Steward approved removing only f997→f487 sequencing edge;5687/83e retained. Timing and host-lock trial stay held.",
+      "dependency_ruling": "Steward approved removing only f997\u2192f487 sequencing edge;5687/83e retained. Timing and host-lock trial stay held.",
       "test_owner_ruling": "Steward approved existing shell self-test as canonical fixture owner, no recreated Rust suite.",
       "scope_commit": "5595358f9",
       "implementation": "16aada055",
