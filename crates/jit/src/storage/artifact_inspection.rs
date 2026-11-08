@@ -1,7 +1,8 @@
 //! No-follow inspection of repository paths, and the advisory citation scan
 //! built on it.
 
-use crate::domain::artifact_classifier::{contains_path, CitationScanEvidence, CitationScanner};
+use crate::domain::archive_advisory::{CitationIndex, CitationScanner};
+use crate::domain::artifact_classifier::contains_path;
 use crate::domain::artifact_discovery::{ArtifactEvidence, ArtifactListingScope};
 use crate::domain::artifact_plan::normalize_artifact_path;
 use crate::domain::relative_path::RootRelativePath;
@@ -18,8 +19,9 @@ use cap_std::fs::Dir;
 use std::collections::BTreeSet;
 use std::io::{ErrorKind, Read};
 
-/// Scan every file the declared citation scan roots reach for citations of
-/// `sources`, holding one file's bytes at a time.
+/// Index the citations of `sources` in every file the declared citation scan
+/// roots reach, in one [`CitationScanner`] pass holding one file's bytes at a
+/// time.
 ///
 /// A declared root that is absent, a path component that is a symbolic link, a
 /// permission-denied subtree, and a file whose bytes are not valid UTF-8 are
@@ -30,18 +32,19 @@ use std::io::{ErrorKind, Read};
 /// The walk is [`inspect_artifact_evidence`]'s recursive listing, which opens
 /// every component with no-follow directory handles, so the scan escapes the
 /// repository through no symbolic link and starts no external process.
-pub(crate) fn collect_citation_scan_evidence<S: IssueStore>(
+pub(crate) fn scan_citation_index<S: IssueStore>(
     storage: &S,
     roots: &[String],
     sources: impl IntoIterator<Item = String>,
-) -> Result<CitationScanEvidence, PathReadError> {
+) -> Result<CitationIndex, PathReadError> {
     let scanner = CitationScanner::new(sources).map_err(other)?;
     let roots = roots
         .iter()
         .map(|root| normalize_artifact_path(root))
         .filter(|root| !root.is_empty())
         .collect::<BTreeSet<_>>();
-    let mut evidence = CitationScanEvidence::new();
+    let mut index = CitationIndex::default();
+    let mut record = |path: &str, bytes: &[u8]| scanner.scan(path, bytes, &mut index);
     for root in roots.iter().filter(|root| {
         !roots
             .iter()
@@ -53,18 +56,18 @@ pub(crate) fn collect_citation_scan_evidence<S: IssueStore>(
             ArtifactListingScope::RecursiveFiles,
             PermissionDeniedPolicy::Skip,
         )? {
-            ArtifactEvidence::File(bytes) => scanner.scan(root, &bytes, &mut evidence),
+            ArtifactEvidence::File(bytes) => record(root, &bytes),
             ArtifactEvidence::Directory { entries, .. } => {
                 for entry in entries {
                     if let Some((path, bytes)) = read_scanned_file(storage, entry)? {
-                        scanner.scan(&path, &bytes, &mut evidence);
+                        record(&path, &bytes);
                     }
                 }
             }
             _ => {}
         }
     }
-    Ok(evidence)
+    Ok(index)
 }
 
 /// Read one listed scan path, skipping everything that is not a regular file.
@@ -316,16 +319,6 @@ fn other(error: impl Into<anyhow::Error>) -> PathReadError {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
-    use crate::domain::artifact_classifier::{
-        classification_facts_from_evidence, classify_artifacts, ArchiveLayout,
-        ArtifactClassificationFacts, ArtifactClassificationInventory, ArtifactClassificationPolicy,
-    };
-    use crate::domain::artifact_discovery::ArtifactEvidenceMap;
-    use crate::domain::artifact_plan::{
-        ArtifactAction, ArtifactOwner, ArtifactPlan, ArtifactPlanEntry, ArtifactProvenance,
-        ArtifactVersion, PlanTarget, WarningCode,
-    };
-    use crate::domain::State;
     use crate::storage::JsonFileStorage;
     use std::collections::BTreeSet;
     use std::fs;
@@ -333,7 +326,6 @@ mod tests {
     use tempfile::TempDir;
 
     const CITED_SOURCE: &str = "dev/active/plan.md";
-    const DESTINATION_ROOT: &str = "dev/archive/abcdef12";
 
     fn repository() -> (TempDir, JsonFileStorage) {
         let repo = TempDir::new().unwrap();
@@ -351,97 +343,21 @@ mod tests {
         fs::write(file, contents).unwrap();
     }
 
-    /// A shell-comment citation of the artifact the fixture plan relocates.
+    /// A shell-comment citation of [`CITED_SOURCE`].
     fn citation() -> String {
         format!("#!/usr/bin/env bash\n# see {CITED_SOURCE} for the design\n")
     }
 
-    fn scan_policy(roots: &[&str]) -> ArtifactClassificationPolicy {
-        ArtifactClassificationPolicy::configured(
-            "dev",
-            vec!["dev/active".into()],
-            vec!["docs".into()],
-            "dev/archive",
-        )
-        .with_citation_scan_roots(roots.iter().map(|root| (*root).to_string()).collect())
-    }
-
-    /// Plan the relocation of one cited artifact with `roots` declared as the
-    /// citation scan universe.
-    fn plan_with_scan(storage: &JsonFileStorage, roots: &[&str]) -> ArtifactPlan {
-        let target = PlanTarget::Container {
-            id: crate::test_utils::issue_id(0x3456_7890_abcd_ef12_3456_7890_abcd_ef12),
-        };
-        let artifacts = vec![ArtifactPlanEntry::new(
-            CITED_SOURCE,
-            ArtifactVersion::WorkingTree,
-            ArtifactAction::Retain,
-        )
-        .with_provenance(vec![ArtifactProvenance::Explicit])
-        .with_owners(vec![ArtifactOwner {
-            issue: crate::test_utils::issue_id(175),
-            document_index: 0,
-            state: State::Done,
-            archived_from: None,
-            inside_subtree: true,
-            pinned: false,
-            selected_for_relink: false,
-        }])];
-        let policy = scan_policy(roots);
-        let layout = ArchiveLayout::new(&target, DESTINATION_ROOT, &policy, &artifacts);
-        let evidence = std::iter::once(CITED_SOURCE.to_string())
-            .chain(layout.destination(CITED_SOURCE))
-            .chain(std::iter::once(DESTINATION_ROOT.to_string()))
-            .map(|path| {
-                let fact =
-                    inspect_artifact_evidence(storage, &path, ArtifactListingScope::MetadataOnly)
-                        .unwrap();
-                (path, fact)
-            })
-            .collect::<ArtifactEvidenceMap>();
-        let facts = ArtifactClassificationFacts {
-            citations: collect_citation_scan_evidence(
-                storage,
-                &policy.citation_scan_roots,
-                [CITED_SOURCE.to_string()],
-            )
-            .unwrap(),
-            ..classification_facts_from_evidence(
-                &target,
-                DESTINATION_ROOT,
-                &artifacts,
-                &policy,
-                Vec::new(),
-                &evidence,
-            )
-            .unwrap()
-        };
-        classify_artifacts(
-            ArtifactClassificationInventory::new(target, artifacts, Vec::new()),
-            DESTINATION_ROOT,
-            policy,
-            facts,
-        )
-        .unwrap()
-    }
-
-    /// The scanned files a produced plan reports citations in, having confirmed
-    /// the plan does relocate the cited artifact — a plan that leaves it in
-    /// place would report nothing whatever the scan reached.
-    fn citing_files(plan: &ArtifactPlan) -> BTreeSet<String> {
-        assert!(
-            plan.artifacts()
-                .iter()
-                .any(|artifact| artifact.action() == ArtifactAction::Move),
-            "the planned artifact must relocate for its citations to be reported"
-        );
-        plan.artifacts()
+    /// The scanned files citing [`CITED_SOURCE`] under `roots`.
+    fn citing_files(storage: &JsonFileStorage, roots: &[&str]) -> BTreeSet<String> {
+        let roots = roots
             .iter()
-            .flat_map(ArtifactPlanEntry::plan_warnings)
-            .filter(|warning| warning.code == WarningCode::MovingPathCitation)
-            .filter_map(|warning| warning.path.as_deref())
-            .filter_map(|location| location.rsplitn(3, ':').nth(2))
-            .map(str::to_string)
+            .map(|root| (*root).to_string())
+            .collect::<Vec<_>>();
+        scan_citation_index(storage, &roots, [CITED_SOURCE.to_string()])
+            .unwrap()
+            .citations(CITED_SOURCE)
+            .map(|location| location.citing.clone())
             .collect()
     }
 
@@ -551,42 +467,40 @@ mod tests {
     }
 
     #[test]
-    fn test_collect_citation_scan_evidence_reads_a_declared_root_outside_the_development_root() {
+    fn test_scan_citation_index_reads_a_declared_root_outside_the_development_root() {
         let (repo, storage) = repository();
         write(&repo, CITED_SOURCE, "plan");
         write(&repo, "scripts/nested/benchmark.sh", citation());
         write(&repo, "CHANGELOG.md", citation());
         write(&repo, "dev/notes.md", citation());
 
-        let plan = plan_with_scan(&storage, &["scripts", "CHANGELOG.md"]);
+        let citing = citing_files(&storage, &["scripts", "CHANGELOG.md"]);
 
         // Both declared roots sit outside the configured development root, one
         // of them naming a single file rather than a directory. The citing file
         // inside the development root that no root declares stays unread, so the
         // universe is the declared list and not the development root.
         assert_eq!(
-            citing_files(&plan),
+            citing,
             paths(&["CHANGELOG.md", "scripts/nested/benchmark.sh"])
         );
     }
 
     #[test]
-    fn test_collect_citation_scan_evidence_skips_an_absent_declared_root_without_failing_the_plan()
-    {
+    fn test_scan_citation_index_skips_an_absent_declared_root_without_failing_the_scan() {
         let (repo, storage) = repository();
         write(&repo, CITED_SOURCE, "plan");
         write(&repo, "scripts/present.sh", citation());
 
-        let plan = plan_with_scan(&storage, &["docs/absent", "scripts"]);
+        let citing = citing_files(&storage, &["docs/absent", "scripts"]);
 
-        // The plan is produced and the readable root still contributes, so the
-        // absent root skipped rather than emptying or failing the scan.
-        assert_eq!(citing_files(&plan), paths(&["scripts/present.sh"]));
+        // The readable root still contributes, so the absent root is skipped
+        // rather than emptying or failing the scan.
+        assert_eq!(citing, paths(&["scripts/present.sh"]));
     }
 
     #[test]
-    fn test_collect_citation_scan_evidence_skips_a_symbolic_link_path_component_without_failing_the_plan(
-    ) {
+    fn test_scan_citation_index_skips_a_symbolic_link_path_component_without_failing_the_scan() {
         let (repo, storage) = repository();
         write(&repo, CITED_SOURCE, "plan");
         write(&repo, "outside/cited.sh", citation());
@@ -598,22 +512,22 @@ mod tests {
         .unwrap();
         symlink(repo.path().join("outside"), repo.path().join("linked-root")).unwrap();
 
-        let plan = plan_with_scan(&storage, &["linked-root", "scripts"]);
+        let citing = citing_files(&storage, &["linked-root", "scripts"]);
 
         // The same citing file sits behind a symlinked declared root and behind
         // a symlinked component of a walked root; neither reaches it, while the
         // regular file beside the link is still read.
-        assert_eq!(citing_files(&plan), paths(&["scripts/real.sh"]));
+        assert_eq!(citing, paths(&["scripts/real.sh"]));
         // Declared by its real path, that same file is read, so the skip is the
         // symbolic link and not the file behind it.
         assert_eq!(
-            citing_files(&plan_with_scan(&storage, &["outside"])),
+            citing_files(&storage, &["outside"]),
             paths(&["outside/cited.sh"])
         );
     }
 
     #[test]
-    fn test_collect_citation_scan_evidence_skips_a_file_whose_bytes_are_not_valid_utf8_without_failing_the_plan(
+    fn test_scan_citation_index_skips_a_file_whose_bytes_are_not_valid_utf8_without_failing_the_scan(
     ) {
         let (repo, storage) = repository();
         write(&repo, CITED_SOURCE, "plan");
@@ -624,10 +538,10 @@ mod tests {
             [b"\xff", citation().as_bytes(), b"\xfe"].concat(),
         );
 
-        let plan = plan_with_scan(&storage, &["scripts"]);
+        let citing = citing_files(&storage, &["scripts"]);
 
         // The undecodable file carries the cited path in its bytes, so a lossy
-        // read would report it; the plan is produced and only the text file is.
-        assert_eq!(citing_files(&plan), paths(&["scripts/real.sh"]));
+        // read would report it; only the text file is.
+        assert_eq!(citing, paths(&["scripts/real.sh"]));
     }
 }

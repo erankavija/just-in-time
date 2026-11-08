@@ -1,0 +1,31 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-08T05:51:55.675110397Z",
+  "context": {},
+  "created_at": "2026-11-08T05:50:57.879405290Z",
+  "dependencies": [],
+  "description": "Anchor redo apply's directory walks at the opened worktree-root handle, so publishing a profile no longer re-walks the absolute path from `/` down to the worktree root for each operation.\n\n## Background\n\n- The 45d0a971 cost harness (scenario (d)) counts directory `openat` calls of `jit profile add` for a 48-file package over four nested directories: tip 467 against base 547 (ratio 0.85, threshold ≤ 0.6). Inside the worktree the tip opens 102 directories against base 527; the tip also re-walks `/` down to the worktree root on about 73 opens (base 4), which adds about 365 at the fixture's depth. fsync: base 107 (58 directory), tip 62 (12 directory).\n- Invoker ruling: the verdict counts every directory `openat` (REQ-01(d) of 45d0a971); anchor the walk at the opened worktree-root handle. Capability helpers live in `crates/jit/src/storage/capability_fs.rs` (`open_capability_parent`, `open_descendant_dir_nofollow`); redo apply in `crates/jit/src/storage/redo_apply.rs`.\n- Epic criteria: `b697a3f7` REQ-14, REQ-15, REQ-22 (story `0672b087`).\n\n## Success Criteria\n\n- [hard] REQ-01: A redo apply opens the worktree root once and resolves every operation's parent relative to that handle; no operation re-opens an absolute path from `/`.\n- [hard] REQ-02: Each parent directory is still opened and synced once per record, as `4d834432` settled; `@/inv/atomic-writes` and the symlink refusals hold unchanged.\n- [hard] REQ-03: One test owns REQ-01 (the root is opened once per apply, observed through the existing redo-apply open-count instrumentation or its equivalent); no duplicate of 4d834432's per-parent test.\n- [hard] REQ-04: Scenario (d) of the 45d0a971 harness reports tip directory opens ≤ 0.6 × base in a smoke run; the lead records the run's numbers.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-08T05:50:57.879405290Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "2add77bc-aaf6-4849-bb8a-d1ef63d59eb2",
+  "labels": [
+    "component:storage",
+    "satisfies:b697a3f7/REQ-15",
+    "per:@/charter/D-17",
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:read-concurrency",
+    "satisfies:b697a3f7/REQ-22",
+    "per:@/charter/D-19"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Redo apply anchors its directory walks at the opened worktree root",
+  "updated_at": "2026-11-08T05:51:55.675110397Z"
+}

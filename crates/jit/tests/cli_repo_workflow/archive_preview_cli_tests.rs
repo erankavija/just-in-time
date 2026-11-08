@@ -342,6 +342,7 @@ fn test_archive_document_cli_json_is_exact_plan_and_blocked_preview_exits_zero_w
         keys,
         [
             "action_counts",
+            "advisory",
             "artifacts",
             "blockers",
             "count",
@@ -517,6 +518,7 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
             .map(String::as_str)
             .collect::<Vec<_>>(),
         [
+            "advisory",
             "deleted_sources",
             "destination_root",
             "event_appended",
@@ -740,7 +742,7 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
             .keys()
             .cloned()
             .collect::<Vec<_>>(),
-        ["candidates", "count", "schema_version"]
+        ["advisory", "candidates", "count", "schema_version"]
     );
     assert_eq!(report["schema_version"], 1);
     assert_eq!(report["candidates"].as_array().unwrap().len(), 2);
@@ -899,9 +901,10 @@ fn test_archive_candidates_cli_reports_directory_root_but_skips_directory_link_t
         .iter()
         .all(|edge| edge["target"] != "dev/active"));
 
-    let preview_plan = cli
+    let mut preview_plan = cli
         .run_json(["archive", "container", &directory_candidate])
         .unwrap();
+    preview_plan.as_object_mut().unwrap().remove("advisory");
     assert_eq!(preview_plan, *directory_plan);
     let document_plan = cli.run_json(["archive", "document", "dev/active"]).unwrap();
     assert!(document_plan["artifacts"]
@@ -1047,6 +1050,12 @@ fn test_container_archive_slug_is_consistent_and_frozen_by_marker() {
         .exists());
 }
 
+/// The one file of the citation-scan fixture's declared scan universe.
+const CITING_FILE: &str = "notes/mention.md";
+
+/// [`CITING_FILE`]'s text, naming the moving artifact's path.
+const CITING_TEXT: &str = "See fixtures/root.md for the source of truth.\n";
+
 /// Seed a citation scan universe of exactly `notes/` into a repository
 /// initialized over [`CITATION_SCAN_POLICY`]: `fixtures/root.md` is the moving
 /// artifact, and `notes/mention.md` carries `citing_text` verbatim. Archival is
@@ -1068,19 +1077,16 @@ const CITATION_SCAN_POLICY: &str = concat!(
     "citation_scan_roots = [\"notes\"]\n",
 );
 
-/// Every `moving-path-citation` warning path recorded against `source` in `plan`.
-fn citation_warning_paths(plan: &Value, source: &str) -> Vec<String> {
-    plan["artifacts"]
+/// Every `<citing path>:<line>:<column>` location the advisory section of
+/// `report` records against `artifact`.
+fn advisory_locations(report: &Value, artifact: &str) -> Vec<String> {
+    report["advisory"]["citations"]
         .as_array()
-        .unwrap()
+        .expect("an archive report carries an advisory citation section")
         .iter()
-        .find(|artifact| artifact["source"] == source)
-        .expect("plan carries the moving artifact")["plan_warnings"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|warning| warning["code"] == "moving-path-citation")
-        .map(|warning| warning["path"].as_str().unwrap().to_string())
+        .filter(|citations| citations["artifact"] == artifact)
+        .flat_map(|citations| citations["locations"].as_array().unwrap())
+        .map(|location| location.as_str().unwrap().to_string())
         .collect()
 }
 
@@ -1108,127 +1114,66 @@ fn archive_warning_set(report: &Value) -> BTreeSet<(String, Option<String>)> {
         .collect()
 }
 
-/// Blank out every warnings collection in `plan`, in place, leaving actions,
-/// blockers, and eligibility as the only remaining variables.
-fn clear_warnings(plan: &mut Value) {
-    plan["plan_warnings"] = serde_json::json!([]);
-    for artifact in plan["artifacts"].as_array_mut().unwrap() {
-        artifact["plan_warnings"] = serde_json::json!([]);
-    }
-}
-
 /// REQ-01 (`jit:9ca124f9`): the citation scan reads a declared root set, not
 /// tracking data, so a preview over a citing fixture reports the moving
-/// artifact's citation even when the working tree is under no version control
-/// at all (`@/charter/D-4` — archival is a core command).
+/// artifact's citation, at its line and column, in its advisory section even
+/// when the working tree is under no version control at all (`@/charter/D-4`).
 #[test]
-fn test_archive_document_preview_reports_moving_path_citation_without_version_control() {
-    let citing_text = "See fixtures/root.md for the source of truth.\n";
+fn test_archive_document_preview_reports_the_citation_in_its_advisory_section_without_version_control(
+) {
     let cli = JitCli::with_repository(
         declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
     );
     cli.run(["init", "--json"]).unwrap();
-    seed_citation_scan(&cli, citing_text);
+    seed_citation_scan(&cli, CITING_TEXT);
     assert!(
         !cli.root().join(".git").exists(),
         "fixture must genuinely lack version control to exercise REQ-01"
     );
 
-    let plan = cli
+    let preview = cli
         .run_json(["archive", "document", "fixtures/root.md"])
         .unwrap();
 
-    let column = citing_text.find("fixtures/root.md").unwrap() + 1;
+    let column = CITING_TEXT.find("fixtures/root.md").unwrap() + 1;
     assert_eq!(
-        citation_warning_paths(&plan, "fixtures/root.md"),
-        vec![format!("notes/mention.md:1:{column}")]
+        advisory_locations(&preview, "fixtures/root.md"),
+        vec![format!("{CITING_FILE}:1:{column}")]
     );
 }
 
 /// REQ-02 (`jit:9ca124f9`): the identical fixture inside an initialized git
-/// repository reports the identical citation warnings as its untracked twin —
-/// the scan is indifferent to whether the tree is under version control.
+/// repository reports the identical advisory section as its untracked twin.
 #[test]
-fn test_archive_document_preview_reports_same_moving_path_citation_inside_version_control() {
-    let citing_text = "See fixtures/root.md for the source of truth.\n";
+fn test_archive_document_preview_reports_the_same_advisory_section_inside_version_control() {
     let untracked = JitCli::with_repository(
         declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
     );
     untracked.run(["init", "--json"]).unwrap();
-    seed_citation_scan(&untracked, citing_text);
+    seed_citation_scan(&untracked, CITING_TEXT);
     let tracked = JitCli::with_repository(
         declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
     );
     tracked.init_git().unwrap();
     tracked.run(["init", "--json"]).unwrap();
-    seed_citation_scan(&tracked, citing_text);
+    seed_citation_scan(&tracked, CITING_TEXT);
     assert!(
         tracked.root().join(".git").is_dir(),
         "fixture must genuinely sit under version control to exercise REQ-02"
     );
 
-    let untracked_plan = untracked
+    let untracked_preview = untracked
         .run_json(["archive", "document", "fixtures/root.md"])
         .unwrap();
-    let tracked_plan = tracked
+    let tracked_preview = tracked
         .run_json(["archive", "document", "fixtures/root.md"])
         .unwrap();
 
-    let untracked_citations = citation_warning_paths(&untracked_plan, "fixtures/root.md");
     assert!(
-        !untracked_citations.is_empty(),
+        !advisory_locations(&untracked_preview, "fixtures/root.md").is_empty(),
         "fixture must actually carry a citation for the comparison to be meaningful"
     );
-    assert_eq!(
-        untracked_citations,
-        citation_warning_paths(&tracked_plan, "fixtures/root.md")
-    );
-}
-
-/// REQ-03 (`jit:9ca124f9`): a citation warning is purely advisory. A plan whose
-/// scan universe carries a citation of the moving artifact's path reports the
-/// same actions, blockers, and eligibility as the same plan whose scan universe
-/// holds no citation at all — the fixture pair differs only in the text of the
-/// citing file.
-#[test]
-fn test_archive_document_preview_actions_blockers_and_eligibility_match_regardless_of_citation() {
-    let with_citation = JitCli::with_repository(
-        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
-    );
-    with_citation.run(["init", "--json"]).unwrap();
-    seed_citation_scan(
-        &with_citation,
-        "See fixtures/root.md for the source of truth.\n",
-    );
-    let without_citation = JitCli::with_repository(
-        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
-    );
-    without_citation.run(["init", "--json"]).unwrap();
-    seed_citation_scan(
-        &without_citation,
-        "See fixtures/unrelated.md for the source of truth.\n",
-    );
-
-    let mut with_plan = with_citation
-        .run_json(["archive", "document", "fixtures/root.md"])
-        .unwrap();
-    let mut without_plan = without_citation
-        .run_json(["archive", "document", "fixtures/root.md"])
-        .unwrap();
-
-    // Guard: the scan universe genuinely differs in whether it carries a citation.
-    assert!(!citation_warning_paths(&with_plan, "fixtures/root.md").is_empty());
-    assert!(citation_warning_paths(&without_plan, "fixtures/root.md").is_empty());
-
-    assert_eq!(with_plan["eligible"], without_plan["eligible"]);
-    assert_eq!(with_plan["blockers"], without_plan["blockers"]);
-    assert_eq!(with_plan["action_counts"], without_plan["action_counts"]);
-    clear_warnings(&mut with_plan);
-    clear_warnings(&mut without_plan);
-    assert_eq!(
-        with_plan, without_plan,
-        "a citation warning must change nothing but the plan's warnings"
-    );
+    assert_eq!(untracked_preview["advisory"], tracked_preview["advisory"]);
 }
 
 /// The policy classifying development areas explicitly, per
@@ -1408,9 +1353,6 @@ fn test_archive_preview_reports_unmanaged_selected_root_for_deck_outside_configu
     }
 }
 
-/// The one file of the citation-scan fixture's declared scan universe.
-const CITING_FILE: &str = "notes/mention.md";
-
 /// The moving artifact whose path [`CITING_FILE`] names in its text.
 const CITED_ARTIFACT: &str = "fixtures/root.md";
 
@@ -1524,8 +1466,8 @@ struct ArchivedCitation {
 /// Every guarantee `jit:3be32cad` locks in is a claim about this single
 /// execution, so the preconditions that keep those claims from passing
 /// vacuously are established here rather than in each test: both linked
-/// artifacts are genuinely selected for relocation, and the planner genuinely
-/// sees the citation. A run that relocated nothing, or one whose scan universe
+/// artifacts are genuinely selected for relocation, and the advisory section
+/// genuinely reports the citation. A run that relocated nothing, or one whose scan universe
 /// never reached the citing file, would satisfy immutability trivially.
 ///
 /// The citing file sits outside `managed_paths` and is linked to no issue, so
@@ -1535,13 +1477,13 @@ fn archived_citation(cli: &JitCli) -> ArchivedCitation {
     archived_citation_with_scan_directories(cli, 0)
 }
 
-/// Add empty scan directories to exercise the archive capture's complete-listing
-/// closure without changing the one citation the fixture reports.
+/// Add empty scan directories to widen the citation scan's walk without
+/// changing the one citation the fixture reports.
 fn archived_citation_with_scan_directories(
     cli: &JitCli,
     directory_count: usize,
 ) -> ArchivedCitation {
-    seed_citation_scan(cli, "See fixtures/root.md for the source of truth.\n");
+    seed_citation_scan(cli, CITING_TEXT);
     (0..directory_count).for_each(|index| {
         fs::create_dir_all(cli.root().join(format!("notes/fanout-{index:03}"))).unwrap();
     });
@@ -1560,9 +1502,9 @@ fn archived_citation_with_scan_directories(
         "both linked artifacts must genuinely relocate, or immutability holds trivially: {preview}"
     );
     assert!(
-        citation_warning_paths(&preview, CITED_ARTIFACT)
+        advisory_locations(&preview, CITED_ARTIFACT)
             .iter()
-            .any(|occurrence| occurrence.starts_with(CITING_FILE)),
+            .any(|location| location.starts_with(CITING_FILE)),
         "the scan must genuinely see the citation, or nothing observes the rewrite it declines to make: {preview}"
     );
 
@@ -1640,7 +1582,7 @@ fn test_archive_container_execution_relocates_every_artifact_byte_identically() 
     );
 }
 
-/// REQ-02 (`jit:3be32cad`): the warning channel is the whole response to an
+/// REQ-02 (`jit:3be32cad`): the advisory section is the whole response to an
 /// in-content citation. The scanned file that names the moving artifact's path
 /// survives execution byte for byte, so the citation it carries is left naming
 /// a path the tree no longer holds (`@/issue/8e071e18/decision/D-8`).
@@ -1674,8 +1616,7 @@ fn test_archive_container_execution_leaves_a_citing_scanned_file_byte_identical(
 }
 
 /// REQ-03 (`jit:ef118aea`): execution derives the same advisory warnings as a
-/// preview of the unchanged target, including citations it intentionally leaves
-/// for the adopter to repair after relocation.
+/// preview of the unchanged target.
 #[test]
 fn test_archive_container_execution_reports_the_preview_warning_set() {
     let cli = JitCli::with_repository(
@@ -1689,6 +1630,24 @@ fn test_archive_container_execution_reports_the_preview_warning_set() {
         archive_warning_set(&run.preview),
         "execution must report the warning set preview computed for the same archive target"
     );
+}
+
+/// A declared scan root may hold more directories than the archive capture's
+/// listing budget; the scan walks it outside the guarded image, so preview and
+/// execution still report the same warnings and advisory section.
+#[test]
+fn test_archive_container_execution_reports_citations_with_more_than_256_scan_directories() {
+    let cli = JitCli::with_repository(
+        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
+    );
+    cli.run(["init", "--json"]).unwrap();
+    let run = archived_citation_with_scan_directories(&cli, 261);
+
+    assert_eq!(
+        archive_warning_set(&run.execution),
+        archive_warning_set(&run.preview)
+    );
+    assert_eq!(run.execution["advisory"], run.preview["advisory"]);
 }
 
 #[cfg(unix)]
@@ -1731,43 +1690,19 @@ fn test_archive_container_preview_and_execution_preserve_citations_beside_unread
     fs::set_permissions(&secret, fs::Permissions::from_mode(0o700)).unwrap();
     let preview = previewed.unwrap();
     let execution = executed.unwrap();
-    let expected = BTreeSet::from([
+    let expected = vec![
         "dev/scan/readable.md:1:8".to_string(),
         "dev/scan/readable.md:2:9".to_string(),
         "dev/scan/readable.md:3:8".to_string(),
-    ]);
-    let preview_citations = citation_warning_paths(&preview, "dev/active/design.md")
-        .into_iter()
-        .collect::<BTreeSet<_>>();
-    let execution_citations = archive_warning_set(&execution)
-        .into_iter()
-        .filter_map(|(code, path)| (code == "moving-path-citation").then_some(path).flatten())
-        .collect::<BTreeSet<_>>();
-
-    assert_eq!(preview_citations, expected);
-    assert_eq!(execution_citations, expected);
-    assert_eq!(
-        archive_warning_set(&execution),
-        archive_warning_set(&preview)
-    );
-}
-
-/// REQ-03 (`jit:ef118aea`): a declared scan root may contain more directories
-/// than the ordinary validation closure lists; execution still captures and
-/// revalidates that complete configured universe rather than imposing a
-/// smaller repository-size cap than its listing budget.
-#[test]
-fn test_archive_container_execution_reports_citations_with_more_than_256_scan_directories() {
-    let cli = JitCli::with_repository(
-        declaration_dir(&[(".jit/config.toml", &declared_config(CITATION_SCAN_POLICY))]).unwrap(),
-    );
-    cli.run(["init", "--json"]).unwrap();
-    let run = archived_citation_with_scan_directories(&cli, 261);
+    ];
 
     assert_eq!(
-        archive_warning_set(&run.execution),
-        archive_warning_set(&run.preview),
-        "a large declared scan root must preserve preview/execution warning parity"
+        advisory_locations(&preview, "dev/active/design.md"),
+        expected
+    );
+    assert_eq!(
+        advisory_locations(&execution, "dev/active/design.md"),
+        expected
     );
 }
 

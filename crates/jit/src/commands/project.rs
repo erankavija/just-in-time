@@ -117,8 +117,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
     /// keeps the validation exit code.
     pub fn project_render(&self, name: Option<&str>) -> Result<ProjectRenderResult> {
         use crate::repository_state::{
-            assemble_config, derive_materialization, render_capture_closure, require_target,
-            CaptureBudget, CaptureSpec, MaterializationRequest, VirtualPath,
+            derive_materialization, render_capture_closure, require_target, CaptureBudget,
+            CaptureSpec, MaterializationRequest, VirtualPath,
         };
         use std::collections::BTreeSet;
 
@@ -143,15 +143,16 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
         with_mutation_session(self.exec.storage(), &layout, "project render", |session| {
             let mut spec = CaptureSpec::new(registries()?, budget)?;
             spec.discover_tail(VirtualPath::EVENTS)?;
+            let mut configuration = super::ConfigurationParse::captured();
             let Some(image) = capture_discovering(session, spec, |image, spec| {
-                let config = assemble_config(image)?;
+                let config = configuration.parse(image)?;
                 let rules_text = super::image_virtual_bytes(image, &VirtualPath::RULES)?
                     .map(String::from_utf8)
                     .transpose()?;
                 let closure = render_capture_closure(
                     image.layout(),
-                    &config,
-                    &selected_projection_names(&config, name)?,
+                    config,
+                    &selected_projection_names(config, name)?,
                     rules_text.as_deref(),
                 )
                 .map_err(project_producer_error)?;
@@ -161,7 +162,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
                 return Ok(SessionStep::Retry);
             };
 
-            let declarations = crate::repository_state::declarations_from_image(&image)?;
+            let declarations = crate::repository_state::declarations_with_config(
+                &image,
+                configuration.into_config(&image),
+            )?;
             let config = declarations.config();
             let selected_names = selected_projection_names(config, name)?;
 

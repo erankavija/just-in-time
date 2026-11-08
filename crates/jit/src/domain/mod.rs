@@ -23,6 +23,7 @@
 //! The domain layer is independent of CLI orchestration and can be used
 //! directly for library integration.
 
+pub mod archive_advisory;
 pub mod artifact_classifier;
 pub mod artifact_conformance;
 pub mod artifact_directory;

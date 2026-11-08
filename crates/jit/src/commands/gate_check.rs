@@ -80,6 +80,8 @@ pub(super) struct PrecheckExecution {
 struct CapturedGateExecution<'a> {
     run_id: &'a GateRunId,
     image: &'a crate::repository_state::RepositoryImage,
+    /// The configuration assembled from `image`.
+    config: &'a crate::config::JitConfig,
     issue: &'a Issue,
     issues: &'a [Issue],
     gate: &'a crate::declarations::GateDefinition,
@@ -152,10 +154,11 @@ pub(super) struct CapturedGateEvidence {
     pub(super) runs: Vec<GateRunResult>,
 }
 
-/// An evaluation's captured image with the bound issue, the gate registry and
-/// the required automated gate resolved from it.
+/// An evaluation's captured image with its configuration, the bound issue, the
+/// gate registry and the required automated gate resolved from it.
 struct BoundGateEvaluation {
     image: crate::repository_state::RepositoryImage,
+    config: crate::config::JitConfig,
     issue: Issue,
     registry: crate::declarations::GateRegistry,
     gate: crate::declarations::GateDefinition,
@@ -726,7 +729,7 @@ impl<S: IssueStore> GateOps<'_, S> {
 
 impl<S: IssueStore> CommandExecutor<S> {
     /// Capture the resolved issue and the inputs `gate_key` evaluates, with
-    /// the issue, gate registry and gate the capture resolved.
+    /// the configuration, issue, gate registry and gate the capture resolved.
     fn capture_gate_evaluation_image(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
@@ -770,16 +773,25 @@ impl<S: IssueStore> CommandExecutor<S> {
             .checker
             .as_ref()
             .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", gate_key))?;
-        let bind = |image| BoundGateEvaluation {
-            image,
-            issue: issue.clone(),
-            registry: registry.clone(),
-            gate: gate.clone(),
+        let bind = |image,
+                    config: std::result::Result<
+            crate::config::JitConfig,
+            crate::repository_state::ProducerError,
+        >|
+         -> Result<BoundGateEvaluation> {
+            Ok(BoundGateEvaluation {
+                image,
+                config: config?,
+                issue: issue.clone(),
+                registry: registry.clone(),
+                gate: gate.clone(),
+            })
         };
         if checker_needs_validation_image(checker) {
-            return Ok(self
-                .capture_proposed_base(session, &BTreeMap::new(), run_paths, Some(initial))?
-                .map(bind));
+            return self
+                .capture_proposed_base(session, &BTreeMap::new(), run_paths, Some(initial.into()))?
+                .map(|(image, config)| bind(image, config))
+                .transpose();
         }
         let layout = initial.layout().clone();
         let image = super::grow_discovering(session, initial, |_, spec| {
@@ -813,7 +825,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
             Ok(())
         })?;
-        Ok(image.map(bind))
+        image
+            .map(|image| {
+                let config = crate::repository_state::assemble_config(&image);
+                bind(image, config)
+            })
+            .transpose()
     }
 }
 
@@ -888,7 +905,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                     return Ok(AttemptOutcome::Retry);
                 };
                 let input_warnings = super::refuse_foreign_leases_held(
-                    crate::repository_state::assemble_config(&bound.image)?.enforcement_mode(),
+                    bound.config.enforcement_mode(),
                     std::slice::from_ref(&bound.issue.id),
                     claims_guard.as_ref(),
                 )?;
@@ -912,7 +929,11 @@ impl<S: IssueStore> GateOps<'_, S> {
             })?;
 
         let BoundGateEvaluation {
-            image, issue, gate, ..
+            image,
+            config,
+            issue,
+            gate,
+            ..
         } = &bound;
         let target_id = &issue.id;
         // Digest the declared inputs BEFORE the checker runs: the value must name the content
@@ -937,6 +958,7 @@ impl<S: IssueStore> GateOps<'_, S> {
             None => self.exec.execute_captured_gate(CapturedGateExecution {
                 run_id: &run_id,
                 image,
+                config,
                 issue,
                 issues: &issues,
                 gate,
@@ -964,7 +986,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 return Ok(AttemptOutcome::Retry);
             };
             let record_warnings = super::refuse_foreign_leases_held(
-                crate::repository_state::assemble_config(&final_bound.image)?.enforcement_mode(),
+                final_bound.config.enforcement_mode(),
                 std::slice::from_ref(target_id),
                 claims_guard.as_ref(),
             )?;
@@ -1072,6 +1094,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         subject: GateRunSubject<'_>,
         checker: &crate::declarations::GateChecker,
         repository_image: &crate::repository_state::RepositoryImage,
+        config: &crate::config::JitConfig,
     ) -> Result<GateRunResult>
     where
         S: crate::storage::RepositoryStateStore,
@@ -1111,18 +1134,18 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .validate_repository_report()
                 .and_then(|report| selected_gate_findings(&report, &Selection::Whole)),
             GateChecker::IssueValidation => select_over_image(
-                &CapturedValidation::from_image(repository_image),
+                &CapturedValidation::with_config(repository_image, config.clone()),
                 Selection::Issue(issue_id.into()),
             ),
             GateChecker::RuleValidation { rule } => select_over_image(
-                &CapturedValidation::from_image(repository_image),
+                &CapturedValidation::with_config(repository_image, config.clone()),
                 Selection::Rule {
                     issue: issue_id.into(),
                     rule: rule.clone(),
                 },
             ),
             GateChecker::LabelTargetValidation { label_namespace } => {
-                let captured = CapturedValidation::from_image(repository_image);
+                let captured = CapturedValidation::with_config(repository_image, config.clone());
                 label_target(&captured, issue_id, label_namespace).and_then(|target| {
                     select_over_image(&captured, Selection::Scope(target.clone())).with_context(
                         || format!("label '{label_namespace}:{target}' on issue {issue_id}"),
@@ -1360,7 +1383,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                     )
                 })
             }
-            _ => self.execute_builtin_checker_with_repository_view(subject, checker, input.image),
+            _ => self.execute_builtin_checker_with_repository_view(
+                subject,
+                checker,
+                input.image,
+                input.config,
+            ),
         }
     }
 }
@@ -1459,21 +1487,25 @@ impl<S: IssueStore> GateOps<'_, S> {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    /// Execute prechecks from one closed repository image and the evidence
-    /// captured from it without publishing, deriving run ids from index
-    /// `first_run` of `mutation`.
+    /// Execute `precheck`'s gates from its closed repository image and the
+    /// evidence captured from it without publishing, deriving run ids from
+    /// index `first_run` of `mutation`.
     pub(super) fn execute_captured_prechecks(
         &self,
-        image: &crate::repository_state::RepositoryImage,
-        issue: &Issue,
-        registry: &crate::declarations::GateRegistry,
-        captured: &CapturedGateEvidence,
+        precheck: &super::PrecheckPreflight,
         first_run: u64,
         mutation: &crate::repository_state::MutationContext,
     ) -> Result<PrecheckExecution>
     where
         S: crate::storage::RepositoryStateStore,
     {
+        let super::PrecheckPreflight {
+            captured,
+            image,
+            config,
+            issue,
+            registry,
+        } = precheck;
         let issues = super::captured_active_issues(image)?;
         let mut projected_issue = issue.clone();
         let mut failed_gates = Vec::new();
@@ -1501,6 +1533,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     let result = match self.execute_captured_gate(CapturedGateExecution {
                         run_id: &run_id,
                         image,
+                        config,
                         issue: &projected_issue,
                         issues: &issues,
                         gate,
@@ -2338,6 +2371,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 },
                 &GateChecker::IssueValidation,
                 &image,
+                &crate::repository_state::assemble_config(&image).unwrap(),
             )
             .unwrap();
 
@@ -3272,6 +3306,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 },
                 &GateChecker::RepositoryValidation,
                 &image,
+                &crate::repository_state::assemble_config(&image).unwrap(),
             )
             .unwrap();
         (validate, run)
@@ -3578,6 +3613,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     },
                     &checker,
                     &image,
+                    &crate::repository_state::assemble_config(&image).unwrap(),
                 )
                 .unwrap();
             let reported = run
@@ -3659,6 +3695,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     },
                     &checker,
                     &image,
+                    &crate::repository_state::assemble_config(&image).unwrap(),
                 )
                 .unwrap();
 

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "27beaa78533dfc68134e6e451621ff17033e4c37",
+  "completed_at": "2026-11-08T06:14:18.210364807Z",
+  "duration_ms": 134865,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact defects found; implementation and tests support REQ-01–03, and recorded smoke evidence meets REQ-04.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e7635f2f-98c6-42a0-bd48-e582b43ffb8b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7ec5800e-a603-44d9-8860-38696a1d077c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T06:12:03.344371056Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:e7635f2f — d3b03a461, fabc4e729, 664827607, c41d3b540; inspected individually\nPolicy sources: AGENTS.md (only applicable policy file)\nResolved items: @/issue/16c53cc2/requirement/REQ-06 and @/issue/b697a3f7/requirement/REQ-22 → respective issue descriptions; @/charter/D-19, @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/inv/architecture-dependency-direction, @/inv/orthogonal-tests, @/inv/essential-code-prose, @/inv/shared-test-contracts, @/inv/semantic-test-assertions, @/inv/convention-convergence, @/inv/canonical-cutover, @/inv/dag-acyclic → .jit/invariants.toml; @/gate/cargo-ci, @/gate/jit-validate → .jit/gates.toml\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T06:10:06.428385972+00:00; supplied ancestry confirms coverage of all four commits; current code-review pending\nTruncation recovery: recovered combined-output truncation through separate commit/path reads covering graph, archive, inventory, tests, and issue-record patches\n\nNo findings. Current code satisfies REQ-01–03 through the shared reverse index, session-level hierarchy resolution, property test, and graph-construction counter. REQ-04 has recorded smoke evidence: base 38.01 ms versus tip 6.78 ms per candidate, ratio 0.178 ≤ 0.5. The referenced harness is absent from this checkout; these numbers are recorded evidence, not independently reproduced results.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects found; implementation and tests support REQ-01–03, and recorded smoke evidence meets REQ-04.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -159,7 +159,7 @@ impl Tree {
     ) -> ArtifactClassificationInventory {
         let inventory = inventory_explicit_roots(
             &[],
-            &jit::test_taxonomy::test_taxonomy().hierarchy_config(),
+            &jit::test_taxonomy::test_taxonomy().resolve_hierarchy(&[]),
             ExplicitRootTarget::Document(root),
             &PinnedRootEvidenceMap::new(),
         )
@@ -739,7 +739,7 @@ fn test_readable_pinned_root_is_historical_and_never_scanned_or_constrains_worki
     let issues = [pinned_issue()];
     let inventory = inventory_explicit_roots(
         &issues,
-        &jit::test_taxonomy::test_taxonomy().hierarchy_config(),
+        &jit::test_taxonomy::test_taxonomy().resolve_hierarchy(&issues),
         ExplicitRootTarget::Container(&issues[0].id),
         &pin_evidence(true),
     )
@@ -761,7 +761,7 @@ fn test_failed_pinned_read_stays_pinned_read_failed_without_working_tree_fallbac
     let issues = [pinned_issue()];
     let inventory = inventory_explicit_roots(
         &issues,
-        &jit::test_taxonomy::test_taxonomy().hierarchy_config(),
+        &jit::test_taxonomy::test_taxonomy().resolve_hierarchy(&issues),
         ExplicitRootTarget::Container(&issues[0].id),
         &pin_evidence(false),
     )

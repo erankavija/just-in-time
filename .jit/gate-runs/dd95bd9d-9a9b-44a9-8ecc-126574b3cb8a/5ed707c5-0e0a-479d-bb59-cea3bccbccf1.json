@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fedd005b9785bdc5a80e08f4a976cdbb32e5f204",
+  "completed_at": "2026-11-08T05:33:18.061603247Z",
+  "duration_ms": 241873,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are satisfied, and both prior blocking findings are resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "dd95bd9d-9a9b-44a9-8ecc-126574b3cb8a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5ed707c5-0e0a-479d-bb59-cea3bccbccf1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T05:29:16.188079310Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:dd95bd9d`: 0867de482, b63bae7b1, 853cde937, 0cc25ddba, 8f9d250d8, e6e4cb5fc, 5ebce93b9, efab0755a, 45ded1fc5; individual patches inspected; uncommitted records excluded.\nPolicy sources: `AGENTS.md` (no nested policies), `.jit/config.toml`, `.jit/invariants.toml`, `.jit/gates.toml`, `dev/TESTING.md`.\nResolved items: issue descriptions: @/issue/dd95bd9d/requirement/REQ-01, @/issue/dd95bd9d/requirement/REQ-02, @/issue/dd95bd9d/requirement/REQ-03, @/issue/dd95bd9d/requirement/REQ-04, @/issue/b697a3f7/requirement/REQ-06, @/issue/8e071e18/decision/D-8; `dev/vision/9db27a3a-charter.md`: @/charter/D-4, @/charter/D-9, @/charter/D-18, @/charter/D-20, @/charter/D-24; `.jit/invariants.toml`: @/inv/architecture-dependency-direction, @/inv/orthogonal-tests, @/inv/essential-code-prose, @/inv/canonical-cutover, @/inv/shared-test-contracts, @/inv/semantic-test-assertions, @/inv/semantic-types, @/inv/convention-convergence, @/inv/derived-state-coherence; `.jit/gates.toml`: @/gate/jit-validate.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T05:27:26.068926605Z; supplied ancestry confirms coverage of all nine commits; not rerun. Prior code-review failed, exit 1, run b33701f2; both findings rechecked.\nTruncation recovery: separate policy/configuration reads, targeted issue criteria, and bounded commit/path reads recovered relevant evidence; unrelated sibling criteria and historical records excluded from current-behavior judgment.\n\nNo findings. REQ-01–REQ-04 are satisfied. Execute scans before publication at `crates/jit/src/commands/archive.rs:900`; tests at lines 1652 and 1698 cover rewritten citation sources and scan failure without publication, addressing both prior blocking findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are satisfied, and both prior blocking findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Archive citations are an advisory section beside the plan.** `jit archive
+  document`, `jit archive container` (preview and `--execute`) and `jit archive
+  candidates` report the in-content citations a relocation would break in an
+  `advisory` section beside the plan instead of as `moving-path-citation` plan
+  warnings. A preview or listing scans once after planning; an execution scans
+  once per attempt before it writes, and a scan error aborts it with no write. A plan now derives only from its
+  captured snapshot, so a preview equals the plan execution applies. A
+  Markdown link, inline, angle-bracket or by reference, now cites the path it
+  resolves to. See
+  [Archive planning and execution](docs/reference/cli-commands.md#archive-planning-and-execution).
+
+- **`jit doc check-links` reports real link lines.** Each link error and
+  warning's `line` is the 1-based line where the link's destination is
+  written, instead of `0`. See
+  [`jit doc check-links`](docs/reference/cli-commands.md#jit-doc-check-links).
+
 - **Search result paths are relative to the search root.** Each `jit search`
   result's `path` is relative to the `.jit/` data directory, and each
   linked-document match from the server's combined search is relative to the

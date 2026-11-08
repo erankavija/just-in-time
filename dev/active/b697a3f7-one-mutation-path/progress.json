@@ -220,8 +220,8 @@
           "id": "45d0a971",
           "short_id": "45d0a971",
           "title": "Cost evidence: the epic's four cost reductions against the base binary",
-          "status": "pending",
-          "note": "after 04:30 quiet window; coordinate with df129d9e fba8d478 quiet-host trials"
+          "status": "in_progress",
+          "note": "dispatched opus 07:4x; phase 1 harness build under normal load; phase 2 recorded runs in announced quiet window"
         }
       ]
     },
@@ -239,8 +239,8 @@
           "id": "c31c2e57",
           "short_id": "c31c2e57",
           "title": "A mutation attempt parses its configuration once per captured image",
-          "status": "in_progress",
-          "note": "dispatched 05:1x on opus, worktrees based f9dbac535"
+          "status": "done",
+          "note": "r2 landed dd7d4178c (86898bfe1); cargo-ci passed; code-review passed run 5f86b8ae"
         },
         {
           "id": "e73ad8bc",
@@ -253,8 +253,8 @@
           "id": "dd95bd9d",
           "short_id": "dd95bd9d",
           "title": "Archive citation warnings are an advisory report beside the plan, from one index per command",
-          "status": "in_progress",
-          "note": "opus"
+          "status": "done",
+          "note": "r3 landed 37fab84fd (0867de482); cargo-ci passed; code-review passed run 5ed707c5"
         },
         {
           "id": "82f1647f",
@@ -274,6 +274,40 @@
           "title": "A gate evaluation resolves checker documents and validation from its own captured image",
           "status": "pending",
           "note": "after a2153a6f (shared gate_check.rs); opus"
+        }
+      ]
+    },
+    {
+      "wave_number": 13,
+      "issues": [
+        {
+          "id": "e7635f2f",
+          "short_id": "e7635f2f",
+          "status": "done",
+          "note": "landed 27beaa785 (d3b03a461); cargo-ci passed; code-review passed run 7ec5800e; smoke (b) ratio 0.178 (base 38.01 ms, tip 6.78 ms, load ~7)"
+        },
+        {
+          "id": "2add77bc",
+          "short_id": "2add77bc",
+          "status": "pending",
+          "note": "opus"
+        }
+      ]
+    },
+    {
+      "wave_number": 14,
+      "issues": [
+        {
+          "id": "6a19e93f",
+          "short_id": "6a19e93f",
+          "status": "pending",
+          "note": "after e7635f2f"
+        },
+        {
+          "id": "86a183c2",
+          "short_id": "86a183c2",
+          "status": "pending",
+          "note": "after a869900b"
         }
       ]
     }
@@ -337,7 +371,11 @@
       ]
     },
     "dd95bd9d",
-    "82f1647f"
+    "82f1647f",
+    "e7635f2f",
+    "6a19e93f",
+    "86a183c2",
+    "2add77bc"
   ],
   "escalations": [
     {
@@ -377,6 +415,12 @@
       "detail": "code-review/holistic-review REVIEWER_AGENT pinned to gpt-5.6-terra in .jit/gates.toml; invoker asked for gpt-6.1-sol reviewers. Options: change gates.toml repo-wide, keep gate config and use sol for non-gate reviews, or hold.",
       "status": "resolved",
       "decision": "invoker (user): all five review gates use codex gpt-6.1-sol high, landed be302dc9c"
+    },
+    {
+      "issue": "dd95bd9d",
+      "reason": "rework limit exceeded; same defect class (post-apply citation scan)",
+      "to": "just-in-time-d5",
+      "status": "closed: r3 passed"
     }
   ],
   "rework_counts": {
@@ -393,8 +437,8 @@
     "030df4b1": 1,
     "219b9df8": 1,
     "42046050": 2,
-    "c31c2e57": 1,
-    "dd95bd9d": 1
+    "c31c2e57": 2,
+    "dd95bd9d": 3
   },
   "surfaced_pitfalls": [
     {
@@ -422,7 +466,9 @@
       "detail": "One-session candidates: 233 s for 230 candidates against 254 s per-candidate path on this repository; per-candidate planning (reachability, hashing, citation scan) dominates, not base derivation. 45d0a971 REQ-02(b) requires tip per-candidate slope <= 0.5 x base; may fail. Invoker warned 01:28.",
       "status": "open",
       "owner": "45d0a971"
-    }
+    },
+    "Lead trap: telling dd95bd9d to scan after the committed execute attempt lost citations from relocated citing files; any post-apply observation of live files must map moved files back to their sources.",
+    "Lead review trap: verifying one-parse-per-image by spot-checking sites misses classes; brief the worker to enumerate every assemble_config/declarations_from_image site against discovery-parsed images, including error paths."
   ],
   "started_at": "2026-11-06T01:20:00+02:00",
   "coordination": [
@@ -480,6 +526,11 @@
       "story": "dfb2f10d",
       "result": "done",
       "evidence": "sol checkpoint reviews r1-r3; remediation b0dc019f, f98f2353, 219b9df8 done; r3: REQ-01/03 MET, REQ-02 MET with steward ruling that embedded.rs is_forbidden_route is a URL route filter, out of scope"
+    },
+    {
+      "story": "19404174",
+      "result": "done",
+      "evidence": "sol checkpoint r1 (58e61799c): REQ-01/04 unmet -> dd95bd9d, 82f1647f; r2 (43949fdca): all four MET, no findings"
     }
   ],
   "decisions": [
@@ -512,6 +563,16 @@
     {
       "at": "06:1x",
       "decision": "dd95bd9d REQ-03 amended (steward): index built by the existing whole-path citation scanner with Markdown link targets via resolve_link; Markdown-only narrowing rejected under D-9. Rework 1 dispatched.",
+      "by": "invoker just-in-time-d5"
+    },
+    {
+      "at": "07:2x",
+      "decision": "dd95bd9d option A: execute scans once per mutation attempt before publication; AppliedChanges deleted; REQ-02 amended (steward); one attempt beyond limit",
+      "by": "invoker just-in-time-d5"
+    },
+    {
+      "at": "08:0x",
+      "decision": "45d0a971 smoke: all four tip verdicts fail. Remediation under 0672b087: e7635f2f (graph reverse index once, satisfies 16c53cc2/REQ-06), 6a19e93f (bulk per-match, after e7635f2f, 16c53cc2/REQ-07 if profiled cause), 86a183c2 (one parse per distinct config source per command, after a869900b), 2add77bc (redo walk anchored at worktree root). (d) verdict literal all-dir openat. 45d0a971 base record next quiet window; tip after all four.",
       "by": "invoker just-in-time-d5"
     }
   ],
@@ -654,6 +715,68 @@
       "effort": "high",
       "verdict": "pass",
       "run": "393e6166"
+    },
+    {
+      "issue": "dd95bd9d",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "fail (F1, F2 blocking)",
+      "run": "031018ef"
+    },
+    {
+      "issue": "c31c2e57",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "fail (F1, F2 blocking)",
+      "run": "81638c37"
+    },
+    {
+      "issue": "dd95bd9d",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "fail (F1, F2 blocking)",
+      "run": "b33701f2"
+    },
+    {
+      "issue": "c31c2e57",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "5f86b8ae"
+    },
+    {
+      "issue": "dd95bd9d",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "5ed707c5"
+    },
+    {
+      "issue": "19404174",
+      "review": "story checkpoint r2 (non-gate)",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "all MET, no findings"
+    },
+    {
+      "issue": "e7635f2f",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "7ec5800e"
     }
   ]
 }

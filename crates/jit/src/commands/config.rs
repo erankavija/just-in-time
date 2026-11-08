@@ -348,21 +348,22 @@ impl<S: IssueStore> ConfigOps<'_, S> {
             // held session.
             let overrides =
                 std::iter::once((config_vpath.clone(), Some(edited_bytes.clone()))).collect();
-            let Some(base) =
-                self.exec
-                    .capture_proposed_base(session, &overrides, &[], Some(config_image))?
+            let Some((base, edited_config)) = self.exec.capture_proposed_base(
+                session,
+                &overrides,
+                &[],
+                Some(config_image.into()),
+            )?
             else {
                 return Ok(SessionStep::Retry);
             };
             // Declarations are read from the config-overlaid image so the effective
             // ruleset and projection inputs reflect the EDITED configuration (the
-            // base may not carry config.toml yet on a first-time creation).
-            let overlaid = apply_overlay(
-                &base,
-                std::iter::once((config_vpath.clone(), Some(edited_bytes.clone())))
-                    .collect::<std::collections::BTreeMap<_, _>>(),
-            )?;
-            let declarations = crate::repository_state::declarations_from_image(&overlaid)?;
+            // base may not carry config.toml yet on a first-time creation); the
+            // discovery overlaid the same edit, so its assembly is the edited one.
+            let overlaid = apply_overlay(&base, overrides)?;
+            let declarations =
+                crate::repository_state::declarations_with_config(&overlaid, edited_config)?;
             let plan =
                 finalize_config_edit(&base, &context, &edited_bytes, declarations.borrowed())?;
             let proposed = apply_overlay(

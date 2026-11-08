@@ -51,8 +51,8 @@ pub enum RepositoryValidationPass {
     Projections,
 }
 
-/// A captured image paired with the index and issue records parsed from it.
-/// Each loader failure is shared with each report that fails on it; the
+/// A captured image paired with the index, issue records, and declarations
+/// parsed from it. Each loader failure is shared with each report that fails on it; the
 /// index's failure precedes the records'.
 #[derive(Debug)]
 pub struct CapturedValidation<'a> {
@@ -61,17 +61,31 @@ pub struct CapturedValidation<'a> {
     pub(crate) issues: std::result::Result<Arc<[Issue]>, Arc<anyhow::Error>>,
     /// The JSON value each of `issues` decoded from, in order; empty when they failed.
     pub(crate) values: Vec<serde_json::Value>,
+    declarations: crate::repository_state::DeferredDeclarations,
 }
 
 impl<'a> CapturedValidation<'a> {
     /// Parse `image`'s index and issue records.
     pub fn from_image(image: &'a RepositoryImage) -> Self {
+        Self::loaded(image, None)
+    }
+
+    /// [`Self::from_image`] with `config`, the configuration already
+    /// assembled from `image`.
+    pub(crate) fn with_config(image: &'a RepositoryImage, config: JitConfig) -> Self {
+        Self::loaded(image, Some(Ok(config)))
+    }
+
+    fn loaded(
+        image: &'a RepositoryImage,
+        config: Option<std::result::Result<JitConfig, crate::repository_state::ProducerError>>,
+    ) -> Self {
         match load_issues(image) {
             Ok(records) => {
                 let (issues, values) = records.into_iter().unzip();
-                Self::new(Cow::Borrowed(image), Ok(issues), values)
+                Self::new(Cow::Borrowed(image), Ok(issues), values, config)
             }
-            Err(error) => Self::new(Cow::Borrowed(image), Err(error), Vec::new()),
+            Err(error) => Self::new(Cow::Borrowed(image), Err(error), Vec::new(), config),
         }
     }
 
@@ -79,24 +93,42 @@ impl<'a> CapturedValidation<'a> {
         image: Cow<'a, RepositoryImage>,
         issues: Result<Vec<Issue>>,
         values: Vec<serde_json::Value>,
+        config: Option<std::result::Result<JitConfig, crate::repository_state::ProducerError>>,
     ) -> Self {
         Self {
             index: records_pass(load_index(&image)),
             issues: records_pass(issues).map(Arc::from),
             values,
             image,
+            declarations: crate::repository_state::DeferredDeclarations::new(
+                crate::repository_state::validation_declarations_with_config,
+                config,
+            ),
         }
+    }
+
+    /// The image's declarations, parsed once from the configuration its
+    /// capture assembled, with an unloadable rules source kept as state.
+    pub(crate) fn declarations(
+        &self,
+    ) -> std::result::Result<
+        &crate::repository_state::CapturedRepositoryDeclarations,
+        Arc<crate::repository_state::DeclarationParseError>,
+    > {
+        self.declarations.get(&self.image)
     }
 }
 
 impl CapturedValidation<'static> {
-    /// Parse `image`'s index beside the issue records and values its capture parsed.
+    /// Parse `image`'s index beside the issue records, values, and
+    /// configuration its capture parsed.
     pub(crate) fn with_records(
         image: RepositoryImage,
         issues: Result<Vec<Issue>>,
         values: Vec<serde_json::Value>,
+        config: std::result::Result<JitConfig, crate::repository_state::ProducerError>,
     ) -> Self {
-        Self::new(Cow::Owned(image), issues, values)
+        Self::new(Cow::Owned(image), issues, values, Some(config))
     }
 }
 
@@ -232,11 +264,11 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
             selectable: Err(error),
         }
     };
-    let declarations = match crate::repository_state::validation_declarations_from_image(image) {
+    let declarations = match captured.declarations() {
         Ok(declarations) => declarations,
         Err(error) => return failed(anyhow!(error).context("declaration validation pass")),
     };
-    if let Some(error) = undeclared_template_node_types(&declarations) {
+    if let Some(error) = undeclared_template_node_types(declarations) {
         return failed(anyhow!(error).context("declaration validation pass"));
     }
     let expected = match declarations
@@ -346,7 +378,7 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
             namespace_and_hierarchy_complete = false;
         }
     }
-    findings.extend(collect_enforcement_drift_findings(&declarations));
+    findings.extend(collect_enforcement_drift_findings(declarations));
     findings.extend(collect_review_placeholder_findings(gates));
     if namespace_and_hierarchy_complete {
         passes.push(RepositoryValidationPass::NamespaceAndHierarchy);
@@ -393,8 +425,8 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
     ) {
         (Ok(records), None) => Ok(Box::new(Selectable {
             records: Arc::clone(records),
-            rules: rules_file_message.map_or_else(|| Ok(declarations.rules), Err),
-            templates: declarations.config.templates,
+            rules: rules_file_message.map_or_else(|| Ok(declarations.rules.clone()), Err),
+            templates: declarations.config.templates.clone(),
         })),
         (Err(error), _) => Err(Arc::clone(error)),
         (Ok(_), Some(error)) => Err(error),
@@ -851,8 +883,11 @@ mod tests {
             )
         });
         let image = builder.build();
-        let declarations =
-            crate::repository_state::validation_declarations_from_image(&image).unwrap();
+        let declarations = crate::repository_state::validation_declarations_with_config(
+            &image,
+            crate::repository_state::assemble_config(&image),
+        )
+        .unwrap();
         let image = if declarations.rules_loaded() {
             let serialized =
                 crate::repository_state::serialize_ruleset(declarations.rules()).unwrap();

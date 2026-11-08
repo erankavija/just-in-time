@@ -407,6 +407,133 @@ pub(crate) fn grow_discovering(
     Ok(None)
 }
 
+/// The configuration a discovery assembles, kept across the rounds that grow
+/// one image and handed to the consumer of the returned image, so a mutation
+/// attempt assembles it once per captured image.
+///
+/// A grown image keeps every byte its earlier rounds read, so the assembly
+/// changes only when a configuration source joins the capture. A failed
+/// assembly is kept like a successful one.
+pub(crate) struct ConfigurationParse<F = AssembleConfiguration> {
+    assemble: F,
+    /// The sources the kept assembly read; `None` before the first.
+    sources: Option<ConfigurationSources>,
+    /// The kept assembly, or the default configuration when it failed.
+    config: crate::config::JitConfig,
+    failure: Option<crate::repository_state::ProducerError>,
+}
+
+/// Which configuration sources a capture holds, in [`CONFIGURATION_SOURCES`] order.
+type ConfigurationSources = [bool; 3];
+
+pub(crate) const CONFIGURATION_SOURCES: [crate::repository_state::VirtualPath; 3] = [
+    crate::repository_state::VirtualPath::CONFIG,
+    crate::repository_state::VirtualPath::TEMPLATES,
+    crate::repository_state::VirtualPath::INVARIANTS,
+];
+
+/// An assembly of a captured image's configuration.
+pub(crate) type AssembleConfiguration =
+    fn(
+        &crate::repository_state::RepositoryImage,
+    )
+        -> std::result::Result<crate::config::JitConfig, crate::repository_state::ProducerError>;
+
+impl ConfigurationParse {
+    /// Assemble with [`crate::repository_state::assemble_config`].
+    pub(crate) fn captured() -> Self {
+        Self::new(crate::repository_state::assemble_config)
+    }
+}
+
+impl<F> ConfigurationParse<F>
+where
+    F: Fn(
+        &crate::repository_state::RepositoryImage,
+    )
+        -> std::result::Result<crate::config::JitConfig, crate::repository_state::ProducerError>,
+{
+    /// Assemble with `assemble`.
+    pub(crate) fn new(assemble: F) -> Self {
+        Self {
+            assemble,
+            sources: None,
+            config: crate::config::JitConfig::default(),
+            failure: None,
+        }
+    }
+
+    /// Keep `config`, the assembly of `image` an earlier discovery made.
+    pub(crate) fn seed(
+        &mut self,
+        image: &crate::repository_state::RepositoryImage,
+        config: std::result::Result<
+            crate::config::JitConfig,
+            crate::repository_state::ProducerError,
+        >,
+    ) {
+        self.sources = Some(Self::sources(image));
+        (self.config, self.failure) = match config {
+            Ok(config) => (config, None),
+            Err(error) => (crate::config::JitConfig::default(), Some(error)),
+        };
+    }
+
+    fn sources(image: &crate::repository_state::RepositoryImage) -> ConfigurationSources {
+        CONFIGURATION_SOURCES.map(|path| image.capture_spec().contains_path(&path))
+    }
+
+    /// Keep the assembly of `image`, reusing an earlier round's assembly of
+    /// the same sources.
+    fn assemble_sources_of(&mut self, image: &crate::repository_state::RepositoryImage) {
+        let sources = Some(Self::sources(image));
+        if self.sources != sources {
+            let config = (self.assemble)(image);
+            self.seed(image, config);
+        }
+    }
+
+    /// The configuration of `image`, or its assembly failure for a discovery
+    /// that stops on it.
+    pub(crate) fn parse(
+        &mut self,
+        image: &crate::repository_state::RepositoryImage,
+    ) -> std::result::Result<&crate::config::JitConfig, crate::repository_state::ProducerError>
+    {
+        self.assemble_sources_of(image);
+        match self.failure.take() {
+            Some(error) => {
+                self.sources = None;
+                Err(error)
+            }
+            None => Ok(&self.config),
+        }
+    }
+
+    /// The configuration of `image`, or the default configuration for a
+    /// discovery that plans past an assembly failure, which stays kept for
+    /// [`Self::into_config`].
+    pub(crate) fn parse_or_default(
+        &mut self,
+        image: &crate::repository_state::RepositoryImage,
+    ) -> &crate::config::JitConfig {
+        self.assemble_sources_of(image);
+        &self.config
+    }
+
+    /// The assembly of `image`, the image the discovery returned, by value.
+    pub(crate) fn into_config(
+        mut self,
+        image: &crate::repository_state::RepositoryImage,
+    ) -> std::result::Result<crate::config::JitConfig, crate::repository_state::ProducerError> {
+        self.assemble_sources_of(image);
+        match self.failure {
+            Some(error) => Err(error),
+            None => Ok(self.config),
+        }
+    }
+}
+
 /// Report an occupied repository export target as the caller-facing
 /// already-exists failure naming the output path the invocation asked for.
 ///
@@ -990,6 +1117,8 @@ fn derive_state_target(
 struct PrecheckPreflight {
     captured: gate_check::CapturedGateEvidence,
     image: crate::repository_state::RepositoryImage,
+    /// The configuration assembled from `image`.
+    config: crate::config::JitConfig,
     issue: Issue,
     registry: crate::declarations::GateRegistry,
 }
@@ -2926,7 +3055,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         let target = light.target.id;
         // A preflight without prechecks reads only configuration.
-        let Some(issues) = light.issues else {
+        let Some(base) = light.base else {
             return Ok(Some(StateChangePreflight {
                 target,
                 enforcement_mode: crate::repository_state::assemble_config(&light.image)?
@@ -2934,8 +3063,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 precheck: None,
             }));
         };
-        let declarations = crate::repository_state::declarations_from_image(&light.image)?;
+        let issues = base.issues;
+        let declarations =
+            crate::repository_state::declarations_with_config(&light.image, base.config)?;
         let enforcement_mode = declarations.config().enforcement_mode();
+        let config = declarations.config;
         let registry = declarations.gates;
         let issue = project(
             issues
@@ -2945,7 +3077,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             &registry,
         )?;
         Ok(self
-            .capture_precheck_preflights(session.as_mut(), light.image, vec![issue], &registry)?
+            .capture_precheck_preflights(
+                session.as_mut(),
+                light.image,
+                config,
+                vec![issue],
+                &registry,
+            )?
             .and_then(|preflights| preflights.into_iter().next())
             .map(|precheck| StateChangePreflight {
                 target,
@@ -2955,11 +3093,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Plan the prechecks of each `planned` issue, growing `image`, a mutation
-    /// base read with those issues as precheck targets, to what they read.
+    /// base read with those issues as precheck targets, to what they read;
+    /// `config` is the configuration assembled from `image`.
     fn capture_precheck_preflights(
         &self,
         session: &mut (dyn crate::storage::RepositoryReadSession + '_),
         image: crate::repository_state::RepositoryImage,
+        config: crate::config::JitConfig,
         planned: Vec<Issue>,
         registry: &crate::declarations::GateRegistry,
     ) -> Result<Option<Vec<PrecheckPreflight>>>
@@ -2981,15 +3121,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         let broad = planned
             .iter()
             .any(|issue| has_broad_precheck(issue, registry));
-        let image = match broad || !unread_prompts.is_empty() {
-            false => image,
+        let (image, config) = match broad || !unread_prompts.is_empty() {
+            false => (image, config),
             true => match self.capture_proposed_base(
                 session,
                 &std::collections::BTreeMap::new(),
                 &unread_prompts,
-                Some(image),
+                Some(validate::GrowthStart {
+                    image,
+                    config: Some(Ok(config)),
+                }),
             )? {
-                Some(image) => image,
+                Some((image, config)) => (image, config?),
                 None => return Ok(None),
             },
         };
@@ -2999,6 +3142,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 Ok(PrecheckPreflight {
                     captured: captured_precheck_evidence(&image, &issue, registry)?,
                     image: image.clone(),
+                    config: config.clone(),
                     issue,
                     registry: registry.clone(),
                 })
@@ -3031,14 +3175,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             *cached = Some(CachedPrecheckExecution {
                 target_id: target.clone(),
                 evidence: precheck.captured.evidence.clone(),
-                execution: self.execute_captured_prechecks(
-                    &precheck.image,
-                    &precheck.issue,
-                    &precheck.registry,
-                    &precheck.captured,
-                    first_run,
-                    context,
-                )?,
+                execution: self.execute_captured_prechecks(precheck, first_run, context)?,
             });
         }
         Ok(cached
@@ -3581,6 +3718,86 @@ mod tests {
                 .collect::<Vec<_>>(),
             [(&leased, &holder)]
         );
+    }
+
+    /// Issue creation, template application, and `validate --fix` assemble
+    /// their configuration once per captured image, failed or not: discovery's
+    /// assembly is the one the derivation reads.
+    #[test]
+    fn test_configuration_parse_assembles_once_per_captured_image_over_mutations_and_template_application(
+    ) {
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config = taxonomy.config_fragment();
+        let executor = test_helpers::memory_executor_declaring(
+            crate::storage::InMemoryStorage::new(),
+            test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
+        let template: crate::templates::GraphTemplate = toml::from_str(&format!(
+            "name = 'child'\napplies_to = ['{0}']\n[[nodes]]\nrole = 'child'\ntype = '{0}'\n",
+            taxonomy.default_type,
+        ))
+        .unwrap();
+        fn assemblies<T>(run: impl FnOnce() -> T) -> (T, usize) {
+            let before = crate::declarations::assemblies_on_this_thread();
+            let value = run();
+            (
+                value,
+                crate::declarations::assemblies_on_this_thread() - before,
+            )
+        }
+
+        let (container, creation) = assemblies(|| {
+            executor
+                .issues()
+                .create_issue(
+                    "Container".into(),
+                    String::new(),
+                    crate::domain::Priority::Normal,
+                    vec![],
+                    vec![],
+                    None,
+                    None,
+                    false,
+                )
+                .unwrap()
+                .issue
+                .id
+        });
+        let (_, application) = assemblies(|| {
+            executor
+                .templates()
+                .apply_template_with(&template, &container, &Default::default(), false)
+                .unwrap()
+        });
+        // The fix attempt and the report of its result capture one image each.
+        let (_, repair) = assemblies(|| executor.validation().validate_with_fix(false).unwrap());
+        // A failed assembly is handed on like a successful one.
+        let malformed = test_helpers::memory_executor_declaring(
+            crate::storage::InMemoryStorage::new(),
+            test_helpers::MemoryDeclarations {
+                config: Some("undeclared_key = 1\n"),
+                after_initialization: true,
+                ..Default::default()
+            },
+        );
+        let (refused, refusal) = assemblies(|| {
+            malformed.issues().create_issue(
+                "Refused".into(),
+                String::new(),
+                crate::domain::Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+        });
+
+        assert!(refused.is_err());
+        assert_eq!((creation, application, repair, refusal), (1, 1, 2, 1));
     }
 
     #[test]

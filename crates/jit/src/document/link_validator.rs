@@ -32,45 +32,54 @@ impl LinkValidator {
 
     /// Scan document content for internal links to other documents
     ///
-    /// Uses pulldown_cmark parser to properly handle Markdown structure.
-    /// Skips links inside code blocks (fenced and indented).
-    /// Note: Inline code cannot contain links in Markdown, so we don't need to track it.
+    /// Uses pulldown_cmark parser to properly handle Markdown structure:
+    /// inline, angle-bracket and reference links alike. Skips links inside
+    /// code blocks (fenced and indented); inline code cannot contain links.
+    ///
+    /// Each link is positioned where its destination is written: an inline
+    /// link at the link itself, a reference link at its definition.
     ///
     /// Taking content rather than a path lets a caller scan the version a
     /// document reference names, such as a commit-pinned document that the
     /// working tree no longer carries.
     pub fn scan_links(content: &str) -> Vec<InternalLink> {
-        use pulldown_cmark::{Event, Parser, Tag, TagEnd};
+        use pulldown_cmark::{Event, LinkType as MarkdownLink, Parser, Tag, TagEnd};
 
-        let mut links = Vec::new();
-
-        let parser = Parser::new(content);
-
-        // Track whether we're inside a code block
+        let mut parsed = Parser::new(content).into_offset_iter();
+        let events = parsed.by_ref().collect::<Vec<_>>();
+        let definitions = parsed.reference_definitions();
+        let lines = LineStarts::new(content);
         let mut in_code_block = false;
-
-        for event in parser {
+        let mut links = Vec::new();
+        for (event, range) in events {
             match event {
-                // Track code block boundaries
-                Event::Start(Tag::CodeBlock(_)) => {
-                    in_code_block = true;
-                }
-                Event::End(TagEnd::CodeBlock) => {
-                    in_code_block = false;
-                }
-                // Process links only if not in code block
-                // Note: Inline code (`...`) cannot contain Markdown links, so no need to track it
-                Event::Start(Tag::Link { dest_url, .. }) if !in_code_block => {
-                    let Some(LinkTarget::Local(url_without_anchor)) =
-                        classify_link_target(dest_url.as_ref())
+                Event::Start(Tag::CodeBlock(_)) => in_code_block = true,
+                Event::End(TagEnd::CodeBlock) => in_code_block = false,
+                Event::Start(Tag::Link {
+                    link_type,
+                    dest_url,
+                    id,
+                    ..
+                }) if !in_code_block => {
+                    let Some(LinkTarget::Local(target)) = classify_link_target(dest_url.as_ref())
                     else {
                         continue;
                     };
-
+                    let span = match link_type {
+                        MarkdownLink::Reference
+                        | MarkdownLink::Collapsed
+                        | MarkdownLink::Shortcut => definitions
+                            .get(id.as_ref())
+                            .map_or(range, |definition| definition.span.clone()),
+                        _ => range,
+                    };
+                    let (line_number, column) = lines.position(content, span.start);
                     links.push(InternalLink {
-                        target: url_without_anchor.to_string(),
-                        line_number: 0, // Line number tracking requires more complex parsing
-                        link_type: if url_without_anchor.starts_with('/') {
+                        target: target.to_string(),
+                        line_number,
+                        column,
+                        span,
+                        link_type: if target.starts_with('/') {
                             LinkType::RootRelative
                         } else {
                             LinkType::Relative
@@ -80,7 +89,6 @@ impl LinkValidator {
                 _ => {}
             }
         }
-
         links
     }
 
@@ -222,8 +230,33 @@ impl LinkValidator {
 #[derive(Debug, Clone)]
 pub struct InternalLink {
     pub target: String,
+    /// 1-based line where the link's destination is written.
     pub line_number: usize,
+    /// 1-based character column on that line.
+    pub column: usize,
+    /// Byte range of the link, or of its reference definition.
+    pub span: std::ops::Range<usize>,
     pub link_type: LinkType,
+}
+
+/// Byte offsets where each line of a text starts.
+struct LineStarts(Vec<usize>);
+
+impl LineStarts {
+    fn new(text: &str) -> Self {
+        Self(
+            std::iter::once(0)
+                .chain(text.match_indices('\n').map(|(offset, _)| offset + 1))
+                .collect(),
+        )
+    }
+
+    /// The 1-based line and character column of byte `offset` in `text`.
+    fn position(&self, text: &str, offset: usize) -> (usize, usize) {
+        let line = self.0.partition_point(|start| *start <= offset);
+        let start = self.0[line - 1];
+        (line, text[start..offset].chars().count() + 1)
+    }
 }
 
 /// Type of link
@@ -291,6 +324,8 @@ mod tests {
         let link = InternalLink {
             target: "doc2.md".to_string(),
             line_number: 1,
+            column: 1,
+            span: 0..0,
             link_type: LinkType::Relative,
         };
 
@@ -311,6 +346,8 @@ mod tests {
         let link = InternalLink {
             target: "nonexistent.md".to_string(),
             line_number: 1,
+            column: 1,
+            span: 0..0,
             link_type: LinkType::Relative,
         };
 
@@ -330,6 +367,8 @@ mod tests {
         let link = InternalLink {
             target: "studies".to_string(),
             line_number: 1,
+            column: 1,
+            span: 0..0,
             link_type: LinkType::Relative,
         };
 
@@ -351,6 +390,8 @@ mod tests {
         let link = InternalLink {
             target: "appendix.md".to_string(),
             line_number: 1,
+            column: 1,
+            span: 0..0,
             link_type: LinkType::Relative,
         };
 
@@ -390,6 +431,8 @@ mod tests {
                 &InternalLink {
                     target: "../assets/diagram.png".to_string(),
                     line_number: 1,
+                    column: 1,
+                    span: 0..0,
                     link_type: LinkType::Relative,
                 }
             ),
@@ -401,6 +444,8 @@ mod tests {
                 &InternalLink {
                     target: "/docs/index.md".to_string(),
                     line_number: 1,
+                    column: 1,
+                    span: 0..0,
                     link_type: LinkType::RootRelative,
                 }
             ),
@@ -412,6 +457,8 @@ mod tests {
                 &InternalLink {
                     target: "section".to_string(),
                     line_number: 1,
+                    column: 1,
+                    span: 0..0,
                     link_type: LinkType::Anchor,
                 }
             ),
@@ -426,6 +473,46 @@ mod tests {
         assert!(validator.is_risky_path("../../other/doc.md"));
         assert!(!validator.is_risky_path("../doc.md"));
         assert!(!validator.is_risky_path("doc.md"));
+    }
+
+    #[test]
+    fn test_scan_links_positions_each_link_where_its_destination_is_written() {
+        let content = "# Title\n\nSee [ä](inline.md) and [b](<angle.md>).\n\nUse [the ref][r].\n\n[r]: ref.md\n";
+
+        let positions = LinkValidator::scan_links(content)
+            .into_iter()
+            .map(|link| {
+                let line = content.lines().nth(link.line_number - 1).unwrap();
+                let at = line.chars().skip(link.column - 1).collect::<String>();
+                (link.target, at, content[link.span].to_string())
+            })
+            .collect::<Vec<_>>();
+
+        // An inline link sits at its own `[`; a reference link at its
+        // definition, the text naming its destination.
+        assert_eq!(positions.len(), 3);
+        for (target, at, spanned) in &positions {
+            assert!(
+                at.starts_with('['),
+                "{target} is positioned at a link: {at}"
+            );
+            assert!(
+                at.starts_with(spanned.as_str()),
+                "{target}: {at} / {spanned}"
+            );
+            assert!(
+                spanned.contains(target.as_str()),
+                "{target} lies in {spanned}"
+            );
+        }
+        assert_eq!(
+            positions
+                .iter()
+                .map(|(target, ..)| target.as_str())
+                .collect::<Vec<_>>(),
+            ["inline.md", "angle.md", "ref.md"]
+        );
+        assert!(positions[2].1.starts_with("[r]:"));
     }
 
     #[test]

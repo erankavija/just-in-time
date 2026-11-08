@@ -309,7 +309,7 @@ impl From<crate::domain::item::ItemError> for ProducerError {
 }
 
 /// A typed failure raised while parsing captured declaration files into the
-/// canonical bundle (`declarations_from_image` / `validation_declarations_from_image`).
+/// canonical bundle (`declarations_from_image` / `validation_declarations_with_config`).
 ///
 /// Each variant carries its leaf parser's concrete error; rendering lives in this
 /// type's `Display` impl rather than at the parse site. Also the stored type of a
@@ -456,21 +456,33 @@ impl CapturedRepositoryDeclarations {
 pub(crate) fn declarations_from_image(
     image: &RepositoryImage,
 ) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
-    let mut declarations = validation_declarations_from_image(image)?;
+    declarations_with_config(image, materialize::assemble_config(image))
+}
+
+/// [`declarations_from_image`] over `config`, the configuration assembly of
+/// `image` already made.
+pub(crate) fn declarations_with_config(
+    image: &RepositoryImage,
+    config: Result<crate::config::JitConfig, ProducerError>,
+) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
+    let mut declarations = validation_declarations_with_config(image, config)?;
     match declarations.take_rules_load_error() {
         Some(error) => Err(error),
         None => Ok(declarations),
     }
 }
 
-/// Parse captured declarations for validation while preserving an unloadable
-/// rules source as reportable state. Configuration, gates, templates, and
-/// invariants remain strict; only rules use the empty-set sentinel because
-/// validation must still report bindings into an unloadable rule source.
-pub(crate) fn validation_declarations_from_image(
+/// Parse captured declarations for validation over `config`, the
+/// configuration assembly of `image` already made, while preserving an
+/// unloadable rules source as reportable state. Configuration, gates,
+/// templates, and invariants remain strict; only rules use the empty-set
+/// sentinel because validation must still report bindings into an unloadable
+/// rule source.
+pub(crate) fn validation_declarations_with_config(
     image: &RepositoryImage,
+    config: Result<crate::config::JitConfig, ProducerError>,
 ) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
-    let config = materialize::assemble_config(image)?;
+    let config = config?;
     let namespaces = crate::config_manager::namespaces_from_config(&config);
     let gates = match image.file_bytes(&VirtualPath::GATES)? {
         Some(bytes) => crate::declarations::parse_gate_registry(bytes)?,
@@ -509,6 +521,71 @@ pub(crate) fn validation_declarations_from_image(
     let mut declarations = CapturedRepositoryDeclarations::from_parts(config, gates, rules);
     declarations.rules_load_error = rules_load_error;
     Ok(declarations)
+}
+
+/// How a configuration assembly of an image becomes its declarations:
+/// [`declarations_with_config`] or [`validation_declarations_with_config`].
+pub(crate) type DeclarationParse =
+    fn(
+        &RepositoryImage,
+        Result<crate::config::JitConfig, ProducerError>,
+    ) -> Result<CapturedRepositoryDeclarations, DeclarationParseError>;
+
+/// The declarations of one captured image, parsed on first use from the
+/// configuration its capture assembled, so a holder fails on a declaration
+/// only when it reads one. Every read returns that one parse, its failure
+/// included.
+pub(crate) struct DeferredDeclarations {
+    parse: DeclarationParse,
+    /// The capture's assembly, until the parse takes it; `None` assembles
+    /// from the image.
+    config: std::sync::Mutex<Option<Result<crate::config::JitConfig, ProducerError>>>,
+    parsed: std::sync::OnceLock<
+        Result<CapturedRepositoryDeclarations, std::sync::Arc<DeclarationParseError>>,
+    >,
+}
+
+impl DeferredDeclarations {
+    /// Declarations `parse` derives from `config`, or from the image's own
+    /// assembly when `config` is `None`.
+    pub(crate) fn new(
+        parse: DeclarationParse,
+        config: Option<Result<crate::config::JitConfig, ProducerError>>,
+    ) -> Self {
+        Self {
+            parse,
+            config: std::sync::Mutex::new(config),
+            parsed: std::sync::OnceLock::new(),
+        }
+    }
+
+    /// The declarations of `image`, the image this holder was captured with.
+    pub(crate) fn get(
+        &self,
+        image: &RepositoryImage,
+    ) -> Result<&CapturedRepositoryDeclarations, std::sync::Arc<DeclarationParseError>> {
+        self.parsed
+            .get_or_init(|| {
+                let config = self
+                    .config
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .take()
+                    .unwrap_or_else(|| materialize::assemble_config(image));
+                (self.parse)(image, config).map_err(std::sync::Arc::new)
+            })
+            .as_ref()
+            .map_err(std::sync::Arc::clone)
+    }
+}
+
+impl std::fmt::Debug for DeferredDeclarations {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("DeferredDeclarations")
+            .field("parsed", &self.parsed.get().map(Result::is_ok))
+            .finish_non_exhaustive()
+    }
 }
 
 /// Complete deterministic pure materialization result.
@@ -800,13 +877,13 @@ pub fn derive_materialization(
 /// Finalize an authored `config.toml` edit plus the complete coupled producer set
 /// as one plan — the single-declaration config-mutation session entry.
 ///
-/// The command supplies the edited, preservation-safe `config.toml` bytes; this
-/// overlays them onto the captured `base` and assembles the edited configuration
-/// first, so an edit that fails assembly is a typed planning error and never a
-/// published file. It then derives the complete owned-materialization set —
-/// default rules and their schemas, plus every configured projection — from that
-/// edited configuration, with `declarations` supplying the gates and rules,
-/// exactly as `derive_semantic_mutation` does. The
+/// The command supplies the edited, preservation-safe `config.toml` bytes and
+/// `declarations`, the declarations of `base` with those bytes overlaid, so an
+/// edit that fails assembly is refused before planning and never published.
+/// This overlays the bytes onto the captured `base` and derives the complete
+/// owned-materialization set — default rules and their schemas, plus every
+/// configured projection — from the edited declarations, exactly as
+/// `derive_semantic_mutation` does. The
 /// authored `config.toml` write, emitted only when the edit changes its bytes,
 /// carries the captured base preimage, and every
 /// derived action its own base preimage, so `session.apply` revalidates against
@@ -825,9 +902,6 @@ pub fn finalize_config_edit(
     let overlay = std::iter::once((config_path.clone(), Some(edited_config_bytes.to_vec())))
         .collect::<std::collections::BTreeMap<_, _>>();
     let overlaid = apply_overlay(base, overlay)?;
-    // The edit must assemble before any planning: an invalid config is a typed
-    // planning error, not a published file.
-    let edited_config = materialize::assemble_config(&overlaid)?;
 
     // The authored config write carries the base preimage; the complete producer
     // set derives the coupled schemas/rule-membership/projections from the edited
@@ -849,13 +923,7 @@ pub fn finalize_config_edit(
         })
         .into_iter()
         .collect::<Vec<_>>();
-    let edited_declarations = RepositoryDeclarations {
-        item_kinds: resolved_item_kinds(&edited_config),
-        config: &edited_config,
-        gates: declarations.gates,
-        rules: declarations.rules,
-    };
-    actions.extend(compose_complete(&overlaid, &edited_declarations)?);
+    actions.extend(compose_complete(&overlaid, &declarations)?);
     let delta = RepositoryDelta::new(base.layout(), actions)?;
     Ok(MaterializationPlan::new(base, delta, context)?)
 }
@@ -1144,6 +1212,36 @@ mod tests {
             .file(".jit/rules.toml", rules)
             .entry(schema, entry)
             .build()
+    }
+
+    #[test]
+    fn test_deferred_declarations_get_returns_one_parse_from_every_call() {
+        let deferred = |gates: &str| {
+            let image = ImageBuilder::new()
+                .files(&[
+                    (".jit/config.toml", Some("")),
+                    (".jit/gates.toml", Some(gates)),
+                    (".jit/rules.toml", None),
+                ])
+                .build();
+            let config = assemble_config(&image);
+            (
+                DeferredDeclarations::new(declarations_with_config, Some(config)),
+                image,
+            )
+        };
+
+        let (parsed, image) = deferred("");
+        assert!(std::ptr::eq(
+            parsed.get(&image).unwrap(),
+            parsed.get(&image).unwrap()
+        ));
+
+        let (unparseable, image) = deferred("[[gates]\n");
+        let first = unparseable.get(&image).err().unwrap();
+        let second = unparseable.get(&image).err().unwrap();
+        assert!(matches!(*first, DeclarationParseError::Gate(_)));
+        assert!(std::sync::Arc::ptr_eq(&first, &second));
     }
 
     #[test]
@@ -1528,7 +1626,7 @@ mod tests {
     const MALFORMED_ITEM_KINDS: &str = "[item_kinds.custom]\nsection = \"Items\"\n";
 
     #[test]
-    fn test_validation_declarations_from_image_assembles_from_declaration_files_and_index() {
+    fn test_validation_declarations_with_config_assembles_from_declaration_files_and_index() {
         let paths = VirtualPath::DECLARATION_FILES
             .into_iter()
             .chain([VirtualPath::INDEX])
@@ -1546,11 +1644,11 @@ mod tests {
             .with_spec(CaptureSpec::new(paths, budget).unwrap())
             .build();
 
-        validation_declarations_from_image(&image).unwrap();
+        validation_declarations_with_config(&image, assemble_config(&image)).unwrap();
     }
 
     #[test]
-    fn test_validation_declarations_from_image_rejects_malformed_item_kinds() {
+    fn test_validation_declarations_with_config_rejects_malformed_item_kinds() {
         let image = ImageBuilder::new()
             .files(&[
                 (".jit/config.toml", Some(MALFORMED_ITEM_KINDS)),
@@ -1559,33 +1657,8 @@ mod tests {
             ])
             .build();
         assert!(matches!(
-            validation_declarations_from_image(&image),
+            validation_declarations_with_config(&image, assemble_config(&image)),
             Err(DeclarationParseError::Producer(
-                ProducerError::Configuration(ConfigurationAssemblyError::ItemKinds(_))
-            ))
-        ));
-    }
-
-    #[test]
-    fn test_finalize_config_edit_refuses_edit_that_fails_assembly() {
-        let base = ImageBuilder::new()
-            .files(&[(".jit/config.toml", Some(""))])
-            .build();
-        let (config, gates, rules) = empty_declarations();
-        let declarations = RepositoryDeclarations {
-            item_kinds: Ok(std::sync::Arc::from([])),
-            config: &config,
-            gates: &gates,
-            rules: &rules,
-        };
-        assert!(matches!(
-            finalize_config_edit(
-                &base,
-                &MutationContext::preview(),
-                MALFORMED_ITEM_KINDS.as_bytes(),
-                declarations
-            ),
-            Err(RepositoryStateError::Producer(
                 ProducerError::Configuration(ConfigurationAssemblyError::ItemKinds(_))
             ))
         ));

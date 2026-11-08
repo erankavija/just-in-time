@@ -31,11 +31,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
         use std::collections::BTreeSet;
 
         let layout = self.exec.require_layout()?;
-        let image =
+        let (_, declarations) =
             with_read_session(self.exec.storage(), &layout, "invariant check", |session| {
                 self.exec.validation().capture_repair_base(session)
             })?;
-        let declarations = crate::repository_state::validation_declarations_from_image(&image)?;
+        let declarations = declarations?;
         let rule_names: Option<BTreeSet<&str>> = declarations.rules_loaded().then(|| {
             declarations
                 .rules()

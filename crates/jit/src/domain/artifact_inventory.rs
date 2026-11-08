@@ -16,7 +16,7 @@ use crate::domain::artifact_plan::{
 use crate::domain::identity::IssueId;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::{Issue, State};
-use crate::graph::hierarchy::resolve_hierarchy;
+use crate::graph::hierarchy::HierarchyResolution;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// One explicit-root inventory target.
@@ -41,12 +41,14 @@ pub enum PinnedRootEvidence {
 pub type PinnedRootEvidenceMap = BTreeMap<(String, String), PinnedRootEvidence>;
 
 /// Canonical pinned reads relevant to one explicit-root target.
+///
+/// `resolution` is the hierarchy of the same issue set as `issues`.
 pub fn pinned_root_requests(
     issues: &[Issue],
-    hierarchy: &HierarchyConfig,
+    resolution: &HierarchyResolution<'_, Issue>,
     target: ExplicitRootTarget<'_>,
 ) -> Result<BTreeSet<(String, String)>, InventoryError> {
-    let (_, _, explicit_paths, _) = inventory_scope(issues, hierarchy, target)?;
+    let (_, _, explicit_paths, _) = inventory_scope(issues, resolution, target)?;
     Ok(issues
         .iter()
         .flat_map(|issue| issue.documents.iter())
@@ -141,10 +143,11 @@ impl ExplicitRootInventory {
 pub fn member_document_directories(
     issues: &[Issue],
     hierarchy: &HierarchyConfig,
+    resolution: &HierarchyResolution<'_, Issue>,
     root: &IssueId,
     documentation: &DocumentationConfig,
 ) -> BTreeSet<String> {
-    let members = resolved_subtree_members(issues, hierarchy, root);
+    let members = subtree_members(resolution, root);
     issues
         .iter()
         .filter(|issue| members.contains(&issue.id))
@@ -159,11 +162,12 @@ pub fn member_document_directories(
 pub fn member_derived_documents(
     issues: &[Issue],
     hierarchy: &HierarchyConfig,
+    resolution: &HierarchyResolution<'_, Issue>,
     root: &IssueId,
     files: &[String],
     documentation: &DocumentationConfig,
 ) -> BTreeSet<String> {
-    let members = resolved_subtree_members(issues, hierarchy, root);
+    let members = subtree_members(resolution, root);
     let outside_links = issues
         .iter()
         .filter(|issue| !members.contains(&issue.id))
@@ -210,20 +214,20 @@ struct DirectOwner {
 
 /// Inventory explicit roots for a container or arbitrary document target.
 ///
-/// `issues` must be the repository-wide issue set. That single universe is
-/// used both to resolve hierarchy membership and to associate every direct
-/// `DocumentReference` owner. Pinned references are included only after
+/// `issues` must be the repository-wide issue set and `resolution` its
+/// hierarchy. That single universe is used both for hierarchy membership and
+/// to associate every direct `DocumentReference` owner. Pinned references are included only after
 /// evidence proves both canonical resolution and a successful read; failures add a
 /// `pinned-read-failed` blocker and never attach the owner to a working-tree
 /// entry.
 pub fn inventory_explicit_roots(
     issues: &[Issue],
-    hierarchy: &HierarchyConfig,
+    resolution: &HierarchyResolution<'_, Issue>,
     target: ExplicitRootTarget<'_>,
     pinned: &PinnedRootEvidenceMap,
 ) -> Result<ExplicitRootInventory, InventoryError> {
     let (plan_target, member_ids, explicit_paths, force_working_tree) =
-        inventory_scope(issues, hierarchy, target)?;
+        inventory_scope(issues, resolution, target)?;
 
     let mut owners_by_identity: BTreeMap<(String, ArtifactVersion), Vec<DirectOwner>> =
         BTreeMap::new();
@@ -331,7 +335,7 @@ pub fn inventory_explicit_roots(
 
 fn inventory_scope(
     issues: &[Issue],
-    hierarchy: &HierarchyConfig,
+    resolution: &HierarchyResolution<'_, Issue>,
     target: ExplicitRootTarget<'_>,
 ) -> Result<(PlanTarget, BTreeSet<IssueId>, BTreeSet<String>, bool), InventoryError> {
     match target {
@@ -339,7 +343,7 @@ fn inventory_scope(
             if !issues.iter().any(|issue| &issue.id == root) {
                 return Err(InventoryError::ContainerNotFound(root.clone()));
             }
-            let members = resolved_subtree_members(issues, hierarchy, root);
+            let members = subtree_members(resolution, root);
             let paths = issues
                 .iter()
                 .filter(|issue| members.contains(&issue.id))
@@ -365,21 +369,13 @@ fn inventory_scope(
     }
 }
 
-fn resolved_subtree_members(
-    issues: &[Issue],
-    hierarchy: &HierarchyConfig,
+fn subtree_members(
+    resolution: &HierarchyResolution<'_, Issue>,
     root: &IssueId,
 ) -> BTreeSet<IssueId> {
-    let issue_refs = issues.iter().collect::<Vec<_>>();
-    let resolution = resolve_hierarchy(&issue_refs, hierarchy);
-    let mut members = BTreeSet::new();
-    let mut pending = vec![root.clone()];
-
-    while let Some(id) = pending.pop() {
-        if !members.insert(id.clone()) {
-            continue;
-        }
-        pending.extend(resolution.children(&id).iter().cloned());
-    }
-    members
+    resolution
+        .membership_closure(root)
+        .into_iter()
+        .map(|issue| issue.id.clone())
+        .collect()
 }
