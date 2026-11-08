@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **`jit validate --branch-drift` and `--leases` print failed checks on
+  stdout.** Human output lists every check's line or failure details on stdout
+  and carries a one-line summary of the failed checks on stderr. With `--json`,
+  `error.message` is that summary and `error.details.validations` keeps each
+  check's message. See
+  [`jit validate`](docs/reference/cli-commands.md#jit-validate).
+
 - **Archive citations are an advisory section beside the plan.** `jit archive
   document`, `jit archive container` (preview and `--execute`) and `jit archive
   candidates` report the in-content citations a relocation would break in an

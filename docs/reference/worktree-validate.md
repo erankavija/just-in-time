@@ -480,6 +480,10 @@ warning [orphan-leaf] issue e5f6g7h8 (type:task) is an orphaned leaf with no par
 Warnings: 1
 ```
 
+`--branch-drift` and `--leases` print a line for each passed check and the
+details of each failed check on stdout, then one stderr line naming the failed
+checks, for example `Validation failed: branch drift, leases`.
+
 Error-severity rule findings print with a leading `error [<rule>]`, warnings with
 `warning [<rule>]`.
 
