@@ -25939,3 +25939,6 @@
 {"from":"backlog","id":"93549f24-d37a-4fe5-bd60-361100b11c9b","issue_id":"fba8d478-7584-4e01-b7ee-b763a177a56f","timestamp":"2026-11-08T03:57:58.738561960Z","to":"ready","type":"issue_state_changed"}
 {"id":"5bab2d7b-d709-4867-b876-413f1259622a","issue_id":"f487aeef-e0d4-4334-8843-0c80b0023c2d","timestamp":"2026-11-08T03:57:58.738561960Z","type":"issue_completed"}
 {"id":"61a16be3-2261-4c64-b70f-c6e440de263b","paths":["docs/reference/rules-and-gates.md"],"timestamp":"2026-11-08T04:42:38.299915413Z","type":"files_published"}
+{"from":"ready","id":"b1019922-adf0-4550-92d5-3ee28c6cdaff","issue_id":"fba8d478-7584-4e01-b7ee-b763a177a56f","timestamp":"2026-11-08T03:58:53.520777703Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:df129d9e-lead","id":"95bd04d4-029c-48b3-875f-85ae10772ea3","issue_id":"fba8d478-7584-4e01-b7ee-b763a177a56f","timestamp":"2026-11-08T03:58:53.520777703Z","type":"issue_claimed"}
+{"fields":["description"],"id":"87fdb619-9377-4740-aecb-1b07fce84d17","issue_id":"dd95bd9d-9a9b-44a9-8ecc-126574b3cb8a","timestamp":"2026-11-08T04:00:39.776915792Z","type":"issue_updated","updated_by":"issue-update"}
