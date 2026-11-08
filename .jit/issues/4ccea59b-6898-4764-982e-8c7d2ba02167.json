@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2d466c9a-24fb-4f24-8787-28597b397429",
+      "status": "passed",
+      "updated_at": "2026-11-08T07:51:49.259495356Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "e1f182d6-6b5f-4b07-903b-053e1f1cecf3",
+      "status": "failed",
+      "updated_at": "2026-11-08T07:54:57.172687494Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4ccea59b-6898-4764-982e-8c7d2ba02167",
   "labels": [
     "epic:rust-code-quality",
@@ -22,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Every findings outcome prints a one-line stderr summary",
-  "updated_at": "2026-11-08T07:28:56.017300984Z"
+  "updated_at": "2026-11-08T07:54:57.172687494Z"
 }

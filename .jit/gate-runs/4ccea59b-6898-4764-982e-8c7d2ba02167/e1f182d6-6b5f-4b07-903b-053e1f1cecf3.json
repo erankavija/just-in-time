@@ -1,0 +1,54 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9ad50be28d95deafba701cccc54cd97f22cc9555",
+  "completed_at": "2026-11-08T07:54:57.171192035Z",
+  "duration_ms": 187803,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/dispatch/gate.rs",
+        "id": "F1",
+        "line": 318,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/4ccea59b/requirement/REQ-02"
+        ],
+        "severity": "medium",
+        "summary": "All-failed preset reports can omit the original multiline preset name from stdout."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F2",
+        "line": 3385,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/4ccea59b/requirement/REQ-04",
+          "@/charter/D-13"
+        ],
+        "severity": "medium",
+        "summary": "Validation documentation still promises complete integrity-error cause chains in error.message after this change moves them into error.details."
+      }
+    ],
+    "summary": "The integrity-summary defect is fixed, but all-failed preset reports omit potentially multiline content from stdout and validation documentation retains a contradictory JSON promise.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4ccea59b-6898-4764-982e-8c7d2ba02167",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e1f182d6-6b5f-4b07-903b-053e1f1cecf3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T07:51:49.367826274Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5448 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1ba24-6434-7fa1-b3fe-48e4285d7ed0\n--------\nuser\n--- 5435 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:4ccea59b — 71564f8c1727, 49fe18e55c08, 4df3de15d930; uncommitted changes excluded.\nPolicy sources: AGENTS.md; dev/TESTING.md; no subtree AGENTS.md found.\nResolved items: Issue descriptions — @/issue/4ccea59b/requirement/REQ-01, @/issue/4ccea59b/requirement/REQ-02, @/issue/4ccea59b/requirement/REQ-03, @/issue/4ccea59b/requirement/REQ-04, @/issue/df129d9e/decision/D-03, @/issue/df129d9e/requirement/REQ-09, @/issue/75a90224/decision/D-01; dev/vision/9db27a3a-charter.md — @/charter/D-13; .jit/invariants.toml — @/inv/semantic-types, @/inv/orthogonal-tests, @/inv/shared-test-contracts, @/inv/semantic-test-assertions, @/inv/essential-code-prose, @/inv/architecture-dependency-direction, @/inv/single-source-prose, @/inv/convention-convergence; .jit/gates.toml — @/gate/jit-validate.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T07:49:40.396320451+00:00; wrapper ancestry confirms run commit 9ad50be28d95 covers every attributed commit; code-review pending, exit none; no gates rerun.\nTruncation recovery: Recovered the initial truncated batch through separate commit/path reads, including the complete 71564f8 patch; historical abbreviated agent transcripts were outside the current-behavior evidence scope.\n\nThe original multiline integrity-summary defect is fixed. Drift alone and drift with rule errors retain their details in the report; findings preserve the existing error code.\n\nThe required call-site audit found:\n\n| Dispatch call site | Verdict |\n|---|---|\n| `config.rs:47` | Pass |\n| `doc.rs:168` | Pass |\n| `gate.rs:318` | Summary passes; stdout detail retention fails—F1 |\n| `gate.rs:532` | Pass |\n| `gate.rs:664` | Pass |\n| `invariant.rs:12` | Pass |\n| `profile.rs:50` | Pass |\n| `test_group.rs:56` | Pass |\n| `test_group.rs:67` | Pass |\n| `validate.rs:104` | Pass |\n| `validate.rs:168` | Pass |\n| `validate.rs:226` | Pass |\n| `validate.rs:239` | Pass |\n\n1. **F1 — Medium; blocking; issue-impact. Multiline preset content can remain absent from the stdout report.** [dispatch/gate.rs:318](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/dispatch/gate.rs:318) now escapes the preset name in the summary. However, [output/gate.rs:300](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/output/gate.rs:300) renders that name only when a target succeeds. For a multiline preset name and a missing issue ID, resolution fails before preset lookup: stdout contains only the issue error, while the original preset name appears only in JSON details. REQ-02 requires potentially multiline content to reach the stdout report as well. Render the preset identity for all-failed batches and cover that report wiring without duplicating the shared escaping test. Reference: `@/issue/4ccea59b/requirement/REQ-02`.\n\n2. **F2 — Medium; blocking; issue-impact. The validation documentation retains a contradictory JSON contract.** [cli-commands.md:3385](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3385) still promises that `validate --fix --json` retains the complete actionable cause chain in `error.message`. This change deliberately moves integrity details—including malformed-rules diagnostics, as the updated test confirms—into `error.details.integrity_error` and leaves a summary in `error.message`. Scope the existing promise to propagated repair errors and distinguish integrity findings using the canonical contract. References: `@/issue/4ccea59b/requirement/REQ-04`, `@/charter/D-13`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The integrity-summary defect is fixed, but all-failed preset reports omit potentially multiline content from stdout and validation documentation retains a contradictory JSON promise.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"All-failed preset reports can omit the original multiline preset name from stdout.\",\"file\":\"crates/jit/src/dispatch/gate.rs\",\"line\":318,\"references\":[\"@/issue/4ccea59b/requirement/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Validation documentation still promises complete integrity-error cause chains in error.message after this change moves them into error.details.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":3385,\"references\":[\"@/issue/4ccea59b/requirement/REQ-04\",\"@/charter/D-13\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

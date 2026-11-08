@@ -889,9 +889,11 @@
           "short_id": "4ccea59b",
           "title": "Every findings outcome prints a one-line stderr summary",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "rework",
           "model_tier": "opus",
-          "origin": "epic holistic-review run 2, F1 (dispatch/validate.rs:212 integrity error multiline)"
+          "origin": "epic holistic-review run 2, F1 (dispatch/validate.rs:212 integrity error multiline)",
+          "landed": "9ad50be28",
+          "gates": "cargo-ci passed; code-review failed: F1 all-failed preset report omits preset name; F2 cli-commands.md:3385 error.message promise"
         }
       ]
     }
@@ -1132,7 +1134,8 @@
     "f487aeef": 2,
     "0b35be66": 1,
     "afd2d573": 1,
-    "75a90224": 2
+    "75a90224": 2,
+    "4ccea59b": 1
   },
   "surfaced_pitfalls": [
     {
