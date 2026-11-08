@@ -240,8 +240,9 @@ overlay the edited bytes onto the captured base, then run `compose_complete` ove
 the edited declarations so coupled schemas, rule membership, and projections all
 reflect the proposed state before anything is published:
 
-- `finalize_config_edit` — one authored `config.toml` edit. A malformed edit is a
-  typed planning error, never a published file.
+- `finalize_config_edit` — one authored `config.toml` edit, planned from the
+  edited declarations; an edit that fails assembly yields no declarations, so it
+  is refused before planning and never published.
 - `finalize_gate_registry_edit` — one typed `EditGateRegistry` intent, with the
   edited registry serialized only by the neutral declaration owner.
 

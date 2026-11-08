@@ -1,3 +1,4 @@
+use super::validate::GrowthStart;
 use super::{with_mutation_session, with_read_session, CommandExecutor, SessionStep};
 use crate::domain::identity::ProfileId;
 use crate::domain::relative_path::RootRelativePath;
@@ -1029,7 +1030,7 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
             contribution_context,
         ));
 
-        let base = match self.exec.capture_proposed_base(
+        let (base, config) = match self.exec.capture_proposed_base(
             session,
             &BTreeMap::new(),
             &content_paths,
@@ -1060,11 +1061,14 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
         {
             expanded_paths.push(VirtualPath::SCHEMAS);
         }
-        let Some(base) = self.exec.capture_proposed_base(
+        let Some((base, config)) = self.exec.capture_proposed_base(
             session,
             &BTreeMap::new(),
             &expanded_paths,
-            Some(base),
+            Some(GrowthStart {
+                image: base,
+                config: Some(config),
+            }),
         )?
         else {
             return Ok(None);
@@ -1087,9 +1091,15 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                 .filter(|path| path != &VirtualPath::EVENTS),
         );
         let overrides = crate::repository_state::action_overrides(preview.delta().actions());
-        let Some(probe) =
-            self.exec
-                .capture_proposed_base(session, &overrides, &extra_paths, Some(base))?
+        let Some((probe, _)) = self.exec.capture_proposed_base(
+            session,
+            &overrides,
+            &extra_paths,
+            Some(GrowthStart {
+                image: base,
+                config: Some(config),
+            }),
+        )?
         else {
             return Ok(None);
         };

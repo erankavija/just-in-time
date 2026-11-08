@@ -67,12 +67,25 @@ pub struct CapturedValidation<'a> {
 impl<'a> CapturedValidation<'a> {
     /// Parse `image`'s index and issue records.
     pub fn from_image(image: &'a RepositoryImage) -> Self {
+        Self::loaded(image, None)
+    }
+
+    /// [`Self::from_image`] with `config`, the configuration already
+    /// assembled from `image`.
+    pub(crate) fn with_config(image: &'a RepositoryImage, config: JitConfig) -> Self {
+        Self::loaded(image, Some(Ok(config)))
+    }
+
+    fn loaded(
+        image: &'a RepositoryImage,
+        config: Option<std::result::Result<JitConfig, crate::repository_state::ProducerError>>,
+    ) -> Self {
         match load_issues(image) {
             Ok(records) => {
                 let (issues, values) = records.into_iter().unzip();
-                Self::new(Cow::Borrowed(image), Ok(issues), values, None)
+                Self::new(Cow::Borrowed(image), Ok(issues), values, config)
             }
-            Err(error) => Self::new(Cow::Borrowed(image), Err(error), Vec::new(), None),
+            Err(error) => Self::new(Cow::Borrowed(image), Err(error), Vec::new(), config),
         }
     }
 
