@@ -26070,3 +26070,7 @@
 {"id":"6fdc7147-6956-4556-8764-a9a3fcb622d9","issue_id":"dfd0885c-ac17-49e0-b651-067a6e52d588","priority":"normal","timestamp":"2026-11-08T08:22:04.918638207Z","title":"Make jit --schema output byte-deterministic","type":"issue_created"}
 {"fields":["dependencies"],"id":"1c39dff5-527c-47c9-8ac4-e48824701039","issue_id":"0735879a-ed40-450e-9959-5cfe80653745","timestamp":"2026-11-08T08:22:13.336797381Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["description"],"id":"f67a6bd3-b257-4e1c-9098-6f635d1cddcb","issue_id":"6a19e93f-77da-4bf6-b3c2-a6de6929309b","timestamp":"2026-11-08T08:33:45.469372758Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"cargo-ci","id":"f3f1f39d-fdd0-41c0-9c19-71948d1c04cd","issue_id":"6a19e93f-77da-4bf6-b3c2-a6de6929309b","timestamp":"2026-11-08T09:54:49.316188842Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"62ee4b57-4924-482b-91e4-0725672cafbc","issue_id":"6a19e93f-77da-4bf6-b3c2-a6de6929309b","timestamp":"2026-11-08T09:58:16.366481352Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"ef1741cf-7c9d-441c-a24a-2e5b10545f96","issue_id":"6a19e93f-77da-4bf6-b3c2-a6de6929309b","timestamp":"2026-11-08T09:58:35.379466478Z","to":"done","type":"issue_state_changed"}
+{"id":"53278814-9531-466a-9e75-921876aadcd9","issue_id":"6a19e93f-77da-4bf6-b3c2-a6de6929309b","timestamp":"2026-11-08T09:58:35.379466478Z","type":"issue_completed"}

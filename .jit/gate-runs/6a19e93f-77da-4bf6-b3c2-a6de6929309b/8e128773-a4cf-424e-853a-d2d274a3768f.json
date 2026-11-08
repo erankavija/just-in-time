@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "46edf8f599138dcc120ea25435e199d1f74691bb",
+  "completed_at": "2026-11-08T09:58:16.364522651Z",
+  "duration_ms": 206931,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are supported; prior F1 is addressed by indexed precheck lookups and the extended owning cost test, with both required smoke variants recorded passing.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6a19e93f-77da-4bf6-b3c2-a6de6929309b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8e128773-a4cf-424e-853a-d2d274a3768f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T09:54:49.432703188Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:6a19e93f` — c41d3b540, fabc4e729, 46834823c, d703de595, f2e7c20e2, de0ebd560, f9499eb63, fb38ed248, d30511cc0, 59d5901d8, a03fbf0f2, 5892da1de, be754ee04, 98f600823, f109faee8.\nPolicy sources: AGENTS.md; dev/TESTING.md; .jit/config.toml; no applicable subtree AGENTS.md.\nResolved items: @/issue/6a19e93f/requirement/REQ-01, @/issue/6a19e93f/requirement/REQ-02, @/issue/6a19e93f/requirement/REQ-03, @/issue/b697a3f7/requirement/REQ-22, @/issue/16c53cc2/requirement/REQ-07 → respective .jit/issues/ descriptions; @/charter/D-19, @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/invariant/convention-convergence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/canonical-cutover, @/invariant/architecture-dependency-direction, @/invariant/derived-state-coherence, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/semantic-types, @/invariant/gate-semantics, @/invariant/domain-agnostic, @/invariant/dag-acyclic → .jit/invariants.toml; @/gate/jit-validate → .jit/gates.toml.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T09:52:51.170595801Z; supplied ancestry confirms coverage of all 15 tagged commits. Prior code-review failed, exit 1; F1 addressed. Latest recorded REQ-03 smoke ratios: standard 0.796, graph-rule variant 0.857, both ≤ 1.5.\nTruncation recovery: narrower configuration, issue, patch, and source reads recovered relevant omissions; unrelated sibling-task material and historical diagnostic stdout were excluded from judgment.\n\nNo findings. Precheck selection, label-target loading, and exec-context dependencies use shared indexes. The owning cost test at `crates/jit/src/commands/bulk_update.rs:1733` covers these paths alongside readiness and graph rules.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are supported; prior F1 is addressed by indexed precheck lookups and the extended owning cost test, with both required smoke variants recorded passing.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
