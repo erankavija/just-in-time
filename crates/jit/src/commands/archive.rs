@@ -31,6 +31,7 @@ use crate::domain::identity::IssueId;
 use crate::domain::relative_path::RootRelativePath;
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::Issue;
+use crate::graph::hierarchy::{resolve_hierarchy, HierarchyResolution};
 use crate::storage::artifact_inspection::scan_citation_index;
 use crate::storage::{IssueStore, JsonFileStorage, RepositoryReadSession, RepositoryStateStore};
 use anyhow::{bail, Context, Result};
@@ -43,6 +44,14 @@ struct ArchiveBase {
     issues: Vec<Issue>,
     policy: ArtifactClassificationPolicy,
     documentation: crate::config::DocumentationConfig,
+}
+
+impl ArchiveBase {
+    /// The hierarchy of [`issues`](Self::issues): the session's one dependency
+    /// graph, which every target planned over this base reads.
+    fn resolve_hierarchy(&self) -> HierarchyResolution<'_, Issue> {
+        resolve_hierarchy(&self.issues.iter().collect::<Vec<_>>(), &self.hierarchy)
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -462,11 +471,13 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                 let Some((mut image, base)) = self.derive_archive_base(session)? else {
                     return Ok(None);
                 };
+                let resolution = base.resolve_hierarchy();
                 let mut plans = Vec::new();
                 for id in effectively_terminal_container_ids(&base.issues, &base.hierarchy) {
                     let Some((next, plan, _)) = self.plan_archive_target(
                         session,
                         &base,
+                        &resolution,
                         image,
                         ArchiveTarget::Container(&id),
                     )?
@@ -503,7 +514,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                     return Ok(None);
                 };
                 Ok(self
-                    .plan_archive_target(session, &base, image, target)?
+                    .plan_archive_target(session, &base, &base.resolve_hierarchy(), image, target)?
                     .map(|(_, plan, _)| (plan, base.documentation.citation_scan_roots())))
             })?;
         let advisory = self.advise(&roots, &[&plan])?;
@@ -544,11 +555,13 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
     }
 
     /// Grow `image` by what `target`'s plan reads and derive that plan over
-    /// `base`, returning the grown image; `None` is a retryable conflict.
+    /// `base` and its `resolution`, returning the grown image; `None` is a
+    /// retryable conflict.
     fn plan_archive_target(
         &self,
         session: &mut (dyn RepositoryReadSession + '_),
         base: &ArchiveBase,
+        resolution: &HierarchyResolution<'_, Issue>,
         mut image: crate::repository_state::RepositoryImage,
         target: ArchiveTarget<'_>,
     ) -> Result<
@@ -658,7 +671,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                 root_id.as_ref().context("container id was not resolved")?,
             ),
         };
-        let pinned_requests = pinned_root_requests(&inventory_issues, hierarchy, explicit)?;
+        let pinned_requests = pinned_root_requests(&inventory_issues, resolution, explicit)?;
         let Some(next) = capture_more(session, image, |spec| {
             pinned_requests
                 .iter()
@@ -697,13 +710,17 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                 Ok((request, fact))
             })
             .collect::<Result<_>>()?;
-        let inventory = inventory_explicit_roots(&inventory_issues, hierarchy, explicit, &pinned)?;
+        let inventory = inventory_explicit_roots(&inventory_issues, resolution, explicit, &pinned)?;
         let inventory = match root_id.as_ref() {
             Some(root) => {
                 let mut files = Vec::new();
-                for directory in
-                    member_document_directories(&inventory_issues, hierarchy, root, documentation)
-                {
+                for directory in member_document_directories(
+                    &inventory_issues,
+                    hierarchy,
+                    resolution,
+                    root,
+                    documentation,
+                ) {
                     let Some(next) = capture_directory_tree(session, image, &directory)? else {
                         return Ok(None);
                     };
@@ -717,6 +734,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                 inventory.with_unlinked_roots(member_derived_documents(
                     &inventory_issues,
                     hierarchy,
+                    resolution,
                     root,
                     &files,
                     documentation,
@@ -875,8 +893,13 @@ impl ArchiveOps<'_, JsonFileStorage> {
                 let Some((image, base)) = self.derive_archive_base(session)? else {
                     return Ok(SessionStep::Retry);
                 };
-                let Some((image, plan, evidence)) =
-                    self.plan_archive_target(session, &base, image, target)?
+                let Some((image, plan, evidence)) = self.plan_archive_target(
+                    session,
+                    &base,
+                    &base.resolve_hierarchy(),
+                    image,
+                    target,
+                )?
                 else {
                     return Ok(SessionStep::Retry);
                 };
@@ -1177,12 +1200,10 @@ mod tests {
         );
     }
 
-    /// Candidates over shared and distinct artifacts plan in one read session,
-    /// each plan equal to its container's own preview.
-    #[test]
-    fn test_archive_candidates_plan_every_candidate_in_one_read_session() {
-        use crate::commands::test_helpers::SessionOpenCounter;
-
+    /// Three effectively terminal containers, two citing one shared document,
+    /// with the configuration declaring their hierarchy and archive roots.
+    fn three_candidate_repository() -> (crate::storage::InMemoryStorage, String, BTreeSet<IssueId>)
+    {
         let storage = crate::storage::InMemoryStorage::new();
         let root = storage
             .root()
@@ -1213,6 +1234,38 @@ mod tests {
         let config = format!(
             "[documentation]\ndevelopment_root = \"{root}\"\nmanaged_paths = [\"{root}/active\"]\npermanent_paths = []\narchive_root = \"{root}/archive\"\n\n[type_hierarchy]\ntypes = {{ portfolio = 2, unit = 7 }}\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n"
         );
+        (storage, config, containers)
+    }
+
+    #[test]
+    fn test_archive_candidates_build_one_dependency_graph_for_every_candidate() {
+        let (storage, config, containers) = three_candidate_repository();
+        let executor = crate::commands::test_helpers::memory_executor_declaring(
+            storage,
+            crate::commands::test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
+
+        let before = crate::graph::constructions_on_this_thread();
+        let report = executor.archive().archive_candidates().unwrap();
+
+        assert!(report.candidates().len() > 1, "{containers:?} all plan");
+        assert_eq!(
+            crate::graph::constructions_on_this_thread() - before,
+            1,
+            "every candidate plans over the session's one graph"
+        );
+    }
+
+    /// Candidates over shared and distinct artifacts plan in one read session,
+    /// each plan equal to its container's own preview.
+    #[test]
+    fn test_archive_candidates_plan_every_candidate_in_one_read_session() {
+        use crate::commands::test_helpers::SessionOpenCounter;
+
+        let (storage, config, containers) = three_candidate_repository();
         let counter = SessionOpenCounter::new();
         let executor = crate::commands::test_helpers::memory_executor_wrapping(
             storage,
@@ -1640,6 +1693,7 @@ mod tests {
             .plan_archive_target(
                 session.as_mut(),
                 &base,
+                &base.resolve_hierarchy(),
                 image,
                 ArchiveTarget::Document("fixtures/root.md"),
             )
