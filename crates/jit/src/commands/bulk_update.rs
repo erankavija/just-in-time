@@ -500,9 +500,15 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 .iter()
                 .map(|issue| issue.id.clone())
                 .collect::<Vec<_>>();
-            let Some(base) =
-                self.exec
-                    .extend_mutation_base(session.as_mut(), image.clone(), &ids)?
+            let config = graph.declarations.config().clone();
+            let Some(base) = self.exec.extend_mutation_base(
+                session.as_mut(),
+                super::validate::GrowthStart {
+                    image: image.clone(),
+                    config: Some(Ok(config.clone())),
+                },
+                &ids,
+            )?
             else {
                 return Ok(BulkAttempt::Retry);
             };
@@ -510,6 +516,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 match self.exec.capture_precheck_preflights(
                     session.as_mut(),
                     base.image,
+                    config,
                     precheck_targets,
                     &graph.declarations.gates,
                 )? {

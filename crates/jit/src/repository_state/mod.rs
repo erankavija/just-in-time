@@ -877,13 +877,13 @@ pub fn derive_materialization(
 /// Finalize an authored `config.toml` edit plus the complete coupled producer set
 /// as one plan — the single-declaration config-mutation session entry.
 ///
-/// The command supplies the edited, preservation-safe `config.toml` bytes; this
-/// overlays them onto the captured `base` and assembles the edited configuration
-/// first, so an edit that fails assembly is a typed planning error and never a
-/// published file. It then derives the complete owned-materialization set —
-/// default rules and their schemas, plus every configured projection — from that
-/// edited configuration, with `declarations` supplying the gates and rules,
-/// exactly as `derive_semantic_mutation` does. The
+/// The command supplies the edited, preservation-safe `config.toml` bytes and
+/// `declarations`, the declarations of `base` with those bytes overlaid, so an
+/// edit that fails assembly is refused before planning and never published.
+/// This overlays the bytes onto the captured `base` and derives the complete
+/// owned-materialization set — default rules and their schemas, plus every
+/// configured projection — from the edited declarations, exactly as
+/// `derive_semantic_mutation` does. The
 /// authored `config.toml` write, emitted only when the edit changes its bytes,
 /// carries the captured base preimage, and every
 /// derived action its own base preimage, so `session.apply` revalidates against
@@ -902,9 +902,6 @@ pub fn finalize_config_edit(
     let overlay = std::iter::once((config_path.clone(), Some(edited_config_bytes.to_vec())))
         .collect::<std::collections::BTreeMap<_, _>>();
     let overlaid = apply_overlay(base, overlay)?;
-    // The edit must assemble before any planning: an invalid config is a typed
-    // planning error, not a published file.
-    let edited_config = materialize::assemble_config(&overlaid)?;
 
     // The authored config write carries the base preimage; the complete producer
     // set derives the coupled schemas/rule-membership/projections from the edited
@@ -926,13 +923,7 @@ pub fn finalize_config_edit(
         })
         .into_iter()
         .collect::<Vec<_>>();
-    let edited_declarations = RepositoryDeclarations {
-        item_kinds: resolved_item_kinds(&edited_config),
-        config: &edited_config,
-        gates: declarations.gates,
-        rules: declarations.rules,
-    };
-    actions.extend(compose_complete(&overlaid, &edited_declarations)?);
+    actions.extend(compose_complete(&overlaid, &declarations)?);
     let delta = RepositoryDelta::new(base.layout(), actions)?;
     Ok(MaterializationPlan::new(base, delta, context)?)
 }
@@ -1668,31 +1659,6 @@ mod tests {
         assert!(matches!(
             validation_declarations_with_config(&image, assemble_config(&image)),
             Err(DeclarationParseError::Producer(
-                ProducerError::Configuration(ConfigurationAssemblyError::ItemKinds(_))
-            ))
-        ));
-    }
-
-    #[test]
-    fn test_finalize_config_edit_refuses_edit_that_fails_assembly() {
-        let base = ImageBuilder::new()
-            .files(&[(".jit/config.toml", Some(""))])
-            .build();
-        let (config, gates, rules) = empty_declarations();
-        let declarations = RepositoryDeclarations {
-            item_kinds: Ok(std::sync::Arc::from([])),
-            config: &config,
-            gates: &gates,
-            rules: &rules,
-        };
-        assert!(matches!(
-            finalize_config_edit(
-                &base,
-                &MutationContext::preview(),
-                MALFORMED_ITEM_KINDS.as_bytes(),
-                declarations
-            ),
-            Err(RepositoryStateError::Producer(
                 ProducerError::Configuration(ConfigurationAssemblyError::ItemKinds(_))
             ))
         ));

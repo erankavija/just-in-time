@@ -87,11 +87,11 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                 // preserved `IfAbsent` file (e.g. an existing `rules.toml` referencing a
                 // custom schema) is not shadowed by its neutral default in the closure.
                 let probe_overrides = scaffold.overlay_overrides()?;
-                let Some(mut probe) = self.exec.capture_proposed_base(
+                let Some((mut probe, _)) = self.exec.capture_proposed_base(
                     &mut *session,
                     &probe_overrides,
                     &extra_paths,
-                    Some(config_image),
+                    Some(config_image.into()),
                 )?
                 else {
                     return Ok(SessionStep::Retry);
@@ -121,11 +121,11 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
 
                 // Grow the probe by the exact write set's validation closure, then
                 // finalize, validate, and publish under the same held session.
-                let Some(base) = self.exec.capture_proposed_base(
+                let Some((base, _)) = self.exec.capture_proposed_base(
                     &mut *session,
                     &delta_overlay,
                     &extra_paths,
-                    Some(probe),
+                    Some(probe.into()),
                 )?
                 else {
                     return Ok(SessionStep::Retry);
@@ -1332,7 +1332,7 @@ mod tests {
             InitializationScaffold::from_config(config, project_name, Some(profile)).unwrap();
         let layout = executor.require_layout().unwrap();
         let mut session = executor.storage().open_mutation_session(layout).unwrap();
-        let image = executor
+        let (image, _) = executor
             .capture_proposed_base(
                 session.as_mut(),
                 &Default::default(),

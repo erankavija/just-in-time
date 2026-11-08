@@ -530,10 +530,10 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
         &self,
         session: &mut (dyn RepositoryReadSession + '_),
     ) -> Result<Option<(crate::repository_state::RepositoryImage, ArchiveBase)>> {
-        let Some(image) = self.exec.capture_archive_base(session)? else {
+        let Some((image, config)) = self.exec.capture_archive_base(session)? else {
             return Ok(None);
         };
-        let config = crate::repository_state::assemble_config(&image)?;
+        let config = config?;
         let namespaces = crate::config_manager::namespaces_from_config(&config);
         let base = ArchiveBase {
             hierarchy: HierarchyConfig::from_declarations(&namespaces)?,
