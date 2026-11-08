@@ -3,7 +3,7 @@
 use super::CommandExecutor;
 use super::{capture_or_retry, with_mutation_session, with_read_session, SessionStep};
 use crate::domain::artifact_classifier::{
-    artifact_destination_root, classification_facts_from_evidence, classify_artifacts,
+    classification_facts_from_evidence, classify_artifacts, container_marker_path,
     preferred_container_destination_root,
     resolve_container_destination as derive_container_destination, ArchiveLayout,
     ArtifactClassificationInventory, ArtifactClassificationPolicy, ArtifactLocation,
@@ -244,6 +244,101 @@ fn image_evidence(
             ArtifactEvidence::Directory { scope, entries }
         }
     })
+}
+
+/// Capture the evidence `derive_container_destination` consumes: the archive
+/// root, its children and each child directory's marker. `None` is a retryable
+/// conflict.
+fn capture_container_destination_evidence(
+    session: &mut (dyn RepositoryReadSession + '_),
+    mut image: crate::repository_state::RepositoryImage,
+    archive_root: &str,
+) -> Result<
+    Option<(
+        crate::repository_state::RepositoryImage,
+        ArtifactEvidenceMap,
+    )>,
+> {
+    let archive_root = normalize_artifact_path(archive_root);
+    let archive_path = image_path(image.layout(), &archive_root)?;
+    let mut root_evidence = ArtifactEvidenceMap::new();
+    let Some(next) =
+        capture_artifact_evidence(session, image, [archive_root.clone()], &mut root_evidence)?
+    else {
+        return Ok(None);
+    };
+    image = next;
+    let archive_is_directory = matches!(
+        root_evidence.get(&archive_root),
+        Some(ArtifactEvidence::Directory { .. })
+    );
+    let children = if archive_is_directory {
+        let Some(next) = capture_more(session, image, |spec| {
+            Ok(spec.discover_listing(archive_path.clone())?)
+        })?
+        else {
+            return Ok(None);
+        };
+        image = next;
+        image
+            .directory_listings()
+            .get(&archive_path)
+            .context("archive root listing was not captured")?
+            .names()
+            .iter()
+            .map(|name| normalize_artifact_path(&format!("{archive_root}/{name}")))
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    let child_paths = children
+        .iter()
+        .map(|path| image_path(image.layout(), path))
+        .collect::<Result<Vec<_>>>()?;
+    let Some(next) = capture_paths(session, image, child_paths)? else {
+        return Ok(None);
+    };
+    image = next;
+    let mut markers = Vec::new();
+    for path in &children {
+        let child = image_path(image.layout(), path)?;
+        if matches!(
+            image.entry(&child)?,
+            crate::repository_state::RepositoryEntry::Directory { .. }
+        ) {
+            markers.push(image_path(image.layout(), &container_marker_path(path))?);
+        }
+    }
+    let Some(next) = capture_paths(session, image, markers)? else {
+        return Ok(None);
+    };
+    image = next;
+    let mut evidence = ArtifactEvidenceMap::from([(
+        archive_root.clone(),
+        if archive_is_directory {
+            image_evidence(
+                &image,
+                &archive_root,
+                ArtifactListingScope::ImmediateChildren,
+            )?
+        } else {
+            root_evidence
+                .remove(&archive_root)
+                .context("archive root evidence was not derived")?
+        },
+    )]);
+    for child in children {
+        let fact = image_evidence(&image, &child, ArtifactListingScope::MetadataOnly)?;
+        if matches!(fact, ArtifactEvidence::Directory { .. }) {
+            let marker = container_marker_path(&child);
+            evidence.insert(
+                marker.clone(),
+                image_evidence(&image, &marker, ArtifactListingScope::MetadataOnly)?,
+            );
+        }
+        evidence.insert(child, fact);
+    }
+    Ok(Some((image, evidence)))
 }
 
 fn capture_artifact_evidence(
@@ -505,7 +600,6 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                 .into(),
             );
         }
-        let legacy = artifact_destination_root(&plan_target, &policy.archive_root);
         let mut conflicts = Vec::new();
         let destination = if let Some(id) = root_id.as_ref() {
             let issue = issues
@@ -517,115 +611,19 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
             if policy.archive_root.is_empty() {
                 preferred
             } else {
-                let archive_root = std::path::Path::new(&legacy)
-                    .parent()
-                    .context("archive root missing")?
-                    .to_string_lossy()
-                    .replace('\\', "/");
-                let archive_path = image_path(image.layout(), &archive_root)?;
-                let mut root_evidence = ArtifactEvidenceMap::new();
-                let Some(next) = capture_artifact_evidence(
-                    session,
-                    image,
-                    [archive_root.clone()],
-                    &mut root_evidence,
-                )?
+                let Some((next, evidence)) =
+                    capture_container_destination_evidence(session, image, &policy.archive_root)?
                 else {
                     return Ok(None);
                 };
                 image = next;
-                let archive_is_directory = matches!(
-                    root_evidence.get(&archive_root),
-                    Some(ArtifactEvidence::Directory { .. })
-                );
-                let children = if archive_is_directory {
-                    let Some(next) = capture_more(session, image, |spec| {
-                        Ok(spec.discover_listing(archive_path.clone())?)
-                    })?
-                    else {
-                        return Ok(None);
-                    };
-                    image = next;
-                    image
-                        .directory_listings()
-                        .get(&archive_path)
-                        .context("archive root listing was not captured")?
-                        .names()
-                        .iter()
-                        .map(|name| normalize_artifact_path(&format!("{archive_root}/{name}")))
-                        .collect::<Vec<_>>()
-                } else {
-                    Vec::new()
-                };
-                let mut child_paths = children
-                    .iter()
-                    .map(|path| image_path(image.layout(), path))
-                    .collect::<Result<Vec<_>>>()?;
-                if archive_is_directory {
-                    child_paths.push(image_path(image.layout(), &legacy)?);
-                }
-                let Some(next) = capture_paths(session, image, child_paths)? else {
-                    return Ok(None);
-                };
-                image = next;
-                let mut markers = Vec::new();
-                for path in &children {
-                    let child = image_path(image.layout(), path)?;
-                    if matches!(
-                        image.entry(&child)?,
-                        crate::repository_state::RepositoryEntry::Directory { .. }
-                    ) {
-                        markers.push(image_path(
-                            image.layout(),
-                            &format!("{path}/.jit-container"),
-                        )?);
-                    }
-                }
-                let Some(next) = capture_paths(session, image, markers)? else {
-                    return Ok(None);
-                };
-                image = next;
-                let mut evidence = ArtifactEvidenceMap::from([
-                    (
-                        archive_root.clone(),
-                        if archive_is_directory {
-                            image_evidence(
-                                &image,
-                                &archive_root,
-                                ArtifactListingScope::ImmediateChildren,
-                            )?
-                        } else {
-                            root_evidence
-                                .remove(&archive_root)
-                                .context("archive root evidence was not derived")?
-                        },
-                    ),
-                    (
-                        legacy.clone(),
-                        if archive_is_directory {
-                            image_evidence(&image, &legacy, ArtifactListingScope::MetadataOnly)?
-                        } else {
-                            ArtifactEvidence::Missing
-                        },
-                    ),
-                ]);
-                for child in children {
-                    let fact = image_evidence(&image, &child, ArtifactListingScope::MetadataOnly)?;
-                    if matches!(fact, ArtifactEvidence::Directory { .. }) {
-                        let marker = format!("{child}/.jit-container");
-                        evidence.insert(
-                            marker.clone(),
-                            image_evidence(&image, &marker, ArtifactListingScope::MetadataOnly)?,
-                        );
-                    }
-                    evidence.insert(child, fact);
-                }
-                let resolved = derive_container_destination(&preferred, &legacy, id, &evidence)?;
+                let resolved =
+                    derive_container_destination(&policy.archive_root, &preferred, id, &evidence)?;
                 conflicts = resolved.conflicting_roots;
                 resolved.destination_root
             }
         } else {
-            legacy.clone()
+            normalize_artifact_path(&policy.archive_root)
         };
         let mut inventory_issues = issues.clone();
         remap_archived_references(
@@ -773,7 +771,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
             })
             .collect::<BTreeSet<_>>();
         if matches!(plan_target, PlanTarget::Container { .. }) {
-            paths.insert(format!("{destination}/.jit-container"));
+            paths.insert(container_marker_path(&destination));
         }
         let ancestors = paths
             .iter()
@@ -832,8 +830,8 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
             archive_executions,
         );
         let plan = classify_artifacts(
-            ArtifactClassificationInventory::new(plan_target, artifacts, blockers)
-                .with_destination_root(destination),
+            ArtifactClassificationInventory::new(plan_target, artifacts, blockers),
+            &destination,
             policy.clone(),
             facts,
         )?;
@@ -2107,12 +2105,12 @@ mod tests {
         let first = executor.archive().execute_archive_container(&id).unwrap();
         let destination_root = format!("archive/{}-archive-fixture", id.short_id());
         assert_eq!(
-            fs::read_to_string(repo.path().join(&destination_root).join(".jit-container")).unwrap(),
+            fs::read_to_string(repo.path().join(container_marker_path(&destination_root))).unwrap(),
             format!("{id}\n")
         );
         assert!(first.publications.iter().any(|publication| {
             publication.source.is_none()
-                && publication.destination == format!("{destination_root}/.jit-container")
+                && publication.destination == container_marker_path(&destination_root)
         }));
         let issue = executor.storage.load_issue(&id).unwrap();
         assert!(issue
@@ -2967,9 +2965,14 @@ mod tests {
         let mut issue = executor.storage.load_issue(&id).unwrap();
         issue.state = State::InProgress;
         seed_archive_issue_precondition(&executor.storage, issue);
-        let destination = repo.path().join("archive").join(id.short_id());
+        let preferred = format!("archive/{}-archive-fixture", id.short_id());
+        let destination = repo.path().join(&preferred);
         fs::create_dir_all(&destination).unwrap();
-        fs::write(destination.join(".jit-container"), "foreign-container-id\n").unwrap();
+        fs::write(
+            repo.path().join(container_marker_path(&preferred)),
+            "foreign-container-id\n",
+        )
+        .unwrap();
 
         let plan = executor.archive().preview_archive_container(&id).unwrap();
         assert!(!plan.eligible());
@@ -2982,7 +2985,7 @@ mod tests {
             .iter()
             .any(|blocker| blocker.code == BlockerCode::DestinationConflict));
 
-        fs::remove_file(destination.join(".jit-container")).unwrap();
+        fs::remove_file(repo.path().join(container_marker_path(&preferred))).unwrap();
         fs::write(destination.join("foreign.txt"), "not in the plan").unwrap();
         let markerless = executor.archive().preview_archive_container(&id).unwrap();
         assert!(markerless

@@ -401,13 +401,9 @@ a preferred root, planning scans the archive root's immediate non-symlink
 directories for that exact full-ID marker. One match freezes and reuses the
 existing directory even after the container's membership label changes. Multiple
 matches block with deterministic `destination-conflict` findings. If no marker
-matches, planning resolves to the unsuffixed
-`<archive_root>/<container-short-id>/` when that path already exists, and to the
-preferred root otherwise. Adopting an occupied unsuffixed directory
-moves no data, and its markerless accounting and conflict checks still apply, so
-a container's artifacts stay in the one directory that already holds them. A
-marker naming another container or a markerless resolved directory with
-unaccounted entries also blocks. The marker's `ArchivePublication.source` is
+matches, planning resolves to the preferred root. A marker naming another
+container, or a markerless resolved directory with unaccounted entries, also
+blocks. The marker's `ArchivePublication.source` is
 `null` because it is executor-generated ownership metadata, not a copied or
 moved repository artifact.
 

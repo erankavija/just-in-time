@@ -381,7 +381,7 @@ pub struct ArtifactClassificationFacts {
 /// Marker-backed destination chosen from a closed evidence snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedContainerDestination {
-    /// The frozen marker-backed, legacy, or newly preferred destination root.
+    /// The frozen marker-backed or preferred destination root.
     pub destination_root: String,
     /// Every marker-backed root when duplicate ownership makes execution unsafe.
     pub conflicting_roots: Vec<String>,
@@ -396,25 +396,27 @@ pub enum ArtifactEvidenceError {
     /// The archive root was captured with a listing that cannot prove its children.
     #[error("archive evidence for {path} is not an immediate-child listing")]
     WrongListingScope { path: String },
-    /// The legacy destination does not identify an archive root.
-    #[error("container archive destination has no archive root")]
-    MissingArchiveRoot,
     /// The container marker holds bytes that are not a UTF-8 container id.
     #[error("container marker is not valid UTF-8: {path}")]
     InvalidMarker { path: String },
 }
 
-/// Resolve marker ownership, legacy fallback, and preferred placement from closed evidence.
+/// File name of the marker that binds an archive destination to its container.
+const CONTAINER_MARKER_FILE: &str = ".jit-container";
+
+/// Path of the container marker under `root`.
+pub fn container_marker_path(root: &str) -> String {
+    format!("{root}/{CONTAINER_MARKER_FILE}")
+}
+
+/// Resolve marker ownership and preferred placement from closed evidence.
 pub fn resolve_container_destination(
+    archive_root: &str,
     preferred_root: &str,
-    legacy_root: &str,
     container_id: &IssueId,
     evidence: &ArtifactEvidenceMap,
 ) -> Result<ResolvedContainerDestination, ArtifactEvidenceError> {
-    let archive_root = Path::new(legacy_root)
-        .parent()
-        .ok_or(ArtifactEvidenceError::MissingArchiveRoot)?;
-    let archive_root = normalize_artifact_path(&archive_root.to_string_lossy());
+    let archive_root = normalize_artifact_path(archive_root);
     let archive_evidence = required_resolution_evidence(evidence, &archive_root)?;
     let children = match archive_evidence {
         ArtifactEvidence::Directory { scope, entries } => {
@@ -441,7 +443,7 @@ pub fn resolve_container_destination(
             required_resolution_evidence(evidence, child)?,
             ArtifactEvidence::Directory { .. }
         ) {
-            let marker = format!("{child}/.jit-container");
+            let marker = container_marker_path(child);
             if matches!(
                 required_resolution_evidence(evidence, &marker)?,
                 ArtifactEvidence::File(owner) if owner.trim_ascii() == container_id.as_str().as_bytes()
@@ -464,15 +466,7 @@ pub fn resolve_container_destination(
     }
 
     Ok(ResolvedContainerDestination {
-        destination_root: if matches!(
-            required_resolution_evidence(evidence, legacy_root)?,
-            ArtifactEvidence::Missing
-        ) {
-            preferred_root
-        } else {
-            legacy_root
-        }
-        .to_string(),
+        destination_root: preferred_root.to_string(),
         conflicting_roots: Vec::new(),
     })
 }
@@ -583,7 +577,7 @@ fn container_destination_from_evidence(
             entries
         }
     };
-    let marker_path = format!("{destination_root}/.jit-container");
+    let marker_path = container_marker_path(destination_root);
     match required_resolution_evidence(evidence, &marker_path)? {
         ArtifactEvidence::Symlink => return Ok(ContainerDestinationState::Symlink),
         ArtifactEvidence::File(owner) => {
@@ -622,7 +616,6 @@ pub struct ArtifactClassificationInventory {
     pub target: PlanTarget,
     pub artifacts: Vec<ArtifactPlanEntry>,
     pub blockers: Vec<PlanBlocker>,
-    destination_root: Option<String>,
 }
 
 impl ArtifactClassificationInventory {
@@ -636,7 +629,6 @@ impl ArtifactClassificationInventory {
             target,
             artifacts,
             blockers,
-            destination_root: None,
         }
     }
 
@@ -644,29 +636,22 @@ impl ArtifactClassificationInventory {
     pub fn artifacts(&self) -> &[ArtifactPlanEntry] {
         &self.artifacts
     }
-
-    /// Use the destination previously resolved by the storage boundary.
-    pub fn with_destination_root(mut self, destination_root: impl Into<String>) -> Self {
-        self.destination_root = Some(destination_root.into());
-        self
-    }
 }
 
 /// Apply repository ownership, reference selection, and the edge-aware action calculus.
+///
+/// `destination_root` is the root the storage boundary resolved for the target.
 pub fn classify_artifacts(
     inventory: ArtifactClassificationInventory,
+    destination_root: &str,
     policy: ArtifactClassificationPolicy,
     facts: ArtifactClassificationFacts,
 ) -> Result<ArtifactPlan, PlanError> {
-    let destination_root = inventory
-        .destination_root
-        .clone()
-        .unwrap_or_else(|| artifact_destination_root(&inventory.target, &policy.archive_root));
     let mut plan_blockers = inventory.blockers;
     append_container_destination_blocker(
         &inventory.target,
         &facts.container_destination,
-        &destination_root,
+        destination_root,
         &mut plan_blockers,
     );
 
@@ -712,7 +697,7 @@ pub fn classify_artifacts(
     );
     let layout = ArchiveLayout::new(
         &inventory.target,
-        &destination_root,
+        destination_root,
         &policy,
         &inventory.artifacts,
     );
@@ -1609,14 +1594,6 @@ fn append_container_destination_blocker(
     blockers.push(PlanBlocker::new(code, Some(destination_root)));
 }
 
-/// Compute the stable target destination root used by planning and storage inspection.
-pub fn artifact_destination_root(target: &PlanTarget, archive_root: &str) -> String {
-    match target {
-        PlanTarget::Container { id } => join_path(archive_root, &container_short_id(id)),
-        PlanTarget::Document { .. } => normalize_artifact_path(archive_root),
-    }
-}
-
 /// Compute a container's preferred human-readable destination before storage reconciliation.
 ///
 /// The short id is the authoritative collision-resistant prefix. It gains a
@@ -2090,8 +2067,8 @@ mod tests {
             ),
         ]);
         let plan = classify_artifacts(
-            ArtifactClassificationInventory::new(target, artifacts, Vec::new())
-                .with_destination_root("dev/archive/abcdef12-platform"),
+            ArtifactClassificationInventory::new(target, artifacts, Vec::new()),
+            "dev/archive/abcdef12-platform",
             policy,
             facts,
         )
@@ -2129,8 +2106,8 @@ mod tests {
                     vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
                 )],
                 Vec::new(),
-            )
-            .with_destination_root("dev/archive/abcdef12-platform"),
+            ),
+            "dev/archive/abcdef12-platform",
             policy,
             locations(&[(
                 source,
@@ -2168,8 +2145,8 @@ mod tests {
                     vec![owner(crate::test_utils::issue_id(176), State::Done, true)],
                 )],
                 Vec::new(),
-            )
-            .with_destination_root("dev/archive/abcdef12-platform"),
+            ),
+            "dev/archive/abcdef12-platform",
             policy,
             locations(&[(
                 source,
@@ -2423,28 +2400,26 @@ mod tests {
     }
 
     #[test]
-    fn test_destination_resolution_uses_marker_freeze_legacy_fallback_and_duplicate_evidence() {
+    fn test_destination_resolution_uses_marker_preferred_root_and_duplicate_evidence() {
         let cases = [
             (
                 vec!["archive/abcdef12-old"],
                 vec![("archive/abcdef12-old", format!(" \n{}\t", container_id()))],
-                false,
                 "archive/abcdef12-old",
                 Vec::new(),
             ),
-            (Vec::new(), Vec::new(), true, "archive/abcdef12", Vec::new()),
+            (Vec::new(), Vec::new(), "archive/abcdef12-new", Vec::new()),
             (
                 vec!["archive/abcdef12-a", "archive/abcdef12-b"],
                 vec![
                     ("archive/abcdef12-a", container_id().to_string()),
                     ("archive/abcdef12-b", container_id().to_string()),
                 ],
-                false,
                 "archive/abcdef12-a",
                 vec!["archive/abcdef12-a", "archive/abcdef12-b"],
             ),
         ];
-        for (children, markers, legacy_exists, expected, conflicts) in cases {
+        for (children, markers, expected, conflicts) in cases {
             let mut evidence = ArtifactEvidenceMap::from([(
                 "archive".to_string(),
                 directory(ArtifactListingScope::ImmediateChildren, &children),
@@ -2457,22 +2432,13 @@ mod tests {
             });
             markers.into_iter().for_each(|(root, owner)| {
                 evidence.insert(
-                    format!("{root}/.jit-container"),
+                    container_marker_path(root),
                     ArtifactEvidence::File(owner.into_bytes()),
                 );
             });
-            evidence
-                .entry("archive/abcdef12".into())
-                .or_insert_with(|| {
-                    if legacy_exists {
-                        directory(ArtifactListingScope::MetadataOnly, &[])
-                    } else {
-                        ArtifactEvidence::Missing
-                    }
-                });
             let resolved = resolve_container_destination(
+                "archive",
                 "archive/abcdef12-new",
-                "archive/abcdef12",
                 &container_id(),
                 &evidence,
             )
@@ -2483,83 +2449,40 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_container_destination_adopts_a_preexisting_identifier_only_directory_without_relocating_it(
-    ) {
+    fn test_resolve_container_destination_does_not_adopt_an_unmarked_bare_short_id_directory() {
         let issue = container_issue("Mutable title", &["type:epic", "epic:artifact-archival"]);
         let preferred =
             preferred_container_destination_root(&issue, &archive_hierarchy(), "archive");
-        let legacy = artifact_destination_root(
-            &PlanTarget::Container {
-                id: issue.id.clone(),
-            },
-            "archive",
-        );
+        let bare = format!("archive/{}", container_short_id(&issue.id));
         assert_ne!(
-            preferred, legacy,
-            "the precondition needs a preferred name the legacy directory does not already carry"
+            preferred, bare,
+            "the precondition needs a preferred name the bare directory does not already carry"
         );
-
-        // The identifier-only directory exists and carries no ownership marker.
-        let occupied = ArtifactEvidenceMap::from([
+        let evidence = ArtifactEvidenceMap::from([
             (
                 "archive".to_string(),
-                directory(ArtifactListingScope::ImmediateChildren, &[legacy.as_str()]),
+                directory(ArtifactListingScope::ImmediateChildren, &[bare.as_str()]),
             ),
             (
-                legacy.clone(),
+                bare.clone(),
                 directory(ArtifactListingScope::MetadataOnly, &[]),
             ),
-            (
-                format!("{legacy}/.jit-container"),
-                ArtifactEvidence::Missing,
-            ),
+            (container_marker_path(&bare), ArtifactEvidence::Missing),
         ]);
-        let adopted =
-            resolve_container_destination(&preferred, &legacy, &issue.id, &occupied).unwrap();
-        assert_eq!(adopted.destination_root, legacy);
-        assert!(adopted.conflicting_roots.is_empty());
-        assert!(
-            matches!(
-                occupied.get(&adopted.destination_root),
-                Some(ArtifactEvidence::Directory { .. })
-            ),
-            "adoption resolves onto the directory that already exists, so nothing relocates"
-        );
-
-        // The same container against an archive root without that directory
-        // takes the preferred branch, so the adoption above is the legacy
-        // branch rather than a coincidence of the expected name.
-        let vacant = ArtifactEvidenceMap::from([
-            (
-                "archive".to_string(),
-                directory(ArtifactListingScope::ImmediateChildren, &[]),
-            ),
-            (legacy.clone(), ArtifactEvidence::Missing),
-        ]);
-        assert_eq!(
-            resolve_container_destination(&preferred, &legacy, &issue.id, &vacant)
-                .unwrap()
-                .destination_root,
-            preferred
-        );
+        let resolved =
+            resolve_container_destination("archive", &preferred, &issue.id, &evidence).unwrap();
+        assert_eq!(resolved.destination_root, preferred);
+        assert!(resolved.conflicting_roots.is_empty());
     }
 
     #[test]
     fn test_destination_resolution_rejects_missing_immediate_child_evidence() {
-        let evidence = ArtifactEvidenceMap::from([
-            (
-                "archive".into(),
-                directory(ArtifactListingScope::ImmediateChildren, &["archive/unread"]),
-            ),
-            ("archive/abcdef12".into(), ArtifactEvidence::Missing),
-        ]);
+        let evidence = ArtifactEvidenceMap::from([(
+            "archive".into(),
+            directory(ArtifactListingScope::ImmediateChildren, &["archive/unread"]),
+        )]);
         assert_eq!(
-            resolve_container_destination(
-                "archive/new",
-                "archive/abcdef12",
-                &container_id(),
-                &evidence,
-            ),
+            resolve_container_destination("archive", "archive/new", &container_id(), &evidence,),
             Err(ArtifactEvidenceError::IncompleteEvidence {
                 path: "archive/unread".into(),
             })
@@ -2580,33 +2503,24 @@ mod tests {
                 "archive/unmarked".into(),
                 directory(ArtifactListingScope::MetadataOnly, &[]),
             ),
-            ("archive/abcdef12".into(), ArtifactEvidence::Missing),
         ]);
         assert_eq!(
-            resolve_container_destination(
-                "archive/new",
-                "archive/abcdef12",
-                &container_id(),
-                &evidence,
-            ),
+            resolve_container_destination("archive", "archive/new", &container_id(), &evidence,),
             Err(ArtifactEvidenceError::IncompleteEvidence {
-                path: "archive/unmarked/.jit-container".into(),
+                path: container_marker_path("archive/unmarked"),
             })
         );
     }
 
     #[test]
     fn test_evidence_listing_scopes_are_not_interchangeable() {
-        let resolution = ArtifactEvidenceMap::from([
-            (
-                "archive".into(),
-                directory(ArtifactListingScope::RecursiveFiles, &[]),
-            ),
-            ("archive/abcdef12".into(), ArtifactEvidence::Missing),
-        ]);
+        let resolution = ArtifactEvidenceMap::from([(
+            "archive".into(),
+            directory(ArtifactListingScope::RecursiveFiles, &[]),
+        )]);
         assert!(resolve_container_destination(
+            "archive",
             "archive/new",
-            "archive/abcdef12",
             &container_id(),
             &resolution
         )
@@ -2660,7 +2574,7 @@ mod tests {
                     "archive".into(),
                     directory(ArtifactListingScope::RecursiveFiles, &entries),
                 ),
-                ("archive/.jit-container".into(), ArtifactEvidence::Missing),
+                (container_marker_path("archive"), ArtifactEvidence::Missing),
             ]);
             let facts = classification_facts_from_evidence(
                 &PlanTarget::Container {
@@ -2734,7 +2648,7 @@ mod tests {
                 ("archive".into(), root),
             ]);
             if let Some(marker) = marker {
-                evidence.insert("archive/.jit-container".into(), marker);
+                evidence.insert(container_marker_path("archive"), marker);
             }
             let facts = classification_facts_from_evidence(
                 &PlanTarget::Container {
@@ -2788,6 +2702,7 @@ mod tests {
                 )],
                 Vec::new(),
             ),
+            "archive/abcdef12",
             default_policy(),
             no_facts(),
         );
@@ -3131,8 +3046,15 @@ mod tests {
         artifacts: Vec<ArtifactPlanEntry>,
         facts: ArtifactClassificationFacts,
     ) -> ArtifactPlan {
+        let destination_root = match &target {
+            PlanTarget::Container { id } => {
+                join_path(&policy.archive_root, &container_short_id(id))
+            }
+            PlanTarget::Document { .. } => normalize_artifact_path(&policy.archive_root),
+        };
         classify_artifacts(
             ArtifactClassificationInventory::new(target, artifacts, Vec::new()),
+            &destination_root,
             policy,
             facts,
         )

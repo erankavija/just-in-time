@@ -8,12 +8,26 @@
   ],
   "description": "Declare the container marker file name once, with one path constructor, so the classifier, archive planning and archive execution stop spelling `.jit-container` themselves, and extract the container-destination evidence acquisition from the archive execute planner into one function, so the evidence the destination resolver consumes is requested in one place.\n\n## Background\n\n- The marker name `.jit-container` is formatted at six production sites: `crates/jit/src/domain/artifact_classifier.rs:451` (marker of each archive-root child) and `:592` (destination marker), `crates/jit/src/commands/archive.rs:607`, `:641` and `:771` (inside `capture_archive_plan`), and `crates/jit/src/repository_state/archive.rs:124` (the marker written at execution).\n- The classifier and `finalize_archive_execution` (`crates/jit/src/repository_state/archive.rs:22-355`) report layout violations through the domain layout-violation type.\n- Unit tests repeat the literal (`artifact_classifier.rs` destination tests from `:2380`, `repository_state/archive.rs:801,808`, `commands/archive.rs:1569,1574,2244,2257`).\n- The user docs name the marker (`docs/reference/cli-commands.md:337,374`), and `crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs` reads it as an external contract.\n- `archive-candidates-one-session`, which this task follows, splits `capture_archive_plan` (`crates/jit/src/commands/archive.rs:511`) into a base derivation and a per-target planner; the destination block (`crates/jit/src/commands/archive.rs:540-651` today) lands in the per-target planner. That block acquires destination evidence inline: it derives the archive root from the legacy root's parent, captures the root, its child listing, each child and the legacy root, then each child directory's container marker, and builds the `ArtifactEvidenceMap` that the domain `resolve_container_destination` (`crates/jit/src/domain/artifact_classifier.rs:415-485`) consumes.\n- Archive preview, candidate listing and execution all plan through the per-target planner, so this block is the only acquisition.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::artifact_classifier` declares the marker file name once as a constant with one `container_marker_path(root)` constructor; the classifier, `commands/archive.rs` and `repository_state/archive.rs` build marker paths through it, and no other production code spells `.jit-container`.\n- [hard] REQ-02: Unit tests in `crates/jit/src` build marker paths through the constructor; the CLI tests keep the literal file name as the external contract.\n- [hard] REQ-03: One function in `commands/archive.rs` captures and returns the container-destination evidence for a container target, the per-target planner calls it instead of the inline block, and no other code in `commands/archive.rs` requests the archive root, its child listing or child markers for destination resolution.\n- [hard] REQ-04: The existing destination tests in `commands/archive.rs` (marker reuse, conflict, preferred root) pass unchanged through the extracted function.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-08T03:08:11.134047164Z",
   "first_ready_at": "2026-11-07T23:21:40.823043735Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "daf4db95-eea5-48d0-b32b-6ecb97201e8a",
+      "status": "passed",
+      "updated_at": "2026-11-08T03:06:05.979764037Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "187dd597-a9df-43ae-a457-6aa6a09803fb",
+      "status": "passed",
+      "updated_at": "2026-11-08T03:08:00.405626727Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4e2bed35-53a5-487c-9063-b059b6dc8495",
   "labels": [
     "type:task",
@@ -25,7 +39,7 @@
     "satisfies:b697a3f7/REQ-07"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Container marker and destination evidence are declared once",
-  "updated_at": "2026-11-07T23:23:14.790128310Z"
+  "updated_at": "2026-11-08T03:08:11.134047164Z"
 }
