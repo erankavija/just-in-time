@@ -537,7 +537,8 @@
     "d5 ruling applied: e5d7bc11 (F1, item.rs) dispatched on sonnet; 6b22ce6d (F3) after 86a183c2; 86a183c2 REQ-01/02 amended (gates.toml, handoffs, one memo).",
     "e5d7bc11 landed 90862f758; cargo-ci passed; code-review FAILED (captured_declarations_with parses the bundle twice, mod.rs:2798/2804). Fix-forward rework 1 dispatched on a fresh worktree from 2b3ee3f19.",
     "86a183c2 rework 1 at dea774533 (gates.toml memo, handoffs, no fresh memos, no panic); local tip D still ~14.5 ms. Lead decision: REQ-04 requires closing the gap inside this task; derived values (default schema names, namespaces) are computed once per memo entry. No scope change.",
-    "e5d7bc11 fix-forward d59abe232 landed a91c78f4c; cargo-ci passed; code-review FAILED (discovery round clears parsed bundle; custom-source growth still reparses). Rework 2 (final) dispatched with the required closure shape."
+    "e5d7bc11 fix-forward d59abe232 landed a91c78f4c; cargo-ci passed; code-review FAILED (discovery round clears parsed bundle; custom-source growth still reparses). Rework 2 (final) dispatched with the required closure shape.",
+    "e5d7bc11 worker committed 803a8f28a (local bundle reuse) before the stop reached it; NOT landed per d5 ruling. Branch worktree-agent-e5d7bc11 parked unmerged (no -D); worktree reclaimed. Superseded by 86a183c2 memo threading."
   ],
   "story_checkpoints": [
     {
