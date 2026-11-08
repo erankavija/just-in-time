@@ -433,6 +433,18 @@
       "issue": "d675102c",
       "subject": "checkpoint r2 remediation scope: fold F2 into 86a183c2, new tasks for F1 and F3",
       "status": "resolved: proposal approved"
+    },
+    {
+      "to": "just-in-time-d5",
+      "issue": "e5d7bc11",
+      "subject": "rework limit reached; REQ-03 symlink/directory findings; propose extending a869900b non-regular-file ruling",
+      "status": "open"
+    },
+    {
+      "to": "just-in-time-d5",
+      "issue": "86a183c2",
+      "subject": "final rework scope; F3 memo lifetime design: per-command unbounded memo",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -540,7 +552,8 @@
     "e5d7bc11 fix-forward d59abe232 landed a91c78f4c; cargo-ci passed; code-review FAILED (discovery round clears parsed bundle; custom-source growth still reparses). Rework 2 (final) dispatched with the required closure shape.",
     "e5d7bc11 worker committed 803a8f28a (local bundle reuse) before the stop reached it; NOT landed per d5 ruling. Branch worktree-agent-e5d7bc11 parked unmerged (no -D); worktree reclaimed. Superseded by 86a183c2 memo threading.",
     "86a183c2 official smoke on a23f33134 (binary sha256 8f0caa46…, harness defaults, 5 samples, raw in lead scratch smoke-86a1-r2-raw, load 5.58 at end): dep base D 20.355 ms, tip D 13.082 ms, ratio 0.643 PASS; bulk 1.393 pass; archive 0.195 pass; profile pass. Rerun on the final commit after the captured_declarations_with bundle removal.",
-    "86a183c2 REQ-04 smoke on final 6c75253c3 (binary sha256 a3390ff2…, harness defaults, load 1.26 at end): dep base D 18.57 ms, tip D 12.864 ms, ratio 0.693 PASS. Same run bulk 2.377 (fail). A/B quiet reruns: a23f33134 bulk 1.05/1.35, dep 0.644/0.644; 6c75253c3 bulk 2.10/1.09, dep 0.647/0.621. Bulk is variance (diff a23→6c75 is 12 lines in captured_declarations_with, off the bulk path); dep stable 0.62–0.69."
+    "86a183c2 REQ-04 smoke on final 6c75253c3 (binary sha256 a3390ff2…, harness defaults, load 1.26 at end): dep base D 18.57 ms, tip D 12.864 ms, ratio 0.693 PASS. Same run bulk 2.377 (fail). A/B quiet reruns: a23f33134 bulk 1.05/1.35, dep 0.644/0.644; 6c75253c3 bulk 2.10/1.09, dep 0.647/0.621. Bulk is variance (diff a23→6c75 is 12 lines in captured_declarations_with, off the bulk path); dep stable 0.62–0.69.",
+    "86a183c2 cargo-ci passed; code-review FAILED (F1 bootstrap retry fresh memo; F2 direct assembly bypasses in config edit/init/initialize/profile_apply; F3 memo eviction at 4). e5d7bc11 code-review rerun FAILED on REQ-03 (symlink sources rejected; directory occupant silently omitted)."
   ],
   "story_checkpoints": [
     {
