@@ -149,7 +149,15 @@ impl ImageBuilder {
         let spec = self
             .spec
             .unwrap_or_else(|| derived_spec(&self.entries, &self.listings, &self.pinned));
-        RepositoryImage::close(self.layout, spec, self.entries, self.listings, self.pinned).unwrap()
+        RepositoryImage::close(
+            self.layout,
+            spec,
+            self.entries,
+            self.listings,
+            self.pinned,
+            &Default::default(),
+        )
+        .unwrap()
     }
 }
 

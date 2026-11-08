@@ -89,10 +89,14 @@ pub fn apply_overlay(
         }
     }
 
-    Ok(
-        RepositoryImage::close(layout, spec, entries, listings, pinned)?
-            .sharing_declarations(base.declaration_memo()),
-    )
+    Ok(RepositoryImage::close(
+        layout,
+        spec,
+        entries,
+        listings,
+        pinned,
+        base.declaration_memo(),
+    )?)
 }
 
 /// The issue ids `base`'s listing states with `overrides` applied over it.

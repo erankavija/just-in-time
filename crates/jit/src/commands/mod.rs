@@ -2709,6 +2709,23 @@ impl<S: IssueStore> CommandExecutor<S> {
         self
     }
 
+    /// This executor serving another command, whose declarations parse
+    /// through `memo`.
+    pub fn with_declaration_memo(
+        &self,
+        memo: std::sync::Arc<crate::declarations::DeclarationMemo>,
+    ) -> Self
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        Self {
+            storage: self.storage.with_declaration_memo(memo),
+            layout: self.layout.clone(),
+            worktree_paths: self.worktree_paths.clone(),
+            recovered_records: self.recovered_records,
+        }
+    }
+
     /// Return supplied worktree authority, or undiscovered non-Git paths.
     pub(crate) fn require_worktree_paths(&self) -> Result<&crate::storage::WorktreePaths> {
         self.worktree_paths
@@ -3774,7 +3791,8 @@ mod tests {
 
     /// Every capture of an executor reuses the parse of declaration sources
     /// (configuration, rules, gates) an earlier capture parsed, failed or not,
-    /// and a source no capture parsed yet parses once.
+    /// however many distinct sources it parsed since, and a source no capture
+    /// parsed yet parses once.
     #[test]
     fn test_configuration_parse_parses_each_distinct_source_once_across_captures() {
         use crate::declarations::{parses_on_this_thread, ParsedSource};
@@ -3838,6 +3856,37 @@ mod tests {
             &format!("{config}\n# edited\n"),
         );
         let (_, edited) = parses(|| executor.validation().validate_with_fix(false).unwrap());
+        let initialized = |path: &crate::repository_state::VirtualPath| match storage
+            .repository_state()
+            .entries
+            .get(path)
+        {
+            Some(crate::repository_state::RepositoryEntry::File { content, .. }) => {
+                String::from_utf8(content.bytes().to_vec()).unwrap()
+            }
+            entry => panic!("an initialized {path:?}, not {entry:?}"),
+        };
+        // An edited sibling source reassembles the configuration without
+        // parsing the unchanged `config.toml` again.
+        let invariants = initialized(&crate::repository_state::VirtualPath::INVARIANTS);
+        crate::test_harness::seed_memory_repository_file(
+            &storage,
+            ".jit/invariants.toml",
+            &format!("# edited\n{invariants}"),
+        );
+        let (_, sibling) = parses(|| create(&executor).unwrap());
+        // Five distinct gate documents, each revisited after the others parsed.
+        let gates = initialized(&crate::repository_state::VirtualPath::GATES);
+        let mut visit = |variant: usize| {
+            crate::test_harness::seed_memory_repository_file(
+                &storage,
+                ".jit/gates.toml",
+                &format!("# variant {variant}\n{gates}"),
+            );
+            parses(|| create(&executor).unwrap()).1
+        };
+        let first_visits = (0..5).map(&mut visit).collect::<Vec<_>>();
+        let revisits = (0..5).map(&mut visit).collect::<Vec<_>>();
         // A failed assembly is reused like a successful one.
         let malformed = test_helpers::memory_executor_declaring(
             crate::storage::InMemoryStorage::new(),
@@ -3854,9 +3903,18 @@ mod tests {
 
         assert!(refused.is_err());
         assert_eq!(
-            [creation, application, repair, edited, refusal],
-            [[1, 1, 1], [0, 0, 0], [0, 0, 0], [1, 0, 0], [1, 1, 0]]
+            [creation, application, repair, edited, sibling, refusal],
+            [
+                [1, 1, 1],
+                [0, 0, 0],
+                [0, 0, 0],
+                [1, 0, 0],
+                [0, 0, 0],
+                [1, 1, 0]
+            ]
         );
+        assert_eq!(first_visits, [[0, 0, 1]; 5]);
+        assert_eq!(revisits, [[0, 0, 0]; 5]);
     }
 
     #[test]

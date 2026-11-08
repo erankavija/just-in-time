@@ -838,7 +838,7 @@ struct ImageData {
 ///
 /// Clones share the captured data and the token. Equality compares the
 /// captured data only; a session recognises its own image by `ImageToken`.
-/// Declaration parses come from the memo of the store that captured the image.
+/// Declaration parses come from the memo of the command that captured the image.
 #[derive(Clone)]
 pub struct RepositoryImage {
     data: Arc<ImageData>,
@@ -871,13 +871,15 @@ impl Serialize for RepositoryImage {
 }
 
 impl RepositoryImage {
-    /// Close a capture only when every requested path/listing/evidence is present.
+    /// Close a capture only when every requested path/listing/evidence is
+    /// present; its declarations parse through `declarations`.
     pub fn close(
         layout: RepositoryLayout,
         spec: CaptureSpec,
         entries: BTreeMap<VirtualPath, RepositoryEntry>,
         listings: BTreeMap<VirtualPath, DirectoryListing>,
         pinned: BTreeMap<(String, String), PinnedDocumentEvidence>,
+        declarations: &Arc<crate::declarations::DeclarationMemo>,
     ) -> Result<Self, CaptureError> {
         spec.validate()?;
         for (path, entry) in &entries {
@@ -981,19 +983,8 @@ impl RepositoryImage {
                 pinned,
             }),
             token: ImageToken::mint(),
-            declarations: Arc::default(),
+            declarations: Arc::clone(declarations),
         })
-    }
-
-    /// This image, parsing its declarations through `memo`.
-    pub(crate) fn sharing_declarations(
-        self,
-        memo: &Arc<crate::declarations::DeclarationMemo>,
-    ) -> Self {
-        Self {
-            declarations: Arc::clone(memo),
-            ..self
-        }
     }
 
     /// The memo this image's declaration parses come from.
@@ -1799,6 +1790,7 @@ mod tests {
             )]),
             BTreeMap::new(),
             BTreeMap::new(),
+            &Default::default(),
         )
         .unwrap()
     }
@@ -1892,7 +1884,7 @@ mod tests {
                 spec.clone(),
                 extra_entries,
                 BTreeMap::new(),
-                BTreeMap::new(),
+                BTreeMap::new(), &Default::default(),
             ),
             Err(CaptureError::UnexpectedCapturedPath(path)) if path == extra
         ));
@@ -1903,7 +1895,7 @@ mod tests {
                 spec.clone(),
                 entries.clone(),
                 BTreeMap::from([(extra.clone(), DirectoryListing::default())]),
-                BTreeMap::new(),
+                BTreeMap::new(), &Default::default(),
             ),
             Err(CaptureError::UnexpectedListing(path)) if path == extra
         ));
@@ -1927,7 +1919,7 @@ mod tests {
                 spec.clone(),
                 entries.clone(),
                 BTreeMap::new(),
-                BTreeMap::from([(pinned_request.clone(), pinned)]),
+                BTreeMap::from([(pinned_request.clone(), pinned)]), &Default::default(),
             ),
             Err(CaptureError::UnexpectedPinnedEvidence(request)) if request == pinned_request
         ));
@@ -1961,6 +1953,7 @@ mod tests {
             entries,
             BTreeMap::from([(path, listing)]),
             BTreeMap::new(),
+            &Default::default(),
         )
     }
 
@@ -2011,7 +2004,14 @@ mod tests {
                 }
                 let entries = BTreeMap::from([(path.clone(), entry.clone())]);
                 let (listings, pinned) = Default::default();
-                RepositoryImage::close(layout(), spec, entries, listings, pinned)
+                RepositoryImage::close(
+                    layout(),
+                    spec,
+                    entries,
+                    listings,
+                    pinned,
+                    &Default::default(),
+                )
             };
             let read = read as u64;
 
@@ -2114,7 +2114,14 @@ mod tests {
                 spec.discover_paths([path.clone()])?;
             }
             let entries = BTreeMap::from([(path.clone(), entry)]);
-            RepositoryImage::close(layout(), spec, entries, BTreeMap::new(), BTreeMap::new())
+            RepositoryImage::close(
+                layout(),
+                spec,
+                entries,
+                BTreeMap::new(),
+                BTreeMap::new(),
+                &Default::default(),
+            )
         };
         let file = || RepositoryEntry::File {
             content: CapturedBytes::new("a", b"bytes".to_vec()).unwrap(),
@@ -2162,7 +2169,14 @@ mod tests {
                 spec.discover_pinned(&request.0, &request.1)?;
             }
             let pinned = BTreeMap::from([(request.clone(), evidence)]);
-            RepositoryImage::close(layout(), spec, BTreeMap::new(), BTreeMap::new(), pinned)
+            RepositoryImage::close(
+                layout(),
+                spec,
+                BTreeMap::new(),
+                BTreeMap::new(),
+                pinned,
+                &Default::default(),
+            )
         };
         let image = close_pinned(true, evidence(None)).unwrap();
         assert!(image.pinned_evidence()[&request].exists());
@@ -2243,6 +2257,7 @@ mod tests {
                 (issues, DirectoryListing::default()),
             ]),
             BTreeMap::new(),
+            &Default::default(),
         );
 
         assert!(result.is_ok());

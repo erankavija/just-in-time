@@ -1005,16 +1005,9 @@ fn effective_configuration(
     std::sync::Arc<crate::declarations::ParsedConfiguration>,
     crate::repository_state::ProducerError,
 > {
-    use crate::repository_state::VirtualPath;
-    let effective = |path: &VirtualPath| match overrides.get(path) {
-        Some(value) => Ok(value.as_deref()),
-        None => image.file_bytes(path),
-    };
-    Ok(image.declaration_memo().configuration([
-        effective(&VirtualPath::CONFIG)?,
-        effective(&VirtualPath::TEMPLATES)?,
-        effective(&VirtualPath::INVARIANTS)?,
-    ]))
+    crate::repository_state::configuration_overlaid(image, |path| {
+        overrides.get(path).map(Option::as_deref)
+    })
 }
 
 /// Add what the captured `issues` name to `spec`: the plan documents, and each

@@ -411,7 +411,7 @@ pub struct JsonFileStorage {
     /// while the request resolves to the same commit and object, skipping the
     /// content hashing that dominates large pinned documents.
     pinned_evidence_cache: Arc<Mutex<PinnedEvidenceCache>>,
-    /// Declaration parses shared by this invocation's configuration
+    /// The memo of the command this store serves, shared by its configuration
     /// observations and every image it captures.
     pub(crate) declaration_memo: Arc<crate::declarations::DeclarationMemo>,
     git: Git,
@@ -433,13 +433,32 @@ enum IssueReadPhase {
 impl JsonFileStorage {
     /// Create a new JSON file storage instance at the given root path.
     /// The root should be the `.jit` directory (or custom directory from JIT_DATA_DIR).
+    /// The storage serves a command of its own; [`Self::for_command`] serves
+    /// a command that already holds its declaration memo.
     pub fn new<P: AsRef<Path>>(root: P) -> Self {
-        Self::with_lock_timeout(root, crate::storage::lock::configured_lock_timeout())
+        Self::for_command(root, Arc::default())
+    }
+
+    /// Storage at `root` serving the command whose declarations parse
+    /// through `declarations`.
+    pub fn for_command<P: AsRef<Path>>(
+        root: P,
+        declarations: Arc<crate::declarations::DeclarationMemo>,
+    ) -> Self {
+        Self::with_lock_timeout(
+            root,
+            crate::storage::lock::configured_lock_timeout(),
+            declarations,
+        )
     }
 
     /// Create storage whose every lock waits `timeout` instead of the
     /// configured wait.
-    fn with_lock_timeout<P: AsRef<Path>>(root: P, timeout: std::time::Duration) -> Self {
+    fn with_lock_timeout<P: AsRef<Path>>(
+        root: P,
+        timeout: std::time::Duration,
+        declarations: Arc<crate::declarations::DeclarationMemo>,
+    ) -> Self {
         let root = root.as_ref().to_path_buf();
         let bootstrap_lock_path = root
             .parent()
@@ -468,7 +487,7 @@ impl JsonFileStorage {
             worktree_paths: Arc::new(Mutex::new(None)),
             pinned_target_cache: Arc::new(Mutex::new(BTreeMap::new())),
             pinned_evidence_cache: Arc::new(Mutex::new(BTreeMap::new())),
-            declaration_memo: Arc::default(),
+            declaration_memo: declarations,
             git: Git::default(),
             durability: crate::storage::atomic_write::Durability::Full,
             root,
@@ -1539,8 +1558,11 @@ mod tests {
         // be gone before the short-wait storage registers its own.
         let root = storage.root().to_path_buf();
         drop(storage);
-        let storage =
-            JsonFileStorage::with_lock_timeout(root, std::time::Duration::from_millis(50));
+        let storage = JsonFileStorage::with_lock_timeout(
+            root,
+            std::time::Duration::from_millis(50),
+            Default::default(),
+        );
         let data = temp.path().join(".jit");
         let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
         let retained = storage.open_and_retain_mutation_session(layout).unwrap();
@@ -1574,8 +1596,11 @@ mod tests {
         fs::write(temp.path().join(".jit/events.jsonl"), "").unwrap();
         let root = storage.root().to_path_buf();
         drop(storage);
-        let storage =
-            JsonFileStorage::with_lock_timeout(root, std::time::Duration::from_millis(50));
+        let storage = JsonFileStorage::with_lock_timeout(
+            root,
+            std::time::Duration::from_millis(50),
+            Default::default(),
+        );
         let _writer = storage.acquire_events_write_lock().unwrap();
 
         assert_eq!(storage.read_events().unwrap(), Vec::new());
@@ -2083,8 +2108,11 @@ mod tests {
         fn test_list_issues_does_not_wait_for_index_lock() {
             let (temp, _) = crate::test_utils::setup_test_repo().unwrap();
             let data = temp.path().join(".jit");
-            let storage =
-                JsonFileStorage::with_lock_timeout(&data, std::time::Duration::from_millis(50));
+            let storage = JsonFileStorage::with_lock_timeout(
+                &data,
+                std::time::Duration::from_millis(50),
+                Default::default(),
+            );
             let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
             storage.configure_repository_layout(&layout).unwrap();
             let locker = FileLocker::new(std::time::Duration::from_millis(50));

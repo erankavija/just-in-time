@@ -92,17 +92,28 @@ pub fn assemble_config(image: &RepositoryImage) -> Result<JitConfig, ProducerErr
 pub(crate) fn configuration_of(
     image: &RepositoryImage,
 ) -> Result<std::sync::Arc<crate::declarations::ParsedConfiguration>, ProducerError> {
-    let sibling = |path: &VirtualPath| -> Result<Option<&[u8]>, ProducerError> {
-        if image.capture_spec().contains_path(path) {
-            Ok(image.file_bytes(path)?)
-        } else {
-            Ok(None)
+    configuration_overlaid(image, |_| None)
+}
+
+/// [`configuration_of`] with overridden sources: where `override_of` answers
+/// `Some(bytes)`, `bytes` replace the captured source, `None` being absent.
+pub(crate) fn configuration_overlaid<'a>(
+    image: &'a RepositoryImage,
+    override_of: impl Fn(&VirtualPath) -> Option<Option<&'a [u8]>>,
+) -> Result<std::sync::Arc<crate::declarations::ParsedConfiguration>, ProducerError> {
+    let source = |path: &VirtualPath| -> Result<Option<&'a [u8]>, ProducerError> {
+        match override_of(path) {
+            Some(bytes) => Ok(bytes),
+            None if path == &VirtualPath::CONFIG || image.capture_spec().contains_path(path) => {
+                Ok(image.file_bytes(path)?)
+            }
+            None => Ok(None),
         }
     };
     Ok(image.declaration_memo().configuration([
-        image.file_bytes(&VirtualPath::CONFIG)?,
-        sibling(&VirtualPath::TEMPLATES)?,
-        sibling(&VirtualPath::INVARIANTS)?,
+        source(&VirtualPath::CONFIG)?,
+        source(&VirtualPath::TEMPLATES)?,
+        source(&VirtualPath::INVARIANTS)?,
     ]))
 }
 
@@ -974,6 +985,7 @@ kind = "advisory"
             "",
             "identity-test".parse::<ProjectName>().unwrap(),
             None,
+            &Default::default(),
         )
         .unwrap();
         let initialization_image = scaffold
@@ -1817,9 +1829,13 @@ kind = "advisory"
     /// directory that holds a mutation's commit point.
     #[test]
     fn test_initialization_publishes_a_data_root_ignore_file_naming_the_scratch_directory() {
-        let scaffold =
-            InitializationScaffold::render("", "ignore-test".parse::<ProjectName>().unwrap(), None)
-                .unwrap();
+        let scaffold = InitializationScaffold::render(
+            "",
+            "ignore-test".parse::<ProjectName>().unwrap(),
+            None,
+            &Default::default(),
+        )
+        .unwrap();
         let image = scaffold
             .delta_paths()
             .unwrap()
@@ -1961,9 +1977,13 @@ kind = "advisory"
             "derived-state repair must not read the adopter's root ignore file"
         );
 
-        let scaffold =
-            InitializationScaffold::render("", "ignore-test".parse::<ProjectName>().unwrap(), None)
-                .unwrap();
+        let scaffold = InitializationScaffold::render(
+            "",
+            "ignore-test".parse::<ProjectName>().unwrap(),
+            None,
+            &Default::default(),
+        )
+        .unwrap();
         let captured = scaffold.delta_paths().unwrap();
         assert!(
             !captured.contains(&worktree_ignore),

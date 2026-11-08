@@ -52,7 +52,8 @@ pub struct InMemoryStorage {
     /// reentry is admitted only for the same selected roots.
     pub(crate) active_mutation_layout:
         Arc<crate::storage::repository_state_store::ActiveLayoutTracker>,
-    /// Declaration parses shared by every image this store captures.
+    /// The memo of the command this store serves, shared by every image it
+    /// captures.
     pub(crate) declaration_memo: Arc<crate::declarations::DeclarationMemo>,
     #[cfg(feature = "test-support")]
     repository_state_apply_conflicts: Arc<std::sync::atomic::AtomicUsize>,

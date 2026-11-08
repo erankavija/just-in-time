@@ -351,6 +351,13 @@ impl<S: IssueStore + RepositoryStateStore> RepositoryStateStore for PublicationP
     fn declaration_memo(&self) -> &Arc<jit::declarations::DeclarationMemo> {
         self.inner.declaration_memo()
     }
+
+    fn with_declaration_memo(&self, memo: Arc<jit::declarations::DeclarationMemo>) -> Self {
+        Self {
+            inner: self.inner.with_declaration_memo(memo),
+            ..self.clone()
+        }
+    }
 }
 
 fn plan_template(taxonomy: &TestTaxonomy) -> GraphTemplate {

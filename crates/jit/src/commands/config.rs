@@ -71,16 +71,14 @@ pub struct ConfigValidationReport {
 }
 
 impl ConfigValidationReport {
-    /// The report of an invocation that opens no repository: its one
-    /// observation parses through the memo of the store at the selected root.
+    /// The report of an invocation that opens no repository, whose one
+    /// observation parses through the invocation's own memo.
     pub(crate) fn for_invocation(invocation: &super::RepositoryInvocation) -> Result<Self> {
-        use crate::storage::RepositoryStateStore;
         let (data_root, _) = super::bootstrap::select_data_root(invocation);
-        let storage = crate::storage::JsonFileStorage::new(&data_root);
         Self::at_data_root(
             &data_root,
             invocation.worktree_root_override.as_deref(),
-            storage.declaration_memo(),
+            &crate::declarations::DeclarationMemo::default(),
         )
     }
 
@@ -233,14 +231,11 @@ pub fn resolve_dotted_key(
 }
 
 /// Apply one `section.field = value` edit to a config `DocumentMut`, typing the
-/// value and rejecting a post-edit document that fails configuration assembly
-/// as an invalid argument.
+/// value.
 ///
 /// The edit is preservation-safe (toml_edit keeps every unrelated byte, comment,
-/// and ordering). Assembling the POST-mutation document makes a valid replacement
-/// the repair path, while any edit over a document already holding an invalid
-/// value or unknown key is rejected; nothing is mutated on disk until the caller
-/// persists the returned document.
+/// and ordering); nothing is mutated on disk until the caller persists the
+/// edited document.
 fn edit_config_document(doc: &mut toml_edit::DocumentMut, key: &str, value: &str) -> Result<()> {
     let parts: Vec<&str> = key.split('.').collect();
     if parts.len() != 2 {
@@ -265,9 +260,6 @@ fn edit_config_document(doc: &mut toml_edit::DocumentMut, key: &str, value: &str
     };
 
     doc[section][field] = parsed_value;
-
-    crate::declarations::assemble_configuration(Some(doc.to_string().as_bytes()), None, None)
-        .map_err(|e| InvalidArgumentError::new(e.to_string()))?;
     Ok(())
 }
 
@@ -293,10 +285,12 @@ impl<S: IssueStore> ConfigOps<'_, S> {
     /// what the CLI needs to print.
     ///
     /// Edits a formatting-preserving TOML document and publishes it through the
-    /// mutation session. The edited document is assembled as configuration
-    /// BEFORE the write, so an edit that would not load is rejected and the file is
-    /// left untouched. Numeric (`*_secs`/`*_pct`/`max_*`) keys are parsed into
-    /// TOML integers; any other key is stored as a string.
+    /// mutation session. The edited configuration is assembled BEFORE the write,
+    /// so an edit that would not load is rejected as an invalid argument and the
+    /// file is left untouched; assembling the POST-edit document makes a valid
+    /// replacement the repair path for an invalid value or unknown key. Numeric
+    /// (`*_secs`/`*_pct`/`max_*`) keys are parsed into TOML integers; any other
+    /// key is stored as a string.
     pub fn set_config(&self, key: &str, value: &str) -> Result<ConfigSetOutcome>
     where
         S: crate::storage::RepositoryStateStore,
@@ -367,6 +361,12 @@ impl<S: IssueStore> ConfigOps<'_, S> {
             // ruleset and projection inputs reflect the EDITED configuration (the
             // base may not carry config.toml yet on a first-time creation); the
             // discovery overlaid the same edit, so its assembly is the edited one.
+            let edited_config = match edited_config {
+                Err(crate::repository_state::ProducerError::Configuration(error)) => {
+                    return Err(InvalidArgumentError::new(error.to_string()).into());
+                }
+                edited_config => edited_config,
+            };
             let overlaid = apply_overlay(&base, overrides)?;
             let declarations =
                 crate::repository_state::declarations_with_config(&overlaid, edited_config)?;
