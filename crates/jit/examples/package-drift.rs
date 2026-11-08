@@ -12,7 +12,8 @@
 //!   1 — findings, one per line on stderr
 //!   2 — a usage error
 
-use jit::declarations::{parse_gate_registry, GateDefinition};
+use jit::commands::{open_repository, RepositoryInvocation};
+use jit::declarations::{GateDefinition, GateRegistry};
 use jit::domain::repository_inputs::RepositoryInputs;
 use jit::profile::registry_region::{
     RegistryRegion, INVARIANT_REGION, REGION_PACKAGE_ID, TEMPLATE_REGION,
@@ -71,15 +72,34 @@ fn region_finding(
     }
 }
 
+/// The gate registry of the repository at `root`, read through a captured image.
+fn captured_gate_registry(root: &Path) -> anyhow::Result<GateRegistry> {
+    let repository = open_repository(RepositoryInvocation {
+        current_dir: root.canonicalize()?,
+        data_dir_override: None,
+        worktree_root_override: None,
+        is_init: false,
+        opens_mutation_session: false,
+        coordinates_claims_first: false,
+        is_validation_exempt: false,
+        is_recover: false,
+        write_override: None,
+    })?;
+    Ok(repository
+        .executor
+        .config()
+        .captured_declarations()?
+        .gates()
+        .clone())
+}
+
 /// A wrong input footprint makes a reused gate verdict silently stale, and a
 /// wrong one still parses, so this repository's footprints are held here.
 fn gate_input_findings(root: &Path) -> Vec<String> {
     let path = VirtualPath::GATES.repository_relative();
-    let bytes = std::fs::read(root.join(&path))
-        .unwrap_or_else(|error| panic!("failed to read {path}: {error}"));
-    let registry = match parse_gate_registry(&bytes) {
+    let registry = match captured_gate_registry(root) {
         Ok(registry) => registry,
-        Err(error) => return vec![format!("{path} does not parse: {error}")],
+        Err(error) => return vec![format!("{path}: {error:#}")],
     };
     let gate = |key: &str| -> Option<&GateDefinition> { registry.gates.get(&key.parse().ok()?) };
     let inputs = |key: &str| -> Option<&RepositoryInputs> { gate(key)?.inputs.as_ref() };

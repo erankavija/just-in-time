@@ -4,7 +4,6 @@
 //! by file-backed and in-memory backends. Repository-owned publication goes only
 //! through [`RepositoryStateStore`] capture/apply sessions.
 
-use crate::declarations::GateRegistry;
 use crate::domain::identity::{IssueId, IssueIdPrefix};
 use crate::domain::{Event, Issue};
 use anyhow::Result;
@@ -22,7 +21,6 @@ pub mod errors;
 pub(crate) mod external_publish;
 pub(crate) mod gate_run_reader;
 pub mod gate_runs;
-pub mod gate_store;
 pub mod git;
 pub mod guard_order;
 pub(crate) mod init_publish;
@@ -267,13 +265,6 @@ pub trait IssueStore: Clone {
     ///
     /// Returns an error if issues cannot be loaded.
     fn list_issues(&self) -> Result<Vec<Issue>>;
-
-    /// Load the gate registry.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the registry cannot be loaded.
-    fn load_gate_registry(&self) -> Result<GateRegistry>;
 
     /// Read all events. Malformed JSON, a malformed record, and a tag outside the
     /// current event vocabulary are errors.

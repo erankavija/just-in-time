@@ -1489,6 +1489,42 @@ mod tests {
         }
     }
 
+    /// An image whose only present declaration is `gates`, when given.
+    fn gates_image(gates: Option<&str>) -> RepositoryImage {
+        let builder = VirtualPath::DECLARATION_FILES
+            .into_iter()
+            .fold(ImageBuilder::new(), |builder, path| {
+                builder.entry(path, RepositoryEntry::Absent)
+            });
+        match gates {
+            Some(gates) => builder.file(".jit/gates.toml", gates),
+            None => builder,
+        }
+        .build()
+    }
+
+    #[test]
+    fn test_declarations_from_image_without_a_gate_registry_declares_no_gates() {
+        let declarations = declarations_from_image(&gates_image(None)).unwrap();
+
+        assert!(declarations.gates().gates.is_empty());
+    }
+
+    /// The key is the registry identity, so keeping either row would discard
+    /// the other.
+    #[test]
+    fn test_declarations_from_image_rejects_duplicate_gate_keys_naming_the_key() {
+        let row = "[[gates]]\nkey = \"review\"\ntitle = \"Review\"\n\
+                   description = \"Review\"\nstage = \"postcheck\"\nmode = \"manual\"\n";
+
+        assert!(matches!(
+            declarations_from_image(&gates_image(Some(&format!("{row}\n{row}")))),
+            Err(DeclarationParseError::Gate(
+                crate::declarations::GateDeclarationError::DuplicateKey(key)
+            )) if key.as_str() == "review"
+        ));
+    }
+
     const MALFORMED_ITEM_KINDS: &str = "[item_kinds.custom]\nsection = \"Items\"\n";
 
     #[test]

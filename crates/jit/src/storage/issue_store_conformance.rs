@@ -6,10 +6,9 @@
 //! by implementing `Backend` and naming itself there. A backend's own tests
 //! state only what that backend adds (`@/inv/orthogonal-tests`).
 
-use crate::declarations::{serialize_gate_registry, GateRegistry, GateStage};
+use crate::declarations::GateStage;
 use crate::domain::identity::{GateRunId, IssueId, IssueIdPrefix};
 use crate::domain::{Event, EventBody, GateRunResult, GateStatus, GateVerdictOrigin, Issue};
-use crate::gate_presets::{GatePresetDefinition, GateTemplate};
 use crate::repository_state::{
     serialize_gate_run, serialize_issue, CaptureBudget, CaptureSpec, ExpectedPreimage, FileMode,
     MaterializationPlan, MutationContext, RepositoryAction, RepositoryActionOwner, RepositoryDelta,
@@ -299,21 +298,6 @@ fn gate_run_seed(runs: &[GateRunResult]) -> Vec<(VirtualPath, String)> {
         .collect()
 }
 
-fn ci_preset() -> GatePresetDefinition {
-    GatePresetDefinition {
-        name: "ci-checks".to_string(),
-        description: "Continuous integration".to_string(),
-        gates: vec![GateTemplate {
-            key: "review".parse().unwrap(),
-            title: "Review".to_string(),
-            description: "A reviewer approves".to_string(),
-            stage: GateStage::Postcheck,
-            mode: crate::declarations::GateMode::Manual,
-            checker: None,
-        }],
-    }
-}
-
 /// Path spellings every backend refuses before reading anything.
 const INVALID_PATHS: [&str; 6] = [
     "",
@@ -516,29 +500,6 @@ fn test_list_issues_is_empty_before_any_issue_is_published<B: Backend>() {
     let repository = Repository::<B>::seeded(&initialized());
 
     assert_eq!(repository.store.list_issues().unwrap(), Vec::<Issue>::new());
-}
-
-fn test_load_gate_registry_reads_the_declared_gates_and_none_when_absent<B: Backend>() {
-    let gate = ci_preset().gates[0].to_gate();
-    let registry = GateRegistry {
-        gates: [(gate.key.clone(), gate)].into_iter().collect(),
-    };
-    let declared = Repository::<B>::seeded(&[(
-        VirtualPath::GATES,
-        String::from_utf8(serialize_gate_registry(&registry).unwrap()).unwrap(),
-    )]);
-    let undeclared = Repository::<B>::seeded(&initialized());
-
-    assert_eq!(
-        declared.store.load_gate_registry().unwrap().gates,
-        registry.gates
-    );
-    assert!(undeclared
-        .store
-        .load_gate_registry()
-        .unwrap()
-        .gates
-        .is_empty());
 }
 
 fn test_read_events_rejects_unknown_tags_and_malformed_records<B: Backend>() {
@@ -1330,7 +1291,6 @@ conformance_suite!(
         test_resolve_issue_id_reports_a_non_canonical_id_as_not_found,
         test_load_issue_rejects_a_non_canonical_stored_id_naming_the_record,
         test_list_issues_is_empty_before_any_issue_is_published,
-        test_load_gate_registry_reads_the_declared_gates_and_none_when_absent,
         test_read_events_rejects_unknown_tags_and_malformed_records,
         test_load_gate_run_result_reads_a_recorded_run_and_reports_others_not_found,
         test_list_gate_runs_for_issue_lists_only_that_issues_runs,

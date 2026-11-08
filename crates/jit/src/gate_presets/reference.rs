@@ -196,17 +196,9 @@ mod tests {
 
     #[test]
     fn test_portable_checker_registry_examples_load_as_canonical_toml() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(
-            dir.path().join("gates.toml"),
-            PORTABLE_CHECKER_REGISTRY_EXAMPLES,
-        )
-        .unwrap();
-
-        let registry = crate::storage::gate_store::load_gate_registry(
-            &crate::test_utils::repository_layout_for_data_root(dir.path()),
-        )
-        .unwrap();
+        let registry =
+            crate::declarations::parse_gate_registry(PORTABLE_CHECKER_REGISTRY_EXAMPLES.as_bytes())
+                .unwrap();
         assert_eq!(registry.gates.len(), 5);
         assert!(matches!(
             registry.gates[&"repository-policy".parse().unwrap()]
@@ -242,16 +234,9 @@ mod tests {
     /// variant cannot ship undocumented.
     #[test]
     fn test_render_documents_every_portable_checker_the_examples_declare() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(
-            dir.path().join("gates.toml"),
-            PORTABLE_CHECKER_REGISTRY_EXAMPLES,
-        )
-        .unwrap();
-        let registry = crate::storage::gate_store::load_gate_registry(
-            &crate::test_utils::repository_layout_for_data_root(dir.path()),
-        )
-        .unwrap();
+        let registry =
+            crate::declarations::parse_gate_registry(PORTABLE_CHECKER_REGISTRY_EXAMPLES.as_bytes())
+                .unwrap();
         let page = render_reference_markdown();
 
         for gate in registry.gates.values() {

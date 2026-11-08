@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use jit::commands::test_helpers::{memory_executor_wrapping, MemoryDeclarations};
-use jit::declarations::{GateChecker, GateMode, GateRegistry, GateStage};
+use jit::declarations::{GateChecker, GateMode, GateStage};
 use jit::domain::identity::IssueId;
 use jit::domain::{Event, Issue, Priority};
 use jit::repository_state::{CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath};
@@ -166,9 +166,6 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     }
     fn list_issues(&self) -> Result<Vec<Issue>> {
         self.inner.list_issues()
-    }
-    fn load_gate_registry(&self) -> Result<GateRegistry> {
-        self.inner.load_gate_registry()
     }
     fn read_events(&self) -> Result<Vec<Event>> {
         self.inner.read_events()
