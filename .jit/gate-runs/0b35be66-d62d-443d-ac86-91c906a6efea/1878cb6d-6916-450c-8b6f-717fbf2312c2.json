@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ae01461e72861be0280776b37efa2f5fdd06a331",
+  "completed_at": "2026-11-08T03:02:54.439881257Z",
+  "duration_ms": 199850,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three hard criteria are satisfied; no unresolved issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0b35be66-d62d-443d-ac86-91c906a6efea",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1878cb6d-6916-450c-8b6f-717fbf2312c2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T02:59:34.589471060Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:0b35be66 — 0977e9ba, bcd69793, 7945753a, 948212c8, ebcc6d93, 565741ab, 3ffb655b, 4f38ff97, e80a62a9; uncommitted changes excluded.\nPolicy sources: AGENTS.md; dev/TESTING.md; no subtree AGENTS.md found.\nResolved items: @/inv/atomic-writes, @/inv/derived-state-coherence, @/inv/orthogonal-tests, @/inv/shared-test-contracts, @/inv/semantic-test-assertions, @/inv/no-ignored-tests, @/inv/essential-code-prose, @/inv/architecture-dependency-direction, @/inv/convention-convergence → .jit/invariants.toml; @/gate/jit-validate, @/gate/cargo-ci → .jit/gates.toml; @/issue/0b35be66/requirement/REQ-01, @/issue/0b35be66/requirement/REQ-02, @/issue/0b35be66/requirement/REQ-03 → issue description.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T02:57:43.778567215+00:00, commit ae01461e; wrapper confirms coverage of all nine tagged commits. code-review pending, exit none. Gates not rerun.\nTruncation recovery: narrower reads recovered relevant patches, testing guidance, gate configuration, and issue content; XML patches inspected for the ten relevant tests.\n\nNo findings. REQ-01–03 are satisfied: the committed final measurement records all ten tests below their limits at load 3.93; synchronization preserves the original assertions and case counts; production storage retains full durability.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three hard criteria are satisfied; no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
