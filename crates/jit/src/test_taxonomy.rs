@@ -65,6 +65,17 @@ impl TestTaxonomy {
             .expect("the declared test vocabulary is a valid hierarchy")
     }
 
+    /// The hierarchy of `issues` under this vocabulary.
+    pub fn resolve_hierarchy<'a>(
+        &self,
+        issues: &'a [crate::domain::Issue],
+    ) -> crate::graph::hierarchy::HierarchyResolution<'a, crate::domain::Issue> {
+        crate::graph::hierarchy::resolve_hierarchy(
+            &issues.iter().collect::<Vec<_>>(),
+            &self.hierarchy_config(),
+        )
+    }
+
     /// The type this vocabulary declares at `level`, for a consumer that reads
     /// the name it was given rather than repeating a literal.
     ///

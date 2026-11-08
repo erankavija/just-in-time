@@ -71,52 +71,66 @@ pub enum GraphError<Id> {
 /// All methods are pure functions that do not modify the graph structure.
 pub struct DependencyGraph<'a, T: GraphNode> {
     nodes: HashMap<T::Id, &'a T>,
+    /// Reverse-dependency index: each depended-on id's dependents, deduplicated
+    /// and sorted by id so a dependents traversal is deterministic. Built once in
+    /// [`new`](Self::new); every dependents query reads it.
+    dependents: HashMap<&'a T::Id, Vec<&'a T>>,
+}
+
+#[cfg(test)]
+thread_local! {
+    static CONSTRUCTIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// The number of [`DependencyGraph::new`] calls this thread has made.
+#[cfg(test)]
+pub(crate) fn constructions_on_this_thread() -> usize {
+    CONSTRUCTIONS.with(std::cell::Cell::get)
 }
 
 impl<'a, T: GraphNode> DependencyGraph<'a, T> {
-    /// Create a new dependency graph from a list of nodes
+    /// Create a new dependency graph from a list of nodes, building its
+    /// reverse-dependency index in O(V + E log E).
     pub fn new(nodes: &[&'a T]) -> Self {
-        let nodes_map = nodes
+        #[cfg(test)]
+        CONSTRUCTIONS.with(|count| count.set(count.get() + 1));
+        let nodes_map: HashMap<T::Id, &'a T> = nodes
             .iter()
             .map(|node| (node.id().clone(), *node))
             .collect();
+        let mut dependents: HashMap<&'a T::Id, Vec<&'a T>> = HashMap::new();
+        nodes_map.values().for_each(|node| {
+            node.dependencies()
+                .for_each(|dep| dependents.entry(dep).or_default().push(*node))
+        });
+        dependents.values_mut().for_each(|list| {
+            list.sort_unstable_by(|a, b| a.id().cmp(b.id()));
+            list.dedup_by(|a, b| a.id() == b.id());
+        });
 
-        Self { nodes: nodes_map }
+        Self {
+            nodes: nodes_map,
+            dependents,
+        }
     }
 
-    /// Adjacency in `direction`, indexed by node id.
-    ///
-    /// Building it once amortizes the reverse lookup that
-    /// [`get_dependents`](Self::get_dependents) pays per call. Neighbour lists
-    /// keep dependency-declaration order for [`Direction::Dependencies`] and are
-    /// sorted by id for [`Direction::Dependents`], so a traversal is
-    /// deterministic in either direction.
-    fn neighbors(&self, direction: Direction) -> HashMap<&'a T::Id, Vec<&'a T::Id>> {
+    /// The ids `id` reaches by one edge in `direction`: dependency-declaration
+    /// order for [`Direction::Dependencies`], id order for
+    /// [`Direction::Dependents`].
+    fn neighbors(&self, id: &T::Id, direction: Direction) -> Vec<&'a T::Id> {
         match direction {
             Direction::Dependencies => self
                 .nodes
-                .values()
-                .map(|node| (node.id(), node.dependencies().collect()))
-                .collect(),
-            Direction::Dependents => {
-                let mut index: HashMap<&'a T::Id, Vec<&'a T::Id>> = self
-                    .nodes
-                    .values()
-                    .map(|node| (node.id(), Vec::new()))
-                    .collect();
-                for node in self.nodes.values() {
-                    for dep in node.dependencies() {
-                        if let Some(dependents) = index.get_mut(dep) {
-                            dependents.push(node.id());
-                        }
-                    }
-                }
-                index
-                    .values_mut()
-                    .for_each(|dependents| dependents.sort_unstable());
-                index
-            }
+                .get(id)
+                .map(|node| node.dependencies().collect())
+                .unwrap_or_default(),
+            Direction::Dependents => self.dependents_of(id).map(GraphNode::id).collect(),
         }
+    }
+
+    /// The direct dependents of `id`, read from the reverse index.
+    fn dependents_of(&self, id: &T::Id) -> impl Iterator<Item = &'a T> + '_ {
+        self.dependents.get(id).into_iter().flatten().copied()
     }
 
     /// Walk the graph from `start` in `direction`, stopping at `max_depth`.
@@ -129,12 +143,11 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
     /// At `max_depth = 0` and [`Direction::Dependencies`] this returns the same
     /// nodes as [`get_transitive_dependencies`](Self::get_transitive_dependencies).
     pub fn traverse(&self, start: &T::Id, direction: Direction, max_depth: u32) -> Vec<&'a T> {
-        let neighbors = self.neighbors(direction);
         let frontier = |id: &T::Id, depth: u32| -> Vec<(&'a T::Id, u32)> {
-            neighbors
-                .get(id)
+            self.neighbors(id, direction)
                 .into_iter()
-                .flat_map(|ids| ids.iter().rev().map(move |id| (*id, depth)))
+                .rev()
+                .map(|id| (id, depth))
                 .collect()
         };
 
@@ -173,7 +186,7 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
         direction: Direction,
         max_depth: u32,
     ) -> Vec<Expansion<'a, T>> {
-        self.expand_from(start, 1, max_depth, &self.neighbors(direction))
+        self.expand_from(start, 1, max_depth, direction)
     }
 
     /// Unfold the neighbours of `id` at `level`, recursing until `max_depth`.
@@ -185,18 +198,16 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
         id: &T::Id,
         level: u32,
         max_depth: u32,
-        neighbors: &HashMap<&'a T::Id, Vec<&'a T::Id>>,
+        direction: Direction,
     ) -> Vec<Expansion<'a, T>> {
-        neighbors
-            .get(id)
+        self.neighbors(id, direction)
             .into_iter()
-            .flatten()
-            .filter_map(|neighbor| self.nodes.get(*neighbor).copied())
+            .filter_map(|neighbor| self.nodes.get(neighbor).copied())
             .map(|node| Expansion {
                 node,
                 level,
                 children: match max_depth == 0 || level < max_depth {
-                    true => self.expand_from(node.id(), level + 1, max_depth, neighbors),
+                    true => self.expand_from(node.id(), level + 1, max_depth, direction),
                     false => Vec::new(),
                 },
             })
@@ -273,38 +284,26 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             .collect()
     }
 
-    /// Get all nodes that directly depend on the given node
+    /// Every node that directly depends on `node_id`, sorted by id.
     pub fn get_dependents(&self, node_id: &T::Id) -> Vec<&'a T> {
-        self.nodes
-            .values()
-            .filter(|node| node.dependencies().any(|dep| dep == node_id))
-            .copied()
-            .collect()
+        self.dependents_of(node_id).collect()
     }
 
-    /// Get all nodes that transitively depend on the given node
+    /// Every node that transitively depends on `node_id`.
     pub fn get_transitive_dependents(&self, node_id: &T::Id) -> Vec<&'a T> {
-        let mut result = HashSet::new();
+        let mut reached: HashSet<&T::Id> = HashSet::new();
+        let mut result = Vec::new();
         let mut stack = vec![node_id];
-        let mut visited = HashSet::new();
 
         while let Some(current) = stack.pop() {
-            if visited.contains(current) {
-                continue;
-            }
-            visited.insert(current);
-
-            let dependents = self.get_dependents(current);
-            for dependent in dependents {
-                result.insert(dependent.id());
-                stack.push(dependent.id());
+            for dependent in self.dependents_of(current) {
+                if reached.insert(dependent.id()) {
+                    result.push(dependent);
+                    stack.push(dependent.id());
+                }
             }
         }
-
         result
-            .into_iter()
-            .filter_map(|id| self.nodes.get(id).copied())
-            .collect()
     }
 
     /// Get all nodes the given node transitively DEPENDS ON.
@@ -338,19 +337,12 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
             .collect()
     }
 
-    /// Get all isolated nodes (nodes with no dependencies and no dependents)
-    ///
-    /// An isolated node is one that has no incoming or outgoing edges in the
-    /// dependency graph. These nodes are not connected to any other node.
+    /// Every node with neither dependencies nor dependents, in O(V + E).
     pub fn get_isolated_nodes(&self) -> Vec<&'a T> {
         self.nodes
             .values()
             .filter(|node| {
-                // No dependencies (no outgoing edges)
-                let has_no_dependencies = node.dependencies().next().is_none();
-                // No dependents (no incoming edges)
-                let has_no_dependents = self.get_dependents(node.id()).is_empty();
-                has_no_dependencies && has_no_dependents
+                node.dependencies().next().is_none() && !self.dependents.contains_key(node.id())
             })
             .copied()
             .collect()
@@ -639,36 +631,6 @@ mod tests {
     }
 
     #[test]
-    fn test_generic_graph_dependents() {
-        let node1 = TestNode::new("base", vec![]);
-        let node2 = TestNode::new("dep1", vec!["base"]);
-        let node3 = TestNode::new("dep2", vec!["base"]);
-
-        let nodes = vec![&node1, &node2, &node3];
-        let graph = DependencyGraph::new(&nodes);
-
-        let dependents = graph.get_dependents(&"base".to_string());
-        assert_eq!(dependents.len(), 2);
-        assert!(dependents.iter().any(|n| n.id() == "dep1"));
-        assert!(dependents.iter().any(|n| n.id() == "dep2"));
-    }
-
-    #[test]
-    fn test_generic_graph_transitive_dependents() {
-        let node1 = TestNode::new("root", vec![]);
-        let node2 = TestNode::new("level1", vec!["root"]);
-        let node3 = TestNode::new("level2", vec!["level1"]);
-
-        let nodes = vec![&node1, &node2, &node3];
-        let graph = DependencyGraph::new(&nodes);
-
-        let transitive = graph.get_transitive_dependents(&"root".to_string());
-        assert_eq!(transitive.len(), 2);
-        assert!(transitive.iter().any(|n| n.id() == "level1"));
-        assert!(transitive.iter().any(|n| n.id() == "level2"));
-    }
-
-    #[test]
     fn test_generic_graph_cycle_detection() {
         let mut node1 = TestNode::new("A", vec![]);
         let mut node2 = TestNode::new("B", vec![]);
@@ -769,46 +731,6 @@ mod tests {
         assert_eq!(roots.len(), 2);
         assert!(roots.iter().any(|i| i.id == issue1.id));
         assert!(roots.iter().any(|i| i.id == issue3.id));
-    }
-
-    #[test]
-    fn test_get_dependents_returns_direct_dependents() {
-        let issue1 = crate::test_utils::fixture_issue("Dependency".to_string(), "Desc".to_string());
-        let mut issue2 =
-            crate::test_utils::fixture_issue("Dependent 1".to_string(), "Desc".to_string());
-        let mut issue3 =
-            crate::test_utils::fixture_issue("Dependent 2".to_string(), "Desc".to_string());
-
-        issue2.dependencies.push(issue1.id.clone());
-        issue3.dependencies.push(issue1.id.clone());
-
-        let issues = vec![&issue1, &issue2, &issue3];
-        let graph = DependencyGraph::new(&issues);
-
-        let dependents = graph.get_dependents(&issue1.id);
-        assert_eq!(dependents.len(), 2);
-        assert!(dependents.iter().any(|i| i.id == issue2.id));
-        assert!(dependents.iter().any(|i| i.id == issue3.id));
-    }
-
-    #[test]
-    fn test_get_transitive_dependents() {
-        let issue1 = crate::test_utils::fixture_issue("Root".to_string(), "Desc".to_string());
-        let mut issue2 =
-            crate::test_utils::fixture_issue("Level 1".to_string(), "Desc".to_string());
-        let mut issue3 =
-            crate::test_utils::fixture_issue("Level 2".to_string(), "Desc".to_string());
-
-        issue2.dependencies.push(issue1.id.clone());
-        issue3.dependencies.push(issue2.id.clone());
-
-        let issues = vec![&issue1, &issue2, &issue3];
-        let graph = DependencyGraph::new(&issues);
-
-        let transitive = graph.get_transitive_dependents(&issue1.id);
-        assert_eq!(transitive.len(), 2);
-        assert!(transitive.iter().any(|i| i.id == issue2.id));
-        assert!(transitive.iter().any(|i| i.id == issue3.id));
     }
 
     #[test]
@@ -1042,66 +964,6 @@ mod tests {
         assert!(!reduced_deps.contains("D"));
     }
 
-    #[test]
-    fn test_get_isolated_nodes_empty_graph() {
-        let nodes: Vec<&TestNode> = vec![];
-        let graph = DependencyGraph::new(&nodes);
-
-        let isolated = graph.get_isolated_nodes();
-        assert_eq!(isolated.len(), 0);
-    }
-
-    #[test]
-    fn test_get_isolated_nodes_single_node() {
-        let node = TestNode::new("alone", vec![]);
-        let graph = DependencyGraph::new(&[&node]);
-
-        let isolated = graph.get_isolated_nodes();
-        assert_eq!(isolated.len(), 1);
-        assert_eq!(isolated[0].id(), "alone");
-    }
-
-    #[test]
-    fn test_get_isolated_nodes_connected_chain() {
-        // A→B→C - no isolated nodes
-        let a = TestNode::new("A", vec!["B"]);
-        let b = TestNode::new("B", vec!["C"]);
-        let c = TestNode::new("C", vec![]);
-
-        let graph = DependencyGraph::new(&[&a, &b, &c]);
-        let isolated = graph.get_isolated_nodes();
-        assert_eq!(isolated.len(), 0);
-    }
-
-    #[test]
-    fn test_get_isolated_nodes_with_isolated() {
-        // A→B and C is isolated
-        let a = TestNode::new("A", vec!["B"]);
-        let b = TestNode::new("B", vec![]);
-        let c = TestNode::new("C", vec![]);
-
-        let graph = DependencyGraph::new(&[&a, &b, &c]);
-        let isolated = graph.get_isolated_nodes();
-        assert_eq!(isolated.len(), 1);
-        assert_eq!(isolated[0].id(), "C");
-    }
-
-    #[test]
-    fn test_get_isolated_nodes_multiple_isolated() {
-        // A→B and C, D are isolated
-        let a = TestNode::new("A", vec!["B"]);
-        let b = TestNode::new("B", vec![]);
-        let c = TestNode::new("C", vec![]);
-        let d = TestNode::new("D", vec![]);
-
-        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
-        let isolated = graph.get_isolated_nodes();
-        assert_eq!(isolated.len(), 2);
-        let isolated_ids: Vec<&str> = isolated.iter().map(|n| n.id().as_str()).collect();
-        assert!(isolated_ids.contains(&"C"));
-        assert!(isolated_ids.contains(&"D"));
-    }
-
     // Tests for depth-bounded traversal and expansion
 
     fn ids(nodes: &[&TestNode]) -> Vec<String> {
@@ -1195,24 +1057,6 @@ mod tests {
         assert_eq!(
             ids(&graph.traverse(&"D".to_string(), Direction::Dependents, 1)),
             vec!["C"]
-        );
-    }
-
-    #[test]
-    fn test_traverse_dependents_matches_transitive_dependents() {
-        let (a, b, c, d) = chain_with_shortcut();
-        let graph = DependencyGraph::new(&[&a, &b, &c, &d]);
-
-        let mut expected: Vec<String> = graph
-            .get_transitive_dependents(&"D".to_string())
-            .iter()
-            .map(|node| node.id().to_string())
-            .collect();
-        expected.sort();
-
-        assert_eq!(
-            sorted_ids(&graph.traverse(&"D".to_string(), Direction::Dependents, 0)),
-            expected
         );
     }
 
@@ -1311,25 +1155,6 @@ mod tests {
         assert_eq!(rendered, vec!["B@1C@2D@3", "C@1D@2"]);
     }
 
-    #[test]
-    fn test_get_isolated_nodes_with_issues() {
-        // Test with actual Issue type
-        let issue1 =
-            crate::test_utils::fixture_issue("Connected 1".to_string(), "Desc".to_string());
-        let mut issue2 =
-            crate::test_utils::fixture_issue("Connected 2".to_string(), "Desc".to_string());
-        let issue3 = crate::test_utils::fixture_issue("Isolated".to_string(), "Desc".to_string());
-
-        issue2.dependencies.push(issue1.id.clone());
-
-        let issues = vec![&issue1, &issue2, &issue3];
-        let graph = DependencyGraph::new(&issues);
-
-        let isolated = graph.get_isolated_nodes();
-        assert_eq!(isolated.len(), 1);
-        assert_eq!(isolated[0].id, issue3.id);
-    }
-
     /// Random DAG: node `i` may only depend on nodes `< i`, so `edges[i]` is the
     /// mask of admissible predecessors, keeping the graph acyclic by construction.
     fn dag_from_masks(masks: &[u32]) -> Vec<TestNode> {
@@ -1350,6 +1175,55 @@ mod tests {
     }
 
     proptest::proptest! {
+        /// Every reverse-index query equals its definition over the input edges:
+        /// direct dependents list the node, transitive dependents reach it, and
+        /// an isolated node has no edge at either end.
+        #[test]
+        fn test_dependents_index_queries_equal_their_definitions_over_arbitrary_dags(
+            masks in proptest::collection::vec(0u32..128, 0..8),
+        ) {
+            let nodes = dag_from_masks(&masks);
+            let refs: Vec<&TestNode> = nodes.iter().collect();
+            let graph = DependencyGraph::new(&refs);
+            let reaches = |from: &TestNode, target: &str| {
+                let mut stack = vec![from];
+                let mut seen = HashSet::new();
+                while let Some(node) = stack.pop() {
+                    if !seen.insert(node.id.as_str()) {
+                        continue;
+                    }
+                    if node.deps.iter().any(|dep| dep == target) {
+                        return true;
+                    }
+                    stack.extend(nodes.iter().filter(|n| node.deps.contains(&n.id)));
+                }
+                false
+            };
+            let defined = |keep: &dyn Fn(&TestNode) -> bool| -> Vec<String> {
+                nodes.iter().filter(|n| keep(n)).map(|n| n.id.clone()).collect()
+            };
+
+            for node in &nodes {
+                proptest::prop_assert_eq!(
+                    sorted_ids(&graph.get_dependents(node.id())),
+                    defined(&|n| n.deps.contains(&node.id))
+                );
+                let transitive = defined(&|n| reaches(n, &node.id));
+                proptest::prop_assert_eq!(
+                    sorted_ids(&graph.get_transitive_dependents(node.id())),
+                    transitive.clone()
+                );
+                proptest::prop_assert_eq!(
+                    sorted_ids(&graph.traverse(node.id(), Direction::Dependents, 0)),
+                    transitive
+                );
+            }
+            proptest::prop_assert_eq!(
+                sorted_ids(&graph.get_isolated_nodes()),
+                defined(&|n| n.deps.is_empty() && !nodes.iter().any(|m| m.deps.contains(&n.id)))
+            );
+        }
+
         #[test]
         fn test_graph_queries_borrow_nodes_from_the_input_set(
             masks in proptest::collection::vec(0u32..128, 1..8),

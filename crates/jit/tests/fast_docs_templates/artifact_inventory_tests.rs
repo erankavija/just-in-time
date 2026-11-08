@@ -72,7 +72,7 @@ fn test_container_inventory_uses_resolved_children_not_raw_dependency_closure() 
     let issues = vec![sequenced_elsewhere, local, other, selected];
     let inventory = inventory_explicit_roots(
         &issues,
-        &taxonomy.hierarchy_config(),
+        &taxonomy.resolve_hierarchy(&issues),
         ExplicitRootTarget::Container(&selected_id),
         &FakePinnedResolver::default(),
     )
@@ -81,7 +81,7 @@ fn test_container_inventory_uses_resolved_children_not_raw_dependency_closure() 
     reversed.reverse();
     let reordered = inventory_explicit_roots(
         &reversed,
-        &taxonomy.hierarchy_config(),
+        &taxonomy.resolve_hierarchy(&reversed),
         ExplicitRootTarget::Container(&selected_id),
         &FakePinnedResolver::default(),
     )
@@ -119,9 +119,10 @@ fn test_container_inventory_includes_opaque_roots_without_adapters() {
         document_reference("figures/vector.svg"),
     ];
 
+    let issues = [container, child];
     let inventory = inventory_explicit_roots(
-        &[container, child],
-        &taxonomy.hierarchy_config(),
+        &issues,
+        &taxonomy.resolve_hierarchy(&issues),
         ExplicitRootTarget::Container(&container_id),
         &FakePinnedResolver::default(),
     )
@@ -146,7 +147,7 @@ fn test_document_inventory_normalizes_zero_owner_opaque_root() {
     let taxonomy = test_taxonomy();
     let inventory = inventory_explicit_roots(
         &[],
-        &taxonomy.hierarchy_config(),
+        &taxonomy.resolve_hierarchy(&[]),
         ExplicitRootTarget::Document("./exports/../figures//chart.svg"),
         &FakePinnedResolver::default(),
     )
@@ -183,9 +184,10 @@ fn test_mixed_pinned_and_unpinned_owners_group_by_canonical_version() {
         .resolves("01234567", "docs/report.csv", OID_A)
         .resolves("release-v2", "docs/report.csv", OID_B);
 
+    let issues = [z_owner, a_owner];
     let inventory = inventory_explicit_roots(
-        &[z_owner, a_owner],
-        &taxonomy.hierarchy_config(),
+        &issues,
+        &taxonomy.resolve_hierarchy(&issues),
         ExplicitRootTarget::Document("docs/report.csv"),
         &resolver,
     )
@@ -224,9 +226,10 @@ fn test_pinned_resolution_or_read_failure_blocks_without_working_tree_owner_fall
     issue.documents = vec![document_reference_at("docs/history.md", "missing-tag")];
     let resolver = FakePinnedResolver::default().fails("missing-tag", "docs/history.md");
 
+    let issues = [issue];
     let inventory = inventory_explicit_roots(
-        &[issue],
-        &taxonomy.hierarchy_config(),
+        &issues,
+        &taxonomy.resolve_hierarchy(&issues),
         ExplicitRootTarget::Document("docs/history.md"),
         &resolver,
     )
@@ -263,7 +266,7 @@ fn test_pinned_root_requests_are_target_relevant_and_deduplicated() {
     outside.documents = vec![document_reference_at("docs/outside.md", "other")];
     let issues = [outside, child, container];
     let requests = |target| {
-        pinned_root_requests(&issues, &taxonomy.hierarchy_config(), target)
+        pinned_root_requests(&issues, &taxonomy.resolve_hierarchy(&issues), target)
             .unwrap()
             .into_iter()
             .collect::<Vec<_>>()
