@@ -669,8 +669,13 @@ fn assert_branch_drift_failure(mut command: std::process::Command, expected: &st
     let plain = command.output().unwrap();
     assert_eq!(plain.status.code(), Some(4), "{plain:?}");
     assert!(
-        String::from_utf8_lossy(&plain.stderr).contains(expected),
-        "expected {expected:?}: {plain:?}"
+        String::from_utf8_lossy(&plain.stdout).contains(expected),
+        "expected {expected:?} on stdout: {plain:?}"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&plain.stderr).lines().count(),
+        1,
+        "{plain:?}"
     );
 
     let json = command.arg("--json").output().unwrap();
@@ -792,15 +797,16 @@ fn test_validate_branch_drift_detects_drifted_branch() {
         .output()
         .unwrap();
     assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stderr.contains("Branch has diverged from origin/main"),
-        "branch-drift failure explains the divergence: {stderr}"
+        stdout.contains("Branch has diverged from origin/main"),
+        "branch-drift failure explains the divergence: {stdout}"
     );
     assert!(
-        stderr.contains("Fix: git rebase origin/main"),
-        "branch-drift failure gives the rebase remedy: {stderr}"
+        stdout.contains("Fix: git rebase origin/main"),
+        "branch-drift failure gives the rebase remedy: {stdout}"
     );
+    assert_eq!(String::from_utf8_lossy(&output.stderr).lines().count(), 1);
 
     let json_output = cli
         .command(["validate", "--branch-drift", "--json"])
