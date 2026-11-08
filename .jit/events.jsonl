@@ -26027,3 +26027,4 @@
 {"fields":["dependencies"],"id":"af978cbd-e801-40e4-83fe-5b9229968ca4","issue_id":"df129d9e-c795-4d92-9ee5-ffd776339252","timestamp":"2026-11-08T06:52:46.171577813Z","type":"issue_updated","updated_by":"dependency-add"}
 {"from":"ready","id":"fe3b3d42-18fa-4fe1-bb15-d6acaf526beb","issue_id":"75a90224-e9dd-43d2-99c0-3d79d7f1284c","timestamp":"2026-11-08T06:52:46.370044776Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:df129d9e-lead","id":"f2214ab0-4975-4f1c-8401-82a95848a701","issue_id":"75a90224-e9dd-43d2-99c0-3d79d7f1284c","timestamp":"2026-11-08T06:52:46.370044776Z","type":"issue_claimed"}
+{"fields":["labels"],"id":"d9e05079-4cab-4598-a8e1-f8a7e3afe8c0","issue_id":"75a90224-e9dd-43d2-99c0-3d79d7f1284c","timestamp":"2026-11-08T06:53:05.102761609Z","type":"issue_updated","updated_by":"issue-update"}

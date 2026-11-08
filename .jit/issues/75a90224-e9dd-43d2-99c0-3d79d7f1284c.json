@@ -17,11 +17,10 @@
     "epic:rust-code-quality",
     "milestone:v1.0",
     "component:cli",
-    "story:output-contract",
     "type:task"
   ],
   "priority": "normal",
   "state": "in_progress",
   "title": "Validation checks report failures on stdout with a one-line stderr summary",
-  "updated_at": "2026-11-08T06:52:46.370044776Z"
+  "updated_at": "2026-11-08T06:53:05.102761609Z"
 }
