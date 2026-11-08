@@ -151,6 +151,12 @@ impl CapabilityRoots {
         Ok(())
     }
 
+    /// Refuse `record` unless the held worktree is its bound root and the
+    /// bound path still names it (`@/charter/D-26`).
+    ///
+    /// An application checks this once, before its first write: every
+    /// operation then resolves beneath the held handle, which a later move or
+    /// swap of the path cannot redirect.
     pub(in crate::storage) fn validate_record_root(
         &self,
         record: &RedoRecord,
@@ -550,6 +556,17 @@ pub(crate) fn is_executable(_metadata: &Metadata) -> bool {
     false
 }
 
+#[cfg(test)]
+thread_local! {
+    static ABSOLUTE_WALKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// How many absolute walks from the filesystem root this thread has run.
+#[cfg(test)]
+pub(in crate::storage) fn absolute_walks() -> usize {
+    ABSOLUTE_WALKS.with(std::cell::Cell::get)
+}
+
 pub(crate) fn open_absolute_dir_nofollow(path: &Path) -> Result<Dir, CapabilityFsError> {
     if !path.is_absolute() {
         return Err(CapabilityFsError::UnsafeTarget(path.display().to_string()));
@@ -566,6 +583,8 @@ pub(crate) fn open_absolute_dir_nofollow(path: &Path) -> Result<Dir, CapabilityF
             }
         }
     }
+    #[cfg(test)]
+    ABSOLUTE_WALKS.with(|walks| walks.set(walks.get() + 1));
     let mut current = Dir::open_ambient_dir(&anchor, ambient_authority())?;
     for name in descendants {
         current = open_child_dir_nofollow(&current, name)?;
