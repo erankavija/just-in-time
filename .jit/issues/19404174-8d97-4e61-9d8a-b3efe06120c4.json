@@ -10,6 +10,7 @@
   ],
   "description": "Aggregate the work that makes archive preview, candidate listing and snapshot export read the same captured image as the operations they describe.\n\n## Success Criteria\n\n- [hard] REQ-01: Archive preview and candidate listing run the execute planner in one read-only session, the previewed plan equals the executed plan over the same image, and the storage-only archive planning helpers are gone.\n- [hard] REQ-02: Container-destination evidence is requested by one function, and the container marker name is declared once.\n- [hard] REQ-03: Archive planning resolves each artifact reference once per plan and computes reachability once per distinct document root.\n- [hard] REQ-04: Snapshot export writes the stored bytes of each issue and of every declaration file the repository layout defines, read from one captured image.\n",
   "documents": [],
+  "done_at": "2026-11-08T05:37:02.327105866Z",
   "first_ready_at": "2026-11-08T03:21:46.690962687Z",
   "gates_required": [],
   "gates_status": {},
@@ -25,7 +26,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Archive planning and snapshot export read through the execute session",
-  "updated_at": "2026-11-08T05:33:34.008598269Z"
+  "updated_at": "2026-11-08T05:37:02.327105866Z"
 }

@@ -220,8 +220,8 @@
           "id": "45d0a971",
           "short_id": "45d0a971",
           "title": "Cost evidence: the epic's four cost reductions against the base binary",
-          "status": "pending",
-          "note": "after 04:30 quiet window; coordinate with df129d9e fba8d478 quiet-host trials"
+          "status": "in_progress",
+          "note": "dispatched opus 07:4x; phase 1 harness build under normal load; phase 2 recorded runs in announced quiet window"
         }
       ]
     },
@@ -488,6 +488,11 @@
       "story": "dfb2f10d",
       "result": "done",
       "evidence": "sol checkpoint reviews r1-r3; remediation b0dc019f, f98f2353, 219b9df8 done; r3: REQ-01/03 MET, REQ-02 MET with steward ruling that embedded.rs is_forbidden_route is a URL route filter, out of scope"
+    },
+    {
+      "story": "19404174",
+      "result": "done",
+      "evidence": "sol checkpoint r1 (58e61799c): REQ-01/04 unmet -> dd95bd9d, 82f1647f; r2 (43949fdca): all four MET, no findings"
     }
   ],
   "decisions": [
@@ -712,6 +717,14 @@
       "effort": "high",
       "verdict": "pass",
       "run": "5ed707c5"
+    },
+    {
+      "issue": "19404174",
+      "review": "story checkpoint r2 (non-gate)",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "all MET, no findings"
     }
   ]
 }
