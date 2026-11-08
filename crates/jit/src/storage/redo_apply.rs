@@ -218,7 +218,6 @@ impl RedoApplier {
         self.apply_operations(roots, record)?;
         let injector = &*self.injector;
         check_interruption(injector, RedoPoint::BeforeRecordRemoval)?;
-        roots.validate_record_root(record)?;
         remove_record(roots, self.durability)?;
         check_interruption(injector, RedoPoint::AfterApply)
     }
@@ -248,7 +247,6 @@ impl RedoApplier {
             .enumerate()
             .try_for_each(|(index, path)| {
                 check_interruption(injector, RedoPoint::BeforeMakeDirectory { index })?;
-                roots.validate_record_root(record)?;
                 make_directory(handles.of(path)?, path)
             })?;
         record
@@ -257,7 +255,6 @@ impl RedoApplier {
             .enumerate()
             .try_for_each(|(index, put)| {
                 check_interruption(injector, RedoPoint::BeforePut { index })?;
-                roots.validate_record_root(record)?;
                 put_file(handles.of(&put.path)?, put, self.durability)
             })?;
         record
@@ -266,12 +263,10 @@ impl RedoApplier {
             .enumerate()
             .try_for_each(|(index, path)| {
                 check_interruption(injector, RedoPoint::BeforeDelete { index })?;
-                roots.validate_record_root(record)?;
                 delete_file(handles.of(path)?, path)
             })?;
         if let Some(append) = record.event_append() {
             check_interruption(injector, RedoPoint::BeforeEventAppend)?;
-            roots.validate_record_root(record)?;
             append_events(handles.of(&VirtualPath::EVENTS)?, append, self.durability)?;
         }
         if is_synced(self.durability) {
@@ -1093,6 +1088,95 @@ mod tests {
             ancestors,
             "an ancestor several targets share was opened more than once"
         );
+    }
+
+    /// Every operation reaches the bound worktree through the held root handle,
+    /// so one application walks the absolute path to that root once.
+    #[test]
+    fn test_redo_applier_apply_walks_the_absolute_worktree_root_path_once() {
+        let (worktree, roots) = repository();
+        std::fs::write(worktree.path().join("stale.md"), b"stale").unwrap();
+        std::fs::write(data_root(&worktree).join("events.jsonl"), CAPTURED_LOG).unwrap();
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
+            vec![VirtualPath::worktree("templates").unwrap()],
+            vec![
+                put(VirtualPath::worktree("docs/a.md").unwrap(), b"a"),
+                put(VirtualPath::worktree("docs/b.md").unwrap(), b"b"),
+                put(VirtualPath::data("index.json").unwrap(), b"index"),
+            ],
+            vec![VirtualPath::worktree("stale.md").unwrap()],
+            Some(EventAppend {
+                offset: CAPTURED_LOG.len() as u64,
+                bytes: b"{\"tag\":\"issue_claimed\"}\n".to_vec(),
+            }),
+        )
+        .unwrap();
+        let before = crate::storage::capability_fs::absolute_walks();
+
+        uninterrupted().apply(&roots, &record).unwrap();
+
+        assert_eq!(
+            crate::storage::capability_fs::absolute_walks() - before,
+            1,
+            "an operation re-walked the absolute path to the worktree root"
+        );
+    }
+
+    /// Replaces the worktree at its path when the pass reaches one point,
+    /// keeping the original directory at `moved`.
+    struct ReplaceAt {
+        point: RedoPoint,
+        path: PathBuf,
+        moved: PathBuf,
+    }
+
+    impl RedoInterruptionInjector for ReplaceAt {
+        fn check(&self, point: &RedoPoint) -> std::io::Result<()> {
+            match *point == self.point {
+                true => std::fs::rename(&self.path, &self.moved)
+                    .and_then(|()| std::fs::create_dir(&self.path)),
+                false => Ok(()),
+            }
+        }
+    }
+
+    /// Operations resolve beneath the held, verified root, so a root replaced
+    /// at its path between two writes keeps receiving them by identity.
+    #[test]
+    fn test_redo_applier_apply_writes_only_into_the_original_root_replaced_mid_replay() {
+        let (worktree, roots) = repository();
+        let moved = worktree.path().with_extension("moved");
+        let record = RedoRecord::for_layout(
+            &roots.record_layout(),
+            Vec::new(),
+            vec![
+                put(VirtualPath::worktree("a.md").unwrap(), b"a"),
+                put(VirtualPath::worktree("b.md").unwrap(), b"b"),
+            ],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+        let applier = RedoApplier::new(Arc::new(ReplaceAt {
+            point: RedoPoint::BeforePut { index: 1 },
+            path: worktree.path().to_path_buf(),
+            moved: moved.clone(),
+        }));
+
+        let outcome = applier.apply(&roots, &record);
+        let original = ["a.md", "b.md"].map(|name| std::fs::read(moved.join(name)).ok());
+        let replacement = std::fs::read_dir(worktree.path()).unwrap().count();
+        std::fs::remove_dir(worktree.path()).unwrap();
+        std::fs::rename(&moved, worktree.path()).unwrap();
+
+        assert!(outcome.is_ok(), "the replay stopped: {outcome:?}");
+        assert_eq!(
+            original,
+            [Some(b"a".to_vec()), Some(b"b".to_vec())],
+            "a put missed the original root"
+        );
+        assert_eq!(replacement, 0, "a put landed in the replacement directory");
     }
 
     /// Puts sharing a parent cost that parent one fsync, after the last of them.
