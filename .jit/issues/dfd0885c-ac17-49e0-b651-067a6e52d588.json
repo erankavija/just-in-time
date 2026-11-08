@@ -1,0 +1,24 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-08T08:22:04.918638207Z",
+  "dependencies": [],
+  "description": "`jit --schema` emits its JSON with a different key order on each run, so two runs of the same binary produce different bytes. Deterministic output lets the machine contract be diffed, checksummed and committed as evidence.\n\n## Background\n\nThree consecutive runs of `jit --schema` on commit `b80e25ff2` produced three different SHA-256 digests while parsing to equal JSON values. The schema is assembled from hash-map-backed collections, so iteration order varies per process.\n\n## Success Criteria\n\n- [hard] REQ-01: Repeated `jit --schema` runs of one binary produce byte-identical output.\n- [hard] REQ-02: The ordering comes from the schema's own data structures (ordered maps or sorted keys at assembly), not from a post-serialization rewrite.\n- [hard] REQ-03: One test owns the property by comparing two independently assembled schemas byte for byte.\n\n## Notes\n\nSurfaced at the close of the dispatch-layering epic and recorded there as a post-release follow-up; this issue is its tracked home.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-08T08:22:04.918638207Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "dfd0885c-ac17-49e0-b651-067a6e52d588",
+  "labels": [
+    "type:task",
+    "component:core",
+    "milestone:v1.1"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Make jit --schema output byte-deterministic",
+  "updated_at": "2026-11-08T08:22:04.918638207Z"
+}
