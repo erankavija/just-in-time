@@ -26110,3 +26110,4 @@
 {"fields":["description"],"id":"b3b11129-9607-45b8-bcb1-637db6218cdb","issue_id":"45d0a971-b44a-4a32-8f09-2553978cf0bf","timestamp":"2026-11-08T22:47:39.598564571Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["description"],"id":"847f52cd-ffa8-4bbd-ad50-6d9c5bfc7c9e","issue_id":"e5d7bc11-8da0-415b-8321-c75977d6909c","timestamp":"2026-11-08T22:47:46.548007411Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["description"],"id":"65783774-64f3-4d72-bbaf-e40cd33235c6","issue_id":"86a183c2-2a26-42db-bf8a-84f17cd7a3aa","timestamp":"2026-11-08T22:47:46.649003841Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"code-review","id":"f27e982f-beb8-46a8-9e0c-15934a396ef0","issue_id":"e5d7bc11-8da0-415b-8321-c75977d6909c","timestamp":"2026-11-08T22:50:23.853535607Z","type":"gate_passed","updated_by":"auto:executor"}

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bcc831a4c6117d5c8c04d5dd8bc32e94d0e2ce38",
+  "completed_at": "2026-11-08T22:50:23.851961639Z",
+  "duration_ms": 142380,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Captured registry reads and their owning test satisfy the issue criteria under the recorded non-regular-file ruling; no unresolved issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e5d7bc11-8da0-415b-8321-c75977d6909c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a3e986a3-18f1-40d5-b346-6a8c6a938fc9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T22:48:01.471399227Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:e5d7bc11 — bcc831a4, a66e8081, 94cebf8c, b5efa717, aa72dc55, 29a06e6c, d419b1bc, d59abe23, cee78697, e43d02eb, 2b3ee3f1, faa84c4a, 33df6c14, f07211c0\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6, @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/issue/e5d7bc11/requirement/REQ-01, @/issue/e5d7bc11/requirement/REQ-02, @/issue/e5d7bc11/requirement/REQ-03 → issue description; @/issue/b697a3f7/requirement/REQ-10 → container description; @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/convention-convergence, @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/domain-agnostic → .jit/invariants.toml; @/gate/cargo-ci → .jit/gates.toml\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T13:45:18.392264731Z; supplied ancestry covers both Rust implementation commits, excludes seven later record-only commits. Prior code-review failed, exit 1; findings reassessed below. Gate stdout unavailable; no gates rerun.\nTruncation recovery: Narrow implementation patches, current-file ranges, and per-commit issue-field diffs recovered; unrelated sibling changes and historical records excluded from current-behavior judgment.\n\nNo findings.\n\nRegistry-first sources now flow through capture discovery and `file_bytes` (`crates/jit/src/commands/item.rs:82,242,305`). Show and list consume that capture; search delegates to list. The remaining `read_repo_file` call serves the separately deferred Markdown path.\n\nThe single owning test replaces `policies.toml` after capture and verifies that the original items remain visible (`item.rs:1198`). Projection and output mapping remain unchanged for regular files, and the current declaration helper uses the shared memo without retaining a local parse bundle (`commands/mod.rs:2748`).\n\nPrior F1 and F2 are resolved by the issue’s explicit November 9 ruling accepting canonical symlink rejection and directory-as-absent behavior.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Captured registry reads and their owning test satisfy the issue criteria under the recorded non-regular-file ruling; no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
