@@ -505,8 +505,7 @@ check_no_excluded_tests() {
 }
 
 # Deprioritize the build/test work so an interactive shell preempts it under
-# contention — this is what keeps the host responsive while the gate runs, not
-# just the serialization above. nice -n 19 = lowest CPU priority; ionice -c2 -n7
+# contention, keeping the host responsive while the gate runs. nice -n 19 = lowest CPU priority; ionice -c2 -n7
 # = best-effort lowest I/O priority (NOT the idle class -c3, whose requests can be
 # starved for as long as any other class has I/O pending, leaving the gate itself
 # without a bound on when it finishes). Both are best-effort: a missing binary
