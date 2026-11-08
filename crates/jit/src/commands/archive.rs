@@ -3,7 +3,7 @@
 use super::CommandExecutor;
 use super::{capture_or_retry, with_mutation_session, with_read_session, SessionStep};
 use crate::domain::archive_advisory::{
-    planned_sources, AppliedChanges, ArchiveAdvisory, ArchiveExecutionReport, ArchivePreview,
+    planned_sources, ArchiveAdvisory, ArchiveExecutionReport, ArchivePreview,
 };
 use crate::domain::artifact_classifier::{
     classification_facts_from_evidence, classify_artifacts, container_marker_path,
@@ -479,11 +479,7 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                 Ok(Some((plans, base.documentation.citation_scan_roots())))
             },
         )?;
-        let advisory = self.advise(
-            &roots,
-            &plans.iter().collect::<Vec<_>>(),
-            &AppliedChanges::default(),
-        )?;
+        let advisory = self.advise(&roots, &plans.iter().collect::<Vec<_>>())?;
         Ok(ArchiveCandidates::new(plans, advisory))
     }
 
@@ -510,26 +506,19 @@ impl<S: IssueStore + RepositoryStateStore> ArchiveOps<'_, S> {
                     .plan_archive_target(session, &base, image, target)?
                     .map(|(_, plan, _)| (plan, base.documentation.citation_scan_roots())))
             })?;
-        let advisory = self.advise(&roots, &[&plan], &AppliedChanges::default())?;
+        let advisory = self.advise(&roots, &[&plan])?;
         Ok(ArchivePreview { plan, advisory })
     }
 
-    /// The advisory report for `plans`, the command's final admitted plans,
-    /// from one scan of `roots` over their artifact sources, read as they
-    /// stood before `applied`. The scan runs once per command, after planning
-    /// settles, and reads live files outside the guarded image and its capture
-    /// budget, because nothing the command writes derives from it.
-    fn advise(
-        &self,
-        roots: &[String],
-        plans: &[&ArtifactPlan],
-        applied: &AppliedChanges,
-    ) -> Result<ArchiveAdvisory> {
+    /// The advisory report for `plans`, from one scan of `roots` over their
+    /// artifact sources. The scan reads live files outside the guarded image
+    /// and its capture budget, because nothing the command writes derives from
+    /// it; a scan error fails the command.
+    fn advise(&self, roots: &[String], plans: &[&ArtifactPlan]) -> Result<ArchiveAdvisory> {
         let index = scan_citation_index(
             &self.exec.storage,
             roots,
             planned_sources(plans.iter().copied()),
-            applied,
         )?;
         Ok(index.advise(plans.iter().copied()))
     }
@@ -872,13 +861,13 @@ impl ArchiveOps<'_, JsonFileStorage> {
         self.execute_archive_target(ArchiveTarget::Container(id))
     }
 
-    /// The advisory citations come from one scan over the plan the committed
-    /// attempt applied, after it applied, reading the citation roots as they
-    /// stood before it.
+    /// Each mutation attempt scans the live citation roots once over its
+    /// settled plan, before publication, so a retried attempt rescans and a
+    /// scan error aborts the attempt before any write.
     fn execute_archive_target(&self, target: ArchiveTarget<'_>) -> Result<ArchiveExecutionReport> {
         let layout = self.exec.require_layout()?;
         let context = super::production_mutation_context();
-        let (result, plan, roots) = with_mutation_session(
+        with_mutation_session(
             &self.exec.storage,
             &layout,
             "archive execution",
@@ -908,20 +897,18 @@ impl ArchiveOps<'_, JsonFileStorage> {
                 {
                     bail!("cannot archive target: {} — {guidance}", code.as_str());
                 }
+                let advisory = self.advise(&base.documentation.citation_scan_roots(), &[&plan])?;
                 let (materialization, result) =
                     crate::repository_state::finalize_archive_execution(
                         &image, &context, &plan, evidence,
                     )?;
-                let applied = (result, plan, base.documentation.citation_scan_roots());
+                let report = ArchiveExecutionReport { result, advisory };
                 if materialization.delta().actions().is_empty() {
-                    return Ok(SessionStep::Done(applied));
+                    return Ok(SessionStep::Done(report));
                 }
-                Ok(SessionStep::Apply(materialization, applied))
+                Ok(SessionStep::Apply(materialization, report))
             },
-        )?;
-        let applied = AppliedChanges::of(&plan, &result);
-        let advisory = self.advise(&roots, &[&plan], &applied)?;
-        Ok(ArchiveExecutionReport { result, advisory })
+        )
     }
 }
 
@@ -1606,11 +1593,12 @@ mod tests {
     }
 
     /// A repository whose managed document `fixtures/root.md` is cited in
-    /// `notes/cite.md` and itself cites `fixtures/appendix.md`, its relocating
-    /// bundle member; both directories are declared citation scan roots.
+    /// `notes/cite.md` and by its owner's issue record, and itself cites
+    /// `fixtures/appendix.md`, its relocating bundle member. All three
+    /// directories are declared citation scan roots.
     fn cited_document_repository() -> (tempfile::TempDir, CommandExecutor<JsonFileStorage>) {
         let config = format!(
-            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\ncitation_scan_roots = [\"notes\", \"fixtures\"]\n",
+            "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\ncitation_scan_roots = [\"notes\", \"fixtures\", \".jit/issues\"]\n",
             test_taxonomy().config_fragment()
         );
         let (repo, executor) = crate::test_utils::setup_test_repo_with_config(&config).unwrap();
@@ -1661,9 +1649,16 @@ mod tests {
     }
 
     #[test]
-    fn test_execute_reports_the_preview_advisory_for_relocating_citing_files_without_capturing_them(
-    ) {
-        let (_repo, executor) = cited_document_repository();
+    fn test_execute_reports_the_preview_advisory_for_files_its_run_relocates_or_rewrites() {
+        let (repo, executor) = cited_document_repository();
+        let cited_by = |advisory: &crate::domain::archive_advisory::ArchiveAdvisory| {
+            advisory
+                .citations
+                .iter()
+                .flat_map(|citations| &citations.locations)
+                .map(|location| location.citing.clone())
+                .collect::<BTreeSet<_>>()
+        };
 
         let preview = executor
             .archive()
@@ -1675,13 +1670,12 @@ mod tests {
             !image.capture_spec().contains_path(&cited),
             "the citing file stays out of the guarded image and its budget"
         );
+        let record = cited_by(&preview.advisory)
+            .into_iter()
+            .find(|citing| citing.starts_with(".jit/issues/"))
+            .expect("the owner's issue record cites the moving document");
         assert!(
-            preview
-                .advisory
-                .citations
-                .iter()
-                .flat_map(|citations| &citations.locations)
-                .any(|location| location.citing == "fixtures/root.md"),
+            cited_by(&preview.advisory).contains("fixtures/root.md"),
             "a relocating file cites a relocating artifact: {:?}",
             preview.advisory
         );
@@ -1689,7 +1683,43 @@ mod tests {
             .archive()
             .execute_archive_document("fixtures/root.md")
             .unwrap();
+
+        // The run relocated one citing file and relinked the other's
+        // reference, yet reports what the preview saw before it.
+        assert!(!repo.path().join("fixtures/root.md").exists());
+        assert!(!fs::read_to_string(repo.path().join(&record))
+            .unwrap()
+            .contains("\"fixtures/root.md\""));
         assert_eq!(executed.advisory, preview.advisory);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_execute_archive_document_leaves_no_write_when_the_citation_scan_fails() {
+        use std::os::unix::ffi::OsStrExt as _;
+        let (repo, executor) = cited_document_repository();
+        // A file name that is not UTF-8 under a citation root fails the walk.
+        fs::write(
+            repo.path()
+                .join("notes")
+                .join(std::ffi::OsStr::from_bytes(b"\xffname.md")),
+            "",
+        )
+        .unwrap();
+        let before = crate::storage::redo_apply::test_fixtures::snapshot(repo.path());
+
+        let error = executor
+            .archive()
+            .execute_archive_document("fixtures/root.md")
+            .expect_err("the citation scan fails the attempt");
+        assert!(
+            format!("{error:#}").contains("UTF-8"),
+            "the scan's failure aborts the run: {error:#}"
+        );
+        assert_eq!(
+            crate::storage::redo_apply::test_fixtures::snapshot(repo.path()),
+            before
+        );
     }
 
     #[test]
