@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c9173ed6-83ad-47ea-b560-b3bdc4291912",
+      "status": "passed",
+      "updated_at": "2026-11-08T13:35:39.627292421Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1bc98da1-4d60-4e82-a835-8fa0a3d90d3b",
+      "status": "failed",
+      "updated_at": "2026-11-08T13:39:22.539671538Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e5d7bc11-8da0-415b-8321-c75977d6909c",
   "labels": [
     "epic:one-mutation-path",
@@ -25,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Registry-first item queries read their sources from the captured image",
-  "updated_at": "2026-11-08T13:24:55.526423653Z"
+  "updated_at": "2026-11-08T13:39:22.539671538Z"
 }

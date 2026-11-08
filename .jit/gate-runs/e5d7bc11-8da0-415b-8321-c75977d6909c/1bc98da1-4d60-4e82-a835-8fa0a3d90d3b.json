@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2b3ee3f19836839f7c01b3e7f46dbc298344d1ed",
+  "completed_at": "2026-11-08T13:39:22.538048059Z",
+  "duration_ms": 222790,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/mod.rs",
+        "id": "F1",
+        "line": 2798,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "Discovery discards parsed declarations and reparses unchanged sources, doubling every declaration read and tripling item captures that discover a custom source; retain and return the parsed bundle."
+      }
+    ],
+    "summary": "Registry sources use captured bytes, but the shared helper introduces repeated full declaration parsing.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e5d7bc11-8da0-415b-8321-c75977d6909c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1bc98da1-4d60-4e82-a835-8fa0a3d90d3b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T13:35:39.747800630Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4323 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1bb5f-2fa2-7100-96e4-1f324e69e46f\n--------\nuser\n--- 4310 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:e5d7bc11 — f07211c06, 33df6c141, faa84c4ad, 2b3ee3f19; individual patches inspected.\nPolicy sources: AGENTS.md.\nResolved items: @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/issue/b697a3f7/requirement/REQ-10 → issue description; @/gate/jit-validate → .jit/gates.toml; @/inv/orthogonal-tests, @/inv/essential-code-prose, @/inv/architecture-dependency-direction, @/inv/semantic-test-assertions, @/inv/shared-test-contracts, @/inv/domain-agnostic, @/inv/convention-convergence → .jit/invariants.toml.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T13:34:09.534160377+00:00; supplied ancestry covers implementation and earlier tagged commits, excluding history-only 2b3ee3f19; current code-review projection pending.\nTruncation recovery: narrower reads recovered commands/item.rs:340–470, commands/mod.rs:2705–2725, repository_state/materialize.rs:70–105, image.rs:1000–1045, path.rs:318–345, and caller-search output.\n\n1. **F1 — Medium; blocking; issue-impact:** Preserve the parsed declarations during discovery. At [commands/mod.rs:2798](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/mod.rs:2798), discovery parses the complete declaration bundle, discards it, and parses it again at line 2804. Every successful `captured_declarations()` call now performs two complete parses instead of one; discovering a custom registry source causes three. This introduces redundant configuration, gate, and rule parsing across item queries and existing graph, query, and document callers, contradicting the helper’s “parsed once” contract. Retain the discovered bundle and return it with the completed image.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Registry sources use captured bytes, but the shared helper introduces repeated full declaration parsing.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Discovery discards parsed declarations and reparses unchanged sources, doubling every declaration read and tripling item captures that discover a custom source; retain and return the parsed bundle.\",\"file\":\"crates/jit/src/commands/mod.rs\",\"line\":2798,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
