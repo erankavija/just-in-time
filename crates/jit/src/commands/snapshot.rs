@@ -30,7 +30,7 @@ struct SnapshotExporter {
     created_at: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct CapturedFile {
     source: SourceInfo,
     hash_sha256: String,
@@ -138,16 +138,25 @@ fn capture_snapshot_image(
 }
 
 /// Write the stored bytes of each issue record in `issues` and of each
-/// declaration file `image` holds below `base`.
-fn copy_jit_state(base: &Path, image: &RepositoryImage, issues: &[Issue]) -> Result<()> {
+/// declaration file `image` holds below `base`. The staged paths are
+/// reserved: the result holds their manifest entries, which document and
+/// asset capture reuse instead of restaging.
+fn copy_jit_state(
+    base: &Path,
+    image: &RepositoryImage,
+    issues: &[Issue],
+) -> Result<HashMap<String, CapturedFile>> {
     issues
         .iter()
         .map(|issue| VirtualPath::issue_record(&issue.id))
         .chain(declaration_paths(image)?)
-        .try_for_each(|path| {
-            let Some(bytes) = image.file_bytes(&path)? else {
-                return Ok(());
-            };
+        .filter_map(|path| match image.file_bytes(&path) {
+            Ok(Some(bytes)) => Some(Ok((path, bytes))),
+            Ok(None) => None,
+            Err(error) => Some(Err(anyhow::Error::from(error))),
+        })
+        .map(|entry| {
+            let (path, bytes) = entry?;
             let relative =
                 crate::domain::relative_path::RootRelativePath::parse(path.repository_relative())?;
             let destination = base.join(relative.as_path());
@@ -155,8 +164,20 @@ fn copy_jit_state(base: &Path, image: &RepositoryImage, issues: &[Issue]) -> Res
                 std::fs::create_dir_all(parent)?;
             }
             std::fs::write(destination, bytes)?;
-            Ok(())
+            Ok((
+                path.repository_relative().to_string(),
+                CapturedFile {
+                    source: SourceInfo {
+                        type_: "filesystem".to_string(),
+                        commit: None,
+                        blob_sha: None,
+                    },
+                    hash_sha256: compute_sha256(bytes),
+                    size_bytes: bytes.len(),
+                },
+            ))
         })
+        .collect()
 }
 
 impl SnapshotExporter {
@@ -534,11 +555,10 @@ This is a read-only export. Future versions may support:
         let doc_refs = self.extract_documents(&issues);
         let temp_dir = tempfile::TempDir::new()?;
         let base = temp_dir.path();
-        copy_jit_state(base, image, &issues)?;
+        let mut captured = copy_jit_state(base, image, &issues)?;
 
         let mut doc_snapshots = Vec::new();
         let mut warnings = Vec::new();
-        let mut captured = HashMap::new();
         for doc_ref in &doc_refs {
             match self.create_document_snapshot(doc_ref, mode, base, &mut captured) {
                 Ok(snapshot) => doc_snapshots.push(snapshot),
@@ -1116,6 +1136,68 @@ mod tests {
                 .determine_snapshot_source_mode(at, false, committed_only)
                 .is_err());
         }
+    }
+
+    #[test]
+    fn test_assemble_reserved_tracker_path_keeps_captured_bytes_against_document_reference() {
+        let temp = tempfile::tempdir().unwrap();
+        let repository = crate::test_harness::git::GitRepository::init(temp.path());
+        repository.write(".jit/config.toml", "historical declaration\n");
+        let historical = repository.commit("historical declaration");
+        let mut issue = crate::test_utils::fixture_issue("Source".to_string(), String::new());
+        issue
+            .documents
+            .push(crate::test_utils::document_reference(".jit/config.toml"));
+        let captured = b"captured declaration\n";
+        let image = VirtualPath::DECLARATION_FILES
+            .into_iter()
+            .filter(|path| *path != VirtualPath::CONFIG)
+            .chain(VirtualPath::DECLARATION_DIRECTORIES)
+            .fold(
+                crate::test_harness::image::ImageBuilder::new(),
+                |builder, path| builder.entry(path, RepositoryEntry::Absent),
+            )
+            .file(VirtualPath::CONFIG, captured)
+            .file(
+                VirtualPath::issue_record(&issue.id),
+                serde_json::to_vec(&issue).unwrap(),
+            );
+        let image = VirtualPath::DECLARATION_DIRECTORIES
+            .into_iter()
+            .fold(image, |builder, directory| {
+                builder.listing(
+                    directory,
+                    crate::repository_state::DirectoryListing::new([]).unwrap(),
+                )
+            })
+            .build();
+        let exporter = SnapshotExporter::new(
+            crate::storage::WorktreePaths::detect_for_data_root(
+                &repository.root().join(".jit"),
+                repository.root(),
+            )
+            .unwrap()
+            .git(),
+            repository.root().to_path_buf(),
+            chrono::Utc::now(),
+        );
+
+        let (staging, manifest, _) = exporter
+            .assemble(
+                &image,
+                &IssueScope::Issue(issue.id.clone()),
+                &SourceMode::Git { commit: historical },
+            )
+            .unwrap();
+
+        assert_eq!(
+            std::fs::read(staging.path().join(".jit/config.toml")).unwrap(),
+            captured
+        );
+        assert_eq!(
+            manifest.documents.items.items.first().unwrap().hash_sha256,
+            compute_sha256(captured)
+        );
     }
 
     #[test]
