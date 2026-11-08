@@ -19,6 +19,7 @@ use crate::storage::capability_fs::{
 };
 use crate::storage::init_publish;
 use crate::storage::memory::{append_events, MemoryRepositoryState};
+use crate::storage::redo_apply::commit_redo_record_with;
 use crate::storage::{
     commit_redo_record, EventAppend, FileLocker, InMemoryStorage, IssueStore, JsonFileStorage,
     MemoryRedoApplier, MutationInterruptionInjector, MutationPoint, PutFile, RedoApplier,
@@ -1437,8 +1438,11 @@ impl JsonMutationSession {
         let root = self.roots.data_root().ok_or_else(|| {
             RepositoryStateStoreError::UnsafeTarget(self.layout.data_root().display().to_string())
         })?;
-        commit_redo_record(root, &record).map_err(RepositoryStateStoreError::Publication)?;
+        let durability = self.storage.durability();
+        commit_redo_record_with(root, &record, durability)
+            .map_err(RepositoryStateStoreError::Publication)?;
         RedoApplier::new(SessionRedoInterruptions::new(interruptions))
+            .with_durability(durability)
             .apply(&self.roots, &record)
             .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
     }

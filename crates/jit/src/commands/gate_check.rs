@@ -3279,8 +3279,13 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             (remove_index, false),
             (add_dangling_dependency, false),
         ];
-        for (index, (change, passes)) in changes.into_iter().enumerate() {
-            let (validate, run) = judge_repository_after(change);
+        // Each judgment owns its repository, so they run concurrently.
+        let judged = std::thread::scope(|scope| {
+            changes
+                .map(|(change, _)| scope.spawn(move || judge_repository_after(change)))
+                .map(crate::test_utils::join_reraising)
+        });
+        for (index, ((_, passes), (validate, run))) in changes.into_iter().zip(judged).enumerate() {
             assert_eq!(validate, passes, "change {index}: jit validate");
             assert_eq!(
                 run.status == GateRunStatus::Passed,

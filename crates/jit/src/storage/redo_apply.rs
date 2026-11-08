@@ -15,7 +15,7 @@ use crate::repository_state::{
     CaptureError, FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
 use crate::storage::atomic_write::{
-    publish_file, sync_capability_directory, write_staged_file, Durability,
+    publish_file, sync_directory_for, write_staged_file_for, Durability,
 };
 use crate::storage::capability_fs::{
     open_child_dir_nofollow, CapabilityFsError, CapabilityRoots, DataRoot, DirectoryHandles,
@@ -48,13 +48,25 @@ use std::sync::Arc;
 /// Returns an error when the record cannot be serialized, the record path is
 /// occupied, or a write or sync fails.
 pub fn commit_redo_record(root: &DataRoot, record: &RedoRecord) -> anyhow::Result<()> {
+    commit_redo_record_with(root, record, Durability::Full)
+}
+
+/// [`commit_redo_record`] under `durability`, which a test whose subject is
+/// interruption rather than crash durability passes as `Unsynced`.
+pub(in crate::storage) fn commit_redo_record_with(
+    root: &DataRoot,
+    record: &RedoRecord,
+    durability: Durability,
+) -> anyhow::Result<()> {
     let bytes = record.serialize()?;
     let dir = root.dir();
     let scratch = match dir.create_dir(RECORD_SCRATCH_DIR) {
         Ok(()) => {
             adopt_mode(dir, RECORD_SCRATCH_DIR)?;
             let scratch = open_child_dir_nofollow(dir, RECORD_SCRATCH_DIR)?;
-            root.sync()?;
+            if is_synced(durability) {
+                root.sync()?;
+            }
             scratch
         }
         Err(error) if error.kind() == ErrorKind::AlreadyExists => {
@@ -62,13 +74,18 @@ pub fn commit_redo_record(root: &DataRoot, record: &RedoRecord) -> anyhow::Resul
         }
         Err(error) => return Err(error.into()),
     };
-    write_staged_file(
+    write_staged_file_for(
         &scratch,
         RECORD_FILE_NAME,
         bytes.as_slice(),
         FileMode::Regular,
+        durability,
     )?;
-    sync_capability_directory(&scratch).map_err(Into::into)
+    sync_directory_for(&scratch, durability).map_err(Into::into)
+}
+
+fn is_synced(durability: Durability) -> bool {
+    matches!(durability, Durability::Full | Durability::Deferred)
 }
 
 #[cfg(unix)]
@@ -164,12 +181,23 @@ pub enum RedoApplyError {
 /// interruption between two applications of the same applier.
 pub struct RedoApplier {
     injector: Arc<dyn RedoInterruptionInjector>,
+    durability: Durability,
 }
 
 impl RedoApplier {
     /// Hold `injector` for every application this applier runs.
     pub fn new(injector: Arc<dyn RedoInterruptionInjector>) -> Self {
-        Self { injector }
+        Self {
+            injector,
+            durability: Durability::Full,
+        }
+    }
+
+    /// Apply under `durability`: `Full` syncs, and only a test passes `Unsynced`.
+    #[must_use]
+    pub(in crate::storage) fn with_durability(mut self, durability: Durability) -> Self {
+        self.durability = durability;
+        self
     }
 
     /// Apply `record` to `roots` and remove it, checking every [`RedoPoint`].
@@ -191,7 +219,7 @@ impl RedoApplier {
         let injector = &*self.injector;
         check_interruption(injector, RedoPoint::BeforeRecordRemoval)?;
         roots.validate_record_root(record)?;
-        remove_record(roots)?;
+        remove_record(roots, self.durability)?;
         check_interruption(injector, RedoPoint::AfterApply)
     }
 
@@ -230,7 +258,7 @@ impl RedoApplier {
             .try_for_each(|(index, put)| {
                 check_interruption(injector, RedoPoint::BeforePut { index })?;
                 roots.validate_record_root(record)?;
-                put_file(handles.of(&put.path)?, put)
+                put_file(handles.of(&put.path)?, put, self.durability)
             })?;
         record
             .deletes()
@@ -244,9 +272,11 @@ impl RedoApplier {
         if let Some(append) = record.event_append() {
             check_interruption(injector, RedoPoint::BeforeEventAppend)?;
             roots.validate_record_root(record)?;
-            append_events(handles.of(&VirtualPath::EVENTS)?, append)?;
+            append_events(handles.of(&VirtualPath::EVENTS)?, append, self.durability)?;
         }
-        handles.sync_changed()?;
+        if is_synced(self.durability) {
+            handles.sync_changed()?;
+        }
         Ok(handles)
     }
 }
@@ -347,16 +377,17 @@ fn make_directory(
 ///
 /// The publication defers its directory sync: the entries the put writes are
 /// synced with the pass's other changed directories.
-fn put_file(handles: &mut DirectoryHandles, put: &PutFile) -> Result<(), RedoApplyError> {
+fn put_file(
+    handles: &mut DirectoryHandles,
+    put: &PutFile,
+    durability: Durability,
+) -> Result<(), RedoApplyError> {
     let (parent, leaf) = handles.open_or_create_parent(put.path.relative().as_path())?;
-    publish_file(
-        parent,
-        &leaf,
-        &put.bytes,
-        put.mode,
-        Durability::Deferred,
-        || Ok(()),
-    )
+    let durability = match is_synced(durability) {
+        true => Durability::Deferred,
+        false => durability,
+    };
+    publish_file(parent, &leaf, &put.bytes, put.mode, durability, || Ok(()))
 }
 
 /// Remove a deleted path, tolerating a target a previous application already
@@ -387,6 +418,7 @@ fn delete_file(handles: &mut DirectoryHandles, path: &VirtualPath) -> Result<(),
 fn append_events(
     handles: &mut DirectoryHandles,
     append: &EventAppend,
+    durability: Durability,
 ) -> Result<(), RedoApplyError> {
     let log = VirtualPath::EVENTS;
     let relative = log.relative().as_path();
@@ -400,14 +432,16 @@ fn append_events(
     file.seek(SeekFrom::Start(append.offset))?;
     file.write_all(&append.bytes)?;
     file.set_len(append.offset + append.bytes.len() as u64)?;
-    file.sync_all()?;
+    if is_synced(durability) {
+        file.sync_all()?;
+    }
     handles.mark_parent_changed(relative);
     Ok(())
 }
 
 /// Remove the applied record, tolerating one a previous application already
 /// removed.
-fn remove_record(roots: &CapabilityRoots) -> Result<(), RedoApplyError> {
+fn remove_record(roots: &CapabilityRoots, durability: Durability) -> Result<(), RedoApplyError> {
     let data =
         roots
             .root(RepositoryRootClass::Data)
@@ -415,8 +449,11 @@ fn remove_record(roots: &CapabilityRoots) -> Result<(), RedoApplyError> {
                 path: format!("{RECORD_SCRATCH_DIR}/{RECORD_FILE_NAME}"),
             })?;
     match data.remove_file(Path::new(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME)) {
-        Ok(()) => sync_capability_directory(&open_child_dir_nofollow(data, RECORD_SCRATCH_DIR)?)
-            .map_err(Into::into),
+        Ok(()) => sync_directory_for(
+            &open_child_dir_nofollow(data, RECORD_SCRATCH_DIR)?,
+            durability,
+        )
+        .map_err(Into::into),
         Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error.into()),
     }

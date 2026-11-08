@@ -9,17 +9,18 @@
 
 use crate::domain::relative_path::RootRelativePath;
 use crate::repository_state::{FileMode, RepositoryEntry, RepositoryRootClass, VirtualPath};
-use crate::storage::atomic_write::{is_stage_name, unique_stage_name};
+use crate::storage::atomic_write::{is_stage_name, unique_stage_name, Durability};
 use crate::storage::capability_fs::{CapabilityRoots, DataRoot};
 use crate::storage::memory::test_fixtures as memory_fixtures;
+use crate::storage::redo_apply::commit_redo_record_with;
 use crate::storage::redo_apply::test_fixtures::{
     arbitrary_record, data_root, directory_vocabulary_paths, path_vocabulary, record_relative_path,
     record_scratch_relative_path, repository, seed_repository, snapshot, InterruptAt,
     RecordedPoints, SnapshotEntry, CAPTURED_LOG,
 };
 use crate::storage::{
-    commit_redo_record, EventAppend, InMemoryStorage, MemoryRedoApplier, NoRedoInterruptions,
-    PutFile, RedoApplier, RedoApplyError, RedoInterruptionInjector, RedoPoint, RedoRecord,
+    EventAppend, InMemoryStorage, MemoryRedoApplier, NoRedoInterruptions, PutFile, RedoApplier,
+    RedoApplyError, RedoInterruptionInjector, RedoPoint, RedoRecord,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
@@ -88,6 +89,10 @@ trait RecordBackend {
     fn published_ignoring_stages(&self) -> Self::Published;
 }
 
+/// The filesystem backend, applying and committing unsynced: every outcome the
+/// matrix compares is read back in-process, a crash's surviving subset is
+/// modelled rather than produced, and which syncs a pass issues is
+/// `redo_apply`'s own property.
 struct FileBackend {
     worktree: TempDir,
     roots: CapabilityRoots,
@@ -116,7 +121,12 @@ impl RecordBackend for FileBackend {
 
     fn commit(&self, record: &RedoRecord) {
         let record = &self.bound(record);
-        commit_redo_record(&DataRoot::open(&data_root(&self.worktree)).unwrap(), record).unwrap();
+        commit_redo_record_with(
+            &DataRoot::open(&data_root(&self.worktree)).unwrap(),
+            record,
+            Durability::Unsynced,
+        )
+        .unwrap();
     }
 
     fn apply(
@@ -124,7 +134,9 @@ impl RecordBackend for FileBackend {
         injector: Arc<dyn RedoInterruptionInjector>,
         record: &RedoRecord,
     ) -> Result<(), RedoApplyError> {
-        RedoApplier::new(injector).apply(&self.roots, &self.bound(record))
+        RedoApplier::new(injector)
+            .with_durability(Durability::Unsynced)
+            .apply(&self.roots, &self.bound(record))
     }
 
     fn published(&self) -> Self::Published {
@@ -656,15 +668,17 @@ proptest! {
 
         backend.commit(&record);
 
-        let complete = std::fs::read(backend.record_path()).unwrap();
-        for written in 0..complete.len() {
-            std::fs::write(backend.record_path(), &complete[..written]).unwrap();
+        let complete = std::fs::metadata(backend.record_path()).unwrap().len();
+        // Cutting the committed file back leaves exactly each shorter prefix.
+        let record = std::fs::OpenOptions::new().write(true).open(backend.record_path()).unwrap();
+        for written in (0..complete).rev() {
+            record.set_len(written).unwrap();
             prop_assert_eq!(
                 backend.published(),
                 old.clone(),
                 "a commit interrupted after {} of {} bytes reached the repository",
                 written,
-                complete.len()
+                complete
             );
         }
     }
