@@ -382,7 +382,7 @@
       "issue": "dd95bd9d",
       "reason": "rework limit exceeded; same defect class (post-apply citation scan)",
       "to": "just-in-time-d5",
-      "status": "open"
+      "status": "resolved: option A; one extra attempt authorized; REQ-02 amended; stop and report on further failure"
     }
   ],
   "rework_counts": {
@@ -400,7 +400,7 @@
     "219b9df8": 1,
     "42046050": 2,
     "c31c2e57": 2,
-    "dd95bd9d": 2
+    "dd95bd9d": 3
   },
   "surfaced_pitfalls": [
     {
@@ -520,6 +520,11 @@
     {
       "at": "06:1x",
       "decision": "dd95bd9d REQ-03 amended (steward): index built by the existing whole-path citation scanner with Markdown link targets via resolve_link; Markdown-only narrowing rejected under D-9. Rework 1 dispatched.",
+      "by": "invoker just-in-time-d5"
+    },
+    {
+      "at": "07:2x",
+      "decision": "dd95bd9d option A: execute scans once per mutation attempt before publication; AppliedChanges deleted; REQ-02 amended (steward); one attempt beyond limit",
       "by": "invoker just-in-time-d5"
     }
   ],
