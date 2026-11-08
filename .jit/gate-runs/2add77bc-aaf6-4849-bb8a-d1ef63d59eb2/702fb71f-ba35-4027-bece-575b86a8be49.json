@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e30f04c2bf7d563403e2f6f1258466661b5847aa",
+  "completed_at": "2026-11-08T07:34:11.212709213Z",
+  "duration_ms": 176476,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable implementation satisfies the issue criteria and steward ruling; no unresolved findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2add77bc-aaf6-4849-bb8a-d1ef63d59eb2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "702fb71f-ba35-4027-bece-575b86a8be49",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T07:31:14.735905968Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:2add77bc` — `aa3509ef`, `20011263`, `66482760`, `c41d3b54`; individual patches inspected; uncommitted changes excluded.\nPolicy sources: `AGENTS.md`; no applicable nested policies.\nResolved items: `@/inv/atomic-writes`, `@/inv/derived-state-coherence`, `@/inv/orthogonal-tests`, `@/inv/essential-code-prose`, `@/inv/shared-test-contracts`, `@/inv/semantic-test-assertions`, `@/inv/architecture-dependency-direction`, `@/inv/convention-convergence`, `@/inv/semantic-types` → `.jit/invariants.toml`; `@/charter/D-17`, `@/charter/D-19`, `@/charter/D-26`, `@/charter/D-27` → `dev/vision/9db27a3a-charter.md`; `@/issue/2add77bc/requirement/REQ-01`, `@/issue/2add77bc/requirement/REQ-02`, `@/issue/2add77bc/requirement/REQ-03`, `@/issue/2add77bc/requirement/REQ-04`, `@/issue/b697a3f7/requirement/REQ-14`, `@/issue/b697a3f7/requirement/REQ-15`, `@/issue/b697a3f7/requirement/REQ-22` → respective issue descriptions; `@/gate/cargo-ci`, `@/gate/jit-validate` → `.jit/gates.toml`.\nGate evidence: cargo-ci passed, exit 0, recorded `2026-11-08T07:29:44.428381260+00:00`; wrapper ancestry confirms run `e30f04c2` covers all four attributable commits; code-review pending, exit none.\nTruncation recovery: relevant patches and design text recovered through narrower commit/path/line reads; unrelated archived benchmark output excluded.\n\nNo findings. Root validation occurs once at `crates/jit/src/storage/redo_apply.rs:217`; operations retain held handles and existing parent-sync behavior. Tests separately cover absolute-walk count and mid-replay root replacement, while the existing typed preflight refusal remains. The design amendment matches the steward ruling. Recorded smoke evidence reports 167 directory opens against 547 base: ratio 0.305, below 0.6.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable implementation satisfies the issue criteria and steward ruling; no unresolved findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
