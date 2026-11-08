@@ -1,0 +1,54 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5befb8a26b30c8c7ad1860c279f19dbb5f7345ba",
+  "completed_at": "2026-11-08T06:52:04.257985996Z",
+  "duration_ms": 354637,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/output/validate.rs",
+        "id": "F1",
+        "line": 129,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/df129d9e/decision/D-03",
+          "@/issue/df129d9e/requirement/REQ-09"
+        ],
+        "severity": "medium",
+        "summary": "Branch-drift and lease validation send multiline failure details to stderr while omitting failed checks from the stdout report."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/df129d9e-rust-code-quality/completion-report.md",
+        "id": "F2",
+        "line": 124,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/df129d9e/requirement/REQ-10"
+        ],
+        "severity": "low",
+        "summary": "The report says the ambiguous +38 merge is excluded from both totals although the conservative +344 total includes it."
+      }
+    ],
+    "summary": "Validation findings violate the accepted stdout-report/stderr-summary contract; the completion report also contains an advisory ledger contradiction.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "df129d9e-c795-4d92-9ee5-ffd776339252",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ff180099-4035-4866-bcac-a9358a40fff6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T06:46:09.620840760Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 30504 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1b9e8-4813-7252-9869-00f8378ac694\n--------\nuser\n--- 30491 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Reviewed `5befb8a26` and its 377-dependency closure, read-only. Recorded Cargo evidence covers the current Rust tree: 5,156 tests and 25 doctests passed, along with formatting, Clippy and build budgets. Tests were not rerun.\n\n| Criteria | Verified artifacts |\n|---|---|\n| REQ-01, 02, 19 | Thin `main.rs`, library dispatch, command-owned operations |\n| REQ-03 | Family capability types and executor-surface policy tests |\n| REQ-04, 18 | `domain/list_envelope.rs` and CLI envelope census |\n| REQ-05, 17, 20 | Schema generation, handler registry and parser definitions |\n| REQ-06, 07, 08 | Manifest lints, shared harness and budget checker |\n| REQ-10 | Recomputed baseline/final totals and all 126 ledger deltas |\n| REQ-11–14 | Shared classifier, outcome emitter and server status projection |\n| REQ-15, 16 | Global JSON flag and flattened `IssueFilterArgs` |\n| REQ-09, 21 | Output contracts and shared renderers; exception below |\n\nProduction totals reproduce as 78,801 → 75,702. The 125 attributed merges total **+306**, within the approved **+375** ceiling.\n\n1. **F1 — Medium, blocking: validation findings violate the agreed stream contract.** [failure_message()](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/output/validate.rs:129) embeds failure details and newlines in the stderr message. The stdout renderer at line 147 stops at the first failed check and never renders failed checks. Consequently, failing `validate --branch-drift` or `validate --leases` produces multiline stderr without its findings report on stdout; when both fail, later failure details disappear from human output. This contradicts `@/issue/df129d9e/decision/D-03` and leaves REQ-09’s accepted output contract unmet. Render failed-check details on stdout and return one summary line for stderr, with tests covering both streams.\n\n2. **F2 — Low, advisory: the completion report contradicts its conservative ledger total.** [Line 124](/home/vkaskivuo/Projects/just-in-time/dev/active/df129d9e-rust-code-quality/completion-report.md:124) says the ambiguous +38 merge is counted in “neither sum above,” while the second sum explicitly includes it: +306 +38 = +344. Correct the explanation. Both totals remain below the ceiling, so this does not block REQ-10.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Validation findings violate the accepted stdout-report/stderr-summary contract; the completion report also contains an advisory ledger contradiction.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Branch-drift and lease validation send multiline failure details to stderr while omitting failed checks from the stdout report.\",\"file\":\"crates/jit/src/output/validate.rs\",\"line\":129,\"references\":[\"@/issue/df129d9e/decision/D-03\",\"@/issue/df129d9e/requirement/REQ-09\"]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The report says the ambiguous +38 merge is excluded from both totals although the conservative +344 total includes it.\",\"file\":\"dev/active/df129d9e-rust-code-quality/completion-report.md\",\"line\":124,\"references\":[\"@/issue/df129d9e/requirement/REQ-10\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

@@ -6,6 +6,7 @@
   "dependencies": [
     "46fe7593-a860-4767-8a6e-fc631ca1fd81",
     "755964b2-ee96-4fee-aa80-8f782c94dd47",
+    "75a90224-e9dd-43d2-99c0-3d79d7f1284c",
     "c06daf50-c151-402a-851a-fa71a9e6d764",
     "f35c86de-e4fa-4ce9-bf48-ee1378115355",
     "fb2dc5c3-1f32-418f-896b-41df16f57997",
@@ -92,7 +93,20 @@
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "holistic-review": {
+      "run_id": "ff180099-4035-4866-bcac-a9358a40fff6",
+      "status": "failed",
+      "updated_at": "2026-11-08T06:52:04.261383855Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "run_id": "dfa3e8e1-11db-4854-b5e5-be9e977e4016",
+      "status": "passed",
+      "updated_at": "2026-11-08T06:46:09.599068509Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "df129d9e-c795-4d92-9ee5-ffd776339252",
   "labels": [
     "type:epic",
@@ -106,5 +120,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Dispatch layering, executor surface, and build hygiene in crates/jit",
-  "updated_at": "2026-11-08T06:45:58.985511035Z"
+  "updated_at": "2026-11-08T06:52:46.171577813Z"
 }

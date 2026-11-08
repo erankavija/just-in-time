@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-11-08T06:52:46.370044776Z",
+  "context": {},
+  "created_at": "2026-11-08T06:52:38.517173194Z",
+  "dependencies": [],
+  "description": "The df129d9e holistic review (gate run on 2026-11-08) found that `jit validate --branch-drift` and `--leases` break the epic's findings-stderr rule, @/issue/df129d9e/decision/D-03, which REQ-09's output contract relies on. When a check fails, `ValidationChecksResponse::failure_message` in `crates/jit/src/output/validate.rs` puts the check's multi-line details into the stderr message. The human renderer stops at the first failed check, so stdout shows no failed check at all. With both checks failing, the second check's details are lost from human output.\n\nThe same review found an advisory contradiction in `dev/active/df129d9e-rust-code-quality/completion-report.md`. The \"Excluded or ambiguous\" row says the +38 merge is counted in \"neither sum above\", but the ledger table's second sum (+344) includes it.\n\n## Success Criteria\n\n- [hard] REQ-01: For `jit validate --branch-drift`, `--leases` and both together, in human mode, every failed check's details appear in the stdout report beside every passed check's line, and stderr carries one single-line summary of the failure.\n- [hard] REQ-02: `--json` output for these checks is unchanged: the `validations` array still carries each check's `valid` and `message`, and the exit code for a failed check is unchanged.\n- [hard] REQ-03: A test owns each stream: stdout holds every check's report, including both failures when both fail, and stderr holds exactly one line. Each test sits at the cheapest layer that observes its stream.\n- [hard] REQ-04: The completion report's \"Excluded or ambiguous\" row says the +38 merge is excluded from the +306 sum and included in the +344 sum. No other figure in the report changes.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-08T06:52:38.517173194Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "75a90224-e9dd-43d2-99c0-3d79d7f1284c",
+  "labels": [
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:output-contract",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "in_progress",
+  "title": "Validation checks report failures on stdout with a one-line stderr summary",
+  "updated_at": "2026-11-08T06:52:46.370044776Z"
+}
