@@ -527,22 +527,20 @@ mod tests {
         }
     }
 
-    /// Write the serialized ruleset to a temp `.jit` and reload it.
-    fn round_trip(set: &RuleSet) -> (tempfile::TempDir, RuleSet) {
+    /// Serialize the ruleset and parse it back with its emitted schema files.
+    fn round_trip(set: &RuleSet) -> RuleSet {
         let out = serialize_ruleset(set).unwrap();
-        let dir = tempfile::tempdir().unwrap();
-        let schemas = dir.path().join("schemas");
-        std::fs::create_dir_all(&schemas).unwrap();
-        for f in &out.schema_files {
-            std::fs::write(schemas.join(&f.name), &f.content).unwrap();
-        }
-        std::fs::write(dir.path().join("rules.toml"), &out.rules_toml).unwrap();
-        let reloaded = crate::storage::ruleset_store::load_ruleset(
-            &crate::test_utils::repository_layout_for_data_root(dir.path()),
-            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        RuleSet::parse(
+            &out.rules_toml,
+            None,
+            out.schema_files.iter().map(|file| {
+                (
+                    format!("schemas/{}", file.name),
+                    file.content.clone().into_bytes(),
+                )
+            }),
         )
-        .expect("serialized rules.toml must reload");
-        (dir, reloaded)
+        .expect("serialized rules.toml must reload")
     }
 
     /// Field-wise equality EXCLUDING `SchemaSource.reference`/`path` (which
@@ -581,7 +579,7 @@ mod tests {
     }
 
     fn assert_round_trips(set: &RuleSet) {
-        let (_dir, reloaded) = round_trip(set);
+        let reloaded = round_trip(set);
         assert_eq!(
             set.rules.len(),
             reloaded.rules.len(),
@@ -883,7 +881,7 @@ assert = { label-value-pattern = { namespace = "sc", regex = '^\[hard\]\s+\w+' }
     #[test]
     fn test_round_trip_empty_ruleset() {
         let set = RuleSet::empty();
-        let (_dir, reloaded) = round_trip(&set);
+        let reloaded = round_trip(&set);
         assert!(reloaded.rules.is_empty());
     }
 
@@ -969,16 +967,20 @@ name = "a/b"
 severity = "error"
 assert = { json-schema = "schemas/second.json" }
 "#;
-        let dir = tempfile::tempdir().unwrap();
-        let schemas = dir.path().join("schemas");
-        std::fs::create_dir_all(&schemas).unwrap();
         // Two DIFFERENT schema contents so an overwrite would be observable.
-        std::fs::write(schemas.join("first.json"), "{\"const\": 1}\n").unwrap();
-        std::fs::write(schemas.join("second.json"), "{\"const\": 2}\n").unwrap();
-        std::fs::write(dir.path().join("rules.toml"), toml).unwrap();
-        let set = crate::storage::ruleset_store::load_ruleset(
-            &crate::test_utils::repository_layout_for_data_root(dir.path()),
-            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
+        let set = RuleSet::parse(
+            toml,
+            None,
+            [
+                (
+                    "schemas/first.json".to_string(),
+                    b"{\"const\": 1}\n".to_vec(),
+                ),
+                (
+                    "schemas/second.json".to_string(),
+                    b"{\"const\": 2}\n".to_vec(),
+                ),
+            ],
         )
         .unwrap();
 
@@ -1011,7 +1013,7 @@ assert = { json-schema = "schemas/second.json" }
         // schema references are stable (file-name driven). The second pass uses
         // the reloaded set (whose JsonSchema references now point at files).
         let set = default_ruleset(&registry(vec![]));
-        let (_dir, reloaded) = round_trip(&set);
+        let reloaded = round_trip(&set);
         let first = serialize_ruleset(&set).unwrap().rules_toml;
         let second = serialize_ruleset(&reloaded).unwrap().rules_toml;
         assert_eq!(first, second, "serialization must be canonical/stable");
@@ -1056,13 +1058,7 @@ assert = { json-schema = "schemas/second.json" }
             .unwrap();
         let block = render_rule_block(rule).unwrap();
 
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("rules.toml"), &block).unwrap();
-        let reloaded = crate::storage::ruleset_store::load_ruleset(
-            &crate::test_utils::repository_layout_for_data_root(dir.path()),
-            &toml::from_str::<crate::config::JitConfig>("").unwrap(),
-        )
-        .unwrap();
+        let reloaded = RuleSet::parse(&block, None, std::iter::empty()).unwrap();
         assert_eq!(reloaded.rules.len(), 1);
         assert_rules_equivalent(rule, &reloaded.rules[0]);
     }

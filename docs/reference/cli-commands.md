@@ -280,7 +280,10 @@ container it would reconcile also appears here. Active, untyped, unknown-type,
 leaf, and Archived issues whose pre-archive state was non-terminal are excluded. Each selected container is
 fully evaluated through the same resolved-hierarchy planner as `archive
 container`, including zero-document containers and ineligible plans. Ordinary
-sequencing edges do not enlarge a candidate's resolved subtree.
+sequencing edges do not enlarge a candidate's resolved subtree. Every candidate
+is planned in one read session that shares one capture budget, so a repository
+whose candidates together read more than that budget allows fails the whole
+listing with the capture budget error instead of reporting a partial list.
 
 The JSON shape is exactly
 `{"schema_version":1,"count":N,"candidates":[...]}`. Every entry in
@@ -398,13 +401,9 @@ a preferred root, planning scans the archive root's immediate non-symlink
 directories for that exact full-ID marker. One match freezes and reuses the
 existing directory even after the container's membership label changes. Multiple
 matches block with deterministic `destination-conflict` findings. If no marker
-matches, planning resolves to the unsuffixed
-`<archive_root>/<container-short-id>/` when that path already exists, and to the
-preferred root otherwise. Adopting an occupied unsuffixed directory
-moves no data, and its markerless accounting and conflict checks still apply, so
-a container's artifacts stay in the one directory that already holds them. A
-marker naming another container or a markerless resolved directory with
-unaccounted entries also blocks. The marker's `ArchivePublication.source` is
+matches, planning resolves to the preferred root. A marker naming another
+container, or a markerless resolved directory with unaccounted entries, also
+blocks. The marker's `ArchivePublication.source` is
 `null` because it is executor-generated ownership metadata, not a copied or
 moved repository artifact.
 
@@ -2745,10 +2744,9 @@ itself stays in the repository; jit stores the reference. `jit document` is a
 visible alias of `jit doc`.
 
 Reading a document at a commit requires both the `git` executable on `PATH` and
-a Git repository ([Git Optional](../concepts/guarantees.md#git-optional)):
-`history` and `diff` always, and `show` whenever `--at` is given or the
-reference itself is pinned to a commit. The rest of the family works without
-git.
+a Git repository: `diff` always, and `show` whenever `--at` is given or the
+reference itself is pinned to a commit. Outside Git, `history` lists no commits.
+See [Git Optional](../concepts/guarantees.md#git-optional).
 
 ### `jit doc add`
 
@@ -2815,7 +2813,8 @@ the working tree, including uncommitted edits and derived files.
 
 List Git's history for the document path, newest first, including a commit that
 deletes it. Git's default history simplification can omit a merge when the
-document matches a parent; uncommitted changes do not appear.
+document matches a parent; uncommitted changes do not appear. Outside a Git
+checkout, or before its first commit, the list is empty.
 
 ```bash
 jit doc history <ID> <PATH>
@@ -3635,7 +3634,7 @@ JSON uses the list envelope, with the query echoed back:
   "results": [
     {
       "issue_id": "003f9f83-4e8a-4a5f-8e48-44f6f48a7c17",
-      "path": "/path/to/repo/.jit/issues/003f9f83-4e8a-4a5f-8e48-44f6f48a7c17.json",
+      "path": "issues/003f9f83-4e8a-4a5f-8e48-44f6f48a7c17.json",
       "line_number": 12,
       "line_text": "  \"title\": \"Harden auth\",",
       "matches": [{ "text": "auth", "start": 22, "end": 26 }]
@@ -3645,9 +3644,9 @@ JSON uses the list envelope, with the query echoed back:
 }
 ```
 
-`path` is the file's path as the matcher reports it, and `issue_id` is the issue
-the file belongs to, or `null` for a file that is not an issue record. `matches`
-gives each match's byte offsets within `line_text`. Missing ripgrep and other
+`path` is the file's path relative to the `.jit/` data directory, and `issue_id`
+is the issue the file belongs to, or `null` for a file that is not an issue
+record. `matches` gives each match's byte offsets within `line_text`. Missing ripgrep and other
 matcher failures use `RIPGREP_NOT_FOUND` and `SEARCH_FAILED`, respectively; see
 the generated [error-code reference](error-codes.md) and
 [command-specific exit-code mappings](exit-codes.md#command-specific-mappings)

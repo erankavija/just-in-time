@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "45ded1fc5ae600f39b75a0200842eabbbdcdacf8",
+  "completed_at": "2026-11-08T03:31:30.498646009Z",
+  "duration_ms": 140754,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three hard criteria are satisfied; no unresolved issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7909527f-5613-4456-93fc-98d70d9b7ccb",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "537fbca1-3868-4c50-9ce5-aae5afecf481",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T03:29:09.744562561Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:7909527f — cff056858, 057a9cf38, f9dbac535, 3caaf7a24; uncommitted changes excluded.\nPolicy sources: AGENTS.md; dev/TESTING.md; no subtree AGENTS.md applies.\nResolved items: @/inv/atomic-writes, @/inv/orthogonal-tests, @/inv/shared-test-contracts, @/inv/semantic-test-assertions, @/inv/essential-code-prose, @/inv/no-ignored-tests, @/inv/convention-convergence, @/inv/architecture-dependency-direction → .jit/invariants.toml; @/gate/cargo-ci, @/gate/jit-validate → .jit/gates.toml; @/issue/7909527f/requirement/REQ-01, @/issue/7909527f/requirement/REQ-02, @/issue/7909527f/requirement/REQ-03 → issue description.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T03:27:18.942000981+00:00; wrapper confirms commit 2318609d5 contains all four attributable commits. Current code-review pending, exit none. No gates rerun.\nTruncation recovery: narrower reads recovered relevant patches, benchmark evidence, and testing guidance; unrelated historical duration rows were outside this issue’s scope.\n\nNo findings. REQ-01–03 are satisfied:\n\n- The [committed measurement](/home/vkaskivuo/Projects/just-in-time/dev/benchmarks/per-test-durations-1eb949a5/remeasure-7909527f/README.md:18) records 0.506 s, 0.039 s, and 0.567 s at load 3.89, corroborated by the JUnit report.\n- The refactors preserve assertions, cases, generator ranges, and test ownership without introducing time-based waits.\n- The shared fixtures from completed dependency 0b35be66 are correctly integrated. Production durability remains unchanged.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three hard criteria are satisfied; no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

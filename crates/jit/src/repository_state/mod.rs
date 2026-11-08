@@ -479,14 +479,22 @@ pub(crate) fn validation_declarations_from_image(
     let rules = match image.file_bytes(&VirtualPath::RULES)? {
         Some(bytes) => (|| -> Result<RuleSet, DeclarationParseError> {
             let content = std::str::from_utf8(bytes)?;
+            // An absent optional schema is skipped; the parse substitutes its
+            // placeholder.
             let schemas = RuleSet::schema_requests(content)?
                 .into_iter()
-                .map(|request| -> Result<_, DeclarationParseError> {
-                    let path = VirtualPath::schema_reference(&request.reference)?;
-                    let bytes = image.file_bytes(&path)?.ok_or_else(|| {
-                        DeclarationParseError::MissingCapture(request.reference.clone())
-                    })?;
-                    Ok((request.reference, bytes.to_vec()))
+                .filter_map(|request| -> Option<Result<_, DeclarationParseError>> {
+                    let bytes = VirtualPath::schema_reference(&request.reference)
+                        .map_err(DeclarationParseError::from)
+                        .and_then(|path| Ok(image.file_bytes(&path)?.map(<[u8]>::to_vec)));
+                    match bytes {
+                        Ok(Some(bytes)) => Some(Ok((request.reference, bytes))),
+                        Ok(None) if !request.required => None,
+                        Ok(None) => Some(Err(DeclarationParseError::MissingCapture(
+                            request.reference,
+                        ))),
+                        Err(error) => Some(Err(error)),
+                    }
                 })
                 .collect::<Result<Vec<_>, DeclarationParseError>>()?;
             let parsed = RuleSet::parse(content, Some(&config), schemas)?;
@@ -1124,6 +1132,67 @@ pub fn compare_materializations(
 mod tests {
     use super::*;
     use crate::test_harness::image::{synthetic_layout, ImageBuilder};
+
+    /// An image declaring `rules` and the schema `entry`, every other
+    /// declaration absent.
+    fn rules_image(rules: &str, schema: &str, entry: RepositoryEntry) -> RepositoryImage {
+        VirtualPath::DECLARATION_FILES
+            .into_iter()
+            .fold(ImageBuilder::new(), |builder, path| {
+                builder.entry(path, RepositoryEntry::Absent)
+            })
+            .file(".jit/rules.toml", rules)
+            .entry(schema, entry)
+            .build()
+    }
+
+    #[test]
+    fn test_declarations_from_image_rejects_a_malformed_rules_file_rather_than_yielding_no_rules() {
+        let image = rules_image(
+            "[[rules]]\nname = \"broken\"\nassert = {}\n",
+            ".jit/schemas/unused.json",
+            RepositoryEntry::Absent,
+        );
+        assert!(matches!(
+            declarations_from_image(&image),
+            Err(DeclarationParseError::Rule(_))
+        ));
+    }
+
+    #[test]
+    fn test_declarations_from_image_rejects_an_absent_required_schema() {
+        let image = rules_image(
+            "[[rules]]\nname = \"body\"\nassert = { json-schema = \"schemas/body.json\" }\n",
+            ".jit/schemas/body.json",
+            RepositoryEntry::Absent,
+        );
+        assert!(matches!(
+            declarations_from_image(&image),
+            Err(DeclarationParseError::MissingCapture(reference)) if reference == "schemas/body.json"
+        ));
+    }
+
+    #[test]
+    fn test_declarations_from_image_treats_a_directory_at_an_optional_schema_path_as_absent() {
+        let reference = "schemas/default-namespace-registry.json";
+        let rules = format!(
+            "[[rules]]\nname = \"namespace-registry\"\norigin = \"default\"\n\
+             assert = {{ json-schema = \"{reference}\" }}\n"
+        );
+        let parse = |entry| {
+            declarations_from_image(&rules_image(&rules, &format!(".jit/{reference}"), entry))
+                .unwrap()
+                .rules()
+                .clone()
+        };
+        assert_eq!(
+            parse(RepositoryEntry::Directory {
+                identity: EntryIdentity::for_bytes("dir", b"dir").unwrap(),
+                mode: FileMode::Regular,
+            }),
+            parse(RepositoryEntry::Absent)
+        );
+    }
 
     fn plan(image: &RepositoryImage, actions: Vec<RepositoryAction>) -> MaterializationPlan {
         MaterializationPlan::new(

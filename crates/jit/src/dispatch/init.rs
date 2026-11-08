@@ -6,7 +6,7 @@ use crate::commands::{
     open_repository, parse_profile_selectors, parse_profile_variable_assignments, OpenedRepository,
     ProfileVariableOptions, RepositoryInvocation,
 };
-use crate::config_manager::ConfigManager;
+use crate::config_manager::{invocation_write_override, LINKED_CHECKOUT_WRITE_STANCE_ENV};
 use crate::output::InitResponse;
 use std::env;
 use std::path::PathBuf;
@@ -32,7 +32,11 @@ fn init(args: &InitArgs) -> HandlerResult<InitResponse> {
         coordinates_claims_first: false,
         is_validation_exempt: true,
         is_recover: false,
-        write_override: ConfigManager::invocation_write_override()?,
+        write_override: invocation_write_override(
+            std::env::var(LINKED_CHECKOUT_WRITE_STANCE_ENV)
+                .ok()
+                .as_deref(),
+        )?,
     })?;
     let profiles = executor.profiles();
     let selection = profiles.select_profiles(

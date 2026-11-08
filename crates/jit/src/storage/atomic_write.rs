@@ -15,6 +15,7 @@
 //! lives in [`super::external_publish`], which reaches these primitives from
 //! inside `crate::storage`.
 
+use crate::domain::relative_path::RootRelativePath;
 use crate::repository_state::{FileMode, VirtualPath};
 use crate::storage::worktree_paths::WorktreePaths;
 use anyhow::{Context, Result};
@@ -22,7 +23,7 @@ use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, OpenOptions};
 use std::ffi::OsStr;
 use std::io::Read;
-use std::path::{Component, Path};
+use std::path::Path;
 
 /// How much of a publication's durability [`publish_file`] completes itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,9 +32,8 @@ pub(in crate::storage) enum Durability {
     Full,
     /// Sync the staged file; the caller syncs the parent directory.
     Deferred,
-    /// Sync nothing, for tests whose subject is coordination rather than
-    /// crash durability.
-    #[cfg(test)]
+    /// Sync nothing, for tests whose subject is not crash durability.
+    #[cfg(any(test, feature = "test-support"))]
     Unsynced,
 }
 
@@ -63,7 +63,7 @@ pub(in crate::storage) fn publish_file<E: From<std::io::Error>>(
     let stage = unique_stage_name();
     create_staged_file(parent, &stage, bytes, mode)
         .and_then(|file| match durability {
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             Durability::Unsynced => Ok(()),
             _ => file.sync_all(),
         })
@@ -80,7 +80,7 @@ pub(in crate::storage) fn publish_file<E: From<std::io::Error>>(
     match durability {
         Durability::Full => sync_capability_directory(parent).map_err(E::from),
         Durability::Deferred => Ok(()),
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-support"))]
         Durability::Unsynced => Ok(()),
     }
 }
@@ -195,10 +195,10 @@ fn open_git_control_parent<'t>(
 ) -> Result<(Dir, &'t OsStr)> {
     let beneath = |dir: &Path| {
         target.strip_prefix(dir).is_ok_and(|rest| {
-            rest.components().next().is_some()
-                && rest
-                    .components()
-                    .all(|component| matches!(component, Component::Normal(_)))
+            matches!(
+                RootRelativePath::parse(rest),
+                Ok(RootRelativePath::Descendant(_))
+            )
         })
     };
     let (Some(parent), Some(leaf)) = (target.parent(), target.file_name()) else {
@@ -257,7 +257,23 @@ pub(in crate::storage) fn write_staged_file(
     content: impl Read,
     mode: FileMode,
 ) -> std::io::Result<()> {
-    create_staged_file(parent, leaf, content, mode)?.sync_all()
+    write_staged_file_for(parent, leaf, content, mode, Durability::Full)
+}
+
+/// [`write_staged_file`], leaving the file unsynced for `Unsynced`.
+pub(in crate::storage) fn write_staged_file_for(
+    parent: &Dir,
+    leaf: impl AsRef<Path>,
+    content: impl Read,
+    mode: FileMode,
+    durability: Durability,
+) -> std::io::Result<()> {
+    let file = create_staged_file(parent, leaf, content, mode)?;
+    match durability {
+        #[cfg(any(test, feature = "test-support"))]
+        Durability::Unsynced => Ok(()),
+        _ => file.sync_all(),
+    }
 }
 
 /// Write `content` under `mode` as a new file named `leaf`, unsynced. Every
@@ -307,7 +323,7 @@ pub(in crate::storage) fn sync_directory_for(
     durability: Durability,
 ) -> std::io::Result<()> {
     match durability {
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-support"))]
         Durability::Unsynced => Ok(()),
         _ => sync_capability_directory(directory),
     }

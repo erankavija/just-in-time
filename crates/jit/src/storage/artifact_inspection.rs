@@ -417,8 +417,8 @@ mod tests {
             .unwrap()
         };
         classify_artifacts(
-            ArtifactClassificationInventory::new(target, artifacts, Vec::new())
-                .with_destination_root(DESTINATION_ROOT),
+            ArtifactClassificationInventory::new(target, artifacts, Vec::new()),
+            DESTINATION_ROOT,
             policy,
             facts,
         )

@@ -144,6 +144,8 @@ commands read through the driver:
 - `jit validate`, except `--fix` without `--dry-run`, `--branch-drift` and
   `--leases`
 - `jit gate preset list` and `jit gate preset show`
+- `jit archive document` and `jit archive container` without `--execute`, and
+  `jit archive candidates`
 - `jit doc check-links`
 - `jit invariant check`
 - `jit issue batch-create --dry-run`

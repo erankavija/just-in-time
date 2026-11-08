@@ -202,27 +202,23 @@ impl CapabilityRoots {
 /// unsafe target, not a clean absence.
 pub(in crate::storage) fn open_capability_parent(
     root: &Dir,
-    path: &Path,
+    path: &RootRelativePath,
 ) -> Result<Option<(Dir, String)>, CapabilityFsError> {
-    let components = path
-        .components()
-        .map(|component| component.as_os_str().to_string_lossy().into_owned())
-        .collect::<Vec<_>>();
-    let (leaf, parents) = components
-        .split_last()
-        .ok_or_else(|| CapabilityFsError::UnsafeTarget(path.display().to_string()))?;
+    let (parents, leaf) = path
+        .split_leaf()
+        .ok_or_else(|| CapabilityFsError::UnsafeTarget(path.as_path().display().to_string()))?;
     let mut current = root.try_clone()?;
-    for component in parents {
+    for component in parents.segments() {
         match current.symlink_metadata(component) {
             Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
-                return Err(CapabilityFsError::UnsafeTarget(component.clone()))
+                return Err(CapabilityFsError::UnsafeTarget(component.to_owned()))
             }
             Ok(_) => current = open_child_dir_nofollow(&current, component)?,
             Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error.into()),
         }
     }
-    Ok(Some((current, leaf.clone())))
+    Ok(Some((current, leaf.to_owned())))
 }
 
 /// The directory handles one pass over a root opens, keyed by root-relative
@@ -386,13 +382,12 @@ fn split_target(target: &Path) -> Result<(PathBuf, String), CapabilityFsError> {
 
 pub(in crate::storage) fn open_descendant_dir_nofollow(
     root: &Dir,
-    path: &Path,
+    path: &RootRelativePath,
 ) -> Result<Dir, CapabilityFsError> {
-    let mut current = root.try_clone()?;
-    for component in path.components() {
-        current = open_child_dir_nofollow(&current, Path::new(component.as_os_str()))?;
-    }
-    Ok(current)
+    path.segments()
+        .try_fold(root.try_clone()?, |current, name| {
+            open_child_dir_nofollow(&current, name)
+        })
 }
 
 /// The kind required of an opened leaf handle.
@@ -591,7 +586,7 @@ pub(crate) fn read_repository_file_nofollow(
         return Err(CapabilityFsError::UnsafeTarget(root.display().to_string()));
     }
     let root = open_absolute_dir_nofollow(root)?;
-    let Some((parent, leaf)) = open_capability_parent(&root, relative.as_path())? else {
+    let Some((parent, leaf)) = open_capability_parent(&root, relative)? else {
         return Ok(None);
     };
     read_leaf_nofollow(&parent, &leaf, relative.as_path())
@@ -609,29 +604,26 @@ pub(crate) fn read_repository_file_confined(
         return Err(CapabilityFsError::UnsafeTarget(root.display().to_string()));
     }
     let root_dir = open_absolute_dir_nofollow(root)?;
-    read_confined_relative(root, &root_dir, relative.as_path(), 0)
+    read_confined_relative(root, &root_dir, relative, 0)
 }
 
+/// Walk a descendant `relative` beneath `root`; a link resolves to a path that
+/// re-enters only as a [`RootRelativePath::Descendant`].
 fn read_confined_relative(
     root_path: &Path,
     root: &Dir,
-    relative: &Path,
+    relative: &RootRelativePath,
     symlink_depth: usize,
 ) -> Result<Option<Vec<u8>>, CapabilityFsError> {
+    let unsafe_target =
+        || CapabilityFsError::UnsafeTarget(relative.as_path().display().to_string());
     if symlink_depth >= 40 {
-        return Err(CapabilityFsError::UnsafeTarget(
-            relative.display().to_string(),
-        ));
+        return Err(unsafe_target());
     }
     let components = relative
-        .components()
-        .map(|component| match component {
-            Component::Normal(name) => Ok(name.to_os_string()),
-            _ => Err(CapabilityFsError::UnsafeTarget(
-                relative.display().to_string(),
-            )),
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+        .segments()
+        .map(std::ffi::OsString::from)
+        .collect::<Vec<_>>();
     let mut current = root.try_clone()?;
     let mut traversed = PathBuf::new();
     for (index, component) in components.iter().enumerate() {
@@ -644,22 +636,26 @@ fn read_confined_relative(
             let target = current.read_link_contents(component)?;
             let resolved =
                 resolve_confined_symlink(root_path, &traversed, &target, &components[index + 1..])?;
+            let resolved = match RootRelativePath::parse(&resolved) {
+                Ok(descendant @ RootRelativePath::Descendant(_)) => descendant,
+                _ => {
+                    return Err(CapabilityFsError::UnsafeTarget(
+                        resolved.display().to_string(),
+                    ))
+                }
+            };
             return read_confined_relative(root_path, root, &resolved, symlink_depth + 1);
         }
         if index + 1 == components.len() {
-            return read_leaf_nofollow(&current, component, relative);
+            return read_leaf_nofollow(&current, component, relative.as_path());
         }
         if !metadata.is_dir() {
-            return Err(CapabilityFsError::UnsafeTarget(
-                relative.display().to_string(),
-            ));
+            return Err(unsafe_target());
         }
         current = open_child_dir_nofollow(&current, component)?;
         traversed.push(component);
     }
-    Err(CapabilityFsError::UnsafeTarget(
-        relative.display().to_string(),
-    ))
+    Err(unsafe_target())
 }
 
 fn resolve_confined_symlink(
@@ -835,6 +831,22 @@ mod tests {
                 CapabilityFsError::UnsafeTarget(path) if Path::new(&path) == relative.as_path()
             ));
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_repository_file_confined_refuses_a_link_resolving_to_a_non_canonical_path() {
+        use std::os::unix::ffi::OsStrExt as _;
+        use std::os::unix::fs::symlink;
+        let temp = TempDir::new().unwrap();
+        let non_utf8 = std::ffi::OsStr::from_bytes(b"record\xff");
+        std::fs::write(temp.path().join(non_utf8), b"bytes").unwrap();
+        symlink(non_utf8, temp.path().join("link")).unwrap();
+        let relative = RootRelativePath::parse("link").unwrap();
+
+        let error = read_repository_file_confined(temp.path(), &relative).unwrap_err();
+
+        assert!(matches!(error, CapabilityFsError::UnsafeTarget(_)));
     }
 
     #[cfg(unix)]

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "96004309a219af8ca5c6c905d39ea4dafbb578b0",
+  "completed_at": "2026-11-07T23:32:20.277184095Z",
+  "duration_ms": 152767,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Both hard criteria are satisfied, the prior blocking finding is resolved, and no unresolved issue-impact defects were found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d4172016-0225-4ae8-aa37-3e4f28a1922c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2849556e-a2bc-41b4-887b-e1dc17b6d2ae",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-07T23:29:47.509801425Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:d4172016` — 21299930, 61008a67, 9692eaa1, aeb771ba, c7f2680a; inspected individual patches.\nPolicy sources: `AGENTS.md`; supporting testing guidance in `dev/TESTING.md`.\nResolved items: @/issue/0f8efc37/requirement/REQ-09, @/issue/c8e79465/requirement/REQ-01 → respective `.jit/issues/*.json` descriptions; @/inv/canonical-cutover, @/inv/architecture-dependency-direction, @/inv/convention-convergence, @/inv/semantic-types, @/inv/shared-test-contracts, @/inv/semantic-test-assertions, @/inv/single-source-prose, @/inv/orthogonal-tests, @/inv/essential-code-prose → `.jit/invariants.toml`; @/charter/D-4, @/charter/D-18, @/charter/D-20, @/charter/D-21, @/charter/D-24 → `dev/vision/9db27a3a-charter.md`; @/gate/cargo-ci, @/gate/jit-validate → `.jit/gates.toml`.\nGate evidence: cargo-ci passed, exit 0, 2026-11-07T23:28:20.693003696+00:00; supplied ancestry confirms all five attributable commits are covered; not rerun.\nTruncation recovery: Recovered relevant patches and investigation/testing guidance through narrower reads; unrelated historical benchmark and MCP material excluded.\n\nNo findings. Both hard criteria are satisfied. CLI and HTTP share the core method family, preserving selected-version bytes, working-tree reads, document validation, and HTTP diff.\n\nPrior F1 is resolved: raw-byte serving and diff now have independent tests in `crates/server/tests/server_integration/document_api_tests.rs:170` and `:186`.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Both hard criteria are satisfied, the prior blocking finding is resolved, and no unresolved issue-impact defects were found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

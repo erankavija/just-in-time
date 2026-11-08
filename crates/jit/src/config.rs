@@ -5,8 +5,6 @@
 
 use crate::domain::item::KindScope;
 use crate::domain::vocabulary::wire_vocabulary;
-#[cfg(test)]
-use crate::repository_state::VirtualPath;
 use crate::runtime_defaults::{MAX_INDEFINITE_LEASES_PER_AGENT, MAX_INDEFINITE_LEASES_PER_REPO};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -97,7 +95,8 @@ impl VersionConfig {
 /// The sole home for the project's canonical, human-editable name — not
 /// `index.json`, which carries only machine metadata
 /// (`schema_version`/`deleted_ids`) and is not meant to be hand-edited.
-/// Resolve a present value with [`JitConfig::project_name`].
+/// Resolve a present value with
+/// [`project_name_from_config`](crate::config_manager::project_name_from_config).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectConfig {
@@ -1204,15 +1203,6 @@ impl JitConfig {
         resolve_coordination(self.coordination.as_ref())
     }
 
-    /// The declared `[project] name`, or `None` when the table or key is absent.
-    pub fn project_name(&self) -> Option<&str> {
-        self.project
-            .as_ref()?
-            .name
-            .as_ref()
-            .map(ProjectName::as_str)
-    }
-
     /// The repo-level content format, resolved by [`ValidationConfig::content_format`].
     pub fn content_format(&self) -> crate::domain::ContentFormat {
         self.validation
@@ -1335,7 +1325,7 @@ impl EffectiveConfig {
     ///   `projection`): read from the
     ///   REPO config only, with no built-in defaults filled in. Every
     ///   other reader of these fields loads the repo file directly (e.g.
-    ///   [`ConfigManager::namespaces_from_config`](crate::config_manager::ConfigManager::namespaces_from_config)).
+    ///   [`namespaces_from_config`](crate::config_manager::namespaces_from_config)).
     ///   This is also why these sections reflect exactly what `config.toml`
     ///   declares rather than `config show`'s built-in-default-filled view: an
     ///   absent section serializes as an empty object (matching an absent
@@ -1408,124 +1398,6 @@ impl EffectiveConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::configuration_store::load_configuration;
-    use tempfile::TempDir;
-
-    #[test]
-    fn test_load_templates_when_config_absent() {
-        // A repo with `.jit/templates.toml` but NO `.jit/config.toml` must still
-        // load the registry (the absent-config path), not silently return empty.
-        let dir = TempDir::new().unwrap();
-        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
-        std::fs::write(
-            layout.resolve(&VirtualPath::TEMPLATES).unwrap(),
-            r#"
-[[template]]
-name = "plan"
-applies_to = ["epic"]
-[[template.nodes]]
-role = "planning"
-type = "planning"
-doc = "dev/active/{container.id}-plan.md"
-[[template.nodes]]
-role = "breakdown"
-type = "breakdown"
-depends_on = ["planning"]
-"#,
-        )
-        .unwrap();
-
-        let config = load_configuration(&layout).unwrap();
-        let plan = config
-            .templates
-            .get("plan")
-            .expect("templates.toml is loaded even without config.toml");
-        let roles = &config.templates.roles;
-        assert_eq!(plan.planning_type(roles), Some("planning"));
-        assert_eq!(plan.breakdown_type(roles), Some("breakdown"));
-        assert_eq!(config.templates.breakable_types(), vec!["epic".to_string()]);
-    }
-
-    #[test]
-    fn test_load_invariants_when_config_absent() {
-        // A repo with `.jit/invariants.toml` but NO `.jit/config.toml` must still
-        // load the registry (the config-absent early-return path).
-        let dir = TempDir::new().unwrap();
-        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
-        std::fs::write(
-            layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
-            r#"
-[[invariants]]
-id = "sample-invariant"
-statement = "Every dependency edge stays acyclic."
-kind = "enforced"
-enforced-by = "dag-no-cycles"
-"#,
-        )
-        .unwrap();
-
-        let config = load_configuration(&layout).unwrap();
-        assert_eq!(config.invariants.invariants.len(), 1);
-        let inv = &config.invariants.invariants[0];
-        assert_eq!(inv.id, "sample-invariant");
-        assert_eq!(
-            inv.kind,
-            crate::declarations::invariants::InvariantKind::Enforced
-        );
-        assert_eq!(inv.enforced_by.as_deref(), Some("dag-no-cycles"));
-    }
-
-    #[test]
-    fn test_load_invariants_when_config_present() {
-        // With BOTH `.jit/config.toml` and `.jit/invariants.toml`, the
-        // config-present path also chain-loads the invariant registry.
-        let dir = TempDir::new().unwrap();
-        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
-        std::fs::write(
-            layout.resolve(&VirtualPath::CONFIG).unwrap(),
-            "[type_hierarchy]\ntypes = { task = 1 }\n",
-        )
-        .unwrap();
-        std::fs::write(
-            layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
-            "[[invariants]]\nid = \"second-invariant\"\nstatement = \"s\"\nkind = \"advisory\"\n",
-        )
-        .unwrap();
-
-        let config = load_configuration(&layout).unwrap();
-        assert!(config.type_hierarchy.is_some());
-        assert_eq!(config.invariants.invariants.len(), 1);
-        assert_eq!(config.invariants.invariants[0].id, "second-invariant");
-    }
-
-    #[test]
-    fn test_load_invariants_absent_file_is_empty_on_both_paths() {
-        // No `invariants.toml` → empty registry, whether or not config.toml exists.
-        let no_config = TempDir::new().unwrap();
-        assert!(
-            load_configuration(&crate::test_utils::repository_layout_for_data_root(
-                no_config.path()
-            ))
-            .unwrap()
-            .invariants
-            .invariants
-            .is_empty()
-        );
-
-        let with_config = TempDir::new().unwrap();
-        let with_config_layout =
-            crate::test_utils::repository_layout_for_data_root(with_config.path());
-        std::fs::write(
-            with_config_layout.resolve(&VirtualPath::CONFIG).unwrap(),
-            "[type_hierarchy]\ntypes = { task = 1 }\n",
-        )
-        .unwrap();
-        assert!(load_configuration(&with_config_layout)
-            .unwrap()
-            .invariants
-            .invariants
-            .is_empty());
-    }
 
     #[test]
     fn test_documentation_config_unauthored_table_classifies_no_area() {
@@ -1766,49 +1638,6 @@ enforced-by = "dag-no-cycles"
     }
 
     #[test]
-    fn test_load_invalid_invariant_fails_config_load_both_paths() {
-        // A malformed invariant entry fails config load with a descriptive,
-        // context-bearing error on BOTH the config-absent and config-present paths.
-        let bad = "[[invariants]]\nid = \"sample-invariant\"\nkind = \"advisory\"\n"; // missing statement
-
-        let no_config = TempDir::new().unwrap();
-        let no_config_layout = crate::test_utils::repository_layout_for_data_root(no_config.path());
-        std::fs::write(
-            no_config_layout.resolve(&VirtualPath::INVARIANTS).unwrap(),
-            bad,
-        )
-        .unwrap();
-        let err = load_configuration(&no_config_layout).unwrap_err();
-        assert!(
-            err.to_string()
-                .contains(VirtualPath::INVARIANTS.relative().as_str()),
-            "{err:#}"
-        );
-
-        let with_config = TempDir::new().unwrap();
-        let with_config_layout =
-            crate::test_utils::repository_layout_for_data_root(with_config.path());
-        std::fs::write(
-            with_config_layout.resolve(&VirtualPath::CONFIG).unwrap(),
-            "[type_hierarchy]\ntypes = { task = 1 }\n",
-        )
-        .unwrap();
-        std::fs::write(
-            with_config_layout
-                .resolve(&VirtualPath::INVARIANTS)
-                .unwrap(),
-            bad,
-        )
-        .unwrap();
-        let err = load_configuration(&with_config_layout).unwrap_err();
-        assert!(
-            err.to_string()
-                .contains(VirtualPath::INVARIANTS.relative().as_str()),
-            "{err:#}"
-        );
-    }
-
-    #[test]
     fn test_parse_minimal_config() {
         let config_toml = r#"
 [type_hierarchy]
@@ -1907,29 +1736,9 @@ default_type = "task"
         }
     }
 
+    /// Every table of `config.toml` rejects an undeclared key by name.
     #[test]
-    fn test_invalid_strictness_fails_config_load_from_disk() {
-        // The eager rejection also fires through the on-disk load path, so a
-        // committed config.toml with a bad strictness never resolves silently.
-        let temp_dir = TempDir::new().unwrap();
-        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
-        std::fs::write(
-            layout.resolve(&VirtualPath::CONFIG).unwrap(),
-            "[validation]\nstrictness = \"banana\"\n",
-        )
-        .unwrap();
-        let err = load_configuration(&layout).unwrap_err();
-        // The load path wraps the deserialize error with context, so inspect the
-        // full chain for the offending value.
-        let chain = format!("{err:#}");
-        assert!(chain.contains("banana"), "{chain}");
-        assert!(chain.contains("strictness"), "{chain}");
-    }
-
-    /// Every table of `config.toml` rejects an undeclared key, and both disk
-    /// loading and the assembler name it in the error's top-level message.
-    #[test]
-    fn test_load_rejects_unknown_key_by_name_in_every_table() {
+    fn test_parse_rejects_unknown_key_by_name_in_every_table() {
         let key = "undeclared_key";
         for fragment in [
             format!("{key} = 1\n"),
@@ -1947,64 +1756,14 @@ default_type = "task"
             format!("[worktree]\n{key} = 1\n"),
             format!("[coordination]\n{key} = 1\n"),
         ] {
-            let temp_dir = TempDir::new().unwrap();
-            let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
-            std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), &fragment).unwrap();
-            let loaded = load_configuration(&layout)
-                .expect_err("an unknown key must fail to load")
+            let message = toml::from_str::<JitConfig>(&fragment)
+                .expect_err("an unknown key must fail to deserialize")
                 .to_string();
-            let declared =
-                crate::declarations::assemble_configuration(Some(fragment.as_bytes()), None, None)
-                    .expect_err("an unknown key must fail to assemble")
-                    .to_string();
-            for message in [loaded, declared] {
-                assert!(
-                    message.contains(&format!("unknown field `{key}`")),
-                    "{fragment}: {message}"
-                );
-            }
+            assert!(
+                message.contains(&format!("unknown field `{key}`")),
+                "{fragment}: {message}"
+            );
         }
-    }
-
-    #[test]
-    fn test_load_missing_config() {
-        let temp_dir = TempDir::new().unwrap();
-        let config = load_configuration(&crate::test_utils::repository_layout_for_data_root(
-            temp_dir.path(),
-        ))
-        .unwrap();
-
-        // Empty config when file doesn't exist
-        assert!(config.type_hierarchy.is_none());
-        assert!(config.validation.is_none());
-    }
-
-    #[test]
-    fn test_load_existing_config() {
-        let temp_dir = TempDir::new().unwrap();
-        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
-
-        let config_toml = r#"
-[type_hierarchy]
-types = { epic = 1, task = 2 }
-"#;
-        std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), config_toml).unwrap();
-
-        let config = load_configuration(&layout).unwrap();
-        assert!(config.type_hierarchy.is_some());
-        assert_eq!(config.type_hierarchy.unwrap().types.len(), 2);
-    }
-
-    #[test]
-    fn test_malformed_toml_returns_error() {
-        let temp_dir = TempDir::new().unwrap();
-        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
-
-        let bad_toml = "[broken syntax";
-        std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), bad_toml).unwrap();
-
-        let result = load_configuration(&layout);
-        assert!(result.is_err());
     }
 
     #[test]
@@ -2214,28 +1973,6 @@ section = "success_criteria"
         }
     }
 
-    #[test]
-    fn test_item_kinds_load_rejects_partial_declaration() {
-        // The required-six rule fires through the real `load_configuration` path.
-        let temp_dir = TempDir::new().unwrap();
-        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
-        std::fs::write(
-            layout.resolve(&VirtualPath::CONFIG).unwrap(),
-            "[item_kinds.custom-decision]\nsection = \"decisions\"\nid-pattern = \"DEC-\\\\d+\"\n",
-        )
-        .unwrap();
-        let err = load_configuration(&layout).expect_err("load must reject partial kind");
-        let msg = format!("{err:#}");
-        assert!(
-            msg.contains("custom-decision"),
-            "error names the kind: {msg}"
-        );
-        assert!(
-            msg.contains("markers"),
-            "error names a missing field: {msg}"
-        );
-    }
-
     /// A complete `[item_kinds.X]` table body with the six required fields, so a
     /// test can focus on the `aliases` behavior under study.
     fn complete_kind_body() -> &'static str {
@@ -2316,26 +2053,6 @@ section = "success_criteria"
             }
             other => panic!("expected AliasCollision, got {other:?}"),
         }
-    }
-
-    #[test]
-    fn test_item_kinds_alias_collision_rejected_through_load() {
-        // The alias-collision guard fires through the real `load_configuration` path,
-        // the same path that rejects a partial `[item_kinds]` declaration.
-        let body = complete_kind_body();
-        let temp_dir = TempDir::new().unwrap();
-        let layout = crate::test_utils::repository_layout_for_data_root(temp_dir.path());
-        std::fs::write(
-            layout.resolve(&VirtualPath::CONFIG).unwrap(),
-            format!("[item_kinds.custom-requirement]\n{body}aliases = [\"custom-requirement\"]\n"),
-        )
-        .unwrap();
-        let err = load_configuration(&layout).expect_err("load must reject colliding alias");
-        let msg = format!("{err:#}");
-        assert!(
-            msg.contains("custom-requirement"),
-            "error names the token: {msg}"
-        );
     }
 
     #[test]
@@ -2707,15 +2424,9 @@ max_indefinite_leases_per_agent = 3
             .chain(EnforcementMode::ALL.map(|mode| explicit(mode.as_str())))
             .collect::<Vec<_>>();
         for repo in &states {
-            let repo_dir = TempDir::new().unwrap();
-            let repo_dir_layout =
-                crate::test_utils::repository_layout_for_data_root(repo_dir.path());
-            std::fs::write(repo_dir_layout.resolve(&VirtualPath::CONFIG).unwrap(), repo).unwrap();
-            let enforced = load_configuration(&repo_dir_layout)
-                .unwrap()
-                .enforcement_mode();
-            let reported = EffectiveConfig::new(load_configuration(&repo_dir_layout).unwrap())
-                .enforcement_mode();
+            let config: JitConfig = toml::from_str(repo).unwrap();
+            let enforced = config.enforcement_mode();
+            let reported = EffectiveConfig::new(config).enforcement_mode();
             assert_eq!(reported, enforced, "repo {repo:?}");
         }
     }
@@ -2740,12 +2451,9 @@ max_indefinite_leases_per_agent = 3
             (both(Some(3), Some(12)), Some(3), Some(12)),
         ];
         for (repo, agent, repo_limit) in states {
-            let dir = TempDir::new().unwrap();
-            let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
-            std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), &repo).unwrap();
-            let enforced = load_configuration(&layout).unwrap().coordination();
-            let reported =
-                EffectiveConfig::new(load_configuration(&layout).unwrap()).coordination();
+            let config: JitConfig = toml::from_str(&repo).unwrap();
+            let enforced = config.coordination();
+            let reported = EffectiveConfig::new(config).coordination();
             assert_eq!(reported, enforced, "repo {repo:?}");
             assert_eq!(
                 enforced,
@@ -2830,55 +2538,13 @@ max_indefinite_leases_per_agent = 3
     }
 
     #[test]
-    fn test_jitconfig_load_parses_valid_project_table() {
-        let dir = TempDir::new().unwrap();
-        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
-        std::fs::write(
-            layout.resolve(&VirtualPath::CONFIG).unwrap(),
-            "[project]\nname = \"just-in-time\"\n",
-        )
-        .unwrap();
-
-        let config = load_configuration(&layout).unwrap();
-        assert_eq!(
-            config
-                .project
-                .as_ref()
-                .unwrap()
-                .name
-                .as_ref()
-                .unwrap()
-                .as_str(),
-            "just-in-time"
-        );
-    }
-
-    #[test]
-    fn test_jitconfig_load_rejects_invalid_project_name() {
-        let dir = TempDir::new().unwrap();
-        let layout = crate::test_utils::repository_layout_for_data_root(dir.path());
-        std::fs::write(
-            layout.resolve(&VirtualPath::CONFIG).unwrap(),
-            "[project]\nname = \"Bad_Name\"\n",
-        )
-        .unwrap();
-
-        let result = load_configuration(&layout);
-        assert!(result.is_err());
-        let msg = format!("{:#}", result.unwrap_err());
+    fn test_parse_rejects_invalid_project_name_at_deserialize() {
+        let msg = toml::from_str::<JitConfig>("[project]\nname = \"Bad_Name\"\n")
+            .unwrap_err()
+            .to_string();
         assert!(
             msg.contains("Bad_Name"),
             "error must name the offending value: {msg}"
         );
-    }
-
-    #[test]
-    fn test_jitconfig_load_project_absent_is_none() {
-        let dir = TempDir::new().unwrap();
-        let config = load_configuration(&crate::test_utils::repository_layout_for_data_root(
-            dir.path(),
-        ))
-        .unwrap();
-        assert!(config.project.is_none());
     }
 }

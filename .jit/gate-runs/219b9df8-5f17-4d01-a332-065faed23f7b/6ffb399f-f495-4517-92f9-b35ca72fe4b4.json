@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "375db79682f07830b4bb92a8d4e4b9b2b9c17d56",
+  "completed_at": "2026-11-07T23:42:41.186007997Z",
+  "duration_ms": 179487,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/capability_fs.rs",
+        "id": "F1",
+        "line": 626,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/219b9df8/requirement/REQ-02",
+          "@/charter/D-20",
+          "@/invariant/convention-convergence"
+        ],
+        "severity": "medium",
+        "summary": "read_confined_relative retains a separate component-based safety validator, leaving hard REQ-02 unmet."
+      }
+    ],
+    "summary": "The fixture change is correct, but hard REQ-02 remains unmet by a separate component-based validator.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "219b9df8-5f17-4d01-a332-065faed23f7b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6ffb399f-f495-4517-92f9-b35ca72fe4b4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-07T23:39:41.698477532Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4246 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1b861-d5b6-7041-a94c-7b3bc0d275d6\n--------\nuser\n--- 4233 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:219b9df8` — `52747410e08196a991a9a8e06dc7e0aaf4b926f0`, `2cbceb7ce3f9d55e17139337b8960c6f1bd7a106`\nPolicy sources: `AGENTS.md`; testing guidance in `dev/TESTING.md`\nResolved items: `@/issue/219b9df8/requirement/REQ-01`, `@/issue/219b9df8/requirement/REQ-02`, `@/issue/219b9df8/requirement/REQ-03` → context issue description; `@/issue/b697a3f7/requirement/REQ-20`, `@/issue/dfb2f10d/requirement/REQ-02` → respective issue descriptions; `@/charter/D-20` → `dev/vision/9db27a3a-charter.md`; `@/invariant/convention-convergence`, `@/invariant/orthogonal-tests`, `@/invariant/essential-code-prose`, `@/invariant/shared-test-contracts`, `@/invariant/semantic-test-assertions` → `.jit/invariants.toml`; `@/gate/cargo-ci` → `.jit/gates.toml`\nGate evidence: cargo-ci failed, exit 75, timestamp `2026-11-07T23:37:48.361574046+00:00`; diagnostic classifies infrastructure fault; ancestry unavailable. Required code-review currently pending, exit none.\nTruncation recovery: narrower helper/parser reads, compact caller extraction, focused path-check reads, and separate gate-history inspection recovered relevant evidence.\n\n1. **F1 — Medium; blocking; issue-impact: REQ-02 still has a second component-based validator.** At `crates/jit/src/storage/capability_fs.rs:626–634`, `read_confined_relative` independently accepts `Normal` components and rejects others as `UnsafeTarget`. This is a lexical safety decision, separate from the exempt `resolve_confined_symlink` normalizer. Although unchanged by these commits, it falls directly within this issue’s hard REQ-02. Remove the redundant validation from traversal or delegate its safety decision to the canonical parser.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The fixture change is correct, but hard REQ-02 remains unmet by a separate component-based validator.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"read_confined_relative retains a separate component-based safety validator, leaving hard REQ-02 unmet.\",\"file\":\"crates/jit/src/storage/capability_fs.rs\",\"line\":626,\"references\":[\"@/issue/219b9df8/requirement/REQ-02\",\"@/charter/D-20\",\"@/invariant/convention-convergence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

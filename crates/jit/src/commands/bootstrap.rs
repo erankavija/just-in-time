@@ -534,104 +534,148 @@ mod tests {
 
     #[test]
     fn test_open_repository_replays_original_audit_before_recovered_write_policy() {
-        use crate::repository_state::{FileMode, VirtualPath};
-        use crate::storage::{commit_redo_record, DataRoot, EventAppend, PutFile, RedoRecord};
         use crate::test_harness::git::GitRepository;
-        for next_policy in [
+        let (primary, _) = setup_test_repo().unwrap();
+        let git = GitRepository::init(primary.path());
+        git.commit("base data");
+        let outer = tempfile::tempdir().unwrap();
+        let cases: Vec<_> = [
             LinkedCheckoutWriteStance::Refuse,
             LinkedCheckoutWriteStance::Allow,
-        ] {
-            for partial_config in [false, true] {
-                for override_stance in [None, Some(LinkedCheckoutWriteStance::Allow)] {
-                    let old_policy = match next_policy {
-                        LinkedCheckoutWriteStance::Refuse => LinkedCheckoutWriteStance::Allow,
-                        LinkedCheckoutWriteStance::Allow => LinkedCheckoutWriteStance::Refuse,
-                    };
-                    let (primary, _) = setup_test_repo().unwrap();
-                    let git = GitRepository::init(primary.path());
-                    git.commit("base data");
-                    let outer = tempfile::tempdir().unwrap();
-                    let linked = outer.path().join("linked");
-                    git.git(&["worktree", "add", "-b", "linked", linked.to_str().unwrap()]);
-                    let data = linked.join(".jit");
-                    let old_code = outer.path().join("old-code");
-                    let next_code = outer.path().join("next-code");
-                    std::fs::create_dir(&old_code).unwrap();
-                    std::fs::create_dir(&next_code).unwrap();
-                    let config = |root: &str, policy: LinkedCheckoutWriteStance| {
-                        format!("[worktree]\nroot = '../../{root}'\nwrite_policy = '{}'\nenforce_leases = 'off'\n", policy.as_token())
-                    };
-                    std::fs::write(data.join("config.toml"), config("old-code", old_policy))
-                        .unwrap();
-                    let new_config = config("next-code", next_policy).into_bytes();
-                    let before = std::fs::read(data.join("events.jsonl")).unwrap();
-                    let mut audit = serde_json::to_vec(
-                        &crate::domain::event_catalog::EventTag::LinkedCheckoutWriteOverridden
-                            .sample(),
-                    )
-                    .unwrap();
-                    audit.push(b'\n');
-                    let record = RedoRecord::for_layout(
-                        &discover_repository_layout(&old_code, &data).unwrap(),
-                        Vec::new(),
-                        vec![
-                            PutFile {
-                                path: VirtualPath::CONFIG,
-                                bytes: new_config.clone(),
-                                mode: FileMode::Regular,
-                            },
-                            PutFile {
-                                path: VirtualPath::worktree("committed.md").unwrap(),
-                                bytes: b"original target".to_vec(),
-                                mode: FileMode::Regular,
-                            },
-                        ],
-                        Vec::new(),
-                        Some(EventAppend {
-                            offset: before.len() as u64,
-                            bytes: audit.clone(),
-                        }),
-                    )
-                    .unwrap();
-                    commit_redo_record(&DataRoot::open(&data).unwrap(), &record).unwrap();
-                    if partial_config {
-                        std::fs::write(data.join("config.toml"), &new_config).unwrap();
-                    }
-                    let opened = open_repository(RepositoryInvocation {
-                        current_dir: linked.clone(),
-                        opens_mutation_session: true,
-                        write_override: override_stance,
-                        ..invocation(&linked)
-                    });
-                    if next_policy == LinkedCheckoutWriteStance::Refuse && override_stance.is_none()
-                    {
-                        assert!(opened
-                            .err()
-                            .unwrap()
-                            .downcast_ref::<LinkedCheckoutWriteRefusedError>()
-                            .is_some());
-                    } else {
-                        let opened = opened.unwrap();
-                        assert_eq!(opened.layout.worktree_root(), next_code);
-                        assert_eq!(opened.recovered_records, 1);
-                    }
-                    assert_eq!(
-                        std::fs::read(data.join("events.jsonl")).unwrap(),
-                        [before, audit].concat(),
-                        "recovery preserves exactly the original audit bytes"
-                    );
-                    assert_eq!(
-                        std::fs::read(old_code.join("committed.md")).unwrap(),
-                        b"original target"
-                    );
-                    assert!(!next_code.join("committed.md").exists());
-                    assert!(!data
-                        .join(crate::storage::RECORD_SCRATCH_DIR)
-                        .join(crate::storage::RECORD_FILE_NAME)
-                        .exists());
-                }
-            }
+        ]
+        .into_iter()
+        .flat_map(|next_policy| {
+            [false, true].into_iter().flat_map(move |partial_config| {
+                [None, Some(LinkedCheckoutWriteStance::Allow)]
+                    .into_iter()
+                    .map(move |override_stance| (next_policy, partial_config, override_stance))
+            })
+        })
+        .enumerate()
+        .map(|(index, case)| {
+            let root = outer.path().join(format!("case-{index}"));
+            std::fs::create_dir(&root).unwrap();
+            let linked = root.join("linked");
+            git.git(&[
+                "worktree",
+                "add",
+                "-b",
+                &format!("linked-{index}"),
+                linked.to_str().unwrap(),
+            ]);
+            (root, case)
+        })
+        .collect();
+        std::thread::scope(|scope| {
+            let handles: Vec<_> = cases
+                .iter()
+                .map(|(root, (next_policy, partial_config, override_stance))| {
+                    scope.spawn(move || {
+                        assert_replays_original_audit(
+                            root,
+                            *next_policy,
+                            *partial_config,
+                            *override_stance,
+                        )
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .for_each(crate::test_utils::join_reraising);
+        });
+    }
+
+    /// One case of the replay property over the linked worktree under `root`.
+    fn assert_replays_original_audit(
+        root: &Path,
+        next_policy: LinkedCheckoutWriteStance,
+        partial_config: bool,
+        override_stance: Option<LinkedCheckoutWriteStance>,
+    ) {
+        use crate::repository_state::{FileMode, VirtualPath};
+        use crate::storage::{commit_redo_record, DataRoot, EventAppend, PutFile, RedoRecord};
+        let old_policy = match next_policy {
+            LinkedCheckoutWriteStance::Refuse => LinkedCheckoutWriteStance::Allow,
+            LinkedCheckoutWriteStance::Allow => LinkedCheckoutWriteStance::Refuse,
+        };
+        let linked = root.join("linked");
+        let data = linked.join(".jit");
+        let old_code = root.join("old-code");
+        let next_code = root.join("next-code");
+        std::fs::create_dir(&old_code).unwrap();
+        std::fs::create_dir(&next_code).unwrap();
+        let config = |dir: &str, policy: LinkedCheckoutWriteStance| {
+            format!(
+                "[worktree]\nroot = '../../{dir}'\nwrite_policy = '{}'\nenforce_leases = 'off'\n",
+                policy.as_token()
+            )
+        };
+        std::fs::write(data.join("config.toml"), config("old-code", old_policy)).unwrap();
+        let new_config = config("next-code", next_policy).into_bytes();
+        let before = std::fs::read(data.join("events.jsonl")).unwrap();
+        let mut audit = serde_json::to_vec(
+            &crate::domain::event_catalog::EventTag::LinkedCheckoutWriteOverridden.sample(),
+        )
+        .unwrap();
+        audit.push(b'\n');
+        let record = RedoRecord::for_layout(
+            &discover_repository_layout(&old_code, &data).unwrap(),
+            Vec::new(),
+            vec![
+                PutFile {
+                    path: VirtualPath::CONFIG,
+                    bytes: new_config.clone(),
+                    mode: FileMode::Regular,
+                },
+                PutFile {
+                    path: VirtualPath::worktree("committed.md").unwrap(),
+                    bytes: b"original target".to_vec(),
+                    mode: FileMode::Regular,
+                },
+            ],
+            Vec::new(),
+            Some(EventAppend {
+                offset: before.len() as u64,
+                bytes: audit.clone(),
+            }),
+        )
+        .unwrap();
+        commit_redo_record(&DataRoot::open(&data).unwrap(), &record).unwrap();
+        if partial_config {
+            std::fs::write(data.join("config.toml"), &new_config).unwrap();
         }
+        let opened = open_repository(RepositoryInvocation {
+            current_dir: linked.clone(),
+            opens_mutation_session: true,
+            write_override: override_stance,
+            ..invocation(&linked)
+        });
+        if next_policy == LinkedCheckoutWriteStance::Refuse && override_stance.is_none() {
+            assert!(opened
+                .err()
+                .unwrap()
+                .downcast_ref::<LinkedCheckoutWriteRefusedError>()
+                .is_some());
+        } else {
+            let opened = opened.unwrap();
+            assert_eq!(opened.layout.worktree_root(), next_code);
+            assert_eq!(opened.recovered_records, 1);
+        }
+        assert_eq!(
+            std::fs::read(data.join("events.jsonl")).unwrap(),
+            [before, audit].concat(),
+            "recovery preserves exactly the original audit bytes"
+        );
+        assert_eq!(
+            std::fs::read(old_code.join("committed.md")).unwrap(),
+            b"original target"
+        );
+        assert!(!next_code.join("committed.md").exists());
+        assert!(!data
+            .join(crate::storage::RECORD_SCRATCH_DIR)
+            .join(crate::storage::RECORD_FILE_NAME)
+            .exists());
     }
 
     #[test]
@@ -748,15 +792,12 @@ mod linked_checkout_write_decision_tests {
     }
 
     fn declared_policy(data: &std::path::Path) -> LinkedCheckoutWriteStance {
-        crate::storage::configuration_store::load_configuration(&repository_layout_for_data_root(
-            data,
-        ))
-        .unwrap()
-        .worktree
-        .as_ref()
-        .map_or(LinkedCheckoutWriteStance::DEFAULT, |config| {
-            config.write_policy()
-        })
+        crate::config_manager::write_policy_from_config(
+            &crate::storage::configuration_store::load_configuration(
+                &repository_layout_for_data_root(data),
+            )
+            .unwrap(),
+        )
     }
 
     /// Paths describing either a linked non-primary checkout or the primary one.

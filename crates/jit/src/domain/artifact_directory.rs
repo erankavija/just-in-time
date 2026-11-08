@@ -14,8 +14,7 @@
 //! ([`HierarchyConfig::get_membership_namespace`]), then exactly one value of
 //! that namespace on the issue. Every other shape — no type label, several of
 //! them, an unmapped type, no membership value, several of them, or a value
-//! that normalizes to nothing — resolves to the bare short-id directory, which
-//! is the shape archival already adopts for identifier-only directories
+//! that normalizes to nothing — resolves to the bare short-id directory
 //! ([`crate::domain::artifact_classifier::preferred_container_destination_root`]).
 //! Naming reads labels and the short id alone, so renaming an issue leaves its
 //! directory where it is.

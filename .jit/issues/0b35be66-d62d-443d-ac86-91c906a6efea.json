@@ -6,12 +6,26 @@
   "dependencies": [],
   "description": "Slow tests are refactored, never excused. Enforcing the per-test limits (f487aeef) on a quiet host showed ten tests over their layer's limit, so this brings each under it before the limits land.\n\n## Background\n\nThe limits are the per-layer values in `dev/benchmarks/per-test-durations-1eb949a5/README.md`: 2 s for lib and bin targets, 6 s for `crates/*/tests/*` targets. f487aeef's run on 2026-11-08 at loads 2.81 and 4.79 flagged the same ten:\n\n- Unit (2 s): `storage::claim_coordinator::proptests::test_concurrent_claims_exclusive`, `storage::claim_coordinator::proptests::test_concurrent_different_issues_succeed`; three `redo_conformance` properties (`prop_an_interruption_during_the_records_commit…`, `prop_re_application_after_an_interruption…`, `prop_replay_converges…`); `event_tail_tests::test_mutations_append_over_unparseable_history…`; `commands::gate_check::tests::test_repository_validation_checker_passes_exactly_where_validate_passes`; `profile::tests::test_apply_profiles_jit_dogfood_composes…`.\n- Integration (6 s): `profile_cli_tests::test_profile_add_publishes_a_package_whose_directories_outnumber_its_files`, `profile_cli_tests::test_profile_pack_and_add_carry_a_package_at_the_model_limits`.\n\nThe prior pass over the benchmark's own list is 4a01ccba.\n\n## Success Criteria\n\n- [hard] REQ-01: Each listed test runs under its layer's limit in a whole-workspace nextest run on a quiet host (1-minute load below 4), and a committed note under `dev/benchmarks/per-test-durations-1eb949a5/` records each test's measured duration before and after with the run's load.\n- [hard] REQ-02: No refactored test sleeps or waits on wall-clock time to observe the property it owns; time-dependent behaviour goes through an injected clock, a channel or an explicit readiness signal.\n- [hard] REQ-03: Each refactored test still owns the property it owned before, at the same or a cheaper layer, with no weakened assertion, no ignored test and no test deleted without its property moving to another owning test. A property test that runs fewer cases records in its note entry why the remaining cases still cover the property's input space.\n\n## Notes\n\nIf a test cannot meet the limit without losing its property, report it as a blocking concern rather than raising the limit.\n",
   "documents": [],
+  "done_at": "2026-11-08T03:03:25.868537688Z",
   "first_ready_at": "2026-11-07T23:05:38.039762211Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "37f963d6-ba79-45ab-9997-cd6aa5258584",
+      "status": "passed",
+      "updated_at": "2026-11-08T02:59:34.483326490Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "1878cb6d-6916-450c-8b6f-717fbf2312c2",
+      "status": "passed",
+      "updated_at": "2026-11-08T03:02:54.441436505Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0b35be66-d62d-443d-ac86-91c906a6efea",
   "labels": [
     "epic:rust-code-quality",
@@ -21,7 +35,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Bring the tests the enforced limits flagged under their per-test limits",
-  "updated_at": "2026-11-07T23:05:53.517901784Z"
+  "updated_at": "2026-11-08T03:03:25.868537688Z"
 }

@@ -1,0 +1,29 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-08T03:27:56.832353156Z",
+  "context": {},
+  "created_at": "2026-11-08T03:27:37.999536191Z",
+  "dependencies": [],
+  "description": "Reserve the paths snapshot export stages from the captured image, so a document or asset reference to a tracker path reuses the captured bytes instead of overwriting them.\n\n## Background\n\n- Export assembly stages captured tracker state first (`copy_jit_state`, `crates/jit/src/commands/snapshot.rs` ~142, called ~537), then documents and assets (`create_document_snapshot` ~542). `capture_file` (~259-282) writes each document or asset destination unconditionally. When a document references `.jit/config.toml` with scanning skipped and export runs `--at` an older commit, the export replaces the captured declaration with historical bytes. Issue records and asset references collide the same way.\n- Story `19404174` sol checkpoint review, finding 2 (REQ-04, \"stored bytes … read from one captured image\"). Invoker ruling: routine. Paths staged by `copy_jit_state` are reserved, and one test owns the property.\n- Epic criterion: `b697a3f7` REQ-19.\n\n## Success Criteria\n\n- [hard] REQ-01: Every path `copy_jit_state` stages is reserved: a document or asset reference to a reserved path reuses the captured bytes and their manifest entry and never overwrites the staged file.\n- [hard] REQ-02: One test owns the property: exporting `--at` an older commit with a document that links `.jit/config.toml` keeps the captured declaration bytes in the export. Issue-record and asset collisions are covered by the same rule, with no per-kind tests.\n- [hard] REQ-03: Exports without such a collision are byte-identical to today's.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-08T03:27:37.999536191Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "82f1647f-46af-46c1-818c-33d7c8396082",
+  "labels": [
+    "satisfies:b697a3f7/REQ-19",
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:archive-and-snapshot",
+    "component:core",
+    "per:@/charter/D-20"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Snapshot export reserves the paths it stages from the captured image",
+  "updated_at": "2026-11-08T03:27:56.832353156Z"
+}

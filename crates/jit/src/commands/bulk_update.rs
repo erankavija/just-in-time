@@ -1569,7 +1569,7 @@ mod tests {
             id
         });
         let executor = memory_executor(storage);
-        let opened = counter.count();
+        let opened = counter.mutation_opens();
 
         let result = executor
             .issues()
@@ -1585,7 +1585,7 @@ mod tests {
 
         assert_eq!(result.modified, [blocker_id]);
         (
-            counter.count() - opened,
+            counter.mutation_opens() - opened,
             dependent_id.map(|id| executor.storage.load_issue(&id).unwrap().state),
         )
     }
@@ -1907,7 +1907,7 @@ mod tests {
             create_test_issue(&unchecked, State::Ready, vec!["type:task"]),
         );
         let executor = crate::commands::test_helpers::memory_executor(storage.clone());
-        let before = counter.count();
+        let before = counter.mutation_opens();
 
         let result = executor
             .issues()
@@ -1932,7 +1932,7 @@ mod tests {
             State::InProgress
         );
         assert_eq!(
-            counter.count() - before,
+            counter.mutation_opens() - before,
             2,
             "one preflight session and one publishing session"
         );

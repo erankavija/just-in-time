@@ -12,17 +12,15 @@ use tempfile::TempDir;
 
 // Helper to set up a test coordinator
 fn setup_coordinator(temp_dir: &TempDir) -> ClaimCoordinator {
-    let paths = crate::test_utils::primary_checkout_paths(temp_dir.path());
+    let mut paths = crate::test_utils::primary_checkout_paths(temp_dir.path());
+    // The directory is no checkout, so every acquisition's branch probe would
+    // fork git to learn there is none; no property here observes the branch.
+    paths.git_repository = false;
 
-    // The lock wait decides how long a caller queues before asking the
-    // coordinator again, not what it is told, so the shipped default serves.
-    let locker = FileLocker::new(std::time::Duration::from_secs(
-        crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-    ));
     // These properties exercise coordination, not crash durability.
     let coordinator = ClaimCoordinator::new(
         paths,
-        locker,
+        contending_locker(),
         "wt:proptest".parse().unwrap(),
         "agent:proptest".parse().unwrap(),
     )
@@ -30,6 +28,13 @@ fn setup_coordinator(temp_dir: &TempDir) -> ClaimCoordinator {
 
     coordinator.init().unwrap();
     coordinator
+}
+
+// The lock wait decides how long a caller queues before asking the coordinator
+// again, not what it is told. A zero wait makes every refusal an immediate retry
+// in `acquire_claim_when_reached` rather than a sleep between lock polls.
+fn contending_locker() -> FileLocker {
+    FileLocker::new(std::time::Duration::ZERO)
 }
 
 // Bound filesystem work while retaining varied generated inputs.
@@ -149,9 +154,7 @@ proptest! {
             .map(|i| {
                 let coord = ClaimCoordinator::new(
                     coordinator.paths.clone(),
-                    FileLocker::new(std::time::Duration::from_secs(
-                        crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-                    )),
+                    contending_locker(),
                     format!("wt:claimant{i}").parse().unwrap(),
                     format!("agent:claimant{i}").parse().unwrap(),
                 ).with_fsync(false);

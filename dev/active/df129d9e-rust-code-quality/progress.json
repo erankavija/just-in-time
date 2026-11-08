@@ -685,9 +685,43 @@
           "short_id": "0b35be66",
           "title": "Bring the tests the enforced limits flagged under their per-test limits",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "model_tier": "opus",
-          "tier_reason": "proptest/coverage-preserving cost cuts across five modules"
+          "tier_reason": "proptest/coverage-preserving cost cuts across five modules",
+          "branch_head": "e80a62a9f",
+          "production_delta": 99,
+          "landed": "ae01461e7",
+          "gates": "cargo-ci passed, code-review passed (gpt-6.1-sol high, 0 findings)"
+        },
+        {
+          "key": "bootstrap-over-limit",
+          "id": "afd2d573-6c56-471a-b8ac-84d5d4d3bb99",
+          "short_id": "afd2d573",
+          "title": "Bring the bootstrap audit-replay test under the unit limit",
+          "classification": "implementation",
+          "status": "done",
+          "model_tier": "sonnet",
+          "tier_reason": "single-test cost cut reusing 0b35be66 mechanism",
+          "dispatched": "2026-11-08T04:33+02:00",
+          "worktree": ".agents/worktrees/agent-afd2d573",
+          "branch": "worktree-agent-afd2d573",
+          "branch_head": "da2f3d9e8",
+          "landed": "bed5d7f2a",
+          "gates": "cargo-ci passed (retry after exit 75), code-review passed (0 findings)"
+        },
+        {
+          "key": "near-limit-tests",
+          "id": "7909527f-5613-4456-93fc-98d70d9b7ccb",
+          "short_id": "7909527f",
+          "title": "Bring the three near-limit unit tests under 1.5 s",
+          "classification": "implementation",
+          "status": "done",
+          "model_tier": "sonnet",
+          "dispatched": "2026-11-08T05:04+02:00",
+          "branch": "worktree-agent-7909527f",
+          "branch_head": "cff056858",
+          "landed": "2318609d5",
+          "gates": "cargo-ci passed, code-review passed (0 findings)"
         }
       ]
     },
@@ -863,6 +897,16 @@
       "id": "0b35be66",
       "reason": "f487aeef enforcement flagged 10 tests over 2s/6s limits on a quiet host; blocks f487aeef",
       "date": "2026-11-08"
+    },
+    {
+      "id": "afd2d573",
+      "reason": "0b35be66 after2 run: bootstrap audit-replay test 3.443 s > 2 s; blocks f487aeef",
+      "date": "2026-11-08"
+    },
+    {
+      "id": "7909527f",
+      "reason": "0b35be66 after3 put three unit tests at 1.62-1.74 s against the 2 s limit; f487aeef depends on it",
+      "date": "2026-11-08"
     }
   ],
   "escalations": [
@@ -970,6 +1014,21 @@
       "issue": "f487aeef",
       "summary": "user lifted timing hold (session 15)",
       "status": "resolved: run chain"
+    },
+    {
+      "date": "2026-11-08",
+      "kind": "guard-interpretation",
+      "issue": "0b35be66",
+      "summary": "redo_conformance FileBackend Unsynced adapter setting",
+      "status": "resolved by d5: accept adapter-level setting; condition (redo_apply Full-durability sync assertions) verified at 948212c82: test_redo_applier_apply_syncs_a_parent_its_puts_share_once uses RedoApplier::new (Full)"
+    },
+    {
+      "date": "2026-11-08",
+      "from": "just-in-time-d5",
+      "type": "ruling",
+      "subject": "near-limit margin tasks",
+      "ruling": "7909527f is the last margin task; the bound is the declared 2 s/6 s limit. Only a test over its limit on a quiet host (1-min load < 1) gets a refactor task, measured in fba8d478's quiet trials. Loaded-host noise is handled solely by cargo-ci exit 75 (D-18).",
+      "status": "resolved"
     }
   ],
   "rework_counts": {
@@ -1022,7 +1081,9 @@
     "ab168296": 0,
     "755964b2": 1,
     "fe3ad1b0": 1,
-    "f487aeef": 1
+    "f487aeef": 1,
+    "0b35be66": 1,
+    "afd2d573": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1658,7 +1719,7 @@
         "criteria": {
           "REQ-01": "two jit suites; three workspace targets",
           "REQ-02": "exact normalized inventory5038;1684 renamed3354 unchanged",
-          "REQ-03": "3-target706MiB budgets;1177002600→673455960B",
+          "REQ-03": "3-target706MiB budgets;1177002600\u2192673455960B",
           "REQ-04": "normal libtest1180CLI+504contracts passes together; no test logic changes",
           "REQ-05": "guide and CI commands updated"
         },
@@ -1983,7 +2044,19 @@
     "fb38bf1f": "REQ-05 added (commands import nothing from output, structural test); measure added conversion code at planning and report revised estimate vs +375 ceiling (6a)",
     "b23b1bf3": "gate_evaluate-many is the last legacy schema-table row; test_resolve_output_schema_unregistered_leaf_takes_legacy_table_schema targets it: repoint or delete with the row (or leave to da30b92a)"
   },
-  "coordination": "Steward01a1a886-d199-7093-b096-7acbab6adb48; f4d9502a lead01a1a88a-3bda-7302-8fdf-0662e2095cc1;0f8efc37 planning lead01a1a88d-d433-7032-b70a-eb7c4c59d62f. One epic per execution lead; coordinate main landing reservations.",
+  "coordination": [
+    "Steward01a1a886-d199-7093-b096-7acbab6adb48; f4d9502a lead01a1a88a-3bda-7302-8fdf-0662e2095cc1;0f8efc37 planning lead01a1a88d-d433-7032-b70a-eb7c4c59d62f. One epic per execution lead; coordinate main landing reservations.",
+    {
+      "date": "2026-11-08",
+      "from": "just-in-time-d5 (invoker)",
+      "rules": [
+        "escalations route to just-in-time-d5; user-only: permission prompts, reversing explicit user decisions",
+        "commit code/docs by explicit path; commit .jit/ whole via git commit -- .jit/ naming issue IDs",
+        "review gates use gpt-6.1-sol via gates.toml (be302dc9c); non-gate reviews: codex exec --ephemeral -s read-only -m gpt-6.1-sol high; log vendor/model/effort",
+        "forward review findings outside success criteria (speculative edges, extra mechanism) to d5 with gate run ID and quote before acting"
+      ]
+    }
+  ],
   "incidents": [
     {
       "date": "2026-11-04",
@@ -2092,7 +2165,7 @@
         "scope": "current Git requirement docs consistent withD24; targeted links pass"
       }
     },
-    "count_correction": "487 worker−17 used optional flags; default committedb0c51b0e7 is73630 vs e47a08419 73631, therefore−1. All final counts use noflags.",
+    "count_correction": "487 worker\u221217 used optional flags; default committedb0c51b0e7 is73630 vs e47a08419 73631, therefore\u22121. All final counts use noflags.",
     "f35c86de": {
       "merge": "6d9a1ed76",
       "status": "done",
@@ -2226,7 +2299,7 @@
     },
     "f9977efd": {
       "status": "done",
-      "dependency_ruling": "Steward approved removing only f997→f487 sequencing edge;5687/83e retained. Timing and host-lock trial stay held.",
+      "dependency_ruling": "Steward approved removing only f997\u2192f487 sequencing edge;5687/83e retained. Timing and host-lock trial stay held.",
       "test_owner_ruling": "Steward approved existing shell self-test as canonical fixture owner, no recreated Rust suite.",
       "scope_commit": "5595358f9",
       "implementation": "16aada055",
@@ -2324,5 +2397,10 @@
       "fe3ad1b0",
       "46fe7593"
     ]
-  }
+  },
+  "open_items": [
+    {
+      "item": "0b35be66 margin: event_tail 1.694s, dogfood 1.715s at load 2.13; cut further after 04:30"
+    }
+  ]
 }

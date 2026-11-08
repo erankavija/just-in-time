@@ -1,341 +1,632 @@
 {
- "epic_id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
- "epic_short_id": "b697a3f7",
- "lead_agent_id": "agent:b697a3f7-lead",
- "current_wave": 8,
- "waves": [
-  {
-   "wave_number": 1,
-   "label": "1a",
-   "issues": [
+  "epic_id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
+  "epic_short_id": "b697a3f7",
+  "lead_agent_id": "agent:b697a3f7-lead",
+  "current_wave": 11,
+  "waves": [
     {
-     "id": "12064c7b-9429-4f58-b739-4143cb9d399f",
-     "short_id": "12064c7b",
-     "title": "Type labels have one exact extraction",
-     "classification": "implementation",
-     "worker": "codex gpt-6-luna xhigh",
-     "status": "done",
-     "landed": "ee9e410db"
+      "wave_number": 1,
+      "label": "1a",
+      "issues": [
+        {
+          "id": "12064c7b-9429-4f58-b739-4143cb9d399f",
+          "short_id": "12064c7b",
+          "title": "Type labels have one exact extraction",
+          "classification": "implementation",
+          "worker": "codex gpt-6-luna xhigh",
+          "status": "done",
+          "landed": "ee9e410db"
+        },
+        {
+          "id": "f6477007-09ab-4d53-8fec-ca4741c3cf78",
+          "short_id": "f6477007",
+          "title": "Process liveness and signalling go through one PID guard",
+          "classification": "implementation",
+          "worker": "codex gpt-6-luna xhigh",
+          "status": "done",
+          "landed": "7c6855d8a"
+        },
+        {
+          "id": "9a2563fd-61ed-45c2-9cfa-b5f006c47afa",
+          "short_id": "9a2563fd",
+          "title": "Gate registry edits keep the authored file",
+          "classification": "implementation",
+          "worker": "codex gpt-6-luna xhigh",
+          "status": "done"
+        },
+        {
+          "id": "4334df62-95ca-4d3a-9a56-842b2174a5b5",
+          "short_id": "4334df62",
+          "title": "The no-follow leaf open exists once and serves storage, profile and exact-store reads",
+          "classification": "implementation",
+          "worker": "codex gpt-6.1-sol high",
+          "status": "done"
+        },
+        {
+          "id": "c2b3cefa-d690-4c6c-94dd-feaa3156acea",
+          "short_id": "c2b3cefa",
+          "title": "Dedicated, gate and template writes check their leases in their publishing session",
+          "classification": "implementation",
+          "worker": "claude opus (lock order and lease contract)",
+          "status": "done",
+          "commit": "df59347fb",
+          "landed": "6672a5e01"
+        }
+      ]
     },
     {
-     "id": "f6477007-09ab-4d53-8fec-ca4741c3cf78",
-     "short_id": "f6477007",
-     "title": "Process liveness and signalling go through one PID guard",
-     "classification": "implementation",
-     "worker": "codex gpt-6-luna xhigh",
-     "status": "done",
-     "landed": "7c6855d8a"
+      "wave_number": 2,
+      "label": "1b",
+      "issues": [
+        {
+          "id": "4d834432-bb39-4ffc-9683-7dba55c3d06e",
+          "short_id": "4d834432",
+          "title": "Redo apply opens and syncs each parent once per record",
+          "classification": "implementation",
+          "worker": "claude opus (durability proof)",
+          "status": "done",
+          "note": "shares capability_fs.rs with 4334df62"
+        },
+        {
+          "id": "1a737bb4-f063-4737-a796-d137dc34f28b",
+          "short_id": "1a737bb4",
+          "title": "One pure gate-preset catalog serves every preset reader",
+          "classification": "implementation",
+          "worker": "codex gpt-6.1-sol high",
+          "status": "done",
+          "note": "shares gate.rs/template.rs with c2b3cefa"
+        }
+      ]
     },
     {
-     "id": "9a2563fd-61ed-45c2-9cfa-b5f006c47afa",
-     "short_id": "9a2563fd",
-     "title": "Gate registry edits keep the authored file",
-     "classification": "implementation",
-     "worker": "codex gpt-6-luna xhigh",
-     "status": "done"
+      "wave_number": 3,
+      "label": "held",
+      "issues": [
+        {
+          "id": "cfc87a55-063d-4080-8305-ffdfbcae21a8",
+          "short_id": "cfc87a55",
+          "title": "Storage reads configuration files and the registry file loaders are gone",
+          "classification": "implementation",
+          "worker": "tbd",
+          "status": "done",
+          "note": "held: rewrites JitConfig::load/config validate, which the frozen f4d9502a 5046408a patch also rewrites"
+        },
+        {
+          "id": "bb596228-fad0-4415-a131-54db05df0ddd",
+          "short_id": "bb596228",
+          "title": "Benchmark: concurrent readers beside a continuous writer",
+          "classification": "research",
+          "worker": "tbd",
+          "status": "done",
+          "note": "needs a quiet host (load < 2.0); run when no builds are active"
+        }
+      ]
     },
     {
-     "id": "4334df62-95ca-4d3a-9a56-842b2174a5b5",
-     "short_id": "4334df62",
-     "title": "The no-follow leaf open exists once and serves storage, profile and exact-store reads",
-     "classification": "implementation",
-     "worker": "codex gpt-6.1-sol high",
-     "status": "done"
+      "wave_number": 4,
+      "label": "2",
+      "issues": [
+        {
+          "id": "d2acb105-cf3c-4278-ae86-9d3207ce7dd6",
+          "short_id": "d2acb105",
+          "title": "One state derivation for update and lifecycle transitions",
+          "classification": "implementation",
+          "worker": "claude opus",
+          "status": "done"
+        },
+        {
+          "id": "7fefd776-6e85-428d-a386-a1512c0a94a1",
+          "short_id": "7fefd776",
+          "title": "One atomic file publication with a durability argument serves the redo put and external exports",
+          "classification": "implementation",
+          "worker": "claude opus",
+          "status": "done"
+        }
+      ]
     },
     {
-     "id": "c2b3cefa-d690-4c6c-94dd-feaa3156acea",
-     "short_id": "c2b3cefa",
-     "title": "Dedicated, gate and template writes check their leases in their publishing session",
-     "classification": "implementation",
-     "worker": "claude opus (lock order and lease contract)",
-     "status": "done",
-     "commit": "df59347fb",
-     "landed": "6672a5e01"
+      "wave_number": 5,
+      "label": "2b",
+      "issues": [
+        {
+          "id": "905364c1-e1e2-4150-8aa9-2a489d3e5977",
+          "short_id": "905364c1",
+          "title": "Document and gate definition writes check their leases in their publishing session",
+          "classification": "implementation",
+          "worker": "codex gpt-6-luna xhigh",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "label": "3",
+      "issues": [
+        {
+          "short_id": "fe9147fa",
+          "status": "done"
+        },
+        {
+          "short_id": "1b7f58ae",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "label": "4",
+      "issues": [
+        {
+          "short_id": "d3c94dc5",
+          "status": "done"
+        },
+        {
+          "short_id": "700a96dd",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {
+          "id": "c0775a83-0b83-4a90-883b-527876784a21",
+          "short_id": "c0775a83",
+          "title": "Archive candidates plan in one read-only session",
+          "status": "done"
+        },
+        {
+          "id": "b0dc019f-8504-488a-b6f7-d386d53bc8e0",
+          "short_id": "b0dc019f",
+          "title": "Domain names nothing from repository_state and type labels have no hand-written filter",
+          "status": "done"
+        },
+        {
+          "id": "f98f2353-eec3-4473-8c83-811cdcdcea5f",
+          "short_id": "f98f2353",
+          "title": "Type-label extraction and process-group liveness each go through their one shared form",
+          "status": "done"
+        },
+        {
+          "id": "219b9df8",
+          "short_id": "219b9df8",
+          "title": "Test declaration fixtures validate paths through the canonical validator",
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {
+          "id": "42046050",
+          "short_id": "42046050",
+          "title": "The executor holds no disk-backed configuration; ConfigManager and JitConfig::load are gone",
+          "status": "done"
+        },
+        {
+          "id": "4e2bed35",
+          "short_id": "4e2bed35",
+          "title": "Container marker and destination evidence are declared once",
+          "status": "done",
+          "note": "landed 44e5708cc (squashed 5bf321d2a); cargo-ci passed; code-review passed run 187dd597"
+        }
+      ]
+    },
+    {
+      "wave_number": 10,
+      "issues": [
+        {
+          "id": "45d0a971",
+          "short_id": "45d0a971",
+          "title": "Cost evidence: the epic's four cost reductions against the base binary",
+          "status": "pending",
+          "note": "after 04:30 quiet window; coordinate with df129d9e fba8d478 quiet-host trials"
+        }
+      ]
+    },
+    {
+      "wave_number": 11,
+      "issues": [
+        {
+          "id": "a2153a6f",
+          "short_id": "a2153a6f",
+          "title": "Gate registry reads come from the captured image; the live-file reader is gone",
+          "status": "in_progress",
+          "note": "dispatched 05:1x on opus, worktrees based f9dbac535"
+        },
+        {
+          "id": "c31c2e57",
+          "short_id": "c31c2e57",
+          "title": "A mutation attempt parses its configuration once per captured image",
+          "status": "in_progress",
+          "note": "dispatched 05:1x on opus, worktrees based f9dbac535"
+        },
+        {
+          "id": "e73ad8bc",
+          "short_id": "e73ad8bc",
+          "title": "Archive destinations drop the short-id fallback",
+          "status": "done",
+          "note": "landed e52ab0fa3 (36e3fb973); cargo-ci passed; code-review passed run f8b9c7df"
+        },
+        {
+          "id": "dd95bd9d",
+          "short_id": "dd95bd9d",
+          "title": "Archive citation warnings are an advisory report beside the plan, from one index per command",
+          "status": "in_progress",
+          "note": "opus"
+        },
+        {
+          "id": "82f1647f",
+          "short_id": "82f1647f",
+          "title": "Snapshot export reserves the paths it stages from the captured image",
+          "status": "in_progress",
+          "note": "sonnet"
+        }
+      ]
+    },
+    {
+      "wave_number": 12,
+      "issues": [
+        {
+          "id": "a869900b",
+          "short_id": "a869900b",
+          "title": "A gate evaluation resolves checker documents and validation from its own captured image",
+          "status": "pending",
+          "note": "after a2153a6f (shared gate_check.rs); opus"
+        }
+      ]
     }
-   ]
-  },
-  {
-   "wave_number": 2,
-   "label": "1b",
-   "issues": [
+  ],
+  "later_chain_note": "After wave 2: fe9147fa, 1b7f58ae -> 693a2fdd, a991f42b -> d3c94dc5, 700a96dd -> 850eaad3 -> 93e3f1ad. Blocked externally by f4d9502a (parked): 7cd27db8 -> 30334066 -> 030df4b1, 9623fe6a; d9ba0029 -> 65aafaba -> c0775a83 -> 4e2bed35 -> e73ad8bc, 42046050, 45d0a971; e6ec58f3 -> b2c28ec1.",
+  "created_during_execution": [
     {
-     "id": "4d834432-bb39-4ffc-9683-7dba55c3d06e",
-     "short_id": "4d834432",
-     "title": "Redo apply opens and syncs each parent once per record",
-     "classification": "implementation",
-     "worker": "claude opus (durability proof)",
-     "status": "done",
-     "note": "shares capability_fs.rs with 4334df62"
+      "id": "905364c1-e1e2-4150-8aa9-2a489d3e5977",
+      "short_id": "905364c1",
+      "title": "Document and gate definition writes check their leases in their publishing session",
+      "reason": "surfaced pitfall: unowned pre-session lease checks (epic REQ-04); steward authorized filing",
+      "depends_on": [
+        "c2b3cefa"
+      ],
+      "blocks": [
+        "93e3f1ad"
+      ]
     },
     {
-     "id": "1a737bb4-f063-4737-a796-d137dc34f28b",
-     "short_id": "1a737bb4",
-     "title": "One pure gate-preset catalog serves every preset reader",
-     "classification": "implementation",
-     "worker": "codex gpt-6.1-sol high",
-     "status": "done",
-     "note": "shares gate.rs/template.rs with c2b3cefa"
-    }
-   ]
-  },
-  {
-   "wave_number": 3,
-   "label": "held",
-   "issues": [
-    {
-     "id": "cfc87a55-063d-4080-8305-ffdfbcae21a8",
-     "short_id": "cfc87a55",
-     "title": "Storage reads configuration files and the registry file loaders are gone",
-     "classification": "implementation",
-     "worker": "tbd",
-     "status": "done",
-     "note": "held: rewrites JitConfig::load/config validate, which the frozen f4d9502a 5046408a patch also rewrites"
+      "id": "b0dc019f-8504-488a-b6f7-d386d53bc8e0",
+      "short_id": "b0dc019f",
+      "title": "Domain names nothing from repository_state and type labels have no hand-written filter",
+      "reason": "dfb2f10d checkpoint sweep: domain/relative_path.rs test imports repository_state (REQ-18); four hand-written type: filters in tests (REQ-20)",
+      "depends_on": [],
+      "blocks": [
+        "dfb2f10d"
+      ]
     },
     {
-     "id": "bb596228-fad0-4415-a131-54db05df0ddd",
-     "short_id": "bb596228",
-     "title": "Benchmark: concurrent readers beside a continuous writer",
-     "classification": "research",
-     "worker": "tbd",
-     "status": "done",
-     "note": "needs a quiet host (load < 2.0); run when no builds are active"
-    }
-   ]
-  },
-  {
-   "wave_number": 4,
-   "label": "2",
-   "issues": [
-    {
-     "id": "d2acb105-cf3c-4278-ae86-9d3207ce7dd6",
-     "short_id": "d2acb105",
-     "title": "One state derivation for update and lifecycle transitions",
-     "classification": "implementation",
-     "worker": "claude opus",
-     "status": "done"
+      "id": "f98f2353-eec3-4473-8c83-811cdcdcea5f",
+      "short_id": "f98f2353",
+      "title": "Type-label extraction and process-group liveness each go through their one shared form",
+      "reason": "dfb2f10d sol checkpoint review: template_apply_tests type_of (REQ-20 type extraction); serve_cli_tests process_group_survives (REQ-20 liveness); invoker ruled option 1 shape",
+      "depends_on": [],
+      "blocks": [
+        "dfb2f10d"
+      ]
     },
     {
-     "id": "7fefd776-6e85-428d-a386-a1512c0a94a1",
-     "short_id": "7fefd776",
-     "title": "One atomic file publication with a durability argument serves the redo put and external exports",
-     "classification": "implementation",
-     "worker": "claude opus",
-     "status": "done"
-    }
-   ]
-  },
-  {
-   "wave_number": 5,
-   "label": "2b",
-   "issues": [
-    {
-     "id": "905364c1-e1e2-4150-8aa9-2a489d3e5977",
-     "short_id": "905364c1",
-     "title": "Document and gate definition writes check their leases in their publishing session",
-     "classification": "implementation",
-     "worker": "codex gpt-6-luna xhigh",
-     "status": "done"
-    }
-   ]
-  },
-  {
-   "wave_number": 6,
-   "label": "3",
-   "issues": [
-    {
-     "short_id": "fe9147fa",
-     "status": "done"
+      "id": "a2153a6f",
+      "short_id": "a2153a6f",
+      "reason": "d675102c sol checkpoint finding 1; invoker approved",
+      "blocks": [
+        "d675102c"
+      ]
     },
     {
-     "short_id": "1b7f58ae",
-     "status": "done"
-    }
-   ]
-  },
-  {
-   "wave_number": 7,
-   "label": "4",
-   "issues": [
-    {
-     "short_id": "d3c94dc5",
-     "status": "done"
+      "id": "c31c2e57",
+      "short_id": "c31c2e57",
+      "reason": "d675102c sol checkpoint finding 2; invoker approved",
+      "blocks": [
+        "d675102c"
+      ]
     },
     {
-     "short_id": "700a96dd",
-     "status": "done"
-    }
-   ]
-  },
-  {
-   "wave_number": 8,
-   "issues": [
+      "id": "a869900b",
+      "short_id": "a869900b",
+      "reason": "d675102c sol checkpoint finding 3 narrowed to REQ-04; invoker approved",
+      "blocks": [
+        "d675102c"
+      ]
+    },
+    "dd95bd9d",
+    "82f1647f"
+  ],
+  "escalations": [
     {
-     "id": "c0775a83-0b83-4a90-883b-527876784a21",
-     "short_id": "c0775a83",
-     "title": "Archive candidates plan in one read-only session",
-     "status": "in_progress"
+      "to": "steward just-in-time-9b",
+      "category": "blocker outside scope (f4d9502a chain)",
+      "decision": "option 1: accept the wait; re-escalate when the last dispatchable wave is in flight, with remaining reachable count, blocked IDs, and any proposal to decouple a blocked issue; do not reshape the graph unilaterally",
+      "status": "resolved"
     },
     {
-     "id": "b0dc019f-8504-488a-b6f7-d386d53bc8e0",
-     "short_id": "b0dc019f",
-     "title": "Domain names nothing from repository_state and type labels have no hand-written filter",
-     "status": "merged bf72f7b1f; cargo-ci passed; code-review held pending invoker decision on reviewer model"
+      "to": "steward just-in-time-9b",
+      "category": "rework exceeded MAX_REWORK_ATTEMPTS",
+      "issue": "f6477007",
+      "detail": "third distinct code-review finding (run 90b9291f): exited-process test lacks #[cfg(unix)]; requested one more round",
+      "status": "resolved",
+      "decision": "steward: one final round, scope = #[cfg(unix)] on unix-dependent tests in process.rs only; if code-review fails again, do not rework, send the finding to the steward"
+    },
+    {
+      "to": "steward just-in-time-9b",
+      "category": "issue scope (criteria contradiction)",
+      "issue": "693a2fdd",
+      "detail": "code-review 3fe7575a F1: REQ-03 '(modified and failed)' vs REQ-01 'remaining tests pass unchanged' (test_apply_bulk_update_best_effort asserts errors-only). Recommended: comply with REQ-03, update the one test.",
+      "status": "resolved",
+      "decision": "superseded: decisions[] records the ruling and 693a2fdd is done"
+    },
+    {
+      "to": "steward just-in-time-9b",
+      "category": "criterion premise removed upstream",
+      "issue": "b2c28ec1",
+      "detail": "code-review e3ff064f F1: REQ-06 graph.rs rustdoc clause; the cited audit list was deleted by deb6d3beb (6ac41880). Recommended: rule vacuously satisfied and record on issue.",
+      "status": "resolved",
+      "decision": "steward: REQ-06 corrected (read_repo_file rustdoc names the parser; no other parser/splitter named in crates/); ruling dev/active/b2c28ec1/criteria-ruling.md; code-review passed on re-run"
+    },
+    {
+      "to": "just-in-time-d5",
+      "category": "gate configuration (shared infrastructure)",
+      "issue": "b0dc019f",
+      "detail": "code-review/holistic-review REVIEWER_AGENT pinned to gpt-5.6-terra in .jit/gates.toml; invoker asked for gpt-6.1-sol reviewers. Options: change gates.toml repo-wide, keep gate config and use sol for non-gate reviews, or hold.",
+      "status": "resolved",
+      "decision": "invoker (user): all five review gates use codex gpt-6.1-sol high, landed be302dc9c"
     }
-   ]
-  }
- ],
- "later_chain_note": "After wave 2: fe9147fa, 1b7f58ae -> 693a2fdd, a991f42b -> d3c94dc5, 700a96dd -> 850eaad3 -> 93e3f1ad. Blocked externally by f4d9502a (parked): 7cd27db8 -> 30334066 -> 030df4b1, 9623fe6a; d9ba0029 -> 65aafaba -> c0775a83 -> 4e2bed35 -> e73ad8bc, 42046050, 45d0a971; e6ec58f3 -> b2c28ec1.",
- "created_during_execution": [
-  {
-   "id": "905364c1-e1e2-4150-8aa9-2a489d3e5977",
-   "short_id": "905364c1",
-   "title": "Document and gate definition writes check their leases in their publishing session",
-   "reason": "surfaced pitfall: unowned pre-session lease checks (epic REQ-04); steward authorized filing",
-   "depends_on": [
-    "c2b3cefa"
-   ],
-   "blocks": [
-    "93e3f1ad"
-   ]
+  ],
+  "rework_counts": {
+    "f6477007": 3,
+    "4334df62": 1,
+    "9a2563fd": 1,
+    "c2b3cefa": 2,
+    "d2acb105": 1,
+    "700a96dd": 1,
+    "d3c94dc5": 1,
+    "30334066": 1,
+    "850eaad3": 1,
+    "b2c28ec1": 2,
+    "030df4b1": 1,
+    "219b9df8": 1,
+    "42046050": 2
   },
-  {
-   "id": "b0dc019f-8504-488a-b6f7-d386d53bc8e0",
-   "short_id": "b0dc019f",
-   "title": "Domain names nothing from repository_state and type labels have no hand-written filter",
-   "reason": "dfb2f10d checkpoint sweep: domain/relative_path.rs test imports repository_state (REQ-18); four hand-written type: filters in tests (REQ-20)",
-   "depends_on": [],
-   "blocks": [
-    "dfb2f10d"
-   ]
-  }
- ],
- "escalations": [
-  {
-   "to": "steward just-in-time-9b",
-   "category": "blocker outside scope (f4d9502a chain)",
-   "decision": "option 1: accept the wait; re-escalate when the last dispatchable wave is in flight, with remaining reachable count, blocked IDs, and any proposal to decouple a blocked issue; do not reshape the graph unilaterally",
-   "status": "resolved"
-  },
-  {
-   "to": "steward just-in-time-9b",
-   "category": "rework exceeded MAX_REWORK_ATTEMPTS",
-   "issue": "f6477007",
-   "detail": "third distinct code-review finding (run 90b9291f): exited-process test lacks #[cfg(unix)]; requested one more round",
-   "status": "resolved",
-   "decision": "steward: one final round, scope = #[cfg(unix)] on unix-dependent tests in process.rs only; if code-review fails again, do not rework, send the finding to the steward"
-  },
-  {
-   "to": "steward just-in-time-9b",
-   "category": "issue scope (criteria contradiction)",
-   "issue": "693a2fdd",
-   "detail": "code-review 3fe7575a F1: REQ-03 '(modified and failed)' vs REQ-01 'remaining tests pass unchanged' (test_apply_bulk_update_best_effort asserts errors-only). Recommended: comply with REQ-03, update the one test.",
-   "status": "resolved",
-   "decision": "superseded: decisions[] records the ruling and 693a2fdd is done"
-  },
-  {
-   "to": "steward just-in-time-9b",
-   "category": "criterion premise removed upstream",
-   "issue": "b2c28ec1",
-   "detail": "code-review e3ff064f F1: REQ-06 graph.rs rustdoc clause; the cited audit list was deleted by deb6d3beb (6ac41880). Recommended: rule vacuously satisfied and record on issue.",
-   "status": "resolved",
-   "decision": "steward: REQ-06 corrected (read_repo_file rustdoc names the parser; no other parser/splitter named in crates/); ruling dev/active/b2c28ec1/criteria-ruling.md; code-review passed on re-run"
-  },
-  {
-   "to": "just-in-time-d5",
-   "category": "gate configuration (shared infrastructure)",
-   "issue": "b0dc019f",
-   "detail": "code-review/holistic-review REVIEWER_AGENT pinned to gpt-5.6-terra in .jit/gates.toml; invoker asked for gpt-6.1-sol reviewers. Options: change gates.toml repo-wide, keep gate config and use sol for non-gate reviews, or hold.",
-   "status": "open"
-  }
- ],
- "rework_counts": {
-  "f6477007": 3,
-  "4334df62": 1,
-  "9a2563fd": 1,
-  "c2b3cefa": 2,
-  "d2acb105": 1,
-  "700a96dd": 1,
-  "d3c94dc5": 1,
-  "30334066": 1,
-  "850eaad3": 1,
-  "b2c28ec1": 2,
-  "030df4b1": 1
- },
- "surfaced_pitfalls": [
-  {
-   "found_in": "c2b3cefa review",
-   "subject": "pre-session lease checks with no owning issue",
-   "detail": "After c2b3cefa and planned d3c94dc5, the read form refuse_foreign_lease is still called before the publishing session by dispatch/gate.rs evaluate_many (batch pre-check), commands/document.rs:228 and :546 (document writes) and commands/validate.rs:234. Epic REQ-04 says no pre-session lease check remains, so this is a criterion gap to close with a remediation task inside the epic before the epic gate, not a follow-up. Also dispatch/gate.rs preset_apply discards the read-form result (c2b3cefa rework report); evaluate_many and preset_apply both drop warn-mode findings from that pre-check.",
-   "status": "closed by 905364c1 (bulk and dep remain with d3c94dc5)"
-  },
-  {
-   "found_in": "bb596228 benchmark",
-   "subject": "lock-free read conflicts under a continuous writer",
-   "detail": "Tip doc check-links reads exit 12 (RETRYABLE_CONFLICT) in 5.1% of N=1 and 3.2% of N=8 reads beside a back-to-back writer; 1,356 of 1,593 failures report 'Failed to read configuration' although the writer never changes configuration. Reconcile against epic REQ-21 (bounded refused attempts, then locked fallback vs D-25 retryable conflict) before the epic gate; at minimum the diagnostic misattributes the cause.",
-   "status": "open"
-  },
-  {
-   "found_in": "030df4b1",
-   "subject": "captured declaration parse fails on a missing default rule schema",
-   "detail": "The captured-declaration parse fails with MissingCapture when a default schema file named by rules.toml is absent, so test_missing_default_schema_still_validates_and_enforces will not carry over unchanged when 42046050 removes the disk-backed rule caches; 42046050 must reconcile that test's semantics.",
-   "status": "open",
-   "owner": "42046050"
-  }
- ],
- "started_at": "2026-11-06T01:20:00+02:00",
- "coordination": [
-  {
-   "with": "f4d9502a lead (just-in-time-13)",
-   "item": "cfc87a55",
-   "decision": "order (a): 5046408a lands first, cfc87a55 rebases onto it; no near-term date"
-  },
-  {
-   "with": "f4d9502a lead (just-in-time-13)",
-   "item": "4334df62",
-   "decision": "notify that lead before landing so it can check storage/json.rs against the frozen 5046408a patch"
-  },
-  {
-   "with": "f4d9502a lead (just-in-time-13)",
-   "item": "external chain",
-   "decision": "c140921c after a273667c and 5046408a; then d9ba0029, 7cd27db8, e6ec58f3; that lead notifies on each landing"
-  },
-  {
-   "with": "f4d9502a lead (just-in-time-13)",
-   "item": "external chain",
-   "decision": "c140921c landed df02f5271; d9ba0029 and 7cd27db8 ready and being dispatched by that lead; e6ec58f3 after d9ba0029. Git commit resolution now spawns cat-file --batch-check -Z, not rev-parse: tests counting git children by argv[0]=='rev-parse' must follow."
-  },
-  {
-   "with": "f4d9502a lead (just-in-time-13)",
-   "item": "b2c28ec1",
-   "decision": "may change the ':(glob)docs/*.md' row of test_inspect_pinned_targets_classifies_every_target_class to a typed invalid-path refusal (by variant), keeping other rows; no new git-child counting there"
-  }
- ],
- "notes": [
-  "Wave 1 leaves 12064c7b, 4334df62, 9a2563fd, c2b3cefa, f6477007, 4d834432 done; worktrees reclaimed. 1a737bb4 (W1b) and wave 2 (d2acb105, 7fefd776, 905364c1) in flight; dispatched together because all are dependency-ready and their shared files are in disjoint functions.",
-  "Session 2026-11-08 (lead invoked by just-in-time-d5): c0775a83 resumed in its worktree after a lead-preserve WIP commit and a rebase onto main; host quiet window 03:30-04:30 Helsinki, no cargo from 03:15; coordinating crates/jit edits with df129d9e lead just-in-time-55. Pending pitfall: output.rs IssueScope (graph traversal key) shares its name with domain IssueScope; not a REQ-20 violation, raise in holistic review if it matters."
- ],
- "story_checkpoints": [
-  {
-   "story": "a991f42b",
-   "result": "done",
-   "evidence": "children 1b7f58ae, 4334df62, f7a59f5f done (+4d834432, 7fefd776, d58f80c9, 01a88d32 for REQ-02..04); main sweep: only publish_file stages and renames in production storage/serve code; one read leaf-open sequence"
-  },
-  {
-   "story": "93e3f1ad",
-   "result": "done",
-   "evidence": "main sweep: no read-form lease caller (only refuse_foreign_leases rule + refuse_foreign_leases_held remain), no check_auto_transitions/AutoReady/AutoBacklog, no bulk preview, refusal text only in ForeignLeaseError Display; children d2acb105, fe9147fa, c2b3cefa, 905364c1, d3c94dc5, 693a2fdd done"
-  }
- ],
- "decisions": [
-  {
-   "issue": "693a2fdd",
-   "decision": "A Done request diverted to Gated stays reported in errors only (today's behaviour): REQ-03's parenthetical '(modified and failed), as today' contradicts today's code, and REQ-01 requires test_apply_bulk_update_best_effort (errors-only) to pass unchanged."
-  },
-  {
-   "issue": "bb596228",
-   "decision": "Accept base-ratio premise difference (base R(8)/R(1)=16.6 because a single base reader waits behind the writer); README records it; tip verdict passes on the fixed thresholds."
-  }
- ],
- "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",
- "review_dispatches": []
+  "surfaced_pitfalls": [
+    {
+      "found_in": "c2b3cefa review",
+      "subject": "pre-session lease checks with no owning issue",
+      "detail": "After c2b3cefa and planned d3c94dc5, the read form refuse_foreign_lease is still called before the publishing session by dispatch/gate.rs evaluate_many (batch pre-check), commands/document.rs:228 and :546 (document writes) and commands/validate.rs:234. Epic REQ-04 says no pre-session lease check remains, so this is a criterion gap to close with a remediation task inside the epic before the epic gate, not a follow-up. Also dispatch/gate.rs preset_apply discards the read-form result (c2b3cefa rework report); evaluate_many and preset_apply both drop warn-mode findings from that pre-check.",
+      "status": "closed by 905364c1 (bulk and dep remain with d3c94dc5)"
+    },
+    {
+      "found_in": "bb596228 benchmark",
+      "subject": "lock-free read conflicts under a continuous writer",
+      "detail": "Tip doc check-links reads exit 12 (RETRYABLE_CONFLICT) in 5.1% of N=1 and 3.2% of N=8 reads beside a back-to-back writer; 1,356 of 1,593 failures report 'Failed to read configuration' although the writer never changes configuration. Reconcile against epic REQ-21 (bounded refused attempts, then locked fallback vs D-25 retryable conflict) before the epic gate; at minimum the diagnostic misattributes the cause.",
+      "status": "open"
+    },
+    {
+      "found_in": "030df4b1",
+      "subject": "captured declaration parse fails on a missing default rule schema",
+      "detail": "The captured-declaration parse fails with MissingCapture when a default schema file named by rules.toml is absent, so test_missing_default_schema_still_validates_and_enforces will not carry over unchanged when 42046050 removes the disk-backed rule caches; 42046050 must reconcile that test's semantics.",
+      "status": "resolved by 42046050 per invoker ruling (pending rework 1)",
+      "owner": "42046050"
+    },
+    {
+      "found_in": "c0775a83 completion evidence",
+      "subject": "archive candidates per-candidate cost",
+      "detail": "One-session candidates: 233 s for 230 candidates against 254 s per-candidate path on this repository; per-candidate planning (reachability, hashing, citation scan) dominates, not base derivation. 45d0a971 REQ-02(b) requires tip per-candidate slope <= 0.5 x base; may fail. Invoker warned 01:28.",
+      "status": "open",
+      "owner": "45d0a971"
+    }
+  ],
+  "started_at": "2026-11-06T01:20:00+02:00",
+  "coordination": [
+    {
+      "with": "f4d9502a lead (just-in-time-13)",
+      "item": "cfc87a55",
+      "decision": "order (a): 5046408a lands first, cfc87a55 rebases onto it; no near-term date"
+    },
+    {
+      "with": "f4d9502a lead (just-in-time-13)",
+      "item": "4334df62",
+      "decision": "notify that lead before landing so it can check storage/json.rs against the frozen 5046408a patch"
+    },
+    {
+      "with": "f4d9502a lead (just-in-time-13)",
+      "item": "external chain",
+      "decision": "c140921c after a273667c and 5046408a; then d9ba0029, 7cd27db8, e6ec58f3; that lead notifies on each landing"
+    },
+    {
+      "with": "f4d9502a lead (just-in-time-13)",
+      "item": "external chain",
+      "decision": "c140921c landed df02f5271; d9ba0029 and 7cd27db8 ready and being dispatched by that lead; e6ec58f3 after d9ba0029. Git commit resolution now spawns cat-file --batch-check -Z, not rev-parse: tests counting git children by argv[0]=='rev-parse' must follow."
+    },
+    {
+      "with": "f4d9502a lead (just-in-time-13)",
+      "item": "b2c28ec1",
+      "decision": "may change the ':(glob)docs/*.md' row of test_inspect_pinned_targets_classifies_every_target_class to a typed invalid-path refusal (by variant), keeping other rows; no new git-child counting there"
+    }
+  ],
+  "notes": [
+    "Wave 1 leaves 12064c7b, 4334df62, 9a2563fd, c2b3cefa, f6477007, 4d834432 done; worktrees reclaimed. 1a737bb4 (W1b) and wave 2 (d2acb105, 7fefd776, 905364c1) in flight; dispatched together because all are dependency-ready and their shared files are in disjoint functions.",
+    "Session 2026-11-08 (lead invoked by just-in-time-d5): c0775a83 resumed in its worktree after a lead-preserve WIP commit and a rebase onto main; host quiet window 03:30-04:30 Helsinki, no cargo from 03:15; coordinating crates/jit edits with df129d9e lead just-in-time-55. Pending pitfall: output.rs IssueScope (graph traversal key) shares its name with domain IssueScope; not a REQ-20 violation, raise in holistic review if it matters.",
+    "Trap: dispatch-worker-worktree.sh's default TMPDIR (/tmp/lead-worker-tmp/<repo-path>/agent-<id>) is too long for unix sockets; profile::package socket test fails with SUN_LEN. Briefs must set a short TMPDIR such as /tmp/lw-<id>.",
+    "Trap: in zsh an unquoted $VAR holding several flags is one argument; build flag lists as arrays and expand with \"${ARR[@]}\". Trap: checkpoint briefs that ask the reviewer to list every instance must tie each instance to the criterion's exact wording (invoker process note).",
+    "Trap: `jit <cmd> --json >/dev/null && echo ok` hides refusals; jit dep add refused a non-reduced edge (VALIDATION_FAILED) yet the echo ran. Check the JSON error field or the resulting graph; use `jit dep add --reduce` when the new edge makes a parent edge redundant.",
+    "03:14 quiet-window stop: all workers idle, no cargo running, host load ~0.2. Resume after the invoker's all-clear (gf2-16 benchmark at 04:00). Next: 4e2bed35 clippy fix and land; wave 11 a2153a6f + c31c2e57 (opus); then a869900b; e73ad8bc after 4e2bed35; 45d0a971 after df129d9e's fba8d478 quiet-host trials.",
+    "05:15 resumed after invoker all-clear. 4e2bed35 landed and closed. Wave 11: a2153a6f, c31c2e57 (opus), e73ad8bc (sonnet). Coordination: df129d9e 7909527f will touch two gate_check.rs tests (overlaps a2153a6f); it announces before landing. Trap: worktree script default tmp root is long; give workers TMPDIR=/tmp/lw-<id>.",
+    "Coordination protocol with df129d9e (agreed 05:2x): each lead messages before a land and waits for the other OK; no merge onto main while the other lead has a gate judging main.",
+    "If c31c2e57 review flags a captured gate-registry parse site, cite a869900b REQ-04 as owner; do not rework c31c2e57 (invoker)."
+  ],
+  "story_checkpoints": [
+    {
+      "story": "a991f42b",
+      "result": "done",
+      "evidence": "children 1b7f58ae, 4334df62, f7a59f5f done (+4d834432, 7fefd776, d58f80c9, 01a88d32 for REQ-02..04); main sweep: only publish_file stages and renames in production storage/serve code; one read leaf-open sequence"
+    },
+    {
+      "story": "93e3f1ad",
+      "result": "done",
+      "evidence": "main sweep: no read-form lease caller (only refuse_foreign_leases rule + refuse_foreign_leases_held remain), no check_auto_transitions/AutoReady/AutoBacklog, no bulk preview, refusal text only in ForeignLeaseError Display; children d2acb105, fe9147fa, c2b3cefa, 905364c1, d3c94dc5, 693a2fdd done"
+    },
+    {
+      "story": "dfb2f10d",
+      "result": "done",
+      "evidence": "sol checkpoint reviews r1-r3; remediation b0dc019f, f98f2353, 219b9df8 done; r3: REQ-01/03 MET, REQ-02 MET with steward ruling that embedded.rs is_forbidden_route is a URL route filter, out of scope"
+    }
+  ],
+  "decisions": [
+    {
+      "issue": "693a2fdd",
+      "decision": "A Done request diverted to Gated stays reported in errors only (today's behaviour): REQ-03's parenthetical '(modified and failed), as today' contradicts today's code, and REQ-01 requires test_apply_bulk_update_best_effort (errors-only) to pass unchanged."
+    },
+    {
+      "issue": "bb596228",
+      "decision": "Accept base-ratio premise difference (base R(8)/R(1)=16.6 because a single base reader waits behind the writer); README records it; tip verdict passes on the fixed thresholds."
+    },
+    {
+      "issue": "42046050",
+      "decision": "Invoker ruling: keep captured-parse skip of an absent optional default schema (production change: MissingCapture error -> successful validate); reason: regression from moving reads to captured images, D-20 one capability one answer, REQ-03 keeps the test. Condition: one rule both readers call (rework 1). Recorded as stated deviation on the issue."
+    },
+    {
+      "issue": "219b9df8",
+      "decision": "Invoker accepted rework-1 scope: RootRelativePath segments/split_leaf/resolve_link, assets.rs normalize_path deleted, capability fns typed; stricter refusal of ':', '\\\\', control chars recorded as deviation. f14fe734 copy count now six."
+    },
+    {
+      "at": "05:3x",
+      "decision": "Five private captured-gate-registry parses (gate_check.rs, gate.rs, mod.rs, template.rs, validate.rs) folded into a869900b as REQ-04, with a Rulings note on non-regular-file behaviour; dep a869900b→c31c2e57 added with --reduce (dropped d675102c→c31c2e57)",
+      "by": "invoker just-in-time-d5"
+    },
+    {
+      "at": "05:4x",
+      "decision": "19404174 checkpoint F1 -> dd95bd9d (option b: citation warnings leave ArtifactPlan; advisory report from one index per command; removes per-candidate citation cost; before 45d0a971). F2 -> 82f1647f (reserve copy_jit_state paths). Both under 19404174.",
+      "by": "invoker just-in-time-d5"
+    }
+  ],
+  "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",
+  "review_dispatches": [
+    {
+      "issue": "b0dc019f",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass"
+    },
+    {
+      "issue": "c0775a83",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "09f3e02c"
+    },
+    {
+      "issue": "dfb2f10d",
+      "review": "story checkpoint (non-gate)",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "2 blocking findings -> f98f2353"
+    },
+    {
+      "issue": "f98f2353",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "11ef1b9b"
+    },
+    {
+      "issue": "219b9df8",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "fail F1 capability_fs read_confined_relative",
+      "run": "6ffb399f"
+    },
+    {
+      "issue": "dfb2f10d",
+      "review": "story checkpoint round 2 (non-gate)",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "1 blocking finding -> 219b9df8"
+    },
+    {
+      "issue": "219b9df8",
+      "review": "code-review gate (rework 1)",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "007fb972"
+    },
+    {
+      "issue": "dfb2f10d",
+      "review": "story checkpoint round 3 (non-gate)",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "1 finding ruled out of scope by steward"
+    },
+    {
+      "issue": "42046050",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "fail F1-F3 -> rework 2",
+      "run": "3d12cea3"
+    },
+    {
+      "issue": "42046050",
+      "review": "code-review gate (rework 2)",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass; advisory stale comment fixed by lead in d51af4034",
+      "run": "48c3040d"
+    },
+    {
+      "issue": "d675102c",
+      "review": "story checkpoint (non-gate)",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "REQ-01 met; 3 blocking -> a2153a6f, c31c2e57, a869900b"
+    },
+    {
+      "issue": "4e2bed35",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "187dd597"
+    },
+    {
+      "issue": "e73ad8bc",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "f8b9c7df"
+    },
+    {
+      "issue": "19404174",
+      "review": "story checkpoint (non-gate)",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "REQ-02/03 met; REQ-01 unmet (F1 live citation scan in plan), REQ-04 unmet (F2 snapshot staging overwrite); ruling requested from invoker"
+    }
+  ]
 }

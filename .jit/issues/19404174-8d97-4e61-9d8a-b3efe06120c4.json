@@ -4,10 +4,13 @@
   "created_at": "2026-10-24T21:22:37.717854234Z",
   "dependencies": [
     "30334066-4bae-49fb-b10a-2282c07a7344",
+    "82f1647f-46af-46c1-818c-33d7c8396082",
+    "dd95bd9d-9a9b-44a9-8ecc-126574b3cb8a",
     "e73ad8bc-49f8-4b1c-88a3-80460e87eb40"
   ],
   "description": "Aggregate the work that makes archive preview, candidate listing and snapshot export read the same captured image as the operations they describe.\n\n## Success Criteria\n\n- [hard] REQ-01: Archive preview and candidate listing run the execute planner in one read-only session, the previewed plan equals the executed plan over the same image, and the storage-only archive planning helpers are gone.\n- [hard] REQ-02: Container-destination evidence is requested by one function, and the container marker name is declared once.\n- [hard] REQ-03: Archive planning resolves each artifact reference once per plan and computes reachability once per distinct document root.\n- [hard] REQ-04: Snapshot export writes the stored bytes of each issue and of every declaration file the repository layout defines, read from one captured image.\n",
   "documents": [],
+  "first_ready_at": "2026-11-08T03:21:46.690962687Z",
   "gates_required": [],
   "gates_status": {},
   "id": "19404174-8d97-4e61-9d8a-b3efe06120c4",
@@ -24,5 +27,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Archive planning and snapshot export read through the execute session",
-  "updated_at": "2026-10-24T21:22:37.717854234Z"
+  "updated_at": "2026-11-08T03:27:44.027229620Z"
 }

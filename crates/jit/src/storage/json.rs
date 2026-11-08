@@ -416,6 +416,8 @@ pub struct JsonFileStorage {
     /// content hashing that dominates large pinned documents.
     pinned_evidence_cache: Arc<Mutex<PinnedEvidenceCache>>,
     git: Git,
+    /// How a mutation session's redo record is committed and applied.
+    durability: crate::storage::atomic_write::Durability,
 }
 
 #[cfg(test)]
@@ -468,6 +470,7 @@ impl JsonFileStorage {
             pinned_target_cache: Arc::new(Mutex::new(BTreeMap::new())),
             pinned_evidence_cache: Arc::new(Mutex::new(BTreeMap::new())),
             git: Git::default(),
+            durability: crate::storage::atomic_write::Durability::Full,
             root,
             locker: FileLocker::new(timeout),
         }
@@ -484,6 +487,20 @@ impl JsonFileStorage {
         let mut storage = Self::new(root);
         storage.mutation_interruptions = interruptions;
         storage
+    }
+
+    /// Storage whose mutation sessions publish without syncing, for a test
+    /// whose subject is what a publication writes rather than crash durability.
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn unsynced<P: AsRef<Path>>(root: P) -> Self {
+        let mut storage = Self::new(root);
+        storage.durability = crate::storage::atomic_write::Durability::Unsynced;
+        storage
+    }
+
+    pub(in crate::storage) fn durability(&self) -> crate::storage::atomic_write::Durability {
+        self.durability
     }
 
     #[cfg(test)]
@@ -881,7 +898,7 @@ impl super::gate_run_reader::GateRunTree for JsonFileStorage {
                 .is_empty()
             {
                 true => Ok(Some(root)),
-                false => super::capability_fs::open_capability_parent(&root, relative)?
+                false => super::capability_fs::open_capability_parent(&root, directory.relative())?
                     .map(|(parent, leaf)| {
                         super::capability_fs::open_child_dir_nofollow(&parent, leaf)
                     })

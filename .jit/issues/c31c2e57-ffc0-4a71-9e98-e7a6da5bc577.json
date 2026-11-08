@@ -1,0 +1,30 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-08T03:04:26.709010932Z",
+  "context": {},
+  "created_at": "2026-11-08T00:29:55.985302641Z",
+  "dependencies": [],
+  "description": "Make discovery's final-round configuration parse the one parse a mutation attempt performs, carrying it into `MutationBase` and template application.\n\n## Background\n\n- The discovery loop in `crates/jit/src/commands/mod.rs` (~395-406) re-runs discovery on the round that returns the image; its configuration parse (`effective_config`, `crates/jit/src/commands/validate.rs` ~591) is discarded before `MutationBase::declarations()` parses again (`commands/mod.rs` ~1048).\n- Creation, field, lifecycle, batch, bulk, deletion and dependency paths therefore parse the final configuration at least twice; render, registry and preset mutations twice; template application three times (`crates/jit/src/commands/template.rs` ~383, ~466, ~480).\n- Story `d675102c` sol checkpoint review, finding 2. Invoker ruling: discovery's final-round parse is the one parse; one test owns the property.\n- Epic criterion: `b697a3f7` REQ-10 (each mutation attempt parses its declarations once per captured image).\n\n## Success Criteria\n\n- [hard] REQ-01: A mutation attempt parses its configuration declarations once per captured image: the round that returns the image does not re-run `effective_config`, and the parse discovery made is carried into `MutationBase` and template application.\n- [hard] REQ-02: One test owns \"one parse per captured image\", observing the assembler's parse count over a mutation and over template application; no per-command parse-count tests are added.\n- [hard] REQ-03: Behaviour of every mutation is unchanged.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-08T00:29:55.985302641Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "c31c2e57-ffc0-4a71-9e98-e7a6da5bc577",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:configuration",
+    "component:core",
+    "component:gates",
+    "per:@/charter/D-20",
+    "satisfies:b697a3f7/REQ-10"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "A mutation attempt parses its configuration once per captured image",
+  "updated_at": "2026-11-08T03:04:26.709010932Z"
+}

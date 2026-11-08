@@ -1834,7 +1834,7 @@ mod tests {
             seed_issue(executor.storage(), dependent);
             id
         });
-        let opened = counter.count();
+        let opened = counter.mutation_opens();
 
         executor
             .gates()
@@ -1842,7 +1842,7 @@ mod tests {
             .unwrap();
 
         (
-            counter.count() - opened,
+            counter.mutation_opens() - opened,
             executor.storage.load_issue(&gated_id).unwrap().state,
             dependent_id.map(|id| executor.storage.load_issue(&id).unwrap().state),
         )

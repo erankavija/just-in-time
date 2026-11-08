@@ -1,0 +1,43 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-07T23:31:34.450311905Z",
+  "context": {},
+  "created_at": "2026-11-07T23:31:33.885692984Z",
+  "dependencies": [],
+  "description": "Route the test fixture `declaration_dir` through the canonical relative-path validator, closing the round-2 `one-form-convergence` checkpoint finding.\n\n## Background\n\n- `declaration_dir` (`crates/jit/src/test_utils.rs`) validates each worktree-relative fixture path with `Path::components()`, accepting only `Normal` and `CurDir` components. On unix it accepts `./a`, `a//b` and `a:b`, which `RootRelativePath::parse` (`crates/jit/src/domain/relative_path.rs`) rejects.\n- `RootRelativePath::parse` is the one safe-relative-path validator; `profile/package.rs` already delegates to it and requires a `Descendant`.\n- Epic criterion: `b697a3f7` REQ-20 (safe relative paths, with one validator); story `dfb2f10d` REQ-02. Sol checkpoint review round 2, finding 1.\n\n## Success Criteria\n\n- [hard] REQ-01: `declaration_dir` accepts a path only when `RootRelativePath::parse` returns a `Descendant`, and refuses every other path before writing anything.\n- [hard] REQ-02: No code under `crates/` other than `RootRelativePath::parse` decides whether a relative path input is safe by inspecting its components; normalizers that resolve `.` and `..` in absolute or link paths are outside this criterion.\n- [hard] REQ-03: Every existing `declaration_dir` caller still passes, with any fixture path that used a now-refused spelling rewritten in canonical form.\n\n\n## Deviations\n\n- Behaviour change, approved by the invoker (just-in-time-d5, 2026-11-08): symlink-resolved reads, git control-directory remainders, asset links and external stage paths now go through `RootRelativePath::parse`, which is stricter than the component checks it replaces, so paths containing `:`, `\\` or control characters are refused there. Root-relative asset links that climb above the root are refused, where they were clamped before.\n- Scope, approved by the invoker: rework 1 also converged `document/assets.rs` (substring `..` counting replaced by `RootRelativePath::resolve_link`, deleting the now-unused `normalize_path`), `storage/external_publish.rs` stage helpers, and `open_capability_parent` / `open_descendant_dir_nofollow`, which now take `&RootRelativePath`.\n",
+  "documents": [],
+  "done_at": "2026-11-08T00:02:46.749549235Z",
+  "first_ready_at": "2026-11-07T23:31:33.885692984Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "3ed9383e-2bc9-47b2-9c20-8c86a3d90318",
+      "status": "passed",
+      "updated_at": "2026-11-08T00:00:20.184272254Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "007fb972-0680-4bd2-8849-1e782c225823",
+      "status": "passed",
+      "updated_at": "2026-11-08T00:02:36.963638234Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "219b9df8-5f17-4d01-a332-065faed23f7b",
+  "labels": [
+    "type:task",
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:one-form-convergence",
+    "component:core",
+    "per:@/charter/D-20",
+    "satisfies:b697a3f7/REQ-20"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Test declaration fixtures validate paths through the canonical validator",
+  "updated_at": "2026-11-08T00:02:46.749549235Z"
+}

@@ -6,6 +6,7 @@
 
 use crate::commands::{test_helpers::ExecutorTestAccess, CommandExecutor};
 use crate::config::ItemKindConfig;
+use crate::domain::relative_path::RootRelativePath;
 use crate::domain::{identity::IssueId, DocumentReference};
 use crate::profile::{capture_package_tree, ProfilePackage, ProfilePackageModel};
 use crate::repository_state::{Contribution, MapEntryTarget};
@@ -24,7 +25,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tempfile::TempDir;
@@ -904,9 +905,23 @@ pub fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()
 ///
 /// Opens what exists; it neither creates nor initialises the repository.
 pub fn file_executor(worktree: &Path) -> Result<CommandExecutor<JsonFileStorage>> {
+    executor_over(worktree, |root| JsonFileStorage::new(root))
+}
+
+/// [`file_executor`] over storage that publishes unsynced, for a test whose
+/// subject is what a mutation writes rather than crash durability.
+#[cfg(feature = "test-support")]
+pub fn unsynced_file_executor(worktree: &Path) -> Result<CommandExecutor<JsonFileStorage>> {
+    executor_over(worktree, |root| JsonFileStorage::unsynced(root))
+}
+
+fn executor_over(
+    worktree: &Path,
+    storage: fn(&Path) -> JsonFileStorage,
+) -> Result<CommandExecutor<JsonFileStorage>> {
     let jit_root = worktree.join(".jit");
     let layout = discover_repository_layout(worktree, &jit_root)?;
-    CommandExecutor::new(JsonFileStorage::new(&jit_root)).with_layout(layout)
+    CommandExecutor::new(storage(&jit_root)).with_layout(layout)
 }
 
 /// Build an initialised file-backed repository whose `.jit/config.toml` is
@@ -918,11 +933,26 @@ pub fn file_executor(worktree: &Path) -> Result<CommandExecutor<JsonFileStorage>
 pub fn setup_test_repo_with_config(
     config: &str,
 ) -> Result<(TempDir, CommandExecutor<JsonFileStorage>)> {
+    setup_test_repo_over(config, file_executor)
+}
+
+/// [`setup_test_repo_with_config`] through [`unsynced_file_executor`].
+#[cfg(feature = "test-support")]
+pub fn setup_unsynced_test_repo_with_config(
+    config: &str,
+) -> Result<(TempDir, CommandExecutor<JsonFileStorage>)> {
+    setup_test_repo_over(config, unsynced_file_executor)
+}
+
+fn setup_test_repo_over(
+    config: &str,
+    executor: fn(&Path) -> Result<CommandExecutor<JsonFileStorage>>,
+) -> Result<(TempDir, CommandExecutor<JsonFileStorage>)> {
     let temp = TempDir::new()?;
     fs::create_dir_all(temp.path().join(".jit"))?;
     fs::write(temp.path().join(".jit/config.toml"), config)?;
 
-    let executor = file_executor(temp.path())?;
+    let executor = executor(temp.path())?;
     executor
         .profiles()
         .initialize_fresh_repository(temp.path(), None)?;
@@ -949,13 +979,15 @@ title = \"New\", description = \"New gate\", stage = \"postcheck\", mode = \"man
 /// A temporary directory holding exactly `files`, each a worktree-relative path
 /// (parents created) with its contents.
 ///
-/// Fails before writing when a path is absolute or has a `..`, root or prefix
-/// component, since it would leave the directory.
+/// Fails before writing when a path is not a [`RootRelativePath::Descendant`]
+/// under `RootRelativePath::parse`, so an accepted path is always a normalized
+/// descendant of the directory.
 pub fn declaration_dir(files: &[(&str, &str)]) -> Result<TempDir> {
     if let Some((escaping, _)) = files.iter().find(|(relative, _)| {
-        !Path::new(relative)
-            .components()
-            .all(|component| matches!(component, Component::Normal(_) | Component::CurDir))
+        !matches!(
+            RootRelativePath::parse(relative),
+            Ok(RootRelativePath::Descendant(_))
+        )
     }) {
         anyhow::bail!("declaration path '{escaping}' is not confined to its directory");
     }
@@ -1553,6 +1585,14 @@ pub fn write_package_tree_at_model_limits(root: &Path) -> PathBuf {
         fs::write(&path, vec![b'.'; filler]).expect("write a bounded package asset");
     }
     root.to_path_buf()
+}
+
+/// What `thread` returned, re-raising its panic in the joining thread so a
+/// failed assertion inside it keeps its message.
+pub fn join_reraising<T>(thread: std::thread::ScopedJoinHandle<'_, T>) -> T {
+    thread
+        .join()
+        .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
 }
 
 /// Copy an on-disk profile package tree to `root`, creating it and every
@@ -2388,4 +2428,30 @@ mod tests {
             })
         }));
     }
+}
+
+/// The rule set the captured declaration parse yields for an example
+/// directory's `rules.toml` and `schemas/`, copied into a fresh repository.
+pub fn example_rule_set(example_dir: &Path) -> Result<crate::declarations::rules::RuleSet> {
+    let repo = TempDir::new()?;
+    let schemas = repo.path().join(".jit/schemas");
+    fs::create_dir_all(&schemas)?;
+    fs::copy(
+        example_dir.join("rules.toml"),
+        repo.path().join(".jit/rules.toml"),
+    )?;
+    match fs::read_dir(example_dir.join("schemas")) {
+        Ok(entries) => entries.into_iter().try_for_each(|entry| -> Result<()> {
+            let entry = entry?;
+            fs::copy(entry.path(), schemas.join(entry.file_name()))?;
+            Ok(())
+        })?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    Ok(file_executor(repo.path())?
+        .config()
+        .captured_declarations()?
+        .rules()
+        .clone())
 }

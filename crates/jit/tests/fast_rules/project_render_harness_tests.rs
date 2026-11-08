@@ -7,7 +7,6 @@
 //! the two migrated projections (`invariants` id-anchor, `rules-and-gates` full),
 //! each bound to the live renderer code rather than a committed mirror.
 
-use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::commands::test_helpers::{memory_executor_declaring, MemoryDeclarations};
 use jit::declarations::invariants::InvariantRegistry;
 use jit::declarations::rules::RuleSet;
@@ -130,9 +129,9 @@ style = "id-anchor"
 }
 
 /// Project rendering selects and reports from the captured config, even when
-/// another command has already populated the executor's filesystem config cache.
+/// the host filesystem holds a different `config.toml`.
 #[test]
-fn test_project_render_uses_captured_config_when_executor_cache_is_stale() {
+fn test_project_render_uses_captured_config_when_disk_config_is_stale() {
     // `charter` is a custom project-scope markdown-first kind; the default package ships none.
     let captured_config = r#"
 [item_kinds.charter]
@@ -172,9 +171,6 @@ style = "id-anchor"
         },
     );
     std::fs::write(storage.root().join("config.toml"), stale_config).unwrap();
-    executor
-        .effective_rules()
-        .expect("prime the executor's stale config cache");
     let result = executor.items().project_render(Some("charter")).unwrap();
 
     assert_eq!(result.items[0].target, "CAPTURED.md");

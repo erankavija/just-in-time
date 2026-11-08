@@ -1,6 +1,5 @@
 //! Effective rules combine authored rules with registry-derived defaults without writes.
 
-use jit::commands::test_helpers::ExecutorTestAccess;
 use jit::test_utils::{declaration_dir, file_executor};
 
 const REGISTRY_CONFIG: &str = r#"
@@ -10,7 +9,7 @@ unique = true
 "#;
 
 #[test]
-fn test_effective_rules_loads_defaults_with_custom_empty_or_absent_file_without_writing() {
+fn test_captured_rules_load_defaults_with_custom_empty_or_absent_file_without_writing() {
     let custom = r#"
 [[rules]]
 name = "only-rule"
@@ -26,7 +25,8 @@ assert = { require-section = { heading = "Goals" } }
         }
 
         let exec = file_executor(dir.path()).unwrap();
-        let rules = exec.effective_rules().unwrap();
+        let declarations = exec.config().captured_declarations().unwrap();
+        let rules = declarations.rules();
         assert!(rules
             .rules
             .iter()

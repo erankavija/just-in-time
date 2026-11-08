@@ -19,6 +19,7 @@ use crate::storage::capability_fs::{
 };
 use crate::storage::init_publish;
 use crate::storage::memory::{append_events, MemoryRepositoryState};
+use crate::storage::redo_apply::commit_redo_record_with;
 use crate::storage::{
     commit_redo_record, EventAppend, FileLocker, InMemoryStorage, IssueStore, JsonFileStorage,
     MemoryRedoApplier, MutationInterruptionInjector, MutationPoint, PutFile, RedoApplier,
@@ -795,7 +796,9 @@ fn open_leftover_record(
     let Some(data) = roots.root(RepositoryRootClass::Data) else {
         return Ok(None);
     };
-    let relative = Path::new(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME);
+    let relative = RootRelativePath::Root
+        .join(RECORD_SCRATCH_DIR)
+        .join(RECORD_FILE_NAME);
     let Some((scratch, leaf)) = open_capability_parent(data, &relative)? else {
         return Ok(None);
     };
@@ -1435,8 +1438,11 @@ impl JsonMutationSession {
         let root = self.roots.data_root().ok_or_else(|| {
             RepositoryStateStoreError::UnsafeTarget(self.layout.data_root().display().to_string())
         })?;
-        commit_redo_record(root, &record).map_err(RepositoryStateStoreError::Publication)?;
+        let durability = self.storage.durability();
+        commit_redo_record_with(root, &record, durability)
+            .map_err(RepositoryStateStoreError::Publication)?;
         RedoApplier::new(SessionRedoInterruptions::new(interruptions))
+            .with_durability(durability)
             .apply(&self.roots, &record)
             .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
     }
@@ -2257,8 +2263,7 @@ fn inspect_capability_path(
     if path.relative().is_root() {
         return directory_entry(root.dir_metadata()?);
     }
-    let relative = path.relative().as_path();
-    let Some((parent, leaf)) = open_capability_parent(root, relative)? else {
+    let Some((parent, leaf)) = open_capability_parent(root, path.relative())? else {
         // A missing ancestor means the target itself is absent, not a capture
         // failure: a not-yet-created nested path captures as a clean absence.
         return Ok(RepositoryEntry::Absent);
@@ -2281,7 +2286,7 @@ fn inspect_capability_listing(
     let directory = if path.relative().is_root() {
         root.try_clone()?
     } else {
-        open_descendant_dir_nofollow(root, path.relative().as_path())?
+        open_descendant_dir_nofollow(root, path.relative())?
     };
     let names = match directory.entries() {
         Ok(entries) => entries

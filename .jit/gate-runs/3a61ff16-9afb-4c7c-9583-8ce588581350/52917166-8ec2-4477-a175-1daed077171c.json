@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0977e9ba94dfaaab2a642d7958e839ad296d31a2",
+  "completed_at": "2026-11-07T23:11:26.244858494Z",
+  "duration_ms": 227504,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The tagged state transition correctly unblocks the story; current completed dependencies provide refreshed server search, unfiltered graph metadata, live hierarchy reloads, and indexed layout passes with focused coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3a61ff16-9afb-4c7c-9583-8ce588581350",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "52917166-8ec2-4477-a175-1daed077171c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-07T23:07:38.740325830Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0977e9ba94dfaaab2a642d7958e839ad296d31a2 (`jit:3a61ff16`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml\nResolved items: @/issue/3a61ff16/requirement/REQ-01 (issue description, markdown-first); @/gate/repo-validate and @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: repo-validate passed (exit 0, 2026-11-07T23:07:22Z); its run commit contains 0977e9ba94dfaaab2a642d7958e839ad296d31a2\nTruncation recovery: narrowed the tagged patch to per-path metadata diffs and inspected current browser, layout, and focused test files; historical event/gate stdout was excluded from behavioral judgment\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The tagged state transition correctly unblocks the story; current completed dependencies provide refreshed server search, unfiltered graph metadata, live hierarchy reloads, and indexed layout passes with focused coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

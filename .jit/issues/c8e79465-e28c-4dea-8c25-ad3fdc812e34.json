@@ -13,11 +13,26 @@
   ],
   "description": "Server endpoints reuse core execution and document operations, while refresh work is shared across clients.\n\n## Success Criteria\n\n- [hard] REQ-01: Supported server routes use shared core operations and preserve their HTTP contracts.\n",
   "documents": [],
+  "done_at": "2026-11-07T23:36:20.159612600Z",
+  "first_ready_at": "2026-11-07T23:32:30.651652689Z",
   "gates_required": [
     "repo-validate",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "run_id": "e3487024-4ed1-4c6d-98f4-c8ecb9a2d968",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:36:09.989045758Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "run_id": "660420f0-a636-4a41-beb8-a772113cdee0",
+      "status": "passed",
+      "updated_at": "2026-11-07T23:33:47.706245233Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c8e79465-e28c-4dea-8c25-ad3fdc812e34",
   "labels": [
     "type:story",
@@ -25,7 +40,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Server convergence",
-  "updated_at": "2026-11-04T22:24:54.946576604Z"
+  "updated_at": "2026-11-07T23:36:20.159612600Z"
 }

@@ -76,7 +76,8 @@ fn show<S: HandlerStore>(
     let result = ctx
         .executor
         .documents()
-        .show_document_content(&issue(ctx, id)?, path, at)?;
+        .document_content(&issue(ctx, id)?, path, at)?
+        .into();
     Ok(Outcome::success_with(result, "Document content retrieved"))
 }
 
