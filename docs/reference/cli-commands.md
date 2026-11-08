@@ -2748,10 +2748,9 @@ itself stays in the repository; jit stores the reference. `jit document` is a
 visible alias of `jit doc`.
 
 Reading a document at a commit requires both the `git` executable on `PATH` and
-a Git repository ([Git Optional](../concepts/guarantees.md#git-optional)):
-`history` and `diff` always, and `show` whenever `--at` is given or the
-reference itself is pinned to a commit. The rest of the family works without
-git.
+a Git repository: `diff` always, and `show` whenever `--at` is given or the
+reference itself is pinned to a commit. Outside Git, `history` lists no commits.
+See [Git Optional](../concepts/guarantees.md#git-optional).
 
 ### `jit doc add`
 
