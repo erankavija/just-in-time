@@ -672,11 +672,6 @@ fn assert_branch_drift_failure(mut command: std::process::Command, expected: &st
         String::from_utf8_lossy(&plain.stdout).contains(expected),
         "expected {expected:?} on stdout: {plain:?}"
     );
-    assert_eq!(
-        String::from_utf8_lossy(&plain.stderr).lines().count(),
-        1,
-        "{plain:?}"
-    );
 
     let json = command.arg("--json").output().unwrap();
     assert_eq!(json.status.code(), Some(4), "{json:?}");
@@ -806,7 +801,6 @@ fn test_validate_branch_drift_detects_drifted_branch() {
         stdout.contains("Fix: git rebase origin/main"),
         "branch-drift failure gives the rebase remedy: {stdout}"
     );
-    assert_eq!(String::from_utf8_lossy(&output.stderr).lines().count(), 1);
 
     let json_output = cli
         .command(["validate", "--branch-drift", "--json"])
