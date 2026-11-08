@@ -100,6 +100,9 @@ struct BulkPrecheck {
     cached: CachedPrecheckExecution,
     /// The run records and prompt files the publishing base must read.
     capture_paths: Vec<crate::repository_state::VirtualPath>,
+    /// The issue as the preflight planned it, whose precheck inputs the
+    /// publishing base also reads.
+    planned: Issue,
 }
 
 struct BulkUpdateAttemptContext {
@@ -238,6 +241,7 @@ impl BulkDerivation<'_> {
                 precheck.map(|precheck| &precheck.captured),
                 self.comparison,
                 &planned,
+                self.graph.declarations.config(),
                 registry,
             )
         };
@@ -397,6 +401,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
                     )
                     .collect();
                 Ok(BulkPrecheck {
+                    planned: preflight.issue,
                     captured: preflight.captured,
                     cached: cached
                         .ok_or_else(|| anyhow!("precheck execution for {target} was not kept"))?,
@@ -430,10 +435,17 @@ impl<S: IssueStore> IssueOps<'_, S> {
             .iter()
             .flat_map(|precheck| precheck.capture_paths.iter().cloned())
             .collect::<Vec<_>>();
+        let planned = prechecks
+            .iter()
+            .map(|precheck| precheck.planned.clone())
+            .collect::<Vec<_>>();
         let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
-        let Some(mut base) =
-            self.exec
-                .capture_mutation_base(session.as_mut(), &capture_paths, &targets)?
+        let Some(mut base) = self.exec.capture_precheck_mutation_base(
+            session.as_mut(),
+            &capture_paths,
+            &targets,
+            &planned,
+        )?
         else {
             return Ok(BulkAttempt::Retry);
         };

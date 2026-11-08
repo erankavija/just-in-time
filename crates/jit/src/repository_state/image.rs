@@ -741,6 +741,15 @@ impl CaptureSpec {
         self.budget
     }
 
+    /// Raise each bound to at least the one `budget` sets.
+    pub fn widen_budget(&mut self, budget: CaptureBudget) {
+        self.budget = CaptureBudget {
+            max_listings: self.budget.max_listings.max(budget.max_listings),
+            max_bytes: self.budget.max_bytes.max(budget.max_bytes),
+            max_depth: self.budget.max_depth.max(budget.max_depth),
+        };
+    }
+
     fn validate_path(&self, path: &VirtualPath) -> Result<(), CaptureError> {
         if path.relative().depth() > self.budget.max_depth {
             return Err(CaptureError::DepthBudgetExceeded(path.clone()));

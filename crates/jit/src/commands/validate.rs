@@ -11,7 +11,12 @@ use anyhow::Context;
 #[derive(Clone, Copy)]
 enum BaseCapturePurpose<'a> {
     Validation,
-    Mutation { precheck_targets: &'a [IssueId] },
+    /// `planned` holds the precheck targets as the mutation plans them; the
+    /// base also reads what their prechecks evaluate.
+    Mutation {
+        precheck_targets: &'a [IssueId],
+        planned: &'a [Issue],
+    },
     Repair,
     Archive,
 }
@@ -443,7 +448,19 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         extra_paths: &[crate::repository_state::VirtualPath],
         precheck_targets: &[IssueId],
     ) -> Result<Option<MutationBase>> {
-        self.capture_mutation_base_from(session, None, extra_paths, precheck_targets)
+        self.capture_mutation_base_from(session, None, extra_paths, precheck_targets, &[])
+    }
+
+    /// [`Self::capture_mutation_base`] that also reads what the prechecks of
+    /// `planned`, the precheck targets as the mutation plans them, evaluate.
+    pub(crate) fn capture_precheck_mutation_base(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryReadSession + '_),
+        extra_paths: &[crate::repository_state::VirtualPath],
+        precheck_targets: &[IssueId],
+        planned: &[Issue],
+    ) -> Result<Option<MutationBase>> {
+        self.capture_mutation_base_from(session, None, extra_paths, precheck_targets, planned)
     }
 
     /// [`Self::capture_mutation_base`] grown from `start`, an image this
@@ -454,7 +471,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         start: GrowthStart,
         precheck_targets: &[IssueId],
     ) -> Result<Option<MutationBase>> {
-        self.capture_mutation_base_from(session, Some(start), &[], precheck_targets)
+        self.capture_mutation_base_from(session, Some(start), &[], precheck_targets, &[])
     }
 
     fn capture_mutation_base_from(
@@ -463,13 +480,17 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         start: Option<GrowthStart>,
         extra_paths: &[crate::repository_state::VirtualPath],
         precheck_targets: &[IssueId],
+        planned: &[Issue],
     ) -> Result<Option<MutationBase>> {
         self.capture_proposed_base_inner(
             session,
             start,
             &std::collections::BTreeMap::new(),
             extra_paths,
-            BaseCapturePurpose::Mutation { precheck_targets },
+            BaseCapturePurpose::Mutation {
+                precheck_targets,
+                planned,
+            },
         )
         .and_then(|captured| {
             captured
@@ -525,6 +546,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             &[],
             BaseCapturePurpose::Mutation {
                 precheck_targets: std::slice::from_ref(issue_id),
+                planned: &[],
             },
         )?
         .map(|(image, (issues, _), config)| {
@@ -589,9 +611,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         };
 
         let mutation = matches!(purpose, BaseCapturePurpose::Mutation { .. });
-        let precheck_targets = match purpose {
-            BaseCapturePurpose::Mutation { precheck_targets } => precheck_targets,
-            _ => &[],
+        let (precheck_targets, planned) = match purpose {
+            BaseCapturePurpose::Mutation {
+                precheck_targets,
+                planned,
+            } => (precheck_targets, planned),
+            _ => (&[][..], &[][..]),
         };
         // An archive rerun enumerates every directory below its existing
         // container destination, so it is allowed a listing per directory an
@@ -676,6 +701,15 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             if !closure_read {
                 return Ok(());
             }
+            let gates = (!precheck_targets.is_empty() || !planned.is_empty())
+                .then(|| {
+                    crate::repository_state::validation_declarations_with_config(
+                        image,
+                        Ok(config.clone()),
+                    )
+                })
+                .transpose()?
+                .map(|declarations| declarations.gates);
             if issues.is_none() {
                 // A mutation derives from exactly these issues, so they are
                 // parsed once, with the strict reader, and handed back with the
@@ -715,11 +749,23 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                         spec,
                         parsed.as_deref().unwrap_or_default(),
                         config,
-                        &effective_virtual_path,
+                        gates.as_ref(),
                         precheck_targets,
                     )?;
                 }
                 issues = Some((parsed, values));
+            }
+            if let (Some(gates), Some((Ok(parsed), _))) = (&gates, &issues) {
+                planned.iter().try_for_each(|issue| {
+                    super::gate_check::discover_gate_inputs(
+                        image,
+                        spec,
+                        issue,
+                        parsed,
+                        &super::precheck_gates(issue, gates),
+                        config,
+                    )
+                })?;
             }
             Ok(())
         };
@@ -981,13 +1027,6 @@ fn captured_divergences(
     Ok(DivergenceResponse::from_issues(issues, &hierarchy))
 }
 
-/// Effective-bytes byte source over a captured image and a proposed overlay.
-type EffectiveVirtualPath<'a> = dyn Fn(
-        &crate::repository_state::RepositoryImage,
-        &crate::repository_state::VirtualPath,
-    ) -> Result<Option<Vec<u8>>>
-    + 'a;
-
 /// Assemble the configuration of `image` overlaid with `overrides`.
 fn effective_config(
     image: &crate::repository_state::RepositoryImage,
@@ -1013,18 +1052,14 @@ fn discover_issue_closure(
     spec: &mut crate::repository_state::CaptureSpec,
     issues: &[Issue],
     config: &JitConfig,
-    effective: &EffectiveVirtualPath<'_>,
+    gates: Option<&crate::declarations::GateRegistry>,
     precheck_targets: &[IssueId],
 ) -> Result<()> {
     use crate::declarations::{GateChecker, GateMode, GateStage};
 
     spec.discover_paths(plan_document_paths(issues, config)?)?;
-    if precheck_targets.is_empty() {
+    let Some(gates) = gates else {
         return Ok(());
-    }
-    let gates = match effective(image, &crate::repository_state::VirtualPath::GATES)? {
-        Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
-        None => crate::declarations::GateRegistry::default(),
     };
     let ids = crate::domain::queries::IdIndex::new(issues);
     precheck_targets.iter().try_for_each(|target| {
@@ -1178,17 +1213,119 @@ fn capture_document_reference_validation(
             let Some(image) = super::capture_or_retry(session.capture(spec))? else {
                 return Ok(None);
             };
-            if let Some(reason) =
-                crate::document::resolve_document_reference(&image, document)?.unresolved()
-            {
-                return Ok(Some(Err(format!(
-                    "Invalid document reference in issue '{}': {reason}",
-                    issue.id
-                ))));
+            let verdict = document_reference_verdict(&image, [(issue, document)])?;
+            if verdict.is_err() {
+                return Ok(Some(verdict));
             }
         }
     }
     Ok(Some(Ok(())))
+}
+
+/// Whether each of `references`, an issue and one of its documents, resolves
+/// in `image`; the `Err` names the first that does not.
+fn document_reference_verdict<'a>(
+    image: &crate::repository_state::RepositoryImage,
+    references: impl IntoIterator<Item = (&'a Issue, &'a crate::domain::DocumentReference)>,
+) -> Result<std::result::Result<(), String>> {
+    for (issue, document) in references {
+        if let Some(reason) =
+            crate::document::resolve_document_reference(image, document)?.unresolved()
+        {
+            return Ok(Err(format!(
+                "Invalid document reference in issue '{}': {reason}",
+                issue.id
+            )));
+        }
+    }
+    Ok(Ok(()))
+}
+
+/// Whether the stored records of `records` and `events`, the event log,
+/// reproduce what the writer would publish for `captured`.
+fn record_fidelity_verdict(
+    captured: &crate::validation::CapturedValidation<'_>,
+    records: &crate::repository_state::RepositoryImage,
+    events: Option<&[u8]>,
+) -> Result<std::result::Result<(), String>> {
+    let drift = crate::validation::record_fidelity::record_drift(captured, records, events)?;
+    Ok(match drift.is_empty() {
+        true => Ok(()),
+        false => Err(format!(
+            "{} stored record(s) do not reproduce what the writer would publish:\n  {}",
+            drift.len(),
+            drift.join("\n  ")
+        )),
+    })
+}
+
+/// The event log whole-repository validation judges, read in the session
+/// that captured the image it judges.
+#[derive(Debug, Clone)]
+pub(crate) struct RepositoryHistory {
+    events: Option<std::sync::Arc<[u8]>>,
+}
+
+impl RepositoryHistory {
+    /// Read the event log through `session`.
+    pub(crate) fn read(
+        session: &mut (dyn crate::storage::RepositoryReadSession + '_),
+    ) -> Result<Self> {
+        Ok(Self {
+            events: session.read_history_log()?.map(std::sync::Arc::from),
+        })
+    }
+}
+
+/// The issues whole-repository validation reads from `image`, a validation
+/// base: none when a record does not parse, which validation reports itself.
+pub(super) fn validation_issues(image: &crate::repository_state::RepositoryImage) -> Vec<Issue> {
+    crate::repository_state::overlaid_issue_ids(image, &std::collections::BTreeMap::new())
+        .ok()
+        .and_then(|ids| {
+            crate::repository_state::parse_issue_records(&ids, |path| image.file_bytes(path)).ok()
+        })
+        .map(|records| records.into_iter().map(|(issue, _)| issue).collect())
+        .unwrap_or_default()
+}
+
+/// Add to `spec` what [`history_verdicts`] reads from an image beside its
+/// validation base: every gate-run, verdict and archive-evidence record, and
+/// the references of every document of `issues`, the image's issues.
+pub(super) fn discover_repository_history(
+    image: &crate::repository_state::RepositoryImage,
+    spec: &mut crate::repository_state::CaptureSpec,
+    issues: &[Issue],
+) -> Result<()> {
+    spec.widen_budget(RECORD_FIDELITY_CAPTURE_BUDGET);
+    super::discover_gate_records(image, spec)?;
+    discover_archive_evidence_records(image, spec)?;
+    discover_document_references(issues.iter().flat_map(|issue| &issue.documents), spec)
+}
+
+/// The history verdicts of `captured`, whose image also holds what
+/// [`discover_repository_history`] requests, judged against `history`.
+pub(crate) fn history_verdicts(
+    captured: &crate::validation::CapturedValidation<'_>,
+    history: &RepositoryHistory,
+) -> Result<crate::validation::HistoryVerdicts> {
+    let issues = captured.issues.as_deref().unwrap_or_default();
+    Ok(crate::validation::HistoryVerdicts {
+        record_fidelity: record_fidelity_verdict(
+            captured,
+            &captured.image,
+            history.events.as_deref(),
+        )?,
+        document_references: document_reference_verdict(
+            &captured.image,
+            issues.iter().flat_map(|issue| {
+                issue
+                    .documents
+                    .iter()
+                    .map(move |document| (issue, document))
+            }),
+        )?,
+    })
 }
 
 /// Capture every gate-run, verdict and archive-evidence record, read the whole
@@ -1207,16 +1344,11 @@ fn capture_record_fidelity_validation(
         return Ok(None);
     };
     let events = session.read_history_log()?;
-    let drift =
-        crate::validation::record_fidelity::record_drift(captured, &records, events.as_deref())?;
-    Ok(Some(match drift.is_empty() {
-        true => Ok(()),
-        false => Err(format!(
-            "{} stored record(s) do not reproduce what the writer would publish:\n  {}",
-            drift.len(),
-            drift.join("\n  ")
-        )),
-    }))
+    Ok(Some(record_fidelity_verdict(
+        captured,
+        &records,
+        events.as_deref(),
+    )?))
 }
 
 fn discover_archive_evidence_records(
@@ -2411,6 +2543,7 @@ kind = \"enforced\"
             (
                 BaseCapturePurpose::Mutation {
                     precheck_targets: std::slice::from_ref(&target),
+                    planned: &[],
                 },
                 ReadMode::Tail,
             ),

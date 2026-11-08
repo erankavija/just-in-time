@@ -12,6 +12,7 @@
 use crate::domain::identity::GateKey;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+use super::document::DocumentDeclarations;
 use super::template_expand::{
     expand_template, located_document_area_error, node_description, node_document_path,
     validate_delta_acyclic, DeltaEndpoint, PlannedNode, TemplateDelta,
@@ -20,7 +21,7 @@ use super::*;
 use crate::gate_presets::GatePresetCatalog;
 use crate::repository_state::{
     finalize, finalize_gate_registry_edit, render_capture_closure, CaptureBudget, CaptureSpec,
-    MutationContext, MutationIntent, RepositoryEntry, RepositoryImage, VirtualPath,
+    MutationContext, MutationIntent, RepositoryImage, VirtualPath,
 };
 use crate::storage::IssueNotFoundError;
 use crate::templates::{
@@ -504,7 +505,7 @@ fn template_operation_capture_paths(
     let prerequisites_met = require_template_prerequisites(
         &template,
         config,
-        &parse_template_gate_registry(image)?,
+        crate::repository_state::declarations_with_config(image, Ok(config.clone()))?.gates(),
         GatePresetCatalog::from_image(image)?.definitions(),
     )
     .is_ok();
@@ -532,36 +533,6 @@ fn template_operation_capture_paths(
     paths.sort();
     paths.dedup();
     Ok(paths)
-}
-
-/// The repository declarations a template document declaration is resolved
-/// against: the issue-scoped area registry and the type taxonomy the canonical
-/// artifact directory is composed from.
-///
-/// Read from the captured configuration once per operation, so the paths a
-/// derivation pre-declares and the paths the apply engine writes are resolved
-/// against the same repository view.
-struct DocumentDeclarations {
-    documentation: crate::config::DocumentationConfig,
-    hierarchy: crate::domain::type_taxonomy::HierarchyConfig,
-}
-
-impl DocumentDeclarations {
-    /// The declarations `config` carries: its documentation section (defaulted
-    /// when absent) and the taxonomy its namespace registry defines.
-    ///
-    /// # Errors
-    ///
-    /// Returns the hierarchy constructor's error for malformed declarations.
-    fn from_config(config: &crate::config::JitConfig) -> Result<Self> {
-        let namespaces = crate::config_manager::namespaces_from_config(config);
-        Ok(Self {
-            documentation: config.documentation.clone().unwrap_or_default(),
-            hierarchy: crate::domain::type_taxonomy::HierarchyConfig::from_declarations(
-                &namespaces,
-            )?,
-        })
-    }
 }
 
 /// The repository-relative document paths applying `template` to `container`
@@ -635,18 +606,6 @@ fn parse_template_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
             Ok(issue)
         })
         .collect()
-}
-
-fn parse_template_gate_registry(
-    image: &RepositoryImage,
-) -> Result<crate::declarations::GateRegistry> {
-    match image.entry(&VirtualPath::GATES)? {
-        RepositoryEntry::File { content, .. } => {
-            Ok(crate::declarations::parse_gate_registry(content.bytes())?)
-        }
-        RepositoryEntry::Absent => Ok(crate::declarations::GateRegistry::default()),
-        _ => Err(anyhow!("captured gate registry is not an ordinary file")),
-    }
 }
 
 #[allow(clippy::too_many_arguments)]
