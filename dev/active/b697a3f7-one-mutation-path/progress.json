@@ -613,6 +613,10 @@
       "at": "12:0x",
       "decision": "45d0a971 tip record: one harness run, default 5 samples, quiet host (1-min load <1 checked by lead before start, harness defaults unchanged), no other jit/gf2 work (check with gf2-cf), record host load; verdict stands, no reruns; if (a) fails send numbers + flat per-match counts to invoker (criterion-design question for the user)",
       "by": "invoker just-in-time-d5"
+    },
+    {
+      "subject": "markdown-first item sources read outside capture (item.rs:332)",
+      "ruling": "d5: out of e5d7bc11/d675102c scope; filed 3084a48f under v1.1; cite it if a reviewer raises it"
     }
   ],
   "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",
