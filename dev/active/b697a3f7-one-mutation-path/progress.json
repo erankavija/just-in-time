@@ -208,7 +208,7 @@
      "id": "4e2bed35",
      "short_id": "4e2bed35",
      "title": "Container marker and destination evidence are declared once",
-     "status": "in_progress"
+     "status": "partial: REQ-01..03 code complete, preserved as abfaee440 (wip) on worktree-agent-4e2bed35; worker cargo-ci at 01:31 failed on clippy (tests passed); resume after 04:30: fix clippy, squash into feat commit, cargo-ci, land, gates"
     }
    ]
   },
@@ -431,7 +431,8 @@
   "Session 2026-11-08 (lead invoked by just-in-time-d5): c0775a83 resumed in its worktree after a lead-preserve WIP commit and a rebase onto main; host quiet window 03:30-04:30 Helsinki, no cargo from 03:15; coordinating crates/jit edits with df129d9e lead just-in-time-55. Pending pitfall: output.rs IssueScope (graph traversal key) shares its name with domain IssueScope; not a REQ-20 violation, raise in holistic review if it matters.",
   "Trap: dispatch-worker-worktree.sh's default TMPDIR (/tmp/lead-worker-tmp/<repo-path>/agent-<id>) is too long for unix sockets; profile::package socket test fails with SUN_LEN. Briefs must set a short TMPDIR such as /tmp/lw-<id>.",
   "Trap: in zsh an unquoted $VAR holding several flags is one argument; build flag lists as arrays and expand with \"${ARR[@]}\". Trap: checkpoint briefs that ask the reviewer to list every instance must tie each instance to the criterion's exact wording (invoker process note).",
-  "Trap: `jit <cmd> --json >/dev/null && echo ok` hides refusals; jit dep add refused a non-reduced edge (VALIDATION_FAILED) yet the echo ran. Check the JSON error field or the resulting graph; use `jit dep add --reduce` when the new edge makes a parent edge redundant."
+  "Trap: `jit <cmd> --json >/dev/null && echo ok` hides refusals; jit dep add refused a non-reduced edge (VALIDATION_FAILED) yet the echo ran. Check the JSON error field or the resulting graph; use `jit dep add --reduce` when the new edge makes a parent edge redundant.",
+  "03:14 quiet-window stop: all workers idle, no cargo running, host load ~0.2. Resume after the invoker's all-clear (gf2-16 benchmark at 04:00). Next: 4e2bed35 clippy fix and land; wave 11 a2153a6f + c31c2e57 (opus); then a869900b; e73ad8bc after 4e2bed35; 45d0a971 after df129d9e's fba8d478 quiet-host trials."
  ],
  "story_checkpoints": [
   {
