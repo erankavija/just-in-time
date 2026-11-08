@@ -300,8 +300,8 @@
         {
           "id": "6a19e93f",
           "short_id": "6a19e93f",
-          "status": "rework 2",
-          "note": "landed 03f73cf86 (f2e7c20e2); cargo-ci passed. REQ-03 quiet-host runs 09:08-09:12, 5 samples, harness 75c433e70, base 369d35a42: standard scenario (a) tip s(2000)/s(500)=0.378 (base 3.794), pass; graph-rule variant (rule bench-active-depends-on-active dependency-shape in_progress transitive) tip 1.234 (base 3.825), pass; load at start 1.43/1.91, end 1.46/1.59. code-review FAILED run 4e852e52 (F1 broad precheck evidence O(MxN); F2 superseded replacement edges; F3 parallel traversal). Fix-forward from 1ee4aa9ae."
+          "status": "gating",
+          "note": "r2 landed 173883ad9 (fb38ed248); cargo-ci passed. REQ-03 quiet-host runs 10:00-10:05, 5 samples, binary sha256 1963f567..., base 369d35a42: standard tip s(2000)/s(500)=1.334 (base 3.766) pass; graph-rule variant tip 0.599 (base 3.819) pass; load at start 1.91/1.32, end 1.42/1.27."
         },
         {
           "id": "86a183c2",
