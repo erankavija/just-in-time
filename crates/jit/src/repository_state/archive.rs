@@ -123,7 +123,8 @@ pub fn finalize_archive_execution(
     }
 
     if let PlanTarget::Container { id } = plan.target() {
-        let destination = format!("{}/.jit-container", plan.destination_root());
+        let destination =
+            crate::domain::artifact_classifier::container_marker_path(plan.destination_root());
         let bytes = format!("{id}\n").into_bytes();
         let identity = ContentIdentity::from_bytes(&bytes);
         let path = archive_path(image, &destination)?;
@@ -889,7 +890,10 @@ mod tests {
         let image = ImageBuilder::new()
             .entry(VirtualPath::EVENTS, RepositoryEntry::Absent)
             .entry(
-                VirtualPath::worktree("archive/.jit-container").unwrap(),
+                VirtualPath::worktree(crate::domain::artifact_classifier::container_marker_path(
+                    "archive",
+                ))
+                .unwrap(),
                 directory_entry(),
             )
             .build();
@@ -897,7 +901,7 @@ mod tests {
         assert!(matches!(
             error,
             ArchiveExecutionError::UnsafeOccupant { role: "container marker", path }
-                if path == "archive/.jit-container"
+                if path == crate::domain::artifact_classifier::container_marker_path("archive")
         ));
     }
 
