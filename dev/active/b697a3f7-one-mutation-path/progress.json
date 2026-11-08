@@ -556,7 +556,7 @@
     "86a183c2 official smoke on a23f33134 (binary sha256 8f0caa46\u2026, harness defaults, 5 samples, raw in lead scratch smoke-86a1-r2-raw, load 5.58 at end): dep base D 20.355 ms, tip D 13.082 ms, ratio 0.643 PASS; bulk 1.393 pass; archive 0.195 pass; profile pass. Rerun on the final commit after the captured_declarations_with bundle removal.",
     "86a183c2 REQ-04 smoke on final 6c75253c3 (binary sha256 a3390ff2\u2026, harness defaults, load 1.26 at end): dep base D 18.57 ms, tip D 12.864 ms, ratio 0.693 PASS. Same run bulk 2.377 (fail). A/B quiet reruns: a23f33134 bulk 1.05/1.35, dep 0.644/0.644; 6c75253c3 bulk 2.10/1.09, dep 0.647/0.621. Bulk is variance (diff a23\u21926c75 is 12 lines in captured_declarations_with, off the bulk path); dep stable 0.62\u20130.69.",
     "86a183c2 cargo-ci passed; code-review FAILED (F1 bootstrap retry fresh memo; F2 direct assembly bypasses in config edit/init/initialize/profile_apply; F3 memo eviction at 4). e5d7bc11 code-review rerun FAILED on REQ-03 (symlink sources rejected; directory occupant silently omitted).",
-    "e5d7bc11 code-review PASSED (2026-11-08T22:50Z) with d5's REQ-03 stated-deviation ruling; closed done. Worktree agent-e5d7bc11 keeps parked unmerged 803a8f28a (local fix superseded by ruling; not landing)."
+    "e5d7bc11 code-review PASSED (2026-11-08T22:50Z) with d5's REQ-03 stated-deviation ruling; both gates passed; close is blocked by its dependency on 86a183c2 and follows 86a183c2's close. Worktree agent-e5d7bc11 keeps parked unmerged 803a8f28a (local fix superseded by ruling; not landing)."
   ],
   "story_checkpoints": [
     {
