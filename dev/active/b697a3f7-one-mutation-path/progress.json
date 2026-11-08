@@ -202,7 +202,7 @@
      "id": "42046050",
      "short_id": "42046050",
      "title": "The executor holds no disk-backed configuration; ConfigManager and JitConfig::load are gone",
-     "status": "in_progress"
+     "status": "done"
     },
     {
      "id": "4e2bed35",
@@ -489,6 +489,15 @@
    "effort": "high",
    "verdict": "fail F1-F3 -> rework 2",
    "run": "3d12cea3"
+  },
+  {
+   "issue": "42046050",
+   "review": "code-review gate (rework 2)",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "pass; advisory stale comment fixed by lead in d51af4034",
+   "run": "48c3040d"
   }
  ]
 }

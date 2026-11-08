@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6709aca16e7b9ae0c8e39e42ea9b996cecdda819",
+  "completed_at": "2026-11-08T00:21:13.981994048Z",
+  "duration_ms": 174838,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/repository_state/mod.rs",
+        "id": "F1",
+        "line": 482,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "The optional-schema comment references the storage rules loader deleted by this issue; remove the obsolete comparison."
+      }
+    ],
+    "summary": "All six hard criteria and prior blocking fixes are satisfied; one advisory stale comment remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "42046050-895f-42bb-a486-383a47e39649",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "48c3040d-45ed-420b-8466-d893b8e1f6eb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T00:18:19.143925403Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:42046050 — 0746209, db93f29, 9d4c2a9, 8cea1e8, c237f57; uncommitted tracker changes excluded.\nPolicy sources: AGENTS.md; dev/TESTING.md; .jit/config.toml.\nResolved items: @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/issue/b697a3f7/requirement/REQ-10 and @/issue/b697a3f7/requirement/REQ-20 → container issue description; @/invariant/orthogonal-tests, @/invariant/shared-test-contracts, @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/canonical-cutover, @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions, @/invariant/single-source-prose, @/invariant/domain-agnostic → .jit/invariants.toml; @/gate/jit-validate and @/gate/cargo-ci → .jit/gates.toml.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T00:16:48.832612173Z; wrapper ancestry confirms coverage of all five tagged commits; prior code-review failed, exit 1, with all three blocking findings now addressed.\nTruncation recovery: reread .jit/config.toml separately; inspected the issue JSON change as a decoded field diff; reread config_manager.rs:25–62.\n\n1. **Low · advisory · issue-impact:** [repository_state/mod.rs:482](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/mod.rs:482) still says optional schemas are skipped “as the storage loader does,” although this issue deletes that loader. Remove the obsolete comparison and retain the placeholder contract. Reference: @/invariant/essential-code-prose.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All six hard criteria and prior blocking fixes are satisfied; one advisory stale comment remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The optional-schema comment references the storage rules loader deleted by this issue; remove the obsolete comparison.\",\"file\":\"crates/jit/src/repository_state/mod.rs\",\"line\":482,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

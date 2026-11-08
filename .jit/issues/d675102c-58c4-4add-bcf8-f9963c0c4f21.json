@@ -10,6 +10,7 @@
   ],
   "description": "Aggregate the work that gives configuration one assembly from bytes, removes the executor's disk-backed caches, and converges gate presets and gate evidence capture on captured images.\n\n## Success Criteria\n\n- [hard] REQ-01: One pure function assembles `JitConfig` from source bytes for filesystem loading and image capture, and `ConfigurationDeclarations` duplicates no assembled field.\n- [hard] REQ-02: The executor holds no disk-backed configuration, rules or namespace cache; read paths take declarations from a captured image, and each mutation attempt parses its declarations once per captured image.\n- [hard] REQ-03: Gate presets are read as storage-supplied bytes keyed by the gate-presets path through one pure catalog, with no preset file I/O outside storage.\n- [hard] REQ-04: Gate evaluation and precheck capture evidence through one function that enforces the prompt size limit, and each evaluation resolves its inputs once per captured image.\n",
   "documents": [],
+  "first_ready_at": "2026-11-08T00:23:06.156591777Z",
   "gates_required": [],
   "gates_status": {},
   "id": "d675102c-58c4-4add-bcf8-f9963c0c4f21",
@@ -26,7 +27,7 @@
     "per:@/charter/D-20"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Configuration and gate declarations come from captured images",
-  "updated_at": "2026-11-01T01:34:02.006870085Z"
+  "updated_at": "2026-11-08T00:23:06.156591777Z"
 }
