@@ -253,8 +253,8 @@
           "id": "dd95bd9d",
           "short_id": "dd95bd9d",
           "title": "Archive citation warnings are an advisory report beside the plan, from one index per command",
-          "status": "in_progress",
-          "note": "opus"
+          "status": "rework 2",
+          "note": "r1 landed 8c3307b0a (5ebce93b9); cargo-ci passed; code-review FAILED run 031018ef (F1 post-apply scan loses relocated citing files - lead instruction error; F2 parallel ](-parser). Fix-forward on fresh worktree from b28d41b18."
         },
         {
           "id": "82f1647f",
@@ -394,7 +394,7 @@
     "219b9df8": 1,
     "42046050": 2,
     "c31c2e57": 1,
-    "dd95bd9d": 1
+    "dd95bd9d": 2
   },
   "surfaced_pitfalls": [
     {
@@ -422,7 +422,8 @@
       "detail": "One-session candidates: 233 s for 230 candidates against 254 s per-candidate path on this repository; per-candidate planning (reachability, hashing, citation scan) dominates, not base derivation. 45d0a971 REQ-02(b) requires tip per-candidate slope <= 0.5 x base; may fail. Invoker warned 01:28.",
       "status": "open",
       "owner": "45d0a971"
-    }
+    },
+    "Lead trap: telling dd95bd9d to scan after the committed execute attempt lost citations from relocated citing files; any post-apply observation of live files must map moved files back to their sources."
   ],
   "started_at": "2026-11-06T01:20:00+02:00",
   "coordination": [
@@ -654,6 +655,15 @@
       "effort": "high",
       "verdict": "pass",
       "run": "393e6166"
+    },
+    {
+      "issue": "dd95bd9d",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "fail (F1, F2 blocking)",
+      "run": "031018ef"
     }
   ]
 }
