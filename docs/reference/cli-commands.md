@@ -3308,6 +3308,12 @@ jit validate --branch-drift [--leases]
 | `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires the `git` executable on `PATH` and a Git repository ([Git Optional](../concepts/guarantees.md#git-optional)). |
 | `--leases` | Check lease records for expiry and references to missing worktrees or issues. Plain validation does not check leases. |
 
+Under `--branch-drift` and `--leases`, human output prints every check on
+stdout: a line for each passed check and the details of each failed check. Stderr
+carries one summary line naming the failed checks. With `--json`,
+`error.message` is that summary and `error.details.validations` keeps each
+check's `valid` and `message`.
+
 The per-issue, `--rule`, `--explain`, and `--scope` modes are views: selections
 of the one whole-repository report, with rules evaluated over the whole
 repository. What each view admits and how it fails is specified under
