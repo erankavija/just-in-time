@@ -246,8 +246,8 @@
           "id": "e73ad8bc",
           "short_id": "e73ad8bc",
           "title": "Archive destinations drop the short-id fallback",
-          "status": "in_progress",
-          "note": "unblocked by 4e2bed35; no file overlap with a2153a6f/c31c2e57; sonnet"
+          "status": "done",
+          "note": "landed e52ab0fa3 (36e3fb973); cargo-ci passed; code-review passed run f8b9c7df"
         }
       ]
     },
@@ -441,7 +441,8 @@
     "Trap: in zsh an unquoted $VAR holding several flags is one argument; build flag lists as arrays and expand with \"${ARR[@]}\". Trap: checkpoint briefs that ask the reviewer to list every instance must tie each instance to the criterion's exact wording (invoker process note).",
     "Trap: `jit <cmd> --json >/dev/null && echo ok` hides refusals; jit dep add refused a non-reduced edge (VALIDATION_FAILED) yet the echo ran. Check the JSON error field or the resulting graph; use `jit dep add --reduce` when the new edge makes a parent edge redundant.",
     "03:14 quiet-window stop: all workers idle, no cargo running, host load ~0.2. Resume after the invoker's all-clear (gf2-16 benchmark at 04:00). Next: 4e2bed35 clippy fix and land; wave 11 a2153a6f + c31c2e57 (opus); then a869900b; e73ad8bc after 4e2bed35; 45d0a971 after df129d9e's fba8d478 quiet-host trials.",
-    "05:15 resumed after invoker all-clear. 4e2bed35 landed and closed. Wave 11: a2153a6f, c31c2e57 (opus), e73ad8bc (sonnet). Coordination: df129d9e 7909527f will touch two gate_check.rs tests (overlaps a2153a6f); it announces before landing. Trap: worktree script default tmp root is long; give workers TMPDIR=/tmp/lw-<id>."
+    "05:15 resumed after invoker all-clear. 4e2bed35 landed and closed. Wave 11: a2153a6f, c31c2e57 (opus), e73ad8bc (sonnet). Coordination: df129d9e 7909527f will touch two gate_check.rs tests (overlaps a2153a6f); it announces before landing. Trap: worktree script default tmp root is long; give workers TMPDIR=/tmp/lw-<id>.",
+    "Coordination protocol with df129d9e (agreed 05:2x): each lead messages before a land and waits for the other OK; no merge onto main while the other lead has a gate judging main."
   ],
   "story_checkpoints": [
     {
@@ -582,6 +583,15 @@
       "effort": "high",
       "verdict": "pass",
       "run": "187dd597"
+    },
+    {
+      "issue": "e73ad8bc",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "f8b9c7df"
     }
   ]
 }

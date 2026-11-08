@@ -8,12 +8,26 @@
   ],
   "description": "Remove the legacy bare-short-id destination from container archive resolution, so a container archives into its marker-backed directory or its preferred directory and nothing else, and state the rule in the adopter reference.\n\n## Background\n\n- `resolve_container_destination` (`crates/jit/src/domain/artifact_classifier.rs:415-485`) takes `legacy_root` (the bare `<archive_root>/<short-id>` directory from `artifact_destination_root`, `:1608-1613`), derives the archive root as its parent (`:421-424`), and falls back to it when no child carries a matching `.jit-container` marker and the legacy directory exists (`:474-482`). `ArtifactEvidenceError::MissingArchiveRoot` (`:406-407`) exists only for that parent derivation.\n- The one destination-evidence function in `crates/jit/src/commands/archive.rs` captures the legacy root as evidence for this fallback, and `capture_archive_plan` computes `legacy` from `artifact_destination_root` (`archive.rs:540`).\n- `classify_artifacts` (`artifact_classifier.rs:662`) falls back to `artifact_destination_root` when the inventory carries no destination root (`:667-670`); the archive planner always sets one through `with_destination_root`, but the domain discovery builds its inventory without one (`ArtifactClassificationInventory::new` in `discover_archive_artifacts`, `crates/jit/src/domain/artifact_discovery.rs:473`), and the discovery tests classify such inventories directly. Its other callers are `crates/jit/src/commands/archive.rs:302, 826`, the classifier unit tests, and the citation-test helper `plan_with_scan` (`crates/jit/src/storage/artifact_planning.rs:501-532`, call at `:530`), which `archive-preview-through-execute-planner` relocates into `crates/jit/src/storage/artifact_inspection.rs`.\n- Tests: `test_destination_resolution_uses_marker_freeze_legacy_fallback_and_duplicate_evidence` (`artifact_classifier.rs:2380`) and `test_resolve_container_destination_adopts_a_preexisting_identifier_only_directory_without_relocating_it` (`:2440`) assert the fallback.\n- Data check: the three bare short-id directories under this repository's `dev/archive/` each carry a matching `.jit-container`, so the marker branch already resolves them.\n- `docs/reference/cli-commands.md:374-385` says planning resolves to an existing unsuffixed `<archive_root>/<container-short-id>/` directory when no marker matches (`:381-383`). `docs/reference/configuration.md:159` describes the bare short-id directory as the preferred name when no slug resolves; that remains true.\n\n## Success Criteria\n\n- [hard] REQ-01: `resolve_container_destination` takes the archive root, the preferred root and the container id, and returns a marker-backed root, a conflict, or the preferred root; no parameter, evidence request or branch refers to a legacy short-id root.\n- [hard] REQ-02: `classify_artifacts` takes the destination root as a required argument with no fallback derivation; the domain discovery, the relocated `plan_with_scan` helper and their tests pass it explicitly; `artifact_destination_root` serves only document targets or no longer exists.\n- [hard] REQ-03: A domain test shows that an unmarked bare short-id directory under the archive root is not adopted: resolution returns the preferred root. It fails today, where the fallback returns the bare directory; the two fallback tests are replaced.\n- [hard] REQ-04: The archive destination section of `docs/reference/cli-commands.md` states marker reuse and the preferred root only.\n\n## Notes\n\n- Behaviour change: a container whose bare short-id directory exists without a matching marker no longer archives into it; it archives into its preferred root, and an existing unmarked preferred directory is reported as today. Asserted by REQ-03's test. The adopter description of destination resolution changes in the docs (REQ-04).\n- Written against the code as it stands after the changes this one follows; line citations name current code.",
   "documents": [],
+  "done_at": "2026-11-08T03:21:46.690962687Z",
   "first_ready_at": "2026-11-08T03:08:11.134047164Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "7d44dd61-9175-44de-bd0d-aaa3b0dd7211",
+      "status": "passed",
+      "updated_at": "2026-11-08T03:19:36.018131817Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "f8b9c7df-7ac6-4994-90ae-14e1e0f96025",
+      "status": "passed",
+      "updated_at": "2026-11-08T03:21:35.158788038Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e73ad8bc-49f8-4b1c-88a3-80460e87eb40",
   "labels": [
     "type:task",
@@ -26,7 +40,7 @@
     "satisfies:b697a3f7/REQ-20"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Archive destinations drop the short-id fallback",
-  "updated_at": "2026-11-08T03:08:21.035692715Z"
+  "updated_at": "2026-11-08T03:21:46.690962687Z"
 }

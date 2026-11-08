@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e52ab0fa3a7d1e6b1951c646abbfef5ed66d4e06",
+  "completed_at": "2026-11-08T03:21:35.157255959Z",
+  "duration_ms": 119025,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard success criteria are satisfied; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e73ad8bc-49f8-4b1c-88a3-80460e87eb40",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f8b9c7df-7ac6-4994-90ae-14e1e0f96025",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T03:19:36.132126704Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:e73ad8bc` commits `edc98f5c5` and `36e3fb973`; individual patches inspected.\nPolicy sources: `AGENTS.md` (sole applicable policy); `dev/TESTING.md`; `.jit/config.toml`.\nResolved items: `@/charter/D-20` → `dev/vision/9db27a3a-charter.md`; `@/issue/b697a3f7/requirement/REQ-07`, `@/issue/b697a3f7/requirement/REQ-20` → parent issue description; `@/inv/canonical-cutover`, `@/inv/architecture-dependency-direction`, `@/inv/orthogonal-tests`, `@/inv/essential-code-prose`, `@/inv/shared-test-contracts`, `@/inv/semantic-test-assertions` → `.jit/invariants.toml`; `@/gate/jit-validate` → `.jit/gates.toml`.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T03:17:52.318178952+00:00; wrapper ancestry confirms run `e52ab0fa3` covers both tagged commits. Current code-review projection pending, no recorded exit.\nTruncation recovery: narrower configuration and source reads recovered omitted evidence; whitespace-insensitive progress patch inspected, with historical records excluded from current-behavior judgment.\n\nNo findings. All four hard criteria are satisfied: marker-or-preferred resolution, explicit classifier destinations, the replacement regression test, and updated adopter documentation. The completed dependency’s shared marker constructor and evidence acquisition remain integrated.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard success criteria are satisfied; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
