@@ -1006,15 +1006,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .as_ref()
             .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", gate_key))?;
         let (image, config) = if checker_needs_validation_image(checker) {
-            match self.capture_proposed_base(
-                session,
-                &BTreeMap::new(),
-                run_paths,
-                Some(super::validate::GrowthStart {
-                    image: initial,
-                    config: Some(Ok(config)),
-                }),
-            )? {
+            match self.capture_proposed_base(session, &BTreeMap::new(), run_paths, Some(initial))? {
                 Some((image, config)) => (image, config?),
                 None => return Ok(None),
             }

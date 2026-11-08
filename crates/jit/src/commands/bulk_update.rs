@@ -512,14 +512,9 @@ impl<S: IssueStore> IssueOps<'_, S> {
                 .map(|issue| issue.id.clone())
                 .collect::<Vec<_>>();
             let config = graph.declarations.config().clone();
-            let Some(base) = self.exec.extend_mutation_base(
-                session.as_mut(),
-                super::validate::GrowthStart {
-                    image: image.clone(),
-                    config: Some(Ok(config.clone())),
-                },
-                &ids,
-            )?
+            let Some(base) =
+                self.exec
+                    .extend_mutation_base(session.as_mut(), image.clone(), &ids)?
             else {
                 return Ok(BulkAttempt::Retry);
             };

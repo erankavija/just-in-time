@@ -625,7 +625,7 @@ mod tests {
             let document =
                 crate::declarations::ConfigurationDocument::parse(Some(b"not = valid = toml"));
             let expected = crate::commands::configuration_argument_error(
-                document.assemble(None, None).unwrap_err(),
+                document.clone().into_assembled(None, None).unwrap_err(),
             );
             let adapted = super::adapt_configuration_error(
                 &command,

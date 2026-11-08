@@ -8,13 +8,18 @@ use anyhow::{Context, Result};
 /// Load and assemble one admitted set of repository declaration files.
 /// Missing files contribute empty declarations; capture and assembly failures
 /// retain their error types.
-pub fn load_configuration(layout: &RepositoryLayout) -> Result<JitConfig> {
-    let observation = ConfigurationObservation::capture(layout.data_root()).with_context(|| {
-        format!(
-            "Failed to read configuration at '{}'",
-            layout.data_root().display()
-        )
-    })?;
+/// The files parse through `memo`.
+pub fn load_configuration(
+    layout: &RepositoryLayout,
+    memo: &crate::declarations::DeclarationMemo,
+) -> Result<JitConfig> {
+    let observation =
+        ConfigurationObservation::capture(layout.data_root(), memo).with_context(|| {
+            format!(
+                "Failed to read configuration at '{}'",
+                layout.data_root().display()
+            )
+        })?;
     Ok(observation.assemble()?)
 }
 
@@ -29,7 +34,7 @@ mod tests {
     fn test_load_configuration_absent_data_root_is_empty() {
         let dir = tempfile::tempdir().unwrap();
         let layout = repository_layout_for_data_root(&dir.path().join("absent"));
-        let config = load_configuration(&layout).unwrap();
+        let config = load_configuration(&layout, &Default::default()).unwrap();
         assert!(config.type_hierarchy.is_none());
         assert!(config.templates.templates.is_empty());
         assert!(config.invariants.invariants.is_empty());
@@ -41,7 +46,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let layout = repository_layout_for_data_root(dir.path());
         std::fs::write(layout.resolve(&VirtualPath::CONFIG).unwrap(), "[broken").unwrap();
-        let error = load_configuration(&layout).unwrap_err();
+        let error = load_configuration(&layout, &Default::default()).unwrap_err();
         assert!(matches!(
             error.downcast_ref::<ConfigurationAssemblyError>(),
             Some(ConfigurationAssemblyError::Config(_))
@@ -58,7 +63,7 @@ mod tests {
             "[[template",
         )
         .unwrap();
-        let error = load_configuration(&layout).unwrap_err();
+        let error = load_configuration(&layout, &Default::default()).unwrap_err();
         assert!(matches!(
             error.downcast_ref::<ConfigurationAssemblyError>(),
             Some(ConfigurationAssemblyError::Templates(_))
@@ -75,7 +80,7 @@ mod tests {
         let layout = repository_layout_for_data_root(&dir.path().join("sealed"));
         std::fs::create_dir(layout.data_root()).unwrap();
         std::fs::set_permissions(layout.data_root(), std::fs::Permissions::from_mode(0o0)).unwrap();
-        let result = load_configuration(&layout);
+        let result = load_configuration(&layout, &Default::default());
         std::fs::set_permissions(layout.data_root(), std::fs::Permissions::from_mode(0o700))
             .unwrap();
         let error = result.unwrap_err();

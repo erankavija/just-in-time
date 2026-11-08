@@ -1001,7 +1001,7 @@ impl Default for ProjectionStyle {
 /// when a declared kind omits one or more of its six required fields. A repo with
 /// no `[item_kinds]` table declares no kinds (the engine bakes in none), so there
 /// is nothing to validate in that case.
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum ItemKindConfigError {
     /// An explicitly-declared kind omits one or more required six-tuple fields.
     #[error(

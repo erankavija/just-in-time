@@ -24,24 +24,6 @@ enum BaseCapturePurpose<'a> {
 /// A capture's parsed issues and, for validation, the JSON value each decoded from.
 type ParsedIssues = (Result<Vec<Issue>>, Vec<serde_json::Value>);
 
-/// An image a session's round has read, which a base grows from, with the
-/// configuration a discovery assembled from it without overlaying a
-/// configuration source, when one did.
-pub(crate) struct GrowthStart {
-    pub(crate) image: crate::repository_state::RepositoryImage,
-    pub(crate) config:
-        Option<std::result::Result<JitConfig, crate::repository_state::ProducerError>>,
-}
-
-impl From<crate::repository_state::RepositoryImage> for GrowthStart {
-    fn from(image: crate::repository_state::RepositoryImage) -> Self {
-        Self {
-            image,
-            config: None,
-        }
-    }
-}
-
 /// A proposed base and the configuration its discovery assembled.
 pub(crate) type ProposedBase = (
     crate::repository_state::RepositoryImage,
@@ -427,7 +409,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Option<Vec<u8>>,
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
-        start: Option<GrowthStart>,
+        start: Option<crate::repository_state::RepositoryImage>,
     ) -> Result<Option<ProposedBase>> {
         self.capture_proposed_base_inner(
             session,
@@ -468,7 +450,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     pub(crate) fn extend_mutation_base(
         &self,
         session: &mut (dyn crate::storage::RepositoryReadSession + '_),
-        start: GrowthStart,
+        start: crate::repository_state::RepositoryImage,
         precheck_targets: &[IssueId],
     ) -> Result<Option<MutationBase>> {
         self.capture_mutation_base_from(session, Some(start), &[], precheck_targets, &[])
@@ -477,7 +459,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     fn capture_mutation_base_from(
         &self,
         session: &mut (dyn crate::storage::RepositoryReadSession + '_),
-        start: Option<GrowthStart>,
+        start: Option<crate::repository_state::RepositoryImage>,
         extra_paths: &[crate::repository_state::VirtualPath],
         precheck_targets: &[IssueId],
         planned: &[Issue],
@@ -541,7 +523,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         }
         self.capture_proposed_base_inner(
             session,
-            Some(image.into()),
+            Some(image),
             &std::collections::BTreeMap::new(),
             &[],
             BaseCapturePurpose::Mutation {
@@ -598,7 +580,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     fn capture_proposed_base_inner(
         &self,
         session: &mut (dyn crate::storage::RepositoryReadSession + '_),
-        start: Option<GrowthStart>,
+        start: Option<crate::repository_state::RepositoryImage>,
         overrides: &std::collections::BTreeMap<
             crate::repository_state::VirtualPath,
             Option<Vec<u8>>,
@@ -650,19 +632,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             };
         let mut issues = None::<ParsedIssues>;
         let mut configuration = super::ConfigurationParse::new(|image: &RepositoryImage| {
-            effective_config(image, overrides)
-        });
-        // A start's assembly holds only for a discovery that overlays no
-        // configuration source.
-        let start = start.map(|GrowthStart { image, config }| {
-            if let Some(config) = config.filter(|_| {
-                !super::CONFIGURATION_SOURCES
-                    .iter()
-                    .any(|path| overrides.contains_key(path))
-            }) {
-                configuration.seed(&image, config);
-            }
-            image
+            effective_configuration(image, overrides)
         });
         let mut add_base = start.is_some();
         let mut discover = |image: &RepositoryImage, spec: &mut CaptureSpec| -> Result<()> {
@@ -679,17 +649,23 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             // (its projection, item-kind, issue, and schema entries drop out),
             // and the subsequent validation report surfaces the parse
             // error as a finding.
-            let config = configuration.parse_or_default(image);
+            let (config, default_schemas) = configuration.parse_or_default(image);
             let issue_ids =
                 crate::repository_state::overlaid_issue_ids(image, overrides).unwrap_or_default();
             let rules_text = effective_virtual_path(image, &VirtualPath::RULES)?
                 .map(String::from_utf8)
                 .transpose()?;
-            let schema_rules = rules_text.as_deref().filter(|content| {
-                crate::declarations::rules::RuleSet::schema_requests(content).is_ok()
-            });
-            let closure =
-                validate_capture_closure(image.layout(), config, &issue_ids, schema_rules)?;
+            let schema_requests =
+                crate::repository_state::schema_requests_of(image, rules_text.as_deref())
+                    .ok()
+                    .flatten();
+            let closure = validate_capture_closure(
+                image.layout(),
+                config,
+                &issue_ids,
+                schema_requests.as_deref(),
+                default_schemas.as_deref().map_err(Clone::clone)?,
+            )?;
             let read = image.capture_spec();
             let closure_read = closure.paths.iter().all(|path| read.contains_path(path))
                 && closure
@@ -702,14 +678,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 return Ok(());
             }
             let gates = (!precheck_targets.is_empty() || !planned.is_empty())
-                .then(|| {
-                    crate::repository_state::validation_declarations_with_config(
-                        image,
-                        Ok(config.clone()),
-                    )
-                })
-                .transpose()?
-                .map(|declarations| declarations.gates);
+                .then(|| crate::repository_state::captured_gates(image))
+                .transpose()?;
             if issues.is_none() {
                 // A mutation derives from exactly these issues, so they are
                 // parsed once, with the strict reader, and handed back with the
@@ -1027,21 +997,24 @@ fn captured_divergences(
     Ok(DivergenceResponse::from_issues(issues, &hierarchy))
 }
 
-/// Assemble the configuration of `image` overlaid with `overrides`.
-fn effective_config(
+/// The parse of the configuration of `image` overlaid with `overrides`.
+fn effective_configuration(
     image: &crate::repository_state::RepositoryImage,
     overrides: &std::collections::BTreeMap<crate::repository_state::VirtualPath, Option<Vec<u8>>>,
-) -> std::result::Result<JitConfig, crate::repository_state::ProducerError> {
+) -> std::result::Result<
+    std::sync::Arc<crate::declarations::ParsedConfiguration>,
+    crate::repository_state::ProducerError,
+> {
     use crate::repository_state::VirtualPath;
     let effective = |path: &VirtualPath| match overrides.get(path) {
         Some(value) => Ok(value.as_deref()),
         None => image.file_bytes(path),
     };
-    Ok(crate::declarations::assemble_configuration(
+    Ok(image.declaration_memo().configuration([
         effective(&VirtualPath::CONFIG)?,
         effective(&VirtualPath::TEMPLATES)?,
         effective(&VirtualPath::INVARIANTS)?,
-    )?)
+    ]))
 }
 
 /// Add what the captured `issues` name to `spec`: the plan documents, and each

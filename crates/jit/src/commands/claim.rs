@@ -88,9 +88,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ClaimOps<'_, S> {
         let agent = resolve_agent_id(agent_id.map(|s| s.to_string()))?;
 
         // Load config for policy limits
-        let coord_config =
-            crate::storage::configuration_store::load_configuration(&storage.repository_layout()?)?
-                .coordination();
+        let coord_config = crate::storage::configuration_store::load_configuration(
+            &storage.repository_layout()?,
+            storage.declaration_memo(),
+        )?
+        .coordination();
 
         // Create file locker with the default lock-acquisition timeout
         let locker = FileLocker::with_configured_timeout();

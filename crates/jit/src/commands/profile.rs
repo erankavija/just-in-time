@@ -1,4 +1,3 @@
-use super::validate::GrowthStart;
 use super::{with_mutation_session, with_read_session, CommandExecutor, SessionStep};
 use crate::domain::identity::ProfileId;
 use crate::domain::relative_path::RootRelativePath;
@@ -1030,14 +1029,11 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
             contribution_context,
         ));
 
-        let (base, config) = match self.exec.capture_proposed_base(
-            session,
-            &BTreeMap::new(),
-            &content_paths,
-            None,
-        )? {
-            None => return Ok(None),
-            Some(base) => base,
+        let Some((base, _)) =
+            self.exec
+                .capture_proposed_base(session, &BTreeMap::new(), &content_paths, None)?
+        else {
+            return Ok(None);
         };
 
         let contribution_base = apply_overlay(
@@ -1061,14 +1057,11 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
         {
             expanded_paths.push(VirtualPath::SCHEMAS);
         }
-        let Some((base, config)) = self.exec.capture_proposed_base(
+        let Some((base, _)) = self.exec.capture_proposed_base(
             session,
             &BTreeMap::new(),
             &expanded_paths,
-            Some(GrowthStart {
-                image: base,
-                config: Some(config),
-            }),
+            Some(base),
         )?
         else {
             return Ok(None);
@@ -1091,15 +1084,9 @@ impl<S: IssueStore + RepositoryStateStore> ProfileOps<'_, S> {
                 .filter(|path| path != &VirtualPath::EVENTS),
         );
         let overrides = crate::repository_state::action_overrides(preview.delta().actions());
-        let Some((probe, _)) = self.exec.capture_proposed_base(
-            session,
-            &overrides,
-            &extra_paths,
-            Some(GrowthStart {
-                image: base,
-                config: Some(config),
-            }),
-        )?
+        let Some((probe, _)) =
+            self.exec
+                .capture_proposed_base(session, &overrides, &extra_paths, Some(base))?
         else {
             return Ok(None);
         };

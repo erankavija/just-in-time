@@ -15,7 +15,7 @@ use thiserror::Error;
 use crate::domain::vocabulary::wire_vocabulary;
 
 /// Invalid graph-template declarations.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum TemplateConfigError {
     /// The templates file is not valid TOML or does not match the schema.
     #[error("failed to parse templates file: {0}")]

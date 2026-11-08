@@ -3180,7 +3180,8 @@ fn bind_configuration(backend: &FileSessionBackend) {
     backend
         .storage
         .bind_selection(
-            ConfigurationObservation::capture(backend.layout.data_root()).unwrap(),
+            ConfigurationObservation::capture(backend.layout.data_root(), &Default::default())
+                .unwrap(),
             false,
             false,
         )
@@ -3277,7 +3278,7 @@ fn test_configuration_read_with_held_writer_and_pending_record_conflicts_without
     let data = backend.layout.data_root().to_path_buf();
     let (send, receive) = std::sync::mpsc::channel();
     let reader = std::thread::spawn(move || {
-        send.send(ConfigurationObservation::capture(&data).map(|_| ()))
+        send.send(ConfigurationObservation::capture(&data, &Default::default()).map(|_| ()))
             .unwrap()
     });
     let result = receive.recv_timeout(std::time::Duration::from_secs(2));
@@ -3298,7 +3299,7 @@ fn test_initialized_configuration_discards_index_and_declarations_crossed_by_one
     let backend = FileSessionBackend::seeded();
     let data = backend.layout.data_root();
     std::fs::write(data.join("index.json"), b"invalid captured index").unwrap();
-    let result = ConfigurationObservation::attempt(data, true, || {
+    let result = ConfigurationObservation::attempt(data, true, &Default::default(), || {
         let index = crate::repository_state::RepositoryIndex::default()
             .to_pretty_bytes()
             .unwrap();
@@ -3322,7 +3323,8 @@ fn test_initialized_configuration_discards_index_and_declarations_crossed_by_one
         result.is_none(),
         "a crossed capture cannot return its stale index error or new declarations"
     );
-    let observation = ConfigurationObservation::capture_initialized(data).unwrap();
+    let observation =
+        ConfigurationObservation::capture_initialized(data, &Default::default()).unwrap();
     assert_eq!(
         observation.worktree(true, false).unwrap().root,
         Some(PathBuf::from("../new-code"))
@@ -3335,23 +3337,23 @@ fn test_configuration_observation_admits_absent_ancestry_until_publication_or_re
     let outer = TempDir::new().unwrap();
     let ancestor = outer.path().join("new");
     let data = ancestor.join("nested/data");
-    let observation = ConfigurationObservation::capture(&data).unwrap();
+    let observation = ConfigurationObservation::capture(&data, &Default::default()).unwrap();
     assert!(observation.assemble().unwrap().worktree.is_none());
     assert_eq!(observation.admit().unwrap(), ReadAdmission::Granted);
     assert!(std::fs::read_dir(outer.path()).unwrap().next().is_none());
 
     std::fs::create_dir(&ancestor).unwrap();
     assert_eq!(observation.admit().unwrap(), ReadAdmission::Moved);
-    let observation = ConfigurationObservation::capture(&data).unwrap();
+    let observation = ConfigurationObservation::capture(&data, &Default::default()).unwrap();
     std::fs::rename(&ancestor, outer.path().join("old")).unwrap();
     std::fs::create_dir(&ancestor).unwrap();
     assert_eq!(observation.admit().unwrap(), ReadAdmission::Moved);
 
-    let observation = ConfigurationObservation::capture(&data).unwrap();
+    let observation = ConfigurationObservation::capture(&data, &Default::default()).unwrap();
     std::fs::create_dir_all(&data).unwrap();
     std::fs::write(data.join("config.toml"), "[worktree]\nroot = '../code'\n").unwrap();
     assert_eq!(observation.admit().unwrap(), ReadAdmission::Moved);
-    let published = ConfigurationObservation::capture(&data).unwrap();
+    let published = ConfigurationObservation::capture(&data, &Default::default()).unwrap();
     assert_eq!(
         published.worktree(true, false).unwrap().root,
         Some(PathBuf::from("../code"))
@@ -3372,7 +3374,7 @@ fn test_data_read_rejects_ancestor_published_during_absence_discovery() {
         result,
         Err(RepositoryStateStoreError::RetryableConflict { .. })
     ));
-    let selected = ConfigurationObservation::capture(&data).unwrap();
+    let selected = ConfigurationObservation::capture(&data, &Default::default()).unwrap();
     assert_eq!(
         selected.worktree(true, false).unwrap().root,
         Some(PathBuf::from("../code"))

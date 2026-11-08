@@ -45,13 +45,17 @@ pub struct EntryIdentity {
 impl EntryIdentity {
     /// Derive a content identity from boundary-provided object identity and bytes.
     pub fn for_bytes(object: impl Into<String>, bytes: &[u8]) -> Result<Self, CaptureError> {
-        let identity = Self {
-            object: object.into(),
-            sha256: format!("{:x}", Sha256::digest(bytes)),
-            byte_size: bytes.len() as u64,
-        };
+        let identity = Self::derive(object.into(), bytes);
         identity.validate()?;
         Ok(identity)
+    }
+
+    fn derive(object: String, bytes: &[u8]) -> Self {
+        Self {
+            object,
+            sha256: format!("{:x}", Sha256::digest(bytes)),
+            byte_size: bytes.len() as u64,
+        }
     }
 
     /// Stable boundary object identity.
@@ -70,11 +74,7 @@ impl EntryIdentity {
     }
 
     pub(crate) fn validate(&self) -> Result<(), CaptureError> {
-        if self.object.is_empty() || self.object.chars().any(char::is_control) {
-            return Err(CaptureError::InvalidEntryIdentity(
-                "object identity is empty or contains control characters".into(),
-            ));
-        }
+        Self::validate_object(&self.object)?;
         if self.sha256.len() != 64
             || !self
                 .sha256
@@ -83,6 +83,15 @@ impl EntryIdentity {
         {
             return Err(CaptureError::InvalidEntryIdentity(
                 "SHA-256 must be 64 lowercase hexadecimal characters".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_object(object: &str) -> Result<(), CaptureError> {
+        if object.is_empty() || object.chars().any(char::is_control) {
+            return Err(CaptureError::InvalidEntryIdentity(
+                "object identity is empty or contains control characters".into(),
             ));
         }
         Ok(())
@@ -102,27 +111,32 @@ impl EntryIdentity {
 
 /// Exact bytes paired with the content identity derived from them.
 ///
-/// The only constructor hashes the bytes, so an identity can never disagree
-/// with the bytes it describes and a closed image need not re-hash them. It
-/// serializes as its identity alone.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// The identity is derived from the bytes on first use, so it can never
+/// disagree with them and a capture nobody asks the identity of never hashes
+/// its bytes. It serializes as its identity alone.
+#[derive(Debug, Clone)]
 pub struct CapturedBytes {
-    identity: EntryIdentity,
+    object: String,
     bytes: Vec<u8>,
+    identity: std::sync::OnceLock<EntryIdentity>,
 }
 
 impl CapturedBytes {
-    /// Hash `bytes` under the boundary-provided `object` identity.
+    /// `bytes` under the boundary-provided `object` identity.
     pub fn new(object: impl Into<String>, bytes: Vec<u8>) -> Result<Self, CaptureError> {
+        let object = object.into();
+        EntryIdentity::validate_object(&object)?;
         Ok(Self {
-            identity: EntryIdentity::for_bytes(object, &bytes)?,
+            object,
             bytes,
+            identity: std::sync::OnceLock::new(),
         })
     }
 
     /// Identity derived from [`Self::bytes`].
     pub fn identity(&self) -> &EntryIdentity {
-        &self.identity
+        self.identity
+            .get_or_init(|| EntryIdentity::derive(self.object.clone(), &self.bytes))
     }
 
     /// Exact captured bytes.
@@ -131,9 +145,17 @@ impl CapturedBytes {
     }
 }
 
+impl PartialEq for CapturedBytes {
+    fn eq(&self, other: &Self) -> bool {
+        self.object == other.object && self.bytes == other.bytes
+    }
+}
+
+impl Eq for CapturedBytes {}
+
 impl Serialize for CapturedBytes {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.identity.serialize(serializer)
+        self.identity().serialize(serializer)
     }
 }
 
@@ -816,10 +838,22 @@ struct ImageData {
 ///
 /// Clones share the captured data and the token. Equality compares the
 /// captured data only; a session recognises its own image by `ImageToken`.
-#[derive(Debug, Clone)]
+/// Declaration parses come from the memo of the store that captured the image.
+#[derive(Clone)]
 pub struct RepositoryImage {
     data: Arc<ImageData>,
     token: ImageToken,
+    declarations: Arc<crate::declarations::DeclarationMemo>,
+}
+
+impl std::fmt::Debug for RepositoryImage {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RepositoryImage")
+            .field("data", &self.data)
+            .field("token", &self.token)
+            .finish_non_exhaustive()
+    }
 }
 
 impl PartialEq for RepositoryImage {
@@ -947,7 +981,24 @@ impl RepositoryImage {
                 pinned,
             }),
             token: ImageToken::mint(),
+            declarations: Arc::default(),
         })
+    }
+
+    /// This image, parsing its declarations through `memo`.
+    pub(crate) fn sharing_declarations(
+        self,
+        memo: &Arc<crate::declarations::DeclarationMemo>,
+    ) -> Self {
+        Self {
+            declarations: Arc::clone(memo),
+            ..self
+        }
+    }
+
+    /// The memo this image's declaration parses come from.
+    pub(crate) fn declaration_memo(&self) -> &Arc<crate::declarations::DeclarationMemo> {
+        &self.declarations
     }
 
     pub(crate) fn token(&self) -> ImageToken {

@@ -55,9 +55,10 @@ fn test_config_load_succeeds_with_valid_templates() {
     ])
     .unwrap();
     // Config load runs template validation; a valid file must not error.
-    let config = load_configuration(&jit::test_utils::repository_layout_for_data_root(
-        temp.path(),
-    ))
+    let config = load_configuration(
+        &jit::test_utils::repository_layout_for_data_root(temp.path()),
+        &Default::default(),
+    )
     .expect("valid templates.toml must load");
     assert!(config.templates.get("plan").is_some());
 }
@@ -65,9 +66,10 @@ fn test_config_load_succeeds_with_valid_templates() {
 #[test]
 fn test_config_load_succeeds_without_templates_file() {
     let temp = declaration_dir(&[("config.toml", CONFIG_WITH_HIERARCHY)]).unwrap();
-    load_configuration(&jit::test_utils::repository_layout_for_data_root(
-        temp.path(),
-    ))
+    load_configuration(
+        &jit::test_utils::repository_layout_for_data_root(temp.path()),
+        &Default::default(),
+    )
     .expect("absent templates.toml is fine");
 }
 
@@ -85,9 +87,10 @@ applies_to = ["bogus"]
         ("templates.toml", bad),
     ])
     .unwrap();
-    let err = load_configuration(&jit::test_utils::repository_layout_for_data_root(
-        temp.path(),
-    ))
+    let err = load_configuration(
+        &jit::test_utils::repository_layout_for_data_root(temp.path()),
+        &Default::default(),
+    )
     .unwrap_err();
     let msg = format!("{err:#}");
     assert!(
@@ -120,9 +123,10 @@ depends_on = ["a"]
         ("templates.toml", bad),
     ])
     .unwrap();
-    let err = load_configuration(&jit::test_utils::repository_layout_for_data_root(
-        temp.path(),
-    ))
+    let err = load_configuration(
+        &jit::test_utils::repository_layout_for_data_root(temp.path()),
+        &Default::default(),
+    )
     .unwrap_err();
     let msg = format!("{err:#}");
     assert!(
@@ -152,9 +156,10 @@ role = "planning"
         ("templates.toml", bad),
     ])
     .unwrap();
-    let err = load_configuration(&jit::test_utils::repository_layout_for_data_root(
-        temp.path(),
-    ))
+    let err = load_configuration(
+        &jit::test_utils::repository_layout_for_data_root(temp.path()),
+        &Default::default(),
+    )
     .unwrap_err();
     let msg = format!("{err:#}");
     assert!(
@@ -174,12 +179,11 @@ fn test_config_load_fails_on_malformed_templates_toml() {
         ("templates.toml", "[[template"),
     ])
     .unwrap();
-    assert!(
-        load_configuration(&jit::test_utils::repository_layout_for_data_root(
-            temp.path()
-        ))
-        .is_err()
-    );
+    assert!(load_configuration(
+        &jit::test_utils::repository_layout_for_data_root(temp.path()),
+        &Default::default()
+    )
+    .is_err());
 }
 
 /// `jit validate` judges a template's node types against the declared

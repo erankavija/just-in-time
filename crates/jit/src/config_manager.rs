@@ -1,9 +1,8 @@
 //! Pure conversions from parsed configuration to domain settings.
 
-use crate::config::{JitConfig, NamespaceConfig};
+use crate::config::JitConfig;
 use crate::domain::{LabelNamespace, LabelNamespaces, LinkedCheckoutWriteStance};
 use anyhow::Result;
-use std::collections::HashMap;
 
 /// Environment variable carrying one invocation's linked-checkout write stance.
 ///
@@ -68,22 +67,17 @@ pub fn project_name_from_config(config: &JitConfig) -> Option<&str> {
 /// yields no namespace, and an absent `[type_hierarchy]` table yields no
 /// hierarchy.
 pub fn namespaces_from_config(config: &JitConfig) -> LabelNamespaces {
-    build_namespaces_from_config(config, config.namespaces.clone().unwrap_or_default())
-}
-
-fn build_namespaces_from_config(
-    config: &JitConfig,
-    namespaces_config: HashMap<String, NamespaceConfig>,
-) -> LabelNamespaces {
-    let namespaces = namespaces_config
-        .into_iter()
+    let namespaces = config
+        .namespaces
+        .iter()
+        .flatten()
         // Only the taxonomy (description/unique) crosses into the domain
         // registry; per-namespace constraints (values/pattern/required) were
         // removed when validation became rule-driven.
         .map(|(name, ns_config)| {
             (
-                name,
-                LabelNamespace::new(ns_config.description, ns_config.unique),
+                name.clone(),
+                LabelNamespace::new(ns_config.description.clone(), ns_config.unique),
             )
         })
         .collect();

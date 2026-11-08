@@ -2396,6 +2396,7 @@ mod tests {
         let (_temp, storage, taxonomy) = setup_test_repo_with_taxonomy().unwrap();
         let config = crate::storage::configuration_store::load_configuration(
             &storage.repository_layout().unwrap(),
+            &Default::default(),
         )
         .unwrap();
         let hierarchy = config

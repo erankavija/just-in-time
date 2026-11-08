@@ -61,8 +61,11 @@ fn req01_invariant_entry_loads_at_config_time_config_present() {
     .unwrap();
     let jit_root = temp.path().join(".jit");
 
-    let config = load_configuration(&jit::test_utils::repository_layout_for_data_root(&jit_root))
-        .expect("config load must succeed");
+    let config = load_configuration(
+        &jit::test_utils::repository_layout_for_data_root(&jit_root),
+        &Default::default(),
+    )
+    .expect("config load must succeed");
 
     let invs = &config.invariants.invariants;
     assert_eq!(invs.len(), 2, "both invariants must be loaded");
@@ -98,8 +101,11 @@ fn req02_invariants_load_without_config_toml() {
     let temp = declaration_dir(&[(".jit/invariants.toml", INVARIANTS_TOML)]).unwrap();
     let jit_root = temp.path().join(".jit");
 
-    let config = load_configuration(&jit::test_utils::repository_layout_for_data_root(&jit_root))
-        .expect("config load must succeed without config.toml");
+    let config = load_configuration(
+        &jit::test_utils::repository_layout_for_data_root(&jit_root),
+        &Default::default(),
+    )
+    .expect("config load must succeed without config.toml");
 
     // Sanity: config-absent path must have returned an empty type-hierarchy.
     assert!(
@@ -135,8 +141,11 @@ fn req02_invariants_load_with_config_toml() {
     .unwrap();
     let jit_root = temp.path().join(".jit");
 
-    let config = load_configuration(&jit::test_utils::repository_layout_for_data_root(&jit_root))
-        .expect("config load must succeed with config.toml");
+    let config = load_configuration(
+        &jit::test_utils::repository_layout_for_data_root(&jit_root),
+        &Default::default(),
+    )
+    .expect("config load must succeed with config.toml");
 
     // Sanity: config-present path must have a type hierarchy.
     assert!(
@@ -169,9 +178,11 @@ fn req02_absent_invariants_toml_is_empty_on_both_paths() {
         };
         let temp = declaration_dir(files).unwrap();
         let jit_dir = temp.path().join(".jit");
-        let config =
-            load_configuration(&jit::test_utils::repository_layout_for_data_root(&jit_dir))
-                .unwrap_or_else(|e| panic!("load must succeed (with_config={with_config}): {e}"));
+        let config = load_configuration(
+            &jit::test_utils::repository_layout_for_data_root(&jit_dir),
+            &Default::default(),
+        )
+        .unwrap_or_else(|e| panic!("load must succeed (with_config={with_config}): {e}"));
         assert!(
             config.invariants.invariants.is_empty(),
             "absent invariants.toml must yield an empty registry (with_config={with_config})"
@@ -297,8 +308,11 @@ fn req04_missing_statement_fails_with_typed_error() {
         let temp = declaration_dir(files).unwrap();
         let jit_dir = temp.path().join(".jit");
 
-        let err = load_configuration(&jit::test_utils::repository_layout_for_data_root(&jit_dir))
-            .expect_err("missing statement must fail config load");
+        let err = load_configuration(
+            &jit::test_utils::repository_layout_for_data_root(&jit_dir),
+            &Default::default(),
+        )
+        .expect_err("missing statement must fail config load");
 
         // The assembly error names the file; the full chain (via `{err:#}`) also
         // carries the underlying TOML error naming the missing field.
@@ -325,8 +339,11 @@ fn req04_invalid_kind_token_fails_with_descriptive_error() {
     .unwrap();
     let jit_dir = temp.path().join(".jit");
 
-    let err = load_configuration(&jit::test_utils::repository_layout_for_data_root(&jit_dir))
-        .expect_err("invalid kind token must fail config load");
+    let err = load_configuration(
+        &jit::test_utils::repository_layout_for_data_root(&jit_dir),
+        &Default::default(),
+    )
+    .expect_err("invalid kind token must fail config load");
 
     // See req04_missing_statement_fails_with_typed_error for why we use `{err:#}`.
     let full = format!("{err:#}");
