@@ -1,0 +1,55 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b28d41b18f0fe795f3130964f64b3fa251793548",
+  "completed_at": "2026-11-08T04:56:06.701649479Z",
+  "duration_ms": 179232,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/archive.rs",
+        "id": "F1",
+        "line": 911,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/dd95bd9d/requirement/REQ-02"
+        ],
+        "severity": "medium",
+        "summary": "Post-apply citation scanning changes or loses advisory citations when citing files relocate."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/archive_advisory.rs",
+        "id": "F2",
+        "line": 223,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/dd95bd9d/requirement/REQ-03",
+          "@/charter/D-20",
+          "@/inv/convention-convergence"
+        ],
+        "severity": "medium",
+        "summary": "The parallel Markdown destination parser misses angle-delimited and reference links."
+      }
+    ],
+    "summary": "Execution can lose preview citations, and the added Markdown parser misses valid links.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "dd95bd9d-9a9b-44a9-8ecc-126574b3cb8a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "031018ef-c555-45e4-b3ae-c7cdc40c7e8f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T04:53:07.468872243Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9813 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1b980-c9c0-7b10-8c55-8b399ab5a85a\n--------\nuser\n--- 9800 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:dd95bd9d — 5ebce93b98db, efab0755a083, 45ded1fc5ae6; uncommitted changes excluded.\nPolicy sources: AGENTS.md; no subtree AGENTS.md found.\nResolved items: @/charter/D-9, @/charter/D-18, @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/inv/canonical-cutover, @/inv/architecture-dependency-direction, @/inv/convention-convergence, @/inv/essential-code-prose, @/inv/orthogonal-tests, @/inv/semantic-types, @/inv/semantic-test-assertions, @/inv/shared-test-contracts → .jit/invariants.toml; @/issue/dd95bd9d/requirement/REQ-01, @/issue/dd95bd9d/requirement/REQ-02, @/issue/dd95bd9d/requirement/REQ-03, @/issue/dd95bd9d/requirement/REQ-04, @/issue/b697a3f7/requirement/REQ-06 → respective .jit/issues/*.json descriptions; @/gate/jit-validate → .jit/gates.toml.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T04:50:49.920272712+00:00; wrapper ancestry confirms coverage of all three tagged commits; code-review pending, exit none in current issue projection; no gates rerun.\nTruncation recovery: recovered implementation patches by path and line range, the new advisory module in bounded ranges, affected issue patches separately, and relevant relative-path helpers.\n\n1. **F1 — Medium, blocking, issue-impact: execution scans after relocation and loses preview citations.** At [commands/archive.rs:911](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/archive.rs:911), the advisory scan runs after `with_mutation_session` applies the archive. With citation roots `[\"fixtures\"]`, suppose two moving documents include `fixtures/a.md` citing `fixtures/b.md` in a code span. Preview reports that citation; execution moves both outside the scan roots and reports none, despite no intervening external edits. Scanning an archive-inclusive root instead changes the citing location. Preserve the pre-apply advisory evidence outside `ArtifactPlan` and add coverage for a relocating citing file. This violates REQ-02.\n\n2. **F2 — Medium, blocking, issue-impact: the added Markdown parser misses valid destinations.** At [archive_advisory.rs:223](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/archive_advisory.rs:223), destination extraction stops at whitespace or `)` after a literal `](`. In `dev/active/sibling.md`, `[plan](<plan.md>)` resolves as `dev/active/<plan.md>` and misses `dev/active/plan.md`; reference links have no opener and are missed entirely. The existing `LinkValidator::scan_links` uses CommonMark parsing. Reuse or extend that shared parsing while retaining whole-path citation matching and `RootRelativePath::resolve_link`. This leaves REQ-03 incomplete and introduces a parallel parser contrary to D-20 and convention-convergence.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Execution can lose preview citations, and the added Markdown parser misses valid links.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Post-apply citation scanning changes or loses advisory citations when citing files relocate.\",\"file\":\"crates/jit/src/commands/archive.rs\",\"line\":911,\"references\":[\"@/issue/dd95bd9d/requirement/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The parallel Markdown destination parser misses angle-delimited and reference links.\",\"file\":\"crates/jit/src/domain/archive_advisory.rs\",\"line\":223,\"references\":[\"@/issue/dd95bd9d/requirement/REQ-03\",\"@/charter/D-20\",\"@/inv/convention-convergence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
