@@ -300,7 +300,7 @@
         {
           "id": "6a19e93f",
           "short_id": "6a19e93f",
-          "status": "gating",
+          "status": "escalated",
           "note": "r2 landed 173883ad9 (fb38ed248); cargo-ci passed. REQ-03 quiet-host runs 10:00-10:05, 5 samples, binary sha256 1963f567..., base 369d35a42: standard tip s(2000)/s(500)=1.334 (base 3.766) pass; graph-rule variant tip 0.599 (base 3.819) pass; load at start 1.91/1.32, end 1.42/1.27."
         },
         {
@@ -421,6 +421,12 @@
       "reason": "rework limit exceeded; same defect class (post-apply citation scan)",
       "to": "just-in-time-d5",
       "status": "closed: r3 passed"
+    },
+    {
+      "issue": "6a19e93f",
+      "reason": "rework limit exceeded; repeated class (precheck per-match scans)",
+      "to": "just-in-time-d5",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -803,6 +809,15 @@
       "effort": "high",
       "verdict": "pass",
       "run": "702fb71f"
+    },
+    {
+      "issue": "6a19e93f",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "fail (F1 blocking: per-target precheck selection scans)",
+      "run": "bc20ff53"
     }
   ]
 }

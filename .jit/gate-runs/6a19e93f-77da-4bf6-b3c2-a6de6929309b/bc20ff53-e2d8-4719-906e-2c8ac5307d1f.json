@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d30511cc0081eee745209f8e65b62d39eabca9c5",
+  "completed_at": "2026-11-08T08:08:53.431607472Z",
+  "duration_ms": 225216,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/gate_check.rs",
+        "id": "F1",
+        "line": 1258,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/6a19e93f/requirement/REQ-01",
+          "@/issue/6a19e93f/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "Precheck selection, label-target loading, and Exec context enrichment retain repository-sized work per match that the owning cost test does not fully observe."
+      }
+    ],
+    "summary": "Precheck execution still scans or reparses repository-wide issue records per match; the prior replacement and traversal defects are addressed.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6a19e93f-77da-4bf6-b3c2-a6de6929309b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "bc20ff53-e2d8-4719-906e-2c8ac5307d1f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T08:05:08.215175394Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9027 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1ba30-94a5-7423-af23-3749b89286ec\n--------\nuser\n--- 9014 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:6a19e93f` — c41d3b540, fabc4e729, 46834823c, d703de595, f2e7c20e2, de0ebd560, f9499eb63, fb38ed248, d30511cc0.\nPolicy sources: AGENTS.md; dev/TESTING.md; .jit/config.toml; no subtree AGENTS.md.\nResolved items: @/issue/6a19e93f/requirement/REQ-01, @/issue/6a19e93f/requirement/REQ-02, @/issue/6a19e93f/requirement/REQ-03, @/issue/b697a3f7/requirement/REQ-22, @/issue/16c53cc2/requirement/REQ-07 → respective .jit/issues/ descriptions; @/charter/D-19, @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/invariant/convention-convergence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/derived-state-coherence, @/invariant/architecture-dependency-direction, @/invariant/semantic-types, @/invariant/canonical-cutover, @/invariant/gate-semantics, @/invariant/domain-agnostic, @/invariant/dag-acyclic → .jit/invariants.toml; @/gate/jit-validate → .jit/gates.toml.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T07:56:46.581020214Z; supplied ancestry covers every tagged commit except evidence-only d30511cc0. Prior code-review failed, exit 1; its replacement and traversal findings are addressed. Recorded REQ-03 smoke ratios: standard 1.334, graph-rule variant 0.599, both passing.\nTruncation recovery: narrower metadata-patch reads recovered relevant evidence; unrelated sibling-task material and the prior run’s abbreviated diagnostic transcript were excluded from judgment.\n\n1. **F1 — High; blocking; issue-impact: Prechecks still perform repository-sized work per match.** [gate_check.rs:1258](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/gate_check.rs:1258) selects the shared report separately for each target. `Selectable::issue` (`validation/report.rs:256`) scans all records through `resolve_issue_id_among`, then searches them again. Thus IssueValidation and RuleValidation retain O(M×N) work. LabelTargetValidation additionally reparses every issue at `gate_check.rs:1271`; Exec prechecks with context resolve each dependency by scanning `input.issues` at line 1444. These paths leave REQ-01 unmet. Reuse session indexes and parsed records throughout precheck execution, and extend the existing owning cost test (`bulk_update.rs:1723`) to observe these scans: its counters currently miss report selection, so the passing assertion does not establish REQ-02.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Precheck execution still scans or reparses repository-wide issue records per match; the prior replacement and traversal defects are addressed.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Precheck selection, label-target loading, and Exec context enrichment retain repository-sized work per match that the owning cost test does not fully observe.\",\"file\":\"crates/jit/src/commands/gate_check.rs\",\"line\":1258,\"references\":[\"@/issue/6a19e93f/requirement/REQ-01\",\"@/issue/6a19e93f/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

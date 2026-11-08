@@ -19,9 +19,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "4e852e52-49d2-48af-870f-efa6114ba9cf",
+      "run_id": "bc20ff53-e2d8-4719-906e-2c8ac5307d1f",
       "status": "failed",
-      "updated_at": "2026-11-08T07:17:24.102852625Z",
+      "updated_at": "2026-11-08T08:08:53.433249762Z",
       "updated_by": "auto:executor"
     }
   },
@@ -40,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Bulk update's per-match cost is independent of repository size",
-  "updated_at": "2026-11-08T07:58:49.331221156Z"
+  "updated_at": "2026-11-08T08:08:53.433249762Z"
 }
