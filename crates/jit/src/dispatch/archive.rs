@@ -5,8 +5,8 @@
 
 use super::{resolve_issue, CommandContext, HandlerResult};
 use crate::cli::ArchiveCommands;
-use crate::domain::artifact_execution::ArchiveExecutionResult;
-use crate::domain::artifact_plan::{ArchiveCandidates, ArtifactPlan};
+use crate::domain::archive_advisory::{ArchiveExecutionReport, ArchivePreview};
+use crate::domain::artifact_plan::ArchiveCandidates;
 use crate::output::ArchiveTargetResponse;
 use crate::storage::JsonFileStorage;
 
@@ -49,9 +49,9 @@ command_group! {
     leaves: {
         "archive_candidates" => ArchiveCommands::Candidates => candidates() raises [RetryableConflict] -> ArchiveCandidates,
         "archive_document" => ArchiveCommands::Document { path, execute } => document(path, execute) raises [RetryableConflict] -> ArchiveTargetResponse
-            as union [ArtifactPlan, ArchiveExecutionResult] "Default: the ArtifactPlan preview. With --execute: the ArchiveExecutionResult of the run.",
+            as union [ArchivePreview, ArchiveExecutionReport] "Default: the ArchivePreview plan. With --execute: the ArchiveExecutionReport of the run. Both carry an advisory citation section.",
         "archive_container" => ArchiveCommands::Container { id, execute } => container(id, execute) raises [RetryableConflict] -> ArchiveTargetResponse
-            as union [ArtifactPlan, ArchiveExecutionResult] "Default: the ArtifactPlan preview. With --execute: the ArchiveExecutionResult of the run.",
+            as union [ArchivePreview, ArchiveExecutionReport] "Default: the ArchivePreview plan. With --execute: the ArchiveExecutionReport of the run. Both carry an advisory citation section.",
     }
 }
 
@@ -70,7 +70,7 @@ mod tests {
         );
         for path in ["archive_document", "archive_container"] {
             let schema = registered(path);
-            assert_eq!(schema.success, "ArtifactPlan");
+            assert_eq!(schema.success, "ArchivePreview");
             assert!(schema.success_schema.unwrap()["oneOf"].is_array());
         }
     }

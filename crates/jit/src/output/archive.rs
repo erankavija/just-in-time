@@ -1,11 +1,11 @@
 //! Registered responses and human rendering of the `jit archive` leaves.
 
 use super::{
-    render_archive_candidates, render_archive_execution, render_archive_plan, HumanRender,
-    OutputMode,
+    render_archive_advisory, render_archive_candidates, render_archive_execution,
+    render_archive_plan, HumanRender, OutputMode,
 };
-use crate::domain::artifact_execution::ArchiveExecutionResult;
-use crate::domain::artifact_plan::{ArchiveCandidates, ArtifactPlan};
+use crate::domain::archive_advisory::{ArchiveExecutionReport, ArchivePreview};
+use crate::domain::artifact_plan::ArchiveCandidates;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -15,23 +15,23 @@ impl HumanRender for ArchiveCandidates {
     }
 }
 
-impl HumanRender for ArtifactPlan {
+impl HumanRender for ArchivePreview {
     fn render_human(&self, _: OutputMode) -> String {
-        render_archive_plan(self)
+        render_archive_plan(&self.plan) + &render_archive_advisory(&self.advisory)
     }
 }
 
-impl HumanRender for ArchiveExecutionResult {
+impl HumanRender for ArchiveExecutionReport {
     fn render_human(&self, _: OutputMode) -> String {
-        render_archive_execution(self)
+        render_archive_execution(&self.result) + &render_archive_advisory(&self.advisory)
     }
 }
 
 #[derive(Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum ArchiveTargetResponse {
-    Preview(ArtifactPlan),
-    Executed(ArchiveExecutionResult),
+    Preview(ArchivePreview),
+    Executed(ArchiveExecutionReport),
 }
 
 impl HumanRender for ArchiveTargetResponse {

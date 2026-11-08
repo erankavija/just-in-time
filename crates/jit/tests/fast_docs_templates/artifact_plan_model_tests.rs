@@ -1,4 +1,5 @@
 use jit::config::DocumentationConfig;
+use jit::domain::archive_advisory::ArchiveAdvisory;
 use jit::domain::artifact_plan::{
     ArchiveCandidates, ArtifactAction, ArtifactPlan, ArtifactPlanEntry, ArtifactVersion,
     BlockerCode, ContentIdentity, PlanBlocker, PlanError, PlanTarget, PlanWarning, PolicyStatus,
@@ -381,17 +382,20 @@ fn test_archive_plan_schema_v1_golden_fields() {
 
 #[test]
 fn test_archive_candidates_envelope_derives_count_and_rejects_a_mismatched_count() {
-    let candidates = ArchiveCandidates::new(vec![configured_plan(
-        &issue_id(1),
-        vec![artifact("dev/a.md", ArtifactVersion::WorkingTree)],
-        Vec::new(),
-        Vec::new(),
-    )]);
+    let candidates = ArchiveCandidates::new(
+        vec![configured_plan(
+            &issue_id(1),
+            vec![artifact("dev/a.md", ArtifactVersion::WorkingTree)],
+            Vec::new(),
+            Vec::new(),
+        )],
+        ArchiveAdvisory::default(),
+    );
     let wire = serde_json::to_value(&candidates).unwrap();
 
     assert_eq!(
         object_keys(&wire),
-        BTreeSet::from(["count", "candidates", "schema_version"])
+        BTreeSet::from(["count", "candidates", "schema_version", "advisory"])
     );
     assert_eq!(wire["count"], 1);
     assert_eq!(wire["schema_version"], 1);
