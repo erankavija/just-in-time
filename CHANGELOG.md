@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **`jit config set` checks the whole declaration set.** An edit is refused
+  as an invalid argument when the edited configuration fails to assemble with
+  the repository's other declaration files, such as an invalid
+  `templates.toml` or `invariants.toml`; the error names the failing file and
+  its cause. Before, only `config.toml` was checked.
+
 - **Findings summaries stay on one stderr line.** Whole-repository `jit
   validate` prints a repository-integrity error, such as multi-line
   derived-state drift, in full in the stdout report and in
