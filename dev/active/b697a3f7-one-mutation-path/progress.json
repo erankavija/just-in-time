@@ -289,8 +289,8 @@
         {
           "id": "2add77bc",
           "short_id": "2add77bc",
-          "status": "pending",
-          "note": "opus"
+          "status": "done",
+          "note": "landed e30f04c2b (aa3509efe); cargo-ci passed; code-review passed run 702fb71f; smoke (d) 167/547 = 0.305"
         }
       ]
     },
@@ -794,6 +794,15 @@
       "effort": "high",
       "verdict": "fail (F1-F3 blocking)",
       "run": "4e852e52"
+    },
+    {
+      "issue": "2add77bc",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "pass",
+      "run": "702fb71f"
     }
   ]
 }
