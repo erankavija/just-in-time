@@ -83,7 +83,7 @@ struct CapturedGateExecution<'a> {
     /// The configuration assembled from `image`.
     config: &'a crate::config::JitConfig,
     issue: &'a Issue,
-    issues: &'a [Issue],
+    issues: &'a crate::domain::queries::IndexedIssues,
     gate: &'a crate::declarations::GateDefinition,
     runs: &'a [GateRunResult],
     prompt: Option<&'a str>,
@@ -91,27 +91,25 @@ struct CapturedGateExecution<'a> {
     validation: &'a SharedValidation,
 }
 
-/// The validation reports a batch of built-in checkers judges, each computed
-/// on first use and shared by every checker run in the batch, which select
-/// their findings from it: the report of the batch's captured image under its
-/// configuration, and the live repository's report, taken once per batch.
-/// Gate-recency rules in either evaluate at the time of its first use.
+/// What a batch of built-in checkers judges, each computed on first use and
+/// shared by every checker run in the batch: the report of the batch's
+/// captured image under its configuration, which each checker selects its
+/// findings from, and the whole live repository's judgement, taken once per
+/// batch. Gate-recency rules in either evaluate at the time of its first use.
 #[derive(Default)]
 pub(super) struct SharedValidation {
     captured: std::sync::OnceLock<crate::validation::ValidationReport>,
-    live: std::sync::OnceLock<
-        std::result::Result<crate::validation::ValidationReport, std::sync::Arc<anyhow::Error>>,
-    >,
+    live: std::sync::OnceLock<std::result::Result<Judgement, std::sync::Arc<anyhow::Error>>>,
 }
 
+/// A built-in checker's findings and whether they fail its gate.
+type Judgement = (Vec<GateFinding>, bool);
+
 impl SharedValidation {
-    fn live_report(
-        &self,
-        validate: impl FnOnce() -> Result<crate::validation::ValidationReport>,
-    ) -> Result<&crate::validation::ValidationReport> {
+    fn live_judgement(&self, judge: impl FnOnce() -> Result<Judgement>) -> Result<Judgement> {
         self.live
-            .get_or_init(|| validate().map_err(std::sync::Arc::new))
-            .as_ref()
+            .get_or_init(|| judge().map_err(std::sync::Arc::new))
+            .clone()
             .map_err(|error| anyhow!("{error:#}"))
     }
 
@@ -754,20 +752,14 @@ fn selected_gate_findings(
 /// a full id or unique prefix, as templates write short ids. A missing, repeated,
 /// or malformed target is a configuration fault.
 fn label_target(
-    captured: &crate::validation::CapturedValidation<'_>,
+    report: &crate::validation::ValidationReport,
     issue_id: &IssueId,
     label_namespace: &str,
 ) -> Result<IssueIdPrefix> {
     if label_namespace.is_empty() {
         anyhow::bail!("label_namespace is empty");
     }
-    let issue = captured
-        .issues
-        .as_deref()
-        .map_err(|error| anyhow!("{error:#}"))?
-        .iter()
-        .find(|issue| &issue.id == issue_id)
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id.clone()))?;
+    let issue = report.record(issue_id)?;
     let prefix = format!("{label_namespace}:");
     let targets: Vec<&str> = issue
         .labels
@@ -1040,16 +1032,18 @@ impl<S: IssueStore> GateOps<'_, S> {
                     std::slice::from_ref(&bound.issue.id),
                     claims_guard.as_ref(),
                 )?;
-                let issues = if super::is_broad_builtin_gate(&bound.gate) {
-                    super::captured_active_issues(&bound.image)?
-                } else {
-                    std::iter::once(bound.issue.clone())
-                        .chain(captured_direct_dependency_issues(
-                            &bound.image,
-                            &bound.issue,
-                        )?)
-                        .collect()
-                };
+                let issues = crate::domain::queries::IndexedIssues::new(
+                    if super::is_broad_builtin_gate(&bound.gate) {
+                        super::captured_active_issues(&bound.image)?
+                    } else {
+                        std::iter::once(bound.issue.clone())
+                            .chain(captured_direct_dependency_issues(
+                                &bound.image,
+                                &bound.issue,
+                            )?)
+                            .collect()
+                    },
+                );
                 let captured = captured_gate_evidence(&bound.image, &bound.issue, &[&bound.gate])?;
                 Ok(AttemptOutcome::Done((
                     bound,
@@ -1234,7 +1228,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::declarations::GateChecker;
-        use crate::validation::{report::Selection, CapturedValidation};
+        use crate::validation::report::Selection;
 
         let GateRunSubject {
             run_id,
@@ -1259,17 +1253,19 @@ impl<S: IssueStore> CommandExecutor<S> {
             selected_gate_findings(validation.report(repository_image, config), &selection)
         };
         let judged: Result<(Vec<GateFinding>, bool)> = match checker {
-            GateChecker::RepositoryValidation => validation
-                .live_report(|| self.validation().validate_repository_report())
-                .and_then(|report| selected_gate_findings(report, &Selection::Whole)),
+            GateChecker::RepositoryValidation => validation.live_judgement(|| {
+                self.validation()
+                    .validate_repository_report()
+                    .and_then(|report| selected_gate_findings(&report, &Selection::Whole))
+            }),
             GateChecker::IssueValidation => select_over_image(Selection::Issue(issue_id.into())),
             GateChecker::RuleValidation { rule } => select_over_image(Selection::Rule {
                 issue: issue_id.into(),
                 rule: rule.clone(),
             }),
             GateChecker::LabelTargetValidation { label_namespace } => {
-                let captured = CapturedValidation::with_config(repository_image, config.clone());
-                label_target(&captured, issue_id, label_namespace).and_then(|target| {
+                let report = validation.report(repository_image, config);
+                label_target(report, issue_id, label_namespace).and_then(|target| {
                     select_over_image(Selection::Scope(target.clone())).with_context(|| {
                         format!("label '{label_namespace}:{target}' on issue {issue_id}")
                     })
@@ -1441,7 +1437,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .issue
             .dependencies
             .iter()
-            .filter_map(|id| input.issues.iter().find(|candidate| candidate.id == *id))
+            .filter_map(|id| input.issues.get(id))
             .map(crate::domain::MinimalIssue::from)
             .collect();
         let mut issue_view =

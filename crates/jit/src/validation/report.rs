@@ -246,19 +246,72 @@ pub enum Selection {
 /// What selections other than [`Selection::Whole`] read besides the findings.
 #[derive(Debug)]
 pub(crate) struct Selectable {
-    pub(crate) records: Arc<[Issue]>,
+    pub(crate) records: crate::domain::queries::IndexedIssues,
     /// The rule set, or the `rules-file` message when it did not load.
     pub(crate) rules: std::result::Result<RuleSet, String>,
     pub(crate) templates: TemplateRegistry,
+    /// The report's findings by the issues they concern, built on first use.
+    pub(crate) finding_index: std::sync::OnceLock<FindingIndex>,
+}
+
+/// Positions of a report's findings by the issues they name, so a selection
+/// of a few issues reads only theirs.
+#[derive(Debug, Default)]
+pub(crate) struct FindingIndex {
+    /// Each finding attributed to or fired by an issue, under that issue.
+    by_issue: HashMap<IssueId, Vec<usize>>,
+    /// The findings every non-whole selection considers: those naming no
+    /// issue and the repository-level built-in passes.
+    global: Vec<usize>,
+}
+
+impl FindingIndex {
+    fn new(findings: &[ReportFinding]) -> Self {
+        use BuiltInPass::{EnforcementDrift, RulesFile};
+
+        findings
+            .iter()
+            .enumerate()
+            .fold(Self::default(), |mut index, (position, finding)| {
+                let named = finding
+                    .reported
+                    .issue_id
+                    .iter()
+                    .chain(&finding.subject)
+                    .collect::<HashSet<_>>();
+                let repository_level = matches!(
+                    finding.origin,
+                    FindingOrigin::BuiltIn(RulesFile | EnforcementDrift)
+                );
+                if named.is_empty() || repository_level {
+                    index.global.push(position);
+                }
+                named.into_iter().for_each(|id| {
+                    index.by_issue.entry(id.clone()).or_default().push(position);
+                });
+                index
+            })
+    }
+
+    /// The positions of the findings a selection of `issues` can admit, in
+    /// report order.
+    fn candidates<'a>(&self, issues: impl IntoIterator<Item = &'a IssueId>) -> Vec<usize> {
+        let mut positions = issues
+            .into_iter()
+            .filter_map(|id| self.by_issue.get(id))
+            .flatten()
+            .chain(&self.global)
+            .copied()
+            .collect::<Vec<_>>();
+        positions.sort_unstable();
+        positions.dedup();
+        positions
+    }
 }
 
 impl Selectable {
     fn issue(&self, prefix: &IssueIdPrefix) -> Result<&Issue> {
-        let id = crate::storage::resolve_issue_id_among(prefix, &self.records)?;
-        self.records
-            .iter()
-            .find(|issue| issue.id == id)
-            .ok_or_else(|| crate::storage::IssueNotFoundError::new(id).into())
+        crate::storage::resolve_issue_among(prefix, &self.records)
     }
 
     /// Names of the graph rules whose selector matches any of `issues`.
@@ -284,12 +337,14 @@ impl Selectable {
         let breakdown_type = crate::labels::type_label_value(&container.labels)
             .and_then(|kind| templates.template_for_container(kind))
             .and_then(|template| template.breakdown_type(&templates.roles));
-        let members =
-            crate::domain::queries::bracket_scope_ids(&container.id, &self.records, breakdown_type);
-        let in_scope: Vec<&Issue> = self
-            .records
+        let members = crate::domain::queries::bracket_scope_ids(
+            &container.id,
+            |id| self.records.get(id),
+            breakdown_type,
+        );
+        let in_scope: Vec<&Issue> = members
             .iter()
-            .filter(|issue| members.contains(&issue.id))
+            .filter_map(|id| self.records.get(id))
             .collect();
         Membership::Scope {
             applicable: self.applicable(&in_scope),
@@ -422,8 +477,7 @@ impl ValidationReport {
         let membership = self.membership(selection)?;
         let findings = RuleReport {
             findings: self
-                .findings
-                .iter()
+                .candidates(&membership)?
                 .filter_map(|finding| membership.admit(finding))
                 .collect(),
         };
@@ -453,8 +507,7 @@ impl ValidationReport {
             .map_err(|message| anyhow!("{message}"))?;
         let membership = selectable.issue_membership(issue);
         let mut messages = group_messages(
-            self.findings
-                .iter()
+            self.candidates(&membership)?
                 .filter_map(|finding| membership.admit(finding))
                 .map(|finding| (finding.rule, finding.message)),
         );
@@ -483,6 +536,46 @@ impl ValidationReport {
             issue_id: issue.id.clone(),
             outcomes,
         })
+    }
+
+    /// The parsed record of `id`.
+    ///
+    /// # Errors
+    ///
+    /// The structural failure of a report without parsed records, or
+    /// [`IssueNotFoundError`](crate::storage::IssueNotFoundError) when no
+    /// record has `id`.
+    pub(crate) fn record(&self, id: &IssueId) -> Result<&Issue> {
+        self.selectable()?
+            .records
+            .get(id)
+            .ok_or_else(|| crate::storage::IssueNotFoundError::new(id.clone()).into())
+    }
+
+    /// The findings `membership` can admit: every finding for the whole
+    /// report, else those its issues' index entries name.
+    fn candidates<'a>(
+        &'a self,
+        membership: &Membership<'_>,
+    ) -> Result<Box<dyn Iterator<Item = &'a ReportFinding> + 'a>> {
+        let issues: Vec<&IssueId> = match membership {
+            Membership::Whole => {
+                crate::domain::queries::note_repository_pass(self.findings.len());
+                return Ok(Box::new(self.findings.iter()));
+            }
+            Membership::Issue { issue, .. } | Membership::Rule { issue, .. } => vec![*issue],
+            Membership::Scope { members, .. } => members.iter().collect(),
+        };
+        let index = self
+            .selectable()?
+            .finding_index
+            .get_or_init(|| FindingIndex::new(&self.findings));
+        Ok(Box::new(
+            index
+                .candidates(issues)
+                .into_iter()
+                .map(|position| &self.findings[position]),
+        ))
     }
 
     fn selectable(&self) -> Result<&Selectable> {
@@ -838,9 +931,10 @@ assert = { label-uniqueness = { namespace = "req", scope = "all" } }
                 has_history: true,
                 findings: self.findings(),
                 selectable: Ok(Box::new(Selectable {
-                    records: self.records(),
+                    records: crate::domain::queries::IndexedIssues::new(self.records()),
                     rules: Ok(RuleSet::parse(RULES, None, []).unwrap()),
                     templates: TemplateRegistry::default(),
+                    finding_index: Default::default(),
                 })),
             }
         }
@@ -858,9 +952,10 @@ assert = { label-uniqueness = { namespace = "req", scope = "all" } }
                     built_in(BuiltInPass::EnforcementDrift, None, "drift"),
                 ],
                 selectable: Ok(Box::new(Selectable {
-                    records: self.records(),
+                    records: crate::domain::queries::IndexedIssues::new(self.records()),
                     rules: Err("config error: rules-file".into()),
                     templates: TemplateRegistry::default(),
+                    finding_index: Default::default(),
                 })),
                 ..self.report()
             }

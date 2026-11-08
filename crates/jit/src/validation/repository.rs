@@ -424,9 +424,10 @@ pub fn report(captured: &CapturedValidation<'_>, inputs: &ReportInputs) -> Valid
         rule_pass_error,
     ) {
         (Ok(records), None) => Ok(Box::new(Selectable {
-            records: Arc::clone(records),
+            records: crate::domain::queries::IndexedIssues::new(Arc::clone(records)),
             rules: rules_file_message.map_or_else(|| Ok(declarations.rules.clone()), Err),
             templates: declarations.config.templates.clone(),
+            finding_index: Default::default(),
         })),
         (Err(error), _) => Err(Arc::clone(error)),
         (Ok(_), Some(error)) => Err(error),

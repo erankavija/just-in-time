@@ -279,8 +279,12 @@ fn oracle(
             return Err(Fault::Rule);
         }
     }
-    let members =
-        crate::domain::queries::bracket_scope_ids(&issue.id, &case.issues, Some("breakdown"));
+    let indexed = crate::domain::queries::IndexedIssues::new(case.issues.clone());
+    let members = crate::domain::queries::bracket_scope_ids(
+        &issue.id,
+        |id| indexed.get(id),
+        Some("breakdown"),
+    );
     let applies = |name: &str, ids: &HashSet<IssueId>| {
         case.rules.as_ref().is_some_and(|rules| {
             rules.rules.iter().any(|r| {

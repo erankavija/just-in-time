@@ -1026,11 +1026,10 @@ fn discover_issue_closure(
         Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
         None => crate::declarations::GateRegistry::default(),
     };
-    precheck_targets.iter().try_for_each(|raw_target| {
-        let target = super::require_issue_in_capture(issues, raw_target)?;
-        let issue = issues
-            .iter()
-            .find(|issue| issue.id == target)
+    let ids = crate::domain::queries::IdIndex::new(issues);
+    precheck_targets.iter().try_for_each(|target| {
+        let issue = ids
+            .get(issues, target)
             .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.clone()))?;
         let automated = issue
             .gates_required

@@ -109,16 +109,103 @@ pub fn query_ready(issues: &[Issue]) -> Vec<Issue> {
         .collect()
 }
 
+/// Positions of a record set's issues by id and in id order: the one id and
+/// prefix resolution over a record set. Reads take the records it was built
+/// from and count as keyed lookups.
+#[derive(Debug, Clone, Default)]
+pub struct IdIndex {
+    positions: HashMap<IssueId, usize>,
+    /// Positions in id order, which is also normalised-id order, so an id
+    /// prefix resolves by binary search.
+    ordered: Vec<usize>,
+}
+
+impl IdIndex {
+    pub fn new(records: &[Issue]) -> Self {
+        let mut ordered = (0..records.len()).collect::<Vec<_>>();
+        ordered.sort_by(|&left, &right| records[left].id.cmp(&records[right].id));
+        Self {
+            positions: records
+                .iter()
+                .enumerate()
+                .map(|(position, issue)| (issue.id.clone(), position))
+                .collect(),
+            ordered,
+        }
+    }
+
+    pub fn contains(&self, id: &IssueId) -> bool {
+        note_index_lookup();
+        self.positions.contains_key(id)
+    }
+
+    /// The record of `records` with `id`.
+    pub fn get<'r>(&self, records: &'r [Issue], id: &IssueId) -> Option<&'r Issue> {
+        note_index_lookup();
+        self.positions.get(id).map(|&position| &records[position])
+    }
+
+    /// The records of `records` `prefix` names, in id order.
+    pub fn named<'r>(&self, records: &'r [Issue], prefix: &IssueIdPrefix) -> Vec<&'r Issue> {
+        note_index_lookup();
+        let wanted = prefix.normalised().as_bytes();
+        let start = self.ordered.partition_point(|&position| {
+            records[position]
+                .id
+                .as_str()
+                .bytes()
+                .filter(|byte| *byte != b'-')
+                .take(wanted.len())
+                .lt(wanted.iter().copied())
+        });
+        self.ordered[start..]
+            .iter()
+            .map(|&position| &records[position])
+            .take_while(|issue| prefix.matches(&issue.id))
+            .collect()
+    }
+}
+
+/// A parsed record set with its [`IdIndex`], read only through counted
+/// lookups and passes.
+#[derive(Debug, Clone)]
+pub struct IndexedIssues {
+    records: std::sync::Arc<[Issue]>,
+    ids: IdIndex,
+}
+
+impl IndexedIssues {
+    pub fn new(records: impl Into<std::sync::Arc<[Issue]>>) -> Self {
+        let records = records.into();
+        Self {
+            ids: IdIndex::new(&records),
+            records,
+        }
+    }
+
+    pub fn get(&self, id: &IssueId) -> Option<&Issue> {
+        self.ids.get(&self.records, id)
+    }
+
+    /// The records `prefix` names, in id order.
+    pub fn named(&self, prefix: &IssueIdPrefix) -> Vec<&Issue> {
+        self.ids.named(&self.records, prefix)
+    }
+
+    /// Every record, in parse order.
+    pub fn records(&self) -> &[Issue] {
+        note_repository_pass(self.records.len());
+        &self.records
+    }
+}
+
 /// Captured issues keyed by id over the session's [`DependencyGraph`], whose
 /// reverse index answers dependents, and by label, so a derivation over a few
 /// issues reads their neighbours and label holders without scanning the issue
 /// list. Records replaced since capture shadow the captured ones.
 pub struct IssueIndex<'a> {
     captured: &'a [Issue],
-    positions: HashMap<IssueId, usize>,
-    /// Captured positions in id order, which is also normalised-id order, so
-    /// an id prefix resolves by binary search.
-    ordered: Vec<usize>,
+    ids: IdIndex,
     graph: DependencyGraph<'a, Issue>,
     replaced: HashMap<IssueId, Issue>,
     /// Ids absent from the capture, in insertion order.
@@ -139,16 +226,9 @@ fn label_parts(label: &str) -> Option<(&str, &str)> {
 
 impl<'a> IssueIndex<'a> {
     pub fn new(captured: &'a [Issue]) -> Self {
-        let mut ordered = (0..captured.len()).collect::<Vec<_>>();
-        ordered.sort_by(|&left, &right| captured[left].id.cmp(&captured[right].id));
         Self {
-            ordered,
             captured,
-            positions: captured
-                .iter()
-                .enumerate()
-                .map(|(position, issue)| (issue.id.clone(), position))
-                .collect(),
+            ids: IdIndex::new(captured),
             graph: DependencyGraph::new(&captured.iter().collect::<Vec<_>>()),
             replaced: HashMap::new(),
             added: Vec::new(),
@@ -168,14 +248,11 @@ impl<'a> IssueIndex<'a> {
     }
 
     pub fn get(&self, id: &IssueId) -> Option<&Issue> {
-        note_index_lookup();
         self.replaced.get(id).or_else(|| self.captured_record(id))
     }
 
     fn captured_record(&self, id: &IssueId) -> Option<&'a Issue> {
-        self.positions
-            .get(id)
-            .map(|&position| &self.captured[position])
+        self.ids.get(self.captured, id)
     }
 
     /// Insert `issue`, or replace the record with its id.
@@ -310,7 +387,7 @@ impl<'a> IssueView<'a> {
             .iter()
             .enumerate()
             .filter(move |(position, issue)| {
-                !view.index.positions.contains_key(&issue.id)
+                !view.index.ids.contains(&issue.id)
                     && !view.index.replaced.contains_key(&issue.id)
                     && !view.replaced[position + 1..]
                         .iter()
@@ -342,22 +419,12 @@ impl<'a> IssueView<'a> {
 
     /// The issues `prefix` names, in id order.
     pub fn resolve_prefix(&self, prefix: &IssueIdPrefix) -> Vec<&'a Issue> {
-        note_index_lookup();
         let index = self.index;
-        let wanted = prefix.normalised().as_bytes();
-        let start = index.ordered.partition_point(|&position| {
-            index.captured[position]
-                .id
-                .as_str()
-                .bytes()
-                .filter(|byte| *byte != b'-')
-                .take(wanted.len())
-                .lt(wanted.iter().copied())
-        });
-        index.ordered[start..]
-            .iter()
-            .map(|&position| &index.captured[position].id)
-            .take_while(|id| prefix.matches(id))
+        index
+            .ids
+            .named(index.captured, prefix)
+            .into_iter()
+            .map(|issue| &issue.id)
             .chain(index.added.iter().filter(|id| prefix.matches(id)))
             .chain(
                 self.replaced
@@ -804,7 +871,8 @@ pub fn count_by_state(issues: &[Issue]) -> Vec<(State, usize)> {
 /// container is not bracketed — there is no breakdown boundary: the walk is the
 /// full transitive dependency closure of the container, with no halt.
 ///
-/// This is a pure graph walk over dependency edges (no I/O): a BFS from the
+/// This is a pure graph walk over dependency edges (no I/O), resolving each id
+/// through `resolve`: a walk from the
 /// container that adds each dependency it reaches and continues descending,
 /// except that (when a boundary type is configured) it never enqueues the
 /// dependencies OF a boundary node — so `B` is collected as the boundary but
@@ -838,66 +906,56 @@ pub fn count_by_state(issues: &[Issue]) -> Vec<(State, usize)> {
 ///
 /// let p = Issue::draft(issue_id(4), "plan".to_string(), String::new());
 ///
-/// let issues = vec![c, i, b, p];
+/// let issues = jit::domain::queries::IndexedIssues::new(vec![c, i, b, p]);
+/// let resolve = |id: &_| issues.get(id);
 ///
 /// // The walk halts AT the breakdown node: C, I and B are in scope, P is not.
-/// let ids = bracket_scope_ids(&issue_id(1), &issues, Some("breakdown"));
+/// let ids = bracket_scope_ids(&issue_id(1), resolve, Some("breakdown"));
 /// assert!(ids.contains(&issue_id(1)) && ids.contains(&issue_id(2)) && ids.contains(&issue_id(3)));
 /// assert!(!ids.contains(&issue_id(4)));
 ///
 /// // With no configured boundary the walk descends the full closure.
-/// let full = bracket_scope_ids(&issue_id(1), &issues, None);
+/// let full = bracket_scope_ids(&issue_id(1), resolve, None);
 /// assert!(full.contains(&issue_id(4)));
 /// ```
-pub fn bracket_scope_ids(
+pub fn bracket_scope_ids<'a>(
     container_id: &IssueId,
-    issues: &[Issue],
+    resolve: impl Fn(&IssueId) -> Option<&'a Issue>,
     breakdown_type: Option<&str>,
 ) -> std::collections::HashSet<IssueId> {
-    use std::collections::{HashSet, VecDeque};
-
     // The boundary label, built from the caller-supplied breakdown-node type
     // (e.g. `type:breakdown`). Absent when the container is not bracketed (no
     // applicable graph template), in which case nothing halts the walk and the
     // result is the full dependency closure.
     let breakdown_label = breakdown_type.map(crate::labels::type_label);
-
-    let is_breakdown = |id: &IssueId| match &breakdown_label {
-        Some(label) => issues
-            .iter()
-            .find(|i| &i.id == id)
-            .is_some_and(|i| i.labels.iter().any(|l| l == label)),
-        None => false,
+    let is_breakdown = |issue: &Issue| {
+        breakdown_label
+            .as_ref()
+            .is_some_and(|label| issue.labels.contains(label))
     };
-
-    let mut included: HashSet<IssueId> = HashSet::new();
-    included.insert(container_id.clone());
-
-    let mut queue: VecDeque<IssueId> = VecDeque::new();
-    queue.push_back(container_id.clone());
-
-    while let Some(current) = queue.pop_front() {
-        // Halt the walk AT a breakdown node: it is in scope, but its own
-        // dependencies (the plan `P` / upstream) are out of scope.
-        if &current != container_id && is_breakdown(&current) {
-            continue;
-        }
-        let Some(node) = issues.iter().find(|i| i.id == current) else {
-            continue;
-        };
-        for dep in &node.dependencies {
-            // Skip dangling edges to ids absent from the store (defensive: the
-            // integrity check owns broken-dependency reporting).
-            if !issues.iter().any(|i| &i.id == dep) {
-                continue;
+    let Some(container) = resolve(container_id) else {
+        return std::collections::HashSet::from([container_id.clone()]);
+    };
+    // Halt the walk AT a breakdown node: it is in scope, but its own
+    // dependencies (the plan `P` / upstream) are out of scope. A dangling edge
+    // resolves to no issue and is skipped; the integrity check owns reporting
+    // it.
+    crate::graph::traverse_with(
+        &container.id,
+        0,
+        |id| match resolve(id) {
+            Some(issue) if issue.id == container.id || !is_breakdown(issue) => {
+                issue.dependencies.iter().collect()
             }
-            if included.insert(dep.clone()) {
-                queue.push_back(dep.clone());
-            }
-        }
-    }
-
-    included
+            _ => Vec::new(),
+        },
+        &resolve,
+        |_| true,
+    )
+    .into_iter()
+    .map(|issue| issue.id.clone())
+    .chain(std::iter::once(container_id.clone()))
+    .collect()
 }
 
 #[cfg(test)]
@@ -905,6 +963,16 @@ mod tests {
     use super::*;
     use crate::domain::identity::IssueId;
     use crate::test_utils::issue_id;
+
+    /// [`bracket_scope_ids`] of `container` over `issues`.
+    fn scope_of(
+        container: &IssueId,
+        issues: &[Issue],
+        breakdown_type: Option<&str>,
+    ) -> std::collections::HashSet<IssueId> {
+        let issues = IndexedIssues::new(issues.to_vec());
+        bracket_scope_ids(container, |id| issues.get(id), breakdown_type)
+    }
 
     use proptest::prelude::*;
 
@@ -1313,7 +1381,7 @@ mod tests {
     #[test]
     fn test_bracket_scope_includes_container_impl_and_breakdown() {
         let issues = bracket_spine();
-        let ids = bracket_scope_ids(&issue_id(200), &issues, Some("breakdown"));
+        let ids = scope_of(&issue_id(200), &issues, Some("breakdown"));
         assert!(ids.contains(&issue_id(200)), "container is in scope");
         assert!(ids.contains(&issue_id(201)), "impl source is in scope");
         assert!(ids.contains(&issue_id(202)), "impl sink is in scope");
@@ -1326,7 +1394,7 @@ mod tests {
     #[test]
     fn test_bracket_scope_stops_at_breakdown_excludes_plan_and_upstream() {
         let issues = bracket_spine();
-        let ids = bracket_scope_ids(&issue_id(200), &issues, Some("breakdown"));
+        let ids = scope_of(&issue_id(200), &issues, Some("breakdown"));
         assert!(
             !ids.contains(&issue_id(204)),
             "walk halts at B; plan P is out of scope"
@@ -1350,7 +1418,7 @@ mod tests {
             scope_issue(issue_id(204), "planning", &[issue_id(205)]),
             scope_issue(issue_id(205), "goal", &[]),
         ];
-        let ids = bracket_scope_ids(&issue_id(200), &issues, Some("synthesis"));
+        let ids = scope_of(&issue_id(200), &issues, Some("synthesis"));
         assert!(ids.contains(&issue_id(200)), "container is in scope");
         assert!(ids.contains(&issue_id(201)), "impl is in scope");
         assert!(
@@ -1375,7 +1443,7 @@ mod tests {
         // transitive closure: even a node that WOULD be a boundary under a
         // configured type does not halt it.
         let issues = bracket_spine();
-        let ids = bracket_scope_ids(&issue_id(200), &issues, None);
+        let ids = scope_of(&issue_id(200), &issues, None);
         assert!(
             ids.contains(&issue_id(203))
                 && ids.contains(&issue_id(204))
@@ -1388,7 +1456,7 @@ mod tests {
     #[test]
     fn test_bracket_scope_lone_container_is_just_itself() {
         let issues = vec![scope_issue(issue_id(200), "epic", &[])];
-        let ids = bracket_scope_ids(&issue_id(200), &issues, Some("breakdown"));
+        let ids = scope_of(&issue_id(200), &issues, Some("breakdown"));
         assert_eq!(ids.len(), 1);
         assert!(ids.contains(&issue_id(200)));
     }
@@ -1521,7 +1589,7 @@ mod tests {
         // Container depends on an id absent from the store; the walk must not
         // panic and must not include the missing id.
         let issues = vec![scope_issue(issue_id(200), "epic", &[issue_id(207)])];
-        let ids = bracket_scope_ids(&issue_id(200), &issues, Some("breakdown"));
+        let ids = scope_of(&issue_id(200), &issues, Some("breakdown"));
         assert_eq!(ids, std::collections::HashSet::from([issue_id(200)]));
     }
 
