@@ -1,0 +1,63 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "de0ebd5603b2487fa4705701818c35d002347987",
+  "completed_at": "2026-11-08T07:17:24.101236366Z",
+  "duration_ms": 285798,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/mod.rs",
+        "id": "F1",
+        "line": 1199,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/6a19e93f/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "Broad-precheck evidence construction and comparison retain repository-sized work per matched issue, leaving REQ-01 unmet."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/queries.rs",
+        "id": "F2",
+        "line": 335,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "IssueView::dependents includes edges from superseded replacements despite the last-record-wins contract."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/queries.rs",
+        "id": "F3",
+        "line": 395,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/convention-convergence",
+          "@/charter/D-20"
+        ],
+        "severity": "medium",
+        "summary": "IssueView::reach implements a parallel traversal instead of extending the shared graph traversal."
+      }
+    ],
+    "summary": "Three blocking findings: broad-precheck bookkeeping still scales per match, replacement views retain superseded edges, and traversal duplicates the shared graph mechanism.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6a19e93f-77da-4bf6-b3c2-a6de6929309b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4e852e52-49d2-48af-870f-efa6114ba9cf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T07:12:38.302953366Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7803 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1ba00-84cc-7442-8699-fe91263eb371\n--------\nuser\n--- 7790 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:6a19e93f` — c41d3b540, fabc4e729, 46834823c, d703de595, f2e7c20e2, de0ebd560; unrelated uncommitted changes excluded.\nPolicy sources: AGENTS.md (no subtree AGENTS.md); dev/TESTING.md; .jit/config.toml.\nResolved items: @/charter/D-19, @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/issue/6a19e93f/requirement/REQ-01, @/issue/6a19e93f/requirement/REQ-02, @/issue/b697a3f7/requirement/REQ-22, @/issue/16c53cc2/requirement/REQ-07 → respective issue descriptions; @/gate/jit-validate → .jit/gates.toml; @/invariant/convention-convergence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/architecture-dependency-direction, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/derived-state-coherence, @/invariant/dag-acyclic, @/invariant/gate-semantics, @/invariant/canonical-cutover, @/invariant/semantic-types, @/invariant/domain-agnostic, @/invariant/event-log, @/invariant/atomic-writes → .jit/invariants.toml.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T06:59:52.881713959+00:00; supplied ancestry covers all attributable commits except benchmark-record-only de0ebd560. Current code-review pending; no prior run.\nTruncation recovery: narrower configuration, policy, current-source, and per-path patch reads recovered relevant evidence; unrelated sibling-task criteria excluded.\n\n1. **F1 — High; blocking; issue-impact: Broad prechecks retain repository-sized work per match.** At `crates/jit/src/commands/mod.rs:1199`, each matched Ready → InProgress transition compares broad evidence and calls `GateEvidence::matches`, which iterates every captured input (`commands/gate_check.rs:124`). Preflight also rebuilds that evidence per issue (`commands/mod.rs:3136`), including every issue record (`commands/gate_check.rs:490`). Thus tracker bookkeeping still costs O(M×N), leaving REQ-01 unmet. Share the common evidence and its comparison once per session, and extend the owning cost test to cover prechecks; its current fixture declares none.\n\n2. **F2 — Medium; blocking; issue-impact: Superseded replacements retain removed edges.** At `crates/jit/src/domain/queries.rs:335`, `dependents` inspects each replacement directly, although `with` promises the last record for an ID wins. For replacements `[B(dependencies=[A]), B(dependencies=[])]`, `get(B)` returns the second record, but `dependents(A)` still includes B. Dependent traversal and graph-rule evaluation therefore disagree with the effective records. Resolve replacement candidates through `view.get` before checking their dependencies, and cover repeated replacements in the existing property test.\n\n3. **F3 — Medium; blocking; issue-impact: Traversal bypasses the shared graph mechanism.** `crates/jit/src/domain/queries.rs:395` introduces another visited-set/stack traversal alongside `DependencyGraph::traverse` (`graph/mod.rs:145`). Transition neighborhoods and dependency-shape evaluation now use this parallel implementation. Reusing the reverse index does not resolve that duplication. Extend the shared graph traversal to support replacement-aware neighbors and the admission predicate, then route these consumers through it, as required by convention-convergence and D-20.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three blocking findings: broad-precheck bookkeeping still scales per match, replacement views retain superseded edges, and traversal duplicates the shared graph mechanism.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Broad-precheck evidence construction and comparison retain repository-sized work per matched issue, leaving REQ-01 unmet.\",\"file\":\"crates/jit/src/commands/mod.rs\",\"line\":1199,\"references\":[\"@/issue/6a19e93f/requirement/REQ-01\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"IssueView::dependents includes edges from superseded replacements despite the last-record-wins contract.\",\"file\":\"crates/jit/src/domain/queries.rs\",\"line\":335,\"references\":[]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"IssueView::reach implements a parallel traversal instead of extending the shared graph traversal.\",\"file\":\"crates/jit/src/domain/queries.rs\",\"line\":395,\"references\":[\"@/invariant/convention-convergence\",\"@/charter/D-20\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

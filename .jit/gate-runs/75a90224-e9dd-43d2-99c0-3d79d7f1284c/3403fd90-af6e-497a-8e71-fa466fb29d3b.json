@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1ee4aa9aef0fb5c4b90514ebca3b21c8228ad7b0",
+  "completed_at": "2026-11-08T07:18:01.732571258Z",
+  "duration_ms": 148156,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/worktree-validate.md",
+        "id": "F1",
+        "line": 483,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-13",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "low",
+        "summary": "Two reference pages independently restate the same output guarantee, violating canonical documentation policy."
+      }
+    ],
+    "summary": "All four hard criteria and prior findings are addressed; added documentation duplicates the output guarantee instead of using one canonical home.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "75a90224-e9dd-43d2-99c0-3d79d7f1284c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3403fd90-af6e-497a-8e71-fa466fb29d3b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T07:15:33.576294763Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4598 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1ba03-30ff-74e2-b868-b517c1cc417d\n--------\nuser\n--- 4585 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:75a90224`: 77de09e06, ca7252f1b, 76aa32266, f43a87507, 513c2d627, 57d3eff41, 0abb5e264, 23b9c995a; individual patches inspected; uncommitted changes excluded.\nPolicy sources: `AGENTS.md`; no subtree policy files.\nResolved items: @/issue/75a90224/requirement/REQ-01, @/issue/75a90224/requirement/REQ-02, @/issue/75a90224/requirement/REQ-03, @/issue/75a90224/requirement/REQ-04, @/issue/75a90224/decision/D-01 → issue description; @/issue/df129d9e/decision/D-03, @/issue/df129d9e/requirement/REQ-09 → epic description; @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/convention-convergence, @/invariant/single-source-prose → `.jit/invariants.toml`; @/charter/D-13, @/charter/D-18 → `dev/vision/9db27a3a-charter.md`; @/gate/cargo-ci, @/gate/jit-validate → `.jit/gates.toml`.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T07:15:05.335349178+00:00; wrapper ancestry confirms run commit 1ee4aa9ae contains all eight attributable commits; prior code-review failed, exit 1, with both prior findings now addressed; gates not rerun.\nTruncation recovery: narrower current-code, policy, and documentation reads recovered relevant omissions; unrelated test hits and historical transcript excerpts excluded.\n\n1. **F1 — Low; blocking; issue-impact: duplicated documentation guarantee.** The added paragraph at [worktree-validate.md:483](/home/vkaskivuo/Projects/just-in-time/docs/reference/worktree-validate.md:483) repeats the stdout/stderr contract added at [cli-commands.md:3311](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3311). These independently maintained guarantees conflict with `@/charter/D-13` and `@/invariant/single-source-prose`. Keep the contract in one canonical reference page and link to it from the other.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"All four hard criteria and prior findings are addressed; added documentation duplicates the output guarantee instead of using one canonical home.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Two reference pages independently restate the same output guarantee, violating canonical documentation policy.\",\"file\":\"docs/reference/worktree-validate.md\",\"line\":483,\"references\":[\"@/charter/D-13\",\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
