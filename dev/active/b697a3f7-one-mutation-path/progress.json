@@ -239,8 +239,8 @@
           "id": "c31c2e57",
           "short_id": "c31c2e57",
           "title": "A mutation attempt parses its configuration once per captured image",
-          "status": "in_progress",
-          "note": "dispatched 05:1x on opus, worktrees based f9dbac535"
+          "status": "rework 2",
+          "note": "r1 landed f3f3eb2ea (b590b9deb); cargo-ci passed; code-review FAILED run 81638c37 (F1 failed assembly not memoized; F2 capture_archive_base drops discovery parse). Fix-forward from f3f3eb2ea; class sweep requested."
         },
         {
           "id": "e73ad8bc",
@@ -393,7 +393,7 @@
     "030df4b1": 1,
     "219b9df8": 1,
     "42046050": 2,
-    "c31c2e57": 1,
+    "c31c2e57": 2,
     "dd95bd9d": 2
   },
   "surfaced_pitfalls": [
@@ -423,7 +423,8 @@
       "status": "open",
       "owner": "45d0a971"
     },
-    "Lead trap: telling dd95bd9d to scan after the committed execute attempt lost citations from relocated citing files; any post-apply observation of live files must map moved files back to their sources."
+    "Lead trap: telling dd95bd9d to scan after the committed execute attempt lost citations from relocated citing files; any post-apply observation of live files must map moved files back to their sources.",
+    "Lead review trap: verifying one-parse-per-image by spot-checking sites misses classes; brief the worker to enumerate every assemble_config/declarations_from_image site against discovery-parsed images, including error paths."
   ],
   "started_at": "2026-11-06T01:20:00+02:00",
   "coordination": [
@@ -664,6 +665,15 @@
       "effort": "high",
       "verdict": "fail (F1, F2 blocking)",
       "run": "031018ef"
+    },
+    {
+      "issue": "c31c2e57",
+      "review": "code-review gate",
+      "vendor": "openai/codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "verdict": "fail (F1, F2 blocking)",
+      "run": "81638c37"
     }
   ]
 }

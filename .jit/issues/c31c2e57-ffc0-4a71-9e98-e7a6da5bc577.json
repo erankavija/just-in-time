@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "8af44e8c-d78d-40d0-8f9a-9ef411e6764b",
+      "status": "passed",
+      "updated_at": "2026-11-08T04:59:59.974908091Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "81638c37-565e-4cc9-9afd-2d86873c98ea",
+      "status": "failed",
+      "updated_at": "2026-11-08T05:02:46.406746509Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c31c2e57-ffc0-4a71-9e98-e7a6da5bc577",
   "labels": [
     "type:task",
@@ -26,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "A mutation attempt parses its configuration once per captured image",
-  "updated_at": "2026-11-08T03:04:26.709010932Z"
+  "updated_at": "2026-11-08T05:02:46.406746509Z"
 }

@@ -1,0 +1,53 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f3f3eb2ead503b9f636ed37c41e65810625006c5",
+  "completed_at": "2026-11-08T05:02:46.405094019Z",
+  "duration_ms": 166321,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/mod.rs",
+        "id": "F1",
+        "line": 474,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c31c2e57/requirement/REQ-01"
+        ],
+        "severity": "medium",
+        "summary": "Failed configuration assemblies are discarded and repeated across discovery rounds and final handoff."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F2",
+        "line": 531,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c31c2e57/requirement/REQ-01"
+        ],
+        "severity": "medium",
+        "summary": "Archive execution discards discovery's configuration and assembles the same captured image again."
+      }
+    ],
+    "summary": "REQ-01 remains unmet for failed configuration assemblies and archive execution.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c31c2e57-ffc0-4a71-9e98-e7a6da5bc577",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "81638c37-565e-4cc9-9afd-2d86873c98ea",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-08T05:00:00.084074118Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6850 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1b987-158b-71c1-a01d-a50a0d7db697\n--------\nuser\n--- 6837 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:c31c2e57 — b590b9deb, efab0755a, 0a56c961b; uncommitted changes excluded.\nPolicy sources: AGENTS.md; dev/TESTING.md; no subtree AGENTS.md.\nResolved items: @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/issue/c31c2e57/requirement/REQ-01, @/issue/c31c2e57/requirement/REQ-02, @/issue/c31c2e57/requirement/REQ-03, @/issue/b697a3f7/requirement/REQ-10 → issue descriptions; @/inv/orthogonal-tests, @/inv/essential-code-prose, @/inv/architecture-dependency-direction, @/inv/derived-state-coherence, @/inv/convention-convergence, @/inv/shared-test-contracts, @/inv/semantic-test-assertions, @/inv/canonical-cutover → .jit/invariants.toml; @/gate/cargo-ci, @/gate/jit-validate → .jit/gates.toml.\nGate evidence: cargo-ci passed, exit 0, 2026-11-08T04:57:59.179649717+00:00; wrapper confirms f3f3eb2e contains all three tagged commits; no rerun. Current code-review pending, exit none.\nTruncation recovery: narrower commit/path reads recovered relevant patches and callers; unrelated later archive citation changes excluded. Blocked shell here-document replaced with direct read-only Python.\n\n1. **F1 — Medium, blocking, issue-impact: failed configuration assemblies are parsed repeatedly.** At [commands/mod.rs:474](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/mod.rs:474), an assembly error returns before populating `parsed`. Discovery suppresses that error at `commands/validate.rs:615` and continues, so subsequent rounds retry it; `into_config` then assembles the final image again. A mutation attempt with malformed configuration therefore violates REQ-01. Preserve failed results alongside successful assemblies, and extend the existing owning test to cover this case.\n\n2. **F2 — Medium, blocking, issue-impact: archive execution still discards discovery’s configuration.** At [commands/validate.rs:531](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:531), `capture_archive_base` drops the returned configuration. Its caller immediately invokes `assemble_config(&image)` at `commands/archive.rs:536`, including during archive execution (`archive.rs:875`). This parses the same captured image twice with valid configuration, leaving REQ-01 unmet. Carry discovery’s assembly into `derive_archive_base`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-01 remains unmet for failed configuration assemblies and archive execution.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Failed configuration assemblies are discarded and repeated across discovery rounds and final handoff.\",\"file\":\"crates/jit/src/commands/mod.rs\",\"line\":474,\"references\":[\"@/issue/c31c2e57/requirement/REQ-01\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Archive execution discards discovery's configuration and assembles the same captured image again.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":531,\"references\":[\"@/issue/c31c2e57/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
