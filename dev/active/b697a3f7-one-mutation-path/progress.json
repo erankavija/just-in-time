@@ -223,6 +223,37 @@
      "note": "after 04:30 quiet window; coordinate with df129d9e fba8d478 quiet-host trials"
     }
    ]
+  },
+  {
+   "wave_number": 11,
+   "issues": [
+    {
+     "id": "a2153a6f",
+     "short_id": "a2153a6f",
+     "title": "Gate registry reads come from the captured image; the live-file reader is gone",
+     "status": "pending",
+     "note": "after 04:30; opus"
+    },
+    {
+     "id": "c31c2e57",
+     "short_id": "c31c2e57",
+     "title": "A mutation attempt parses its configuration once per captured image",
+     "status": "pending",
+     "note": "after 04:30; opus"
+    }
+   ]
+  },
+  {
+   "wave_number": 12,
+   "issues": [
+    {
+     "id": "a869900b",
+     "short_id": "a869900b",
+     "title": "A gate evaluation resolves checker documents and validation from its own captured image",
+     "status": "pending",
+     "note": "after a2153a6f (shared gate_check.rs); opus"
+    }
+   ]
   }
  ],
  "later_chain_note": "After wave 2: fe9147fa, 1b7f58ae -> 693a2fdd, a991f42b -> d3c94dc5, 700a96dd -> 850eaad3 -> 93e3f1ad. Blocked externally by f4d9502a (parked): 7cd27db8 -> 30334066 -> 030df4b1, 9623fe6a; d9ba0029 -> 65aafaba -> c0775a83 -> 4e2bed35 -> e73ad8bc, 42046050, 45d0a971; e6ec58f3 -> b2c28ec1.",
@@ -257,6 +288,30 @@
    "depends_on": [],
    "blocks": [
     "dfb2f10d"
+   ]
+  },
+  {
+   "id": "a2153a6f",
+   "short_id": "a2153a6f",
+   "reason": "d675102c sol checkpoint finding 1; invoker approved",
+   "blocks": [
+    "d675102c"
+   ]
+  },
+  {
+   "id": "c31c2e57",
+   "short_id": "c31c2e57",
+   "reason": "d675102c sol checkpoint finding 2; invoker approved",
+   "blocks": [
+    "d675102c"
+   ]
+  },
+  {
+   "id": "a869900b",
+   "short_id": "a869900b",
+   "reason": "d675102c sol checkpoint finding 3 narrowed to REQ-04; invoker approved",
+   "blocks": [
+    "d675102c"
    ]
   }
  ],
@@ -374,7 +429,8 @@
  "notes": [
   "Wave 1 leaves 12064c7b, 4334df62, 9a2563fd, c2b3cefa, f6477007, 4d834432 done; worktrees reclaimed. 1a737bb4 (W1b) and wave 2 (d2acb105, 7fefd776, 905364c1) in flight; dispatched together because all are dependency-ready and their shared files are in disjoint functions.",
   "Session 2026-11-08 (lead invoked by just-in-time-d5): c0775a83 resumed in its worktree after a lead-preserve WIP commit and a rebase onto main; host quiet window 03:30-04:30 Helsinki, no cargo from 03:15; coordinating crates/jit edits with df129d9e lead just-in-time-55. Pending pitfall: output.rs IssueScope (graph traversal key) shares its name with domain IssueScope; not a REQ-20 violation, raise in holistic review if it matters.",
-  "Trap: dispatch-worker-worktree.sh's default TMPDIR (/tmp/lead-worker-tmp/<repo-path>/agent-<id>) is too long for unix sockets; profile::package socket test fails with SUN_LEN. Briefs must set a short TMPDIR such as /tmp/lw-<id>."
+  "Trap: dispatch-worker-worktree.sh's default TMPDIR (/tmp/lead-worker-tmp/<repo-path>/agent-<id>) is too long for unix sockets; profile::package socket test fails with SUN_LEN. Briefs must set a short TMPDIR such as /tmp/lw-<id>.",
+  "Trap: in zsh an unquoted $VAR holding several flags is one argument; build flag lists as arrays and expand with \"${ARR[@]}\". Trap: checkpoint briefs that ask the reviewer to list every instance must tie each instance to the criterion's exact wording (invoker process note)."
  ],
  "story_checkpoints": [
   {
@@ -498,6 +554,14 @@
    "effort": "high",
    "verdict": "pass; advisory stale comment fixed by lead in d51af4034",
    "run": "48c3040d"
+  },
+  {
+   "issue": "d675102c",
+   "review": "story checkpoint (non-gate)",
+   "vendor": "openai/codex",
+   "model": "gpt-6.1-sol",
+   "effort": "high",
+   "verdict": "REQ-01 met; 3 blocking -> a2153a6f, c31c2e57, a869900b"
   }
  ]
 }
