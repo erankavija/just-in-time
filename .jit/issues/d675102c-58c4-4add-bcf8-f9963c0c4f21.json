@@ -7,7 +7,6 @@
     "42046050-895f-42bb-a486-383a47e39649",
     "850eaad3-53a3-4d50-bd02-6a51a0c84208",
     "9a2563fd-61ed-45c2-9cfa-b5f006c47afa",
-    "a2153a6f-7c1c-4749-b4ba-4ce890fdcdd7",
     "a869900b-c255-45b5-b915-29d9c4034b24",
     "c31c2e57-ffc0-4a71-9e98-e7a6da5bc577"
   ],
@@ -32,5 +31,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Configuration and gate declarations come from captured images",
-  "updated_at": "2026-11-08T00:30:06.923711313Z"
+  "updated_at": "2026-11-08T00:31:12.012876326Z"
 }

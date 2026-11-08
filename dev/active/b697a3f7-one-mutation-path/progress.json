@@ -430,7 +430,8 @@
   "Wave 1 leaves 12064c7b, 4334df62, 9a2563fd, c2b3cefa, f6477007, 4d834432 done; worktrees reclaimed. 1a737bb4 (W1b) and wave 2 (d2acb105, 7fefd776, 905364c1) in flight; dispatched together because all are dependency-ready and their shared files are in disjoint functions.",
   "Session 2026-11-08 (lead invoked by just-in-time-d5): c0775a83 resumed in its worktree after a lead-preserve WIP commit and a rebase onto main; host quiet window 03:30-04:30 Helsinki, no cargo from 03:15; coordinating crates/jit edits with df129d9e lead just-in-time-55. Pending pitfall: output.rs IssueScope (graph traversal key) shares its name with domain IssueScope; not a REQ-20 violation, raise in holistic review if it matters.",
   "Trap: dispatch-worker-worktree.sh's default TMPDIR (/tmp/lead-worker-tmp/<repo-path>/agent-<id>) is too long for unix sockets; profile::package socket test fails with SUN_LEN. Briefs must set a short TMPDIR such as /tmp/lw-<id>.",
-  "Trap: in zsh an unquoted $VAR holding several flags is one argument; build flag lists as arrays and expand with \"${ARR[@]}\". Trap: checkpoint briefs that ask the reviewer to list every instance must tie each instance to the criterion's exact wording (invoker process note)."
+  "Trap: in zsh an unquoted $VAR holding several flags is one argument; build flag lists as arrays and expand with \"${ARR[@]}\". Trap: checkpoint briefs that ask the reviewer to list every instance must tie each instance to the criterion's exact wording (invoker process note).",
+  "Trap: `jit <cmd> --json >/dev/null && echo ok` hides refusals; jit dep add refused a non-reduced edge (VALIDATION_FAILED) yet the echo ran. Check the JSON error field or the resulting graph; use `jit dep add --reduce` when the new edge makes a parent edge redundant."
  ],
  "story_checkpoints": [
   {
