@@ -25938,3 +25938,4 @@
 {"from":"ready","id":"8b934230-3946-4e96-8ada-151cadcedab6","issue_id":"f487aeef-e0d4-4334-8843-0c80b0023c2d","timestamp":"2026-11-08T03:57:58.738561960Z","to":"done","type":"issue_state_changed"}
 {"from":"backlog","id":"93549f24-d37a-4fe5-bd60-361100b11c9b","issue_id":"fba8d478-7584-4e01-b7ee-b763a177a56f","timestamp":"2026-11-08T03:57:58.738561960Z","to":"ready","type":"issue_state_changed"}
 {"id":"5bab2d7b-d709-4867-b876-413f1259622a","issue_id":"f487aeef-e0d4-4334-8843-0c80b0023c2d","timestamp":"2026-11-08T03:57:58.738561960Z","type":"issue_completed"}
+{"id":"61a16be3-2261-4c64-b70f-c6e440de263b","paths":["docs/reference/rules-and-gates.md"],"timestamp":"2026-11-08T04:42:38.299915413Z","type":"files_published"}
