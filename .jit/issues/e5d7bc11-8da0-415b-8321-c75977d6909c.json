@@ -13,15 +13,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "c9173ed6-83ad-47ea-b560-b3bdc4291912",
+      "run_id": "5833676a-c3e5-45f7-830d-0c639a395e25",
       "status": "passed",
-      "updated_at": "2026-11-08T13:35:39.627292421Z",
+      "updated_at": "2026-11-08T13:46:51.108310482Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "1bc98da1-4d60-4e82-a835-8fa0a3d90d3b",
+      "run_id": "22742408-7a47-48e0-a983-18db21fd4239",
       "status": "failed",
-      "updated_at": "2026-11-08T13:39:22.539671538Z",
+      "updated_at": "2026-11-08T13:49:48.528641833Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Registry-first item queries read their sources from the captured image",
-  "updated_at": "2026-11-08T13:39:22.539671538Z"
+  "updated_at": "2026-11-08T13:49:48.528641833Z"
 }
