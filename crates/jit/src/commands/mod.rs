@@ -2788,7 +2788,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         with_read_session(&self.storage, &layout, "declaration read", |session| {
             let spec =
                 CaptureSpec::new(VirtualPath::DECLARATION_FILES, DECLARATION_CAPTURE_BUDGET)?;
+            // The parse of the latest discovery round; the final round, which adds
+            // nothing, parses the returned image.
+            let mut parsed = None;
             let Some(image) = capture_discovering(session, spec, |image, spec| {
+                parsed = None;
                 let before = spec.clone();
                 spec.discover_paths(rule_schema_paths(image)?)?;
                 // The declarations parse once every named schema is captured.
@@ -2796,12 +2800,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                     return Ok(());
                 }
                 let declarations = crate::repository_state::declarations_from_image(image)?;
-                Ok(spec.discover_paths(sources(&declarations)?)?)
+                spec.discover_paths(sources(&declarations)?)?;
+                parsed = Some(declarations);
+                Ok(())
             })?
             else {
                 return Ok(None);
             };
-            let declarations = crate::repository_state::declarations_from_image(&image)?;
+            let declarations =
+                parsed.ok_or_else(|| anyhow!("declaration capture ended unparsed"))?;
             Ok(Some((declarations, image)))
         })
     }
