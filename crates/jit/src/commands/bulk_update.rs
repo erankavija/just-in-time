@@ -125,10 +125,10 @@ struct MatchedChange {
     error: Option<String>,
 }
 
-/// The batch derived so far over the captured issues, which `issues` holds as
-/// the changes before the next one leave them.
-struct BulkProjection {
-    issues: Vec<Issue>,
+/// The batch derived so far over the captured issues, which `issues` indexes
+/// as the changes before the next one leave them.
+struct BulkProjection<'a> {
+    issues: crate::domain::queries::IssueIndex<'a>,
     intents: Vec<MutationIntent>,
     result: BulkUpdateResult,
     /// Each matched issue whose change runs prechecks, as the change plans it,
@@ -136,7 +136,7 @@ struct BulkProjection {
     precheck_targets: Vec<Issue>,
 }
 
-impl BulkProjection {
+impl BulkProjection<'_> {
     fn record(&mut self, id: &IssueId, change: Result<MatchedChange>) {
         let change = match change {
             Ok(change) => change,
@@ -153,9 +153,7 @@ impl BulkProjection {
                 _ => None,
             })
             .for_each(|updated| {
-                if let Some(slot) = self.issues.iter_mut().find(|issue| issue.id == updated.id) {
-                    *slot = (**updated).clone();
-                }
+                self.issues.replace((**updated).clone());
             });
         self.intents.extend(change.intents);
         match (change.error, change.changed) {
@@ -195,11 +193,10 @@ struct BulkDerivation<'a> {
 }
 
 impl BulkDerivation<'_> {
-    fn derive(&self, mut projection: BulkProjection, id: &IssueId) -> BulkProjection {
+    fn derive<'p>(&self, mut projection: BulkProjection<'p>, id: &IssueId) -> BulkProjection<'p> {
         let change = projection
             .issues
-            .iter()
-            .find(|issue| &issue.id == id)
+            .get(id)
             .cloned()
             .ok_or_else(|| crate::storage::IssueNotFoundError::new(id.clone()).into())
             .and_then(|issue| {
@@ -214,7 +211,7 @@ impl BulkDerivation<'_> {
     fn derive_change(
         &self,
         issue: Issue,
-        issues: &[Issue],
+        issues: &crate::domain::queries::IssueIndex<'_>,
         precheck_targets: &mut Vec<Issue>,
     ) -> Result<MatchedChange> {
         let registry = &self.graph.declarations.gates;
@@ -257,7 +254,7 @@ impl BulkDerivation<'_> {
             });
         }
         let evidence = CapturedTransitionEvidence {
-            issues,
+            issues: issues.view(),
             graph: self.graph,
         };
         match derive_prechecked_field_update(issue.clone(), projected, recorded, &request, evidence)
@@ -465,7 +462,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
             ..
         } = matched.iter().fold(
             BulkProjection {
-                issues,
+                issues: crate::domain::queries::IssueIndex::new(&issues),
                 intents: Vec::new(),
                 result,
                 precheck_targets: Vec::new(),
@@ -1608,6 +1605,90 @@ mod tests {
             sessions, baseline,
             "the dependent's promotion must add no session to the blocker's update"
         );
+    }
+
+    /// Graph rules every issue fires, walking its dependencies, crediting from
+    /// any issue, and resolving label references by link and repository-wide.
+    const GRAPH_RULES: &str = r#"
+[[rules]]
+name = "should-reach-active-work"
+severity = "warn"
+assert = { dependency-shape = { target = { state = "in_progress" }, mode = "should", transitive = true } }
+
+[[rules]]
+name = "credited-from-anywhere"
+severity = "warn"
+assert = { label-coverage = { child-link = "any" } }
+
+[[rules]]
+name = "references-resolve-anywhere"
+severity = "warn"
+assert = { label-reference = { from = "implements", to = "req" } }
+
+[[rules]]
+name = "references-resolve-by-link"
+severity = "warn"
+assert = { label-reference = { from = "implements", to = "req", scope = "linked" } }
+"#;
+
+    /// The issue-index reads of a bulk update completing two blockers, each
+    /// with one `Backlog` dependent, beside `filler` unrelated issues, and the
+    /// number of graph-rule warnings it reported.
+    fn bulk_completion_index_reads(
+        filler: u128,
+        rules: Option<&str>,
+    ) -> (crate::domain::queries::IndexReads, usize) {
+        use crate::commands::test_helpers::{memory_executor, seed_issue};
+        use crate::test_utils::issue_id;
+
+        let storage = crate::storage::InMemoryStorage::new();
+        if let Some(rules) = rules {
+            storage.add_data_file("rules.toml", rules);
+        }
+        seed_issue(
+            &storage,
+            create_test_issue(&issue_id(1), State::InProgress, vec![]),
+        );
+        (0..filler).for_each(|n| {
+            let mut issue = create_test_issue(&issue_id(0x1000 + n), State::Backlog, vec![]);
+            issue.dependencies = vec![issue_id(1)];
+            seed_issue(&storage, issue);
+        });
+        (0..2).for_each(|n| {
+            seed_issue(
+                &storage,
+                create_test_issue(&issue_id(0x2000 + n), State::Ready, vec!["implements:a"]),
+            );
+            let mut dependent = create_test_issue(&issue_id(0x3000 + n), State::Backlog, vec![]);
+            dependent.dependencies = vec![issue_id(0x2000 + n)];
+            seed_issue(&storage, dependent);
+        });
+        let executor = memory_executor(storage);
+        let (result, reads) = crate::domain::queries::count_index_reads(|| {
+            executor.issues().apply_bulk_update(
+                &QueryFilter::parse("state:ready").unwrap(),
+                &UpdateOperations {
+                    state: Some(State::Done),
+                    ..Default::default()
+                },
+                false,
+            )
+        });
+        let result = result.unwrap();
+        assert_eq!(result.modified.len(), 2);
+        (reads, result.warnings.len())
+    }
+
+    #[test]
+    fn test_apply_bulk_update_per_match_issue_reads_are_keyed_and_independent_of_repository_size() {
+        for rules in [None, Some(GRAPH_RULES)] {
+            let (small, _) = bulk_completion_index_reads(4, rules);
+            let (large, warnings) = bulk_completion_index_reads(256, rules);
+
+            assert_eq!(rules.is_some(), warnings > 0, "the graph rule did not fire");
+            assert_eq!(large.scans, 0, "a matched change scanned the issue list");
+            assert_eq!(small, large);
+        }
     }
 
     /// A single-issue `Done` request on `id`, the one `Ready` issue `seed`
