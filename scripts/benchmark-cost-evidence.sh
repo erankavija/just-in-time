@@ -47,6 +47,14 @@ set -euo pipefail
 #                            threshold, default 2.0; output directory, which
 #                            skips summary.json); validate.py rejects evidence
 #                            recorded with other values
+#   COST_BENCH_GRAPH_RULE    1 declares a graph rule in the bulk fixtures
+#                            (jit:6a19e93f REQ-03); each issue then depends on a
+#                            done issue so the rule evaluates a neighbour on the
+#                            in_progress transition. Unset leaves every fixture
+#                            unchanged.
+#   COST_BENCH_SCENARIOS     "bulk" measures scenario (a) alone (default: all
+#                            four). Needs COST_BENCH_RAW; the smoke record is
+#                            checked by `validate.py --smoke`
 #
 # Exit codes:
 #   0 — raw/<label>/ written (the verdict is in summary.json)
@@ -55,6 +63,8 @@ set -euo pipefail
 #   3 — the load average stayed at or above the threshold until the timeout
 
 BASE_REF=369d35a42
+GRAPH_RULE="${COST_BENCH_GRAPH_RULE:-}"
+SCENARIOS="${COST_BENCH_SCENARIOS:-all}"
 SAMPLES="${COST_BENCH_SAMPLES:-5}"
 LOAD_MAX="${COST_BENCH_LOAD_MAX:-2.0}"
 LOAD_TIMEOUT="${COST_BENCH_LOAD_TIMEOUT:-10800}"
@@ -89,6 +99,13 @@ RAW="${COST_BENCH_RAW:-$EVIDENCE/raw/$LABEL}"
 BASE_SHA=$(git -C "$repo_root" rev-parse --verify "$BASE_REF^{commit}") ||
   die "base commit $BASE_REF is not in this repository"
 
+[[ -z "$GRAPH_RULE" || "$GRAPH_RULE" == 1 ]] || die "COST_BENCH_GRAPH_RULE must be 1 or unset"
+case "$SCENARIOS" in
+  all) ;;
+  bulk) [[ -n "${COST_BENCH_RAW:-}" ]] || die "COST_BENCH_SCENARIOS=bulk needs COST_BENCH_RAW" ;;
+  *) die "COST_BENCH_SCENARIOS must be 'all' or 'bulk'" ;;
+esac
+
 BUILD_ROOT="${COST_BENCH_BUILD_ROOT:-${TMPDIR:-/tmp}/jit-cost-evidence-build}"
 WORK_ROOT="${COST_BENCH_WORK_ROOT:-/dev/shm/jit-cost-evidence}"
 mkdir -p "$BUILD_ROOT" "$WORK_ROOT"
@@ -113,7 +130,7 @@ cp "$BUILD_ROOT/target/release/jit" "$WORK/bin/jit-base"
 [[ -z "$TIP_BIN" ]] || cp "$TIP_BIN" "$WORK/bin/jit-tip"
 
 python3 -I - "$WORK" "$RAW" "$BASE_SHA" "$LABEL" "$SAMPLES" "$LOAD_MAX" "$LOAD_TIMEOUT" \
-  "$(git -C "$repo_root" rev-parse HEAD)" <<'PYEOF' || exit $?
+  "$GRAPH_RULE" "$SCENARIOS" "$(git -C "$repo_root" rev-parse HEAD)" <<'PYEOF' || exit $?
 import hashlib
 import json
 import math
@@ -130,7 +147,8 @@ from pathlib import Path
 
 work, raw = Path(sys.argv[1]), Path(sys.argv[2])
 base_sha, label, samples = sys.argv[3], sys.argv[4], int(sys.argv[5])
-load_max, load_timeout, harness_head = float(sys.argv[6]), int(sys.argv[7]), sys.argv[8]
+load_max, load_timeout = float(sys.argv[6]), int(sys.argv[7])
+graph_rule, scenarios, harness_head = sys.argv[8] == "1", sys.argv[9], sys.argv[10]
 binaries = ["base"] if label == "base" else ["base", "tip"]
 bins = {b: work / "bin" / f"jit-{b}" for b in binaries}
 env = {"PATH": os.environ["PATH"], "HOME": os.environ["HOME"], "LC_ALL": "C"}
@@ -207,12 +225,33 @@ def replay_events(path, target_lines):
                 written += 1
 
 
+GRAPH_RULE_DECLARATION = (
+    '\n[[rules]]\nname = "bench-graph-rule"\nwhen = { label = "bench:match" }\n'
+    'severity = "warn"\nassert = { dependency-shape = { target = { label = "bench:dep" }, '
+    'mode = "should" } }\n')
+
+
 def bulk_fixture(binary, path, n, m):
+    """With the graph rule, each issue depends on its own done `bench:dep` issue, so
+    the rule resolves one neighbour per matched issue on the in_progress transition."""
     init(binary, path, BENCH_NAMESPACE)
-    batch_create(binary, path, [
-        {"key": f"i{i}", "title": f"bulk issue {i}",
-         "labels": ["bench:match" if i < m else "bench:other"]}
-        for i in range(n)])
+    if graph_rule:
+        with (path / ".jit" / "rules.toml").open("a") as rules:
+            rules.write(GRAPH_RULE_DECLARATION)
+        jit(binary, path, "validate", "--fix")
+    entries = [{"key": f"i{i}", "title": f"bulk issue {i}",
+                "labels": ["bench:match" if i < m else "bench:other"]} for i in range(n)]
+    if graph_rule:
+        for entry in entries:
+            entry["depends_on"] = [f"{entry['key']}d"]
+        entries += [{"key": f"i{i}d", "title": f"bulk dependency {i}", "labels": ["bench:dep"]}
+                    for i in range(n)]
+    batch_create(binary, path, entries)
+    if graph_rule:
+        result = json.loads(jit(binary, path, "issue", "update", "--filter", "label:bench:dep",
+                                "--state", "done", "--json").stdout)
+        if len(result["modified"]) != n or result["errors"]:
+            fail(f"{binary}: closing dependencies modified {len(result['modified'])} of {n}")
     return {"issues": n, "matches": m}
 
 
@@ -291,11 +330,12 @@ for binary in binaries:
     points = {}
     for n, m in BULK:
         points[f"bulk/N{n}-M{m}"] = bulk_fixture(binary, root / f"bulk-N{n}-M{m}", n, m)
-    for c in ARCHIVE:
-        points[f"archive/C{c}"] = archive_fixture(binary, root / f"archive-C{c}", c)
-    for kind in ("minimal", "inflated"):
-        points[f"dep/{kind}"] = dep_fixture(binary, root / f"dep-{kind}", kind == "inflated")
-    points["profile/package48"] = profile_fixture(binary, root / "profile-package48")
+    if scenarios == "all":
+        for c in ARCHIVE:
+            points[f"archive/C{c}"] = archive_fixture(binary, root / f"archive-C{c}", c)
+        for kind in ("minimal", "inflated"):
+            points[f"dep/{kind}"] = dep_fixture(binary, root / f"dep-{kind}", kind == "inflated")
+        points["profile/package48"] = profile_fixture(binary, root / "profile-package48")
     fixtures[binary] = points
 
 
@@ -414,9 +454,11 @@ load_waited = round(time.monotonic() - waited_from)
 load_start = loadavg()
 
 (raw / "traces").mkdir(parents=True)
-timed_points = [f"bulk/N{n}-M{m}" for n, m in BULK] + [f"archive/C{c}" for c in ARCHIVE] + \
-    ["dep/minimal", "dep/inflated"]
-traced_points = [f"archive/C{c}" for c in ARCHIVE] + ["profile/package48"]
+timed_points = [f"bulk/N{n}-M{m}" for n, m in BULK]
+traced_points = []
+if scenarios == "all":
+    timed_points += [f"archive/C{c}" for c in ARCHIVE] + ["dep/minimal", "dep/inflated"]
+    traced_points = [f"archive/C{c}" for c in ARCHIVE] + ["profile/package48"]
 timings, traces = [], []
 for round_index in range(samples):
     order = binaries if round_index % 2 == 0 else binaries[::-1]
@@ -460,6 +502,8 @@ host = {
         }
         for b in binaries
     },
+    **({"graph_rule": True} if graph_rule else {}),
+    **({"scenarios": scenarios} if scenarios != "all" else {}),
     "fixtures": fixtures,
     "argv": {point: argv_for(binaries[0], point) for point in timed_points + traced_points},
 }

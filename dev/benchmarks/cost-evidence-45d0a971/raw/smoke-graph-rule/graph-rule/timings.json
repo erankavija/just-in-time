@@ -1,0 +1,242 @@
+[
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "bulk/N500-M10",
+  "wall_ns": 194827890
+ },
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "bulk/N500-M160",
+  "wall_ns": 2798556633
+ },
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 723515298
+ },
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 10944554357
+ },
+ {
+  "round": 0,
+  "binary": "tip",
+  "point": "bulk/N500-M10",
+  "wall_ns": 27915924
+ },
+ {
+  "round": 0,
+  "binary": "tip",
+  "point": "bulk/N500-M160",
+  "wall_ns": 56567423
+ },
+ {
+  "round": 0,
+  "binary": "tip",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 91711788
+ },
+ {
+  "round": 0,
+  "binary": "tip",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 113414318
+ },
+ {
+  "round": 1,
+  "binary": "tip",
+  "point": "bulk/N500-M10",
+  "wall_ns": 28140975
+ },
+ {
+  "round": 1,
+  "binary": "tip",
+  "point": "bulk/N500-M160",
+  "wall_ns": 56264232
+ },
+ {
+  "round": 1,
+  "binary": "tip",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 87246133
+ },
+ {
+  "round": 1,
+  "binary": "tip",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 113948051
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "bulk/N500-M10",
+  "wall_ns": 196618140
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "bulk/N500-M160",
+  "wall_ns": 2769999594
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 731781424
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 10975035029
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "bulk/N500-M10",
+  "wall_ns": 204093741
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "bulk/N500-M160",
+  "wall_ns": 2775615897
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 727459060
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 10973472083
+ },
+ {
+  "round": 2,
+  "binary": "tip",
+  "point": "bulk/N500-M10",
+  "wall_ns": 28081106
+ },
+ {
+  "round": 2,
+  "binary": "tip",
+  "point": "bulk/N500-M160",
+  "wall_ns": 56322052
+ },
+ {
+  "round": 2,
+  "binary": "tip",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 86201527
+ },
+ {
+  "round": 2,
+  "binary": "tip",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 118205094
+ },
+ {
+  "round": 3,
+  "binary": "tip",
+  "point": "bulk/N500-M10",
+  "wall_ns": 29185502
+ },
+ {
+  "round": 3,
+  "binary": "tip",
+  "point": "bulk/N500-M160",
+  "wall_ns": 56135431
+ },
+ {
+  "round": 3,
+  "binary": "tip",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 85347513
+ },
+ {
+  "round": 3,
+  "binary": "tip",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 116922778
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "bulk/N500-M10",
+  "wall_ns": 195403903
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "bulk/N500-M160",
+  "wall_ns": 2770240448
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 727686592
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 10915036202
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "bulk/N500-M10",
+  "wall_ns": 192122375
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "bulk/N500-M160",
+  "wall_ns": 2794755274
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 728413695
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 10938702166
+ },
+ {
+  "round": 4,
+  "binary": "tip",
+  "point": "bulk/N500-M10",
+  "wall_ns": 27874134
+ },
+ {
+  "round": 4,
+  "binary": "tip",
+  "point": "bulk/N500-M160",
+  "wall_ns": 59098728
+ },
+ {
+  "round": 4,
+  "binary": "tip",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 85009771
+ },
+ {
+  "round": 4,
+  "binary": "tip",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 115661601
+ }
+]
