@@ -24,6 +24,7 @@
 use crate::domain::identity::GateKey;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -41,6 +42,10 @@ pub const DEFAULT_CRITERION_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 /// Errors that can occur while loading and parsing `.jit/rules.toml`.
 #[derive(Debug, Error)]
 pub enum RuleConfigError {
+    /// A failure derived once and shared by every reader of that derivation.
+    #[error(transparent)]
+    Shared(Arc<RuleConfigError>),
+
     /// The repository layout could not resolve a rules or schema path.
     #[error(transparent)]
     Layout(#[from] RepositoryLayoutError),
@@ -930,7 +935,9 @@ impl RuleSet {
 
     /// Discover safe schema-byte requests without reading them.
     pub fn schema_requests(content: &str) -> Result<Vec<SchemaRequest>, RuleConfigError> {
-        RulesDocument::parse(content).schema_requests()
+        RulesDocument::parse(content)
+            .schema_requests()
+            .map(<[SchemaRequest]>::to_vec)
     }
 
     /// Returns the union of rules whose selector matches the issue.
@@ -949,6 +956,8 @@ impl RuleSet {
 /// rule set are both derived.
 pub(crate) struct RulesDocument {
     raw: Result<RawRulesFile, toml::de::Error>,
+    /// The schema requests of `raw`, derived on first use.
+    schema_requests: std::sync::OnceLock<Result<Vec<SchemaRequest>, Arc<RuleConfigError>>>,
 }
 
 impl RulesDocument {
@@ -957,6 +966,7 @@ impl RulesDocument {
         super::count_parse(super::ParsedSource::Rules);
         Self {
             raw: toml::from_str(content),
+            schema_requests: std::sync::OnceLock::new(),
         }
     }
 
@@ -994,8 +1004,20 @@ impl RulesDocument {
         Ok(RuleSet { rules })
     }
 
-    /// Safe schema-byte requests, without reading them.
-    pub(crate) fn schema_requests(&self) -> Result<Vec<SchemaRequest>, RuleConfigError> {
+    /// Safe schema-byte requests, without reading them, derived once per
+    /// parse with their failure.
+    pub(crate) fn schema_requests(&self) -> Result<&[SchemaRequest], RuleConfigError> {
+        self.schema_requests
+            .get_or_init(|| {
+                #[cfg(test)]
+                super::count_parse(super::ParsedSource::SchemaRequests);
+                self.derive_schema_requests().map_err(Arc::new)
+            })
+            .as_deref()
+            .map_err(|error| RuleConfigError::Shared(Arc::clone(error)))
+    }
+
+    fn derive_schema_requests(&self) -> Result<Vec<SchemaRequest>, RuleConfigError> {
         self.raw()?
             .rules
             .iter()

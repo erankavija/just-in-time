@@ -521,16 +521,16 @@ pub(crate) fn validation_declarations_seeded(
             // placeholder.
             let schemas = document
                 .schema_requests()?
-                .into_iter()
+                .iter()
                 .filter_map(|request| -> Option<Result<_, DeclarationParseError>> {
                     let bytes = VirtualPath::schema_reference(&request.reference)
                         .map_err(DeclarationParseError::from)
                         .and_then(|path| Ok(image.file_bytes(&path)?.map(<[u8]>::to_vec)));
                     match bytes {
-                        Ok(Some(bytes)) => Some(Ok((request.reference, bytes))),
+                        Ok(Some(bytes)) => Some(Ok((request.reference.clone(), bytes))),
                         Ok(None) if !request.required => None,
                         Ok(None) => Some(Err(DeclarationParseError::MissingCapture(
-                            request.reference,
+                            request.reference.clone(),
                         ))),
                         Err(error) => Some(Err(error)),
                     }

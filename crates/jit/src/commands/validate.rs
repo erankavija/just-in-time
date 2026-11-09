@@ -756,10 +756,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             let rules_text = effective_virtual_path(image, &VirtualPath::RULES)?
                 .map(String::from_utf8)
                 .transpose()?;
+            // The memoized outcome: a failure plans no schema paths, and the
+            // declaration parse reads the same failure to report it.
             let schema_requests =
                 crate::repository_state::schema_requests_of(image, rules_text.as_deref())
-                    .ok()
-                    .flatten();
+                    .unwrap_or_default();
             let closure = validate_capture_closure(
                 image.layout(),
                 config,

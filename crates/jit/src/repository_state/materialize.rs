@@ -124,7 +124,13 @@ pub(crate) fn schema_requests_of(
     rules: Option<&str>,
 ) -> Result<Option<Vec<crate::declarations::rules::SchemaRequest>>, ProducerError> {
     Ok(rules
-        .map(|content| image.declaration_memo().rules(content).schema_requests())
+        .map(|content| {
+            image
+                .declaration_memo()
+                .rules(content)
+                .schema_requests()
+                .map(<[_]>::to_vec)
+        })
         .transpose()?)
 }
 
@@ -609,6 +615,7 @@ pub(crate) fn compose_default_ruleset(
         .rules(&current_rules)
         .schema_requests()
         .map_err(ProducerError::from)?
+        .iter()
     {
         let schema_path = VirtualPath::schema_reference(&req.reference)?;
         if origins.get(req.rule.as_str()).copied().flatten()

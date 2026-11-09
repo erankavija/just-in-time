@@ -633,21 +633,22 @@ fn rule_schema_paths(
 ) -> Result<Vec<crate::repository_state::VirtualPath>> {
     use crate::repository_state::VirtualPath;
 
-    let requests = image
+    let Some(rules) = image
         .file_bytes(&VirtualPath::RULES)?
         .and_then(|bytes| std::str::from_utf8(bytes).ok())
-        .and_then(|content| {
-            image
-                .declaration_memo()
-                .rules(content)
-                .schema_requests()
-                .ok()
-        })
-        .unwrap_or_default();
-    Ok(requests
-        .iter()
-        .filter_map(|request| VirtualPath::schema_reference(&request.reference).ok())
-        .collect())
+        .map(|content| image.declaration_memo().rules(content))
+    else {
+        return Ok(Vec::new());
+    };
+    // The memoized outcome: a failure names no paths, and the declaration
+    // parse reads the same failure to report it.
+    Ok(match rules.schema_requests() {
+        Ok(requests) => requests
+            .iter()
+            .filter_map(|request| VirtualPath::schema_reference(&request.reference).ok())
+            .collect(),
+        Err(_) => Vec::new(),
+    })
 }
 
 #[cfg(test)]
@@ -3946,7 +3947,28 @@ mod tests {
             create(&malformed)
         });
 
+        // A rules source naming an unsafe schema reference derives its schema
+        // requests once, for discovery and declaration assembly alike.
+        let unsafe_rules = test_helpers::memory_executor_declaring(
+            crate::storage::InMemoryStorage::new(),
+            test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                rules: Some(
+                    "[[rules]]\nname = 'escape'\n[rules.assert]\njson-schema = 'schemas/../escape.json'\n",
+                ),
+                after_initialization: true,
+                ..Default::default()
+            },
+        );
+        let derivations_before = parses_on_this_thread(ParsedSource::SchemaRequests);
+        assert!(unsafe_rules.captured_declarations().is_err());
+        let derivations = parses_on_this_thread(ParsedSource::SchemaRequests) - derivations_before;
+
         assert!(refused.is_err());
+        assert_eq!(
+            derivations, 1,
+            "schema requests derived more than once for one rules source"
+        );
         assert_eq!(
             [creation, application, repair, edited, sibling, refusal],
             [
