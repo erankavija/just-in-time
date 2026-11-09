@@ -45,7 +45,7 @@ pub(crate) fn record_drift(
         .as_deref()
         .unwrap_or_default()
         .iter()
-        .zip(&captured.values)
+        .zip(captured.values.iter())
         .map(|(issue, value)| {
             report(
                 &VirtualPath::issue_record(&issue.id),

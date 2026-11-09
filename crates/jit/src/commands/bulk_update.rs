@@ -525,6 +525,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
                     config,
                     precheck_targets,
                     &graph.declarations.gates,
+                    (base.issues, base.values),
                 )? {
                     Some(preflights) => BulkAttempt::Preflight(preflights),
                     None => BulkAttempt::Retry,

@@ -60,8 +60,25 @@ pub struct CapturedValidation<'a> {
     pub(crate) index: std::result::Result<RepositoryIndex, Arc<anyhow::Error>>,
     pub(crate) issues: std::result::Result<Arc<[Issue]>, Arc<anyhow::Error>>,
     /// The JSON value each of `issues` decoded from, in order; empty when they failed.
-    pub(crate) values: Vec<serde_json::Value>,
+    pub(crate) values: Arc<[serde_json::Value]>,
     declarations: crate::repository_state::DeferredDeclarations,
+}
+
+/// The issue records one captured image decoded, with the JSON value each
+/// decoded from, shared by every reader of that decode.
+#[derive(Debug, Clone)]
+pub(crate) struct DecodedRecords {
+    pub(crate) issues: Arc<[Issue]>,
+    pub(crate) values: Arc<[serde_json::Value]>,
+}
+
+impl DecodedRecords {
+    pub(crate) fn new(issues: Vec<Issue>, values: Vec<serde_json::Value>) -> Self {
+        Self {
+            issues: issues.into(),
+            values: values.into(),
+        }
+    }
 }
 
 impl<'a> CapturedValidation<'a> {
@@ -71,9 +88,34 @@ impl<'a> CapturedValidation<'a> {
     }
 
     /// [`Self::from_image`] with `config`, the configuration already
-    /// assembled from `image`.
-    pub(crate) fn with_config(image: &'a RepositoryImage, config: JitConfig) -> Self {
-        Self::loaded(image, Some(Ok(config)))
+    /// assembled from `image`, and `decoded`, the records `image` holds when
+    /// the caller has decoded them.
+    pub(crate) fn with_config(
+        image: &'a RepositoryImage,
+        config: JitConfig,
+        decoded: Option<&DecodedRecords>,
+    ) -> Self {
+        match decoded {
+            Some(decoded) => Self::seeded(image, decoded, Ok(config)),
+            None => Self::loaded(image, Some(Ok(config))),
+        }
+    }
+
+    fn seeded(
+        image: &'a RepositoryImage,
+        decoded: &DecodedRecords,
+        config: std::result::Result<JitConfig, crate::repository_state::ProducerError>,
+    ) -> Self {
+        Self {
+            index: records_pass(load_index(image)),
+            issues: Ok(Arc::clone(&decoded.issues)),
+            values: Arc::clone(&decoded.values),
+            image: Cow::Borrowed(image),
+            declarations: crate::repository_state::DeferredDeclarations::new(
+                crate::repository_state::validation_declarations_seeded,
+                Some(config),
+            ),
+        }
     }
 
     fn loaded(
@@ -98,7 +140,7 @@ impl<'a> CapturedValidation<'a> {
         Self {
             index: records_pass(load_index(&image)),
             issues: records_pass(issues).map(Arc::from),
-            values,
+            values: values.into(),
             image,
             declarations: crate::repository_state::DeferredDeclarations::new(
                 crate::repository_state::validation_declarations_seeded,
@@ -461,6 +503,8 @@ fn records_pass<T>(loaded: Result<T>) -> std::result::Result<T, Arc<anyhow::Erro
 }
 
 fn load_index(image: &RepositoryImage) -> Result<RepositoryIndex> {
+    #[cfg(test)]
+    crate::resolution_counts::count_in_image(crate::resolution_counts::Resolution::Index, image);
     let index_path = VirtualPath::INDEX.repository_relative();
     RepositoryIndex::parse(
         &image_read(image, &index_path)?
@@ -471,17 +515,19 @@ fn load_index(image: &RepositoryImage) -> Result<RepositoryIndex> {
 
 fn load_issues(image: &RepositoryImage) -> Result<Vec<(Issue, serde_json::Value)>> {
     let ids = captured_issue_ids(image)?;
-    parse_issue_records(&ids, |path| image.file_bytes(path)).map_err(|error| match error {
-        IssueRecordsError::Malformed { id, error } => {
-            anyhow!(error.into_source()).context(RepositoryJudgedInvalid(format!(
-                "invalid {}",
-                VirtualPath::issue_record(&id).repository_relative()
-            )))
+    parse_issue_records(&ids, crate::repository_state::image_issue_bytes(image)).map_err(|error| {
+        match error {
+            IssueRecordsError::Malformed { id, error } => {
+                anyhow!(error.into_source()).context(RepositoryJudgedInvalid(format!(
+                    "invalid {}",
+                    VirtualPath::issue_record(&id).repository_relative()
+                )))
+            }
+            error @ IssueRecordsError::MismatchedId { .. } => {
+                RepositoryJudgedInvalid(error.to_string()).into()
+            }
+            error => error.into(),
         }
-        error @ IssueRecordsError::MismatchedId { .. } => {
-            RepositoryJudgedInvalid(error.to_string()).into()
-        }
-        error => error.into(),
     })
 }
 

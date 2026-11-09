@@ -99,10 +99,12 @@ struct CapturedGateExecution<'a> {
 /// findings from, and the whole-repository judgement of that image with
 /// `history`, the event log read in the session that captured it, taken once
 /// per batch. Gate-recency rules in either evaluate at the time of its first
-/// use.
+/// use. Both read `records`, the issue records the batch's image decoded once,
+/// when the caller holds them, and otherwise decode the image's own.
 #[derive(Default)]
 pub(super) struct SharedValidation {
     history: Option<super::validate::RepositoryHistory>,
+    records: Option<crate::validation::DecodedRecords>,
     captured: std::sync::OnceLock<crate::validation::ValidationReport>,
     whole: std::sync::OnceLock<std::result::Result<Judgement, std::sync::Arc<anyhow::Error>>>,
 }
@@ -111,11 +113,15 @@ pub(super) struct SharedValidation {
 type Judgement = (Vec<GateFinding>, bool);
 
 impl SharedValidation {
-    /// Reports over a batch's image whose whole-repository judgement reads
-    /// `history`.
-    pub(super) fn new(history: Option<super::validate::RepositoryHistory>) -> Self {
+    /// Reports over a batch's image, whose issue records are `records`, and
+    /// whose whole-repository judgement reads `history`.
+    pub(super) fn new(
+        history: Option<super::validate::RepositoryHistory>,
+        records: Option<crate::validation::DecodedRecords>,
+    ) -> Self {
         Self {
             history,
+            records,
             ..Self::default()
         }
     }
@@ -132,8 +138,11 @@ impl SharedValidation {
                         .history
                         .as_ref()
                         .ok_or_else(|| anyhow!("repository validation has no captured history"))?;
-                    let captured =
-                        crate::validation::CapturedValidation::with_config(image, config.clone());
+                    let captured = crate::validation::CapturedValidation::with_config(
+                        image,
+                        config.clone(),
+                        self.records.as_ref(),
+                    );
                     let inputs = crate::validation::ReportInputs {
                         now: chrono::Utc::now(),
                         history: Some(super::validate::history_verdicts(&captured, history)?),
@@ -156,7 +165,11 @@ impl SharedValidation {
     ) -> &crate::validation::ValidationReport {
         self.captured.get_or_init(|| {
             crate::validation::report(
-                &crate::validation::CapturedValidation::with_config(image, config.clone()),
+                &crate::validation::CapturedValidation::with_config(
+                    image,
+                    config.clone(),
+                    self.records.as_ref(),
+                ),
                 &crate::validation::ReportInputs {
                     now: chrono::Utc::now(),
                     history: None,
@@ -317,6 +330,10 @@ struct BoundGateEvaluation {
     issue: Issue,
     registry: crate::declarations::GateRegistry,
     gate: crate::declarations::GateDefinition,
+    /// The issue records `image` holds, decoded once by the validation base a
+    /// built-in checker judges; `None` when no base was decoded or a record
+    /// does not parse.
+    records: Option<crate::validation::DecodedRecords>,
 }
 
 impl BoundGateEvaluation {
@@ -338,9 +355,9 @@ fn captured_issue_record(
 ) -> Result<Option<Issue>> {
     use crate::repository_state::{RepositoryEntry, VirtualPath};
 
-    #[cfg(test)]
-    crate::resolution_counts::count_in_image(crate::resolution_counts::Resolution::Issue, image);
     let path = VirtualPath::issue_record(issue_id);
+    #[cfg(test)]
+    crate::resolution_counts::count_issue_in_image(image, &path);
     match image.entry(&path)? {
         RepositoryEntry::File { content, .. } => {
             let issue = crate::repository_state::decode_issue_record(&path, content.bytes())?;
@@ -970,7 +987,6 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::declarations::GateChecker;
         use crate::repository_state::{CaptureSpec, VirtualPath};
-        use std::collections::BTreeMap;
 
         let spec = CaptureSpec::new(
             [VirtualPath::issue_record(issue_id)],
@@ -1013,20 +1029,26 @@ impl<S: IssueStore> CommandExecutor<S> {
             .checker
             .as_ref()
             .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", gate_key))?;
-        let (image, config) = if checker_needs_validation_image(checker) {
-            match self.capture_proposed_base(session, &BTreeMap::new(), run_paths, Some(initial))? {
-                Some((image, config)) => (image, config?),
+        let (image, config, records) = if checker_needs_validation_image(checker) {
+            match self.capture_proposed_base_decoded(session, run_paths, Some(initial), None)? {
+                Some((image, config, (issues, values))) => (
+                    image,
+                    config?,
+                    issues
+                        .ok()
+                        .map(|issues| crate::validation::DecodedRecords::new(issues, values)),
+                ),
                 None => return Ok(None),
             }
         } else {
-            (initial, config)
+            (initial, config, None)
         };
-        let issues = match checker {
-            GateChecker::RepositoryValidation => super::validate::validation_issues(&image),
-            _ => Vec::new(),
+        let validated_issues = match (checker, &records) {
+            (GateChecker::RepositoryValidation, Some(records)) => &records.issues[..],
+            _ => &[],
         };
         let Some(image) = super::grow_discovering(session, image, |image, spec| {
-            discover_gate_inputs(image, spec, &issue, &issues, &[&gate], &config)
+            discover_gate_inputs(image, spec, &issue, validated_issues, &[&gate], &config)
         })?
         else {
             return Ok(None);
@@ -1037,6 +1059,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue,
             registry,
             gate,
+            records,
         }))
     }
 }
@@ -1117,15 +1140,16 @@ impl<S: IssueStore> GateOps<'_, S> {
                     claims_guard.as_ref(),
                 )?;
                 let issues = crate::domain::queries::IndexedIssues::new(
-                    if super::is_broad_builtin_gate(&bound.gate) {
-                        super::captured_active_issues(&bound.image)?
-                    } else {
-                        std::iter::once(bound.issue.clone())
+                    match (&bound.records, super::is_broad_builtin_gate(&bound.gate)) {
+                        (Some(records), true) => std::sync::Arc::clone(&records.issues),
+                        (None, true) => super::captured_active_issues(&bound.image)?.into(),
+                        (_, false) => std::iter::once(bound.issue.clone())
                             .chain(captured_direct_dependency_issues(
                                 &bound.image,
                                 &bound.issue,
                             )?)
-                            .collect()
+                            .collect::<Vec<_>>()
+                            .into(),
                     },
                 );
                 let captured = captured_gate_evidence(
@@ -1154,6 +1178,7 @@ impl<S: IssueStore> GateOps<'_, S> {
             config,
             issue,
             gate,
+            records,
             ..
         } = &bound;
         let target_id = &issue.id;
@@ -1186,7 +1211,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 runs: &captured.runs,
                 documents: &captured.documents,
                 prompt: captured.prompts.get(&gate.key).map(String::as_str),
-                validation: &SharedValidation::new(history.clone()),
+                validation: &SharedValidation::new(history.clone(), records.clone()),
             })?,
         };
         result.inputs_digest = digest;
@@ -3548,7 +3573,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 &GateChecker::RepositoryValidation,
                 &image,
                 &crate::repository_state::assemble_config(&image).unwrap(),
-                &super::SharedValidation::new(Some(history)),
+                &super::SharedValidation::new(Some(history), None),
             )
             .unwrap();
         (validate, run)
@@ -3618,7 +3643,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 &GateChecker::RepositoryValidation,
                 &image,
                 &crate::repository_state::assemble_config(&image).unwrap(),
-                &super::SharedValidation::new(Some(history)),
+                &super::SharedValidation::new(Some(history), None),
             )
             .unwrap();
 
@@ -3882,7 +3907,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 whole.select(&Selection::Whole),
                 (
                     &repository_image,
-                    super::SharedValidation::new(Some(history)),
+                    super::SharedValidation::new(Some(history), None),
                 ),
             ),
         ];
@@ -3999,7 +4024,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     &checker,
                     &image,
                     &crate::repository_state::assemble_config(&image).unwrap(),
-                    &super::SharedValidation::new(Some(history)),
+                    &super::SharedValidation::new(Some(history), None),
                 )
                 .unwrap();
 
@@ -5035,9 +5060,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         )
     }
 
-    /// A manual `check_gate` and an automatic precheck each resolve the
-    /// issue, the gate registry with its gate definition, and the issue's
-    /// documents once per captured image.
+    /// A manual `check_gate` and an automatic precheck, over an exec gate and
+    /// over a built-in validation gate, each resolve every issue record, the
+    /// gate registry with its gate definition, and the issue's documents once
+    /// per captured image.
     #[test]
     fn test_gate_evaluation_resolves_its_inputs_once_per_captured_image() {
         use crate::resolution_counts::{per_source, reset, Resolution};
@@ -5054,6 +5080,41 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             &[("manual-exec", "true")],
         );
         let (precheck, _) = seed_ready_issue_with_failing_precheck(&executor, true);
+        let validation_key: GateKey = "validation-gate".parse().unwrap();
+        let validated = add_builtin_gate(
+            &executor,
+            &validation_key,
+            GateChecker::RepositoryValidation,
+            Vec::new(),
+        );
+        let prechecked = add_builtin_gate(
+            &executor,
+            &"validation-precheck".parse().unwrap(),
+            GateChecker::RepositoryValidation,
+            Vec::new(),
+        );
+        executor
+            .gates()
+            .update_gate(
+                &"validation-precheck".parse().unwrap(),
+                GateUpdate {
+                    stage: Some(GateStage::Precheck),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+        reset();
+        executor
+            .gates()
+            .check_gate(&validated, &validation_key)
+            .unwrap();
+        let validated_manual =
+            resolutions(&[Resolution::Issue, Resolution::Registry, Resolution::Index]);
+        reset();
+        start_work_updating_gates(&executor, &prechecked, Default::default()).ok();
+        let validated_precheck =
+            resolutions(&[Resolution::Issue, Resolution::Registry, Resolution::Index]);
 
         reset();
         executor
@@ -5073,7 +5134,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             Resolution::Documents,
         ]);
 
-        for (case, counts) in [("manual", manual_counts), ("precheck", precheck_counts)] {
+        for (case, counts) in [
+            ("manual", manual_counts),
+            ("precheck", precheck_counts),
+            ("validation manual", validated_manual),
+            ("validation precheck", validated_precheck),
+        ] {
             for (kind, per_source) in counts {
                 assert!(!per_source.is_empty(), "{case} {kind:?} never resolved");
                 assert!(

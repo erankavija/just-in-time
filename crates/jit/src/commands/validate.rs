@@ -21,13 +21,25 @@ enum BaseCapturePurpose<'a> {
     Archive,
 }
 
-/// A capture's parsed issues and, for validation, the JSON value each decoded from.
-type ParsedIssues = (Result<Vec<Issue>>, Vec<serde_json::Value>);
+/// The issues a capture parsed, each beside the JSON value it decoded from.
+pub(crate) type ParsedRecords = (Vec<Issue>, Vec<serde_json::Value>);
+
+/// A capture's [`ParsedRecords`], with the parse failure a validation base
+/// reports as a finding; a repair decodes no record.
+pub(crate) type ParsedIssues = (Result<Vec<Issue>>, Vec<serde_json::Value>);
 
 /// A proposed base and the configuration its discovery assembled.
 pub(crate) type ProposedBase = (
     crate::repository_state::RepositoryImage,
     std::result::Result<JitConfig, crate::repository_state::ProducerError>,
+);
+
+/// A validation base, the configuration its discovery assembled, and the
+/// issue records it decoded.
+pub(crate) type DecodedBase = (
+    crate::repository_state::RepositoryImage,
+    std::result::Result<JitConfig, crate::repository_state::ProducerError>,
+    ParsedIssues,
 );
 
 /// A captured base, its issues, the configuration its discovery assembled, and
@@ -423,6 +435,27 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         .map(|captured| captured.map(|(image, _, config, _)| (image, config)))
     }
 
+    /// [`Self::capture_proposed_base`] with the issue records its validation
+    /// base decoded, and from `start` with `known`, the records `start`
+    /// already decoded.
+    pub(crate) fn capture_proposed_base_decoded(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryReadSession + '_),
+        extra_paths: &[crate::repository_state::VirtualPath],
+        start: Option<crate::repository_state::RepositoryImage>,
+        known: Option<ParsedIssues>,
+    ) -> Result<Option<DecodedBase>> {
+        self.capture_proposed_base_known(
+            session,
+            start,
+            &std::collections::BTreeMap::new(),
+            extra_paths,
+            BaseCapturePurpose::Validation,
+            known,
+        )
+        .map(|captured| captured.map(|(image, records, config, _)| (image, config, records)))
+    }
+
     /// The base an issue mutation derives from: the registries, every issue,
     /// the plan documents its transition rules read, and what the prechecks of
     /// `precheck_targets` read.
@@ -478,8 +511,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         )
         .and_then(|captured| {
             captured
-                .map(|(image, (issues, _), config, gates)| {
-                    Ok(MutationBase::new(image, issues?, config, gates))
+                .map(|(image, (issues, values), config, gates)| {
+                    Ok(MutationBase::new(image, (issues?, values), config, gates))
                 })
                 .transpose()
         })
@@ -507,9 +540,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Some(_) => vec![issue_id.clone()],
             None => Vec::new(),
         };
-        let issues = crate::repository_state::parse_issue_records(&candidates, |path| {
-            image.file_bytes(path)
-        })?
+        let issues = crate::repository_state::parse_issue_records(
+            &candidates,
+            crate::repository_state::image_issue_bytes(&image),
+        )?
         .into_iter()
         .map(|(issue, _)| issue)
         .collect::<Vec<_>>();
@@ -535,12 +569,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 planned: &[],
             },
         )?
-        .map(|(image, (issues, _), config, gates)| {
+        .map(|(image, (issues, values), config, gates)| {
             Ok(MutationPreflight {
                 image,
                 target,
                 base: Some(PreflightBase {
                     issues: issues?,
+                    values,
                     config,
                     gates,
                 }),
@@ -593,6 +628,23 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         extra_paths: &[crate::repository_state::VirtualPath],
         purpose: BaseCapturePurpose<'_>,
     ) -> Result<Option<CapturedBase>> {
+        self.capture_proposed_base_known(session, start, overrides, extra_paths, purpose, None)
+    }
+
+    /// [`Self::capture_proposed_base_inner`] over `known`, the records `start`
+    /// already decoded, which it hands back instead of decoding again.
+    fn capture_proposed_base_known(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryReadSession + '_),
+        start: Option<crate::repository_state::RepositoryImage>,
+        overrides: &std::collections::BTreeMap<
+            crate::repository_state::VirtualPath,
+            Option<Vec<u8>>,
+        >,
+        extra_paths: &[crate::repository_state::VirtualPath],
+        purpose: BaseCapturePurpose<'_>,
+        known: Option<ParsedIssues>,
+    ) -> Result<Option<CapturedBase>> {
         use crate::repository_state::{
             validate_capture_closure, CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath,
         };
@@ -635,7 +687,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     None => super::image_virtual_bytes(image, path),
                 }
             };
-        let mut issues = None::<ParsedIssues>;
+        let mut issues = known;
         let mut resolved_gates = None::<(
             crate::repository_state::ImageToken,
             crate::declarations::GateRegistry,
@@ -694,25 +746,23 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 // A mutation derives from exactly these issues, so they are
                 // parsed once, with the strict reader, and handed back with the
                 // image. Validation parses the overlaid set leniently and reports
-                // defects as findings; it keeps each record's JSON value for
-                // record fidelity. Repair derives from the declarations alone and
-                // decodes no record.
+                // defects as findings. Both keep each record's JSON value, which
+                // record fidelity judges. Repair derives from the declarations
+                // alone and decodes no record.
                 let (parsed, values) = if mutation {
-                    #[cfg(test)]
-                    crate::resolution_counts::count_in_image(
-                        crate::resolution_counts::Resolution::Issue,
-                        image,
-                    );
-                    (Ok(super::captured_active_issues(image)?), Vec::new())
+                    let (issues, values) =
+                        super::captured_active_records(image)?.into_iter().unzip();
+                    (Ok(issues), values)
                 } else if matches!(purpose, BaseCapturePurpose::Repair) {
                     (Ok(Vec::new()), Vec::new())
                 } else {
                     // Effective bytes: the override (create/replace or proposed
                     // absence) when present, otherwise the captured base bytes.
+                    let base_bytes = crate::repository_state::image_issue_bytes(image);
                     match crate::repository_state::parse_issue_records(&issue_ids, |path| {
                         match overrides.get(path) {
                             Some(value) => Ok(value.as_deref()),
-                            None => image.file_bytes(path),
+                            None => base_bytes(path),
                         }
                     }) {
                         Ok(records) => {
@@ -1115,6 +1165,8 @@ pub(crate) struct MutationBase {
     pub(crate) image: crate::repository_state::RepositoryImage,
     /// Every issue the listing in `image` states, sorted by id.
     pub(crate) issues: Vec<Issue>,
+    /// The JSON value each of `issues` decoded from, in order.
+    pub(crate) values: Vec<serde_json::Value>,
     declarations: crate::repository_state::DeferredDeclarations,
 }
 
@@ -1124,13 +1176,14 @@ impl MutationBase {
     /// discovery resolved from it.
     pub(crate) fn new(
         image: crate::repository_state::RepositoryImage,
-        issues: Vec<Issue>,
+        (issues, values): (Vec<Issue>, Vec<serde_json::Value>),
         config: std::result::Result<JitConfig, crate::repository_state::ProducerError>,
         gates: Option<crate::declarations::GateRegistry>,
     ) -> Self {
         Self {
             image,
             issues,
+            values,
             declarations: crate::repository_state::DeferredDeclarations::new(
                 crate::repository_state::declarations_seeded,
                 Some(config),
@@ -1168,6 +1221,8 @@ pub(crate) struct MutationPreflight {
 pub(crate) struct PreflightBase {
     /// Every listed issue.
     pub(crate) issues: Vec<Issue>,
+    /// The JSON value each of `issues` decoded from, in order.
+    pub(crate) values: Vec<serde_json::Value>,
     /// The configuration the base discovery assembled from the image.
     pub(crate) config: std::result::Result<JitConfig, crate::repository_state::ProducerError>,
     /// The gate registry the base discovery resolved from the image.
@@ -1264,18 +1319,6 @@ impl RepositoryHistory {
             events: session.read_history_log()?.map(std::sync::Arc::from),
         })
     }
-}
-
-/// The issues whole-repository validation reads from `image`, a validation
-/// base: none when a record does not parse, which validation reports itself.
-pub(super) fn validation_issues(image: &crate::repository_state::RepositoryImage) -> Vec<Issue> {
-    crate::repository_state::overlaid_issue_ids(image, &std::collections::BTreeMap::new())
-        .ok()
-        .and_then(|ids| {
-            crate::repository_state::parse_issue_records(&ids, |path| image.file_bytes(path)).ok()
-        })
-        .map(|records| records.into_iter().map(|(issue, _)| issue).collect())
-        .unwrap_or_default()
 }
 
 /// Add to `spec` what [`history_verdicts`] reads from an image beside its

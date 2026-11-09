@@ -51,5 +51,6 @@ mod selection_proptests;
 pub use engine::{Finding, KeywordFactory, SchemaCompileError, SchemaEngine};
 pub use local::{evaluate_local, LocalEvalError, LocalEvaluation};
 pub use report::{ExplainReport, ReportedFinding, RuleOutcome, RuleReport};
+pub(crate) use repository::DecodedRecords;
 pub use repository::{report, CapturedValidation, HistoryVerdicts, ReportInputs, ValidationReport};
 pub use strictness::Strictness;
