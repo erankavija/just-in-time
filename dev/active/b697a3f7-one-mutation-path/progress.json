@@ -607,7 +607,8 @@
     "Epic close: surfaced_pitfalls reconciled; repo-validate gate PASSED; holistic-review held pending d5 routing of the configuration_store diagnostic advisory.",
     "d4a20645 (ad4fb78f5, merge 5b463ef09): cargo-ci passed; code-review FAILED F1: REQ-02 report not in evidence. Lead committed conflict-wrapper-audit.md (d5caa69e9) from the worker report and linked it; rerunning code-review. Lead trap: link any report a criterion requires before review.",
     "d4a20645 closed done: code-review PASSED with REQ-02 inventory linked; cargo-ci passed on 5b463ef09.",
-    "Epic repo-validate re-run PASSED after d4a20645; holistic-review gate started."
+    "Epic repo-validate re-run PASSED after d4a20645; holistic-review gate started.",
+    "b1d7a600 (56ac259cc, 5265f7051; merge f8593f1dd): cargo-ci and code-review PASSED; closed done. Rescan checks lease in session; claim sync covered by claims lock spanning the publish (revised d5 ruling); audit linked."
   ],
   "story_checkpoints": [
     {

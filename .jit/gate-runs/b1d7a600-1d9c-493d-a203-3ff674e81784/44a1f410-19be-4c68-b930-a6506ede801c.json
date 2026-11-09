@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f8593f1ddcdbecb3310bf374379a4c7d6552f3c0",
+  "completed_at": "2026-11-09T04:12:43.530249067Z",
+  "duration_ms": 137001,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No issue-impact defects found; lease enforcement, caller audit, and regression-test wiring satisfy the scoped criteria. Build and test execution remain unverified.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b1d7a600-1d9c-493d-a203-3ff674e81784",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "44a1f410-19be-4c68-b930-a6506ede801c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-09T04:10:26.528948482Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:b1d7a600`: c34d395ef, 56ac259cc, 46aa93f43, 1575d4614, 5265f7051; individual patches inspected.\nPolicy sources: AGENTS.md; dev/TESTING.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/active/b697a3f7-one-mutation-path/plan.md.\nResolved items: @/issue/b1d7a600/requirement/REQ-01, @/issue/b1d7a600/requirement/REQ-02, @/issue/b1d7a600/requirement/REQ-03, @/issue/b697a3f7/requirement/REQ-04 → issue descriptions; @/inv/orthogonal-tests, @/inv/shared-test-contracts, @/inv/semantic-test-assertions, @/inv/essential-code-prose, @/inv/derived-state-coherence, @/inv/architecture-dependency-direction → .jit/invariants.toml; @/gate/cargo-ci, @/gate/jit-validate → .jit/gates.toml.\nGate evidence: cargo-ci=pending; last_run_at=none; exit_code=none; ancestry unavailable.\nTruncation recovery: narrower issue-patch and plan-section reads completed; unrelated dependency notes and historical transcript omissions excluded.\n\nNo findings. The rescan uses claims-first coordination and the shared in-session lease check. The caller audit and reused-fixture regression test satisfy REQ-02 and REQ-03, including the revised claim-sync ruling. Read-only formatting checks passed; builds and tests were not run.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No issue-impact defects found; lease enforcement, caller audit, and regression-test wiring satisfy the scoped criteria. Build and test execution remain unverified.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
