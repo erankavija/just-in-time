@@ -949,6 +949,16 @@
       "commit": "b098a6bd6",
       "brief": "scratchpad/brief-d675102c-r4.md",
       "result": "REQ-01..03 MET; REQ-04 UNMET: F1 failed record decode repeated (gate_check.rs:1055 .ok() then fallback :1162). Advisory F2 D-20: captured_declarations_with derives final bundle twice (commands/mod.rs:2807/2814). Forwarded to d5."
+    },
+    {
+      "issue": "d675102c",
+      "kind": "checkpoint-r5",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "sandbox": "read-only",
+      "commit": "3698a341b",
+      "brief": "scratchpad/brief-d675102c-r5.md"
     }
   ]
 }
