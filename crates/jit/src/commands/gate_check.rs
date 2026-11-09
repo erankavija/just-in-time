@@ -105,6 +105,8 @@ struct CapturedGateExecution<'a> {
 pub(super) struct SharedValidation {
     history: Option<super::validate::RepositoryHistory>,
     records: Option<crate::validation::DecodedRecords>,
+    /// The registry the caller resolved from the image, when it did.
+    gates: Option<crate::declarations::GateRegistry>,
     /// The image's index and gate registry, read by both validations.
     inputs: std::sync::OnceLock<crate::validation::ImageInputs>,
     captured: std::sync::OnceLock<crate::validation::ValidationReport>,
@@ -120,10 +122,12 @@ impl SharedValidation {
     pub(super) fn new(
         history: Option<super::validate::RepositoryHistory>,
         records: Option<crate::validation::DecodedRecords>,
+        gates: Option<crate::declarations::GateRegistry>,
     ) -> Self {
         Self {
             history,
             records,
+            gates,
             ..Self::default()
         }
     }
@@ -133,7 +137,7 @@ impl SharedValidation {
         image: &crate::repository_state::RepositoryImage,
     ) -> crate::validation::ImageInputs {
         self.inputs
-            .get_or_init(|| crate::validation::ImageInputs::load(image))
+            .get_or_init(|| crate::validation::ImageInputs::load(image, self.gates.clone()))
             .clone()
     }
 
@@ -1192,6 +1196,7 @@ impl<S: IssueStore> GateOps<'_, S> {
             issue,
             gate,
             records,
+            registry,
             ..
         } = &bound;
         let target_id = &issue.id;
@@ -1224,7 +1229,11 @@ impl<S: IssueStore> GateOps<'_, S> {
                 runs: &captured.runs,
                 documents: &captured.documents,
                 prompt: captured.prompts.get(&gate.key).map(String::as_str),
-                validation: &SharedValidation::new(history.clone(), records.clone()),
+                validation: &SharedValidation::new(
+                    history.clone(),
+                    records.clone(),
+                    Some(registry.clone()),
+                ),
             })?,
         };
         result.inputs_digest = digest;
@@ -3586,7 +3595,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 &GateChecker::RepositoryValidation,
                 &image,
                 &crate::repository_state::assemble_config(&image).unwrap(),
-                &super::SharedValidation::new(Some(history), None),
+                &super::SharedValidation::new(Some(history), None, None),
             )
             .unwrap();
         (validate, run)
@@ -3656,7 +3665,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 &GateChecker::RepositoryValidation,
                 &image,
                 &crate::repository_state::assemble_config(&image).unwrap(),
-                &super::SharedValidation::new(Some(history), None),
+                &super::SharedValidation::new(Some(history), None, None),
             )
             .unwrap();
 
@@ -3920,7 +3929,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 whole.select(&Selection::Whole),
                 (
                     &repository_image,
-                    super::SharedValidation::new(Some(history), None),
+                    super::SharedValidation::new(Some(history), None, None),
                 ),
             ),
         ];
@@ -4037,7 +4046,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     &checker,
                     &image,
                     &crate::repository_state::assemble_config(&image).unwrap(),
-                    &super::SharedValidation::new(Some(history), None),
+                    &super::SharedValidation::new(Some(history), None, None),
                 )
                 .unwrap();
 
@@ -5087,6 +5096,53 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 .collect::<Vec<_>>()
         };
         let executor = setup();
+        let make_precheck = |key: &str| {
+            let key: GateKey = key.parse().unwrap();
+            let issue = add_builtin_gate(&executor, &key, GateChecker::IssueValidation, Vec::new());
+            executor
+                .gates()
+                .update_gate(
+                    &key,
+                    GateUpdate {
+                        stage: Some(GateStage::Precheck),
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+            issue
+        };
+        let bulk_target = make_precheck("bulk-selected");
+        reset();
+        executor
+            .issues()
+            .apply_bulk_update(
+                &crate::query_engine::QueryFilter::parse("state:ready").unwrap(),
+                &crate::commands::UpdateOperations {
+                    state: Some(State::InProgress),
+                    ..Default::default()
+                },
+                false,
+            )
+            .unwrap();
+        let bulk_counts =
+            resolutions(&[Resolution::Issue, Resolution::Registry, Resolution::Index]);
+        assert_eq!(
+            executor.storage.load_issue(&bulk_target).unwrap().id,
+            bulk_target
+        );
+        let selected = make_precheck("selected-only");
+        reset();
+        start_work_updating_gates(&executor, &selected, Default::default()).ok();
+        let selected_counts =
+            resolutions(&[Resolution::Issue, Resolution::Registry, Resolution::Index]);
+        let manual_selected = make_precheck("selected-manual");
+        reset();
+        executor
+            .gates()
+            .check_gate(&manual_selected, &"selected-manual".parse().unwrap())
+            .unwrap();
+        let manual_selected_counts =
+            resolutions(&[Resolution::Issue, Resolution::Registry, Resolution::Index]);
         let manual = seed_issue_requiring_exec_gates(
             &executor,
             State::InProgress,
@@ -5184,6 +5240,9 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             ("manual", manual_counts),
             ("precheck", precheck_counts),
             ("validation manual", validated_manual),
+            ("bulk selected-validation precheck", bulk_counts),
+            ("selected-validation precheck", selected_counts),
+            ("selected-validation manual", manual_selected_counts),
             ("validation precheck", validated_precheck),
             ("whole and selected validation precheck", mixed_precheck),
         ] {
