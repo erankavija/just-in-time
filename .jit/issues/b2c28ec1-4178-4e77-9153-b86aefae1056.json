@@ -14,7 +14,7 @@
       "doc_type": "decision",
       "format": "markdown",
       "label": "Criteria ruling: REQ-06 rustdoc clause",
-      "path": "dev/active/b2c28ec1/criteria-ruling.md"
+      "path": "dev/archive/b697a3f7-one-mutation-path/active/b2c28ec1/criteria-ruling.md"
     }
   ],
   "done_at": "2026-11-06T05:40:59.233627013Z",
@@ -51,5 +51,5 @@
   "priority": "high",
   "state": "done",
   "title": "Relative path inputs validate through RootRelativePath::parse",
-  "updated_at": "2026-11-06T05:40:59.233627013Z"
+  "updated_at": "2026-11-09T04:47:37.307242600Z"
 }

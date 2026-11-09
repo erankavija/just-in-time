@@ -11,7 +11,7 @@
       "doc_type": "report",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/d4a20645/conflict-wrapper-audit.md"
+      "path": "dev/archive/b697a3f7-one-mutation-path/active/d4a20645/conflict-wrapper-audit.md"
     }
   ],
   "done_at": "2026-11-09T03:45:58.865358943Z",
@@ -45,5 +45,5 @@
   "priority": "high",
   "state": "done",
   "title": "A read's retryable conflict surfaces with its own message",
-  "updated_at": "2026-11-09T03:45:58.865358943Z"
+  "updated_at": "2026-11-09T04:47:37.307242600Z"
 }

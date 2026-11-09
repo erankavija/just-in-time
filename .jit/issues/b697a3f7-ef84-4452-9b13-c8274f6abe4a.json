@@ -1,4 +1,5 @@
 {
+  "archived_from": "done",
   "assignee": "agent:b697a3f7-lead",
   "claimed_at": "2026-10-20T20:13:20.124991051Z",
   "context": {},
@@ -22,7 +23,7 @@
       "doc_type": "report",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/b697a3f7-one-mutation-path/completion-report.md"
+      "path": "dev/archive/b697a3f7-one-mutation-path/active/b697a3f7-one-mutation-path/completion-report.md"
     }
   ],
   "done_at": "2026-11-09T04:45:28.992528565Z",
@@ -58,7 +59,7 @@
     "per:@/charter/D-22"
   ],
   "priority": "high",
-  "state": "done",
+  "state": "archived",
   "title": "Converge previews and coupled derivations on the mutation session",
-  "updated_at": "2026-11-09T04:45:28.992528565Z"
+  "updated_at": "2026-11-09T04:47:37.307242600Z"
 }

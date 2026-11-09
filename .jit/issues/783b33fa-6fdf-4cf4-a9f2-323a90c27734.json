@@ -11,7 +11,7 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Accepted explicit release actor plan",
-      "path": "dev/active/783b33fa/plan.md"
+      "path": "dev/archive/b697a3f7-one-mutation-path/active/783b33fa/plan.md"
     }
   ],
   "done_at": "2026-11-06T00:03:35.896614835Z",
@@ -44,5 +44,5 @@
   "priority": "high",
   "state": "done",
   "title": "Allow an explicit acting identity for issue release",
-  "updated_at": "2026-11-06T00:03:35.896614835Z"
+  "updated_at": "2026-11-09T04:47:37.307242600Z"
 }

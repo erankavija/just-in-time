@@ -13,7 +13,7 @@
       "doc_type": "decision",
       "format": "markdown",
       "label": "Criteria ruling: Gated diversion reporting",
-      "path": "dev/active/693a2fdd/criteria-ruling.md"
+      "path": "dev/archive/b697a3f7-one-mutation-path/active/693a2fdd/criteria-ruling.md"
     }
   ],
   "done_at": "2026-11-06T03:25:45.985710953Z",
@@ -51,5 +51,5 @@
   "priority": "high",
   "state": "done",
   "title": "Bulk update applies its matches in one session with no preview",
-  "updated_at": "2026-11-06T03:25:45.985710953Z"
+  "updated_at": "2026-11-09T04:47:37.307242600Z"
 }

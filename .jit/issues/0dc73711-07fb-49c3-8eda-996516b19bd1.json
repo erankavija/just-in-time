@@ -11,47 +11,21 @@
       "doc_type": "investigation",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/b697a3f7-one-mutation-path/investigation.md"
+      "path": "dev/archive/b697a3f7-one-mutation-path/active/b697a3f7-one-mutation-path/investigation.md"
     },
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "59f0dfdc7369c146b847f7ea04d6be6fa1eea9282032b4f78e98cab4ef7816e6",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "../../vision/9db27a3a-charter.md",
-          "resolved_path": "dev/vision/9db27a3a-charter.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "c20a2de073f3c0aba4a4fd14e3df677d449feb5c01f37d86b719083920eb7a74",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation.md",
-          "resolved_path": "dev/active/b697a3f7-one-mutation-path/investigation.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "b460099a482902639ed969a32ad5ce2f604d4275d520a1b1998e49839a4cc4f2",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/b697a3f7-one-mutation-path/breakdown.json"
-        }
-      ],
       "commit": null,
       "doc_type": "plan",
       "format": "markdown",
       "label": "Plan",
-      "path": "dev/active/b697a3f7-one-mutation-path/plan.md"
+      "path": "dev/archive/b697a3f7-one-mutation-path/active/b697a3f7-one-mutation-path/plan.md"
     },
     {
       "commit": null,
       "doc_type": "breakdown-manifest",
       "format": "markdown",
       "label": "Breakdown manifest",
-      "path": "dev/active/b697a3f7-one-mutation-path/breakdown.json"
+      "path": "dev/archive/b697a3f7-one-mutation-path/active/b697a3f7-one-mutation-path/breakdown.json"
     }
   ],
   "done_at": "2026-10-24T21:22:04.478017444Z",
@@ -81,5 +55,5 @@
   "priority": "high",
   "state": "done",
   "title": "planning: Converge previews and coupled derivations on the mutation session",
-  "updated_at": "2026-11-03T22:45:48.491118118Z"
+  "updated_at": "2026-11-09T04:47:37.307242600Z"
 }

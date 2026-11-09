@@ -1,0 +1,485 @@
+{
+  "executions": [
+    {
+      "destination_root": "dev/archive/b697a3f7-one-mutation-path",
+      "planned_deletions": [
+        {
+          "content_identity": {
+            "byte_size": 13547,
+            "sha256": "a24c201c32a87e9f67f6d568e5ef67f4d4b07f74e4b5a9fbc6bb3fd020a88fac"
+          },
+          "source": "dev/active/5046408a/boundary-design-review-r1.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 15124,
+            "sha256": "fa490e9d5435fecebc2272e8946612e02561740c70014818574adb84ecf2aa22"
+          },
+          "source": "dev/active/5046408a/boundary-design-review-r2.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 29122,
+            "sha256": "17e629d0535e76b8ce7cfd246b68ec71463c35ba3efacee84e7a5f726c65de37"
+          },
+          "source": "dev/active/5046408a/boundary-proposal.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 21344,
+            "sha256": "3f709144986ff489330e6c6dc3f1545d6f0f21289adb40ef23c7e01a38c72ff2"
+          },
+          "source": "dev/active/5046408a/design-review-r1.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 10944,
+            "sha256": "091d7d68d1248602d42b932746e4bb68936f3cdcc10245b017f20c8b45a0ba5d"
+          },
+          "source": "dev/active/5046408a/design-review-r2.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 1427,
+            "sha256": "f2e72c27c6adaa719fd8077154997e18e17c28ffd5f0a221a4058000fb4fdc1c"
+          },
+          "source": "dev/active/693a2fdd/criteria-ruling.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 2590,
+            "sha256": "5e2e54548cea2b29c967e839e213fcd678617e223b9ce2caa465391974ee95d1"
+          },
+          "source": "dev/active/863fd652/discovery-derivations.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 2297,
+            "sha256": "9ba888d9dd7e6a937f20f0d530cbb2f7f282e446188d42b41ba5076f06b1b51c"
+          },
+          "source": "dev/active/b1d7a600/lease-writer-audit.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 1234,
+            "sha256": "ed72094601f05f0d683acabba6cc150571fc746d12a04e7398891046eb9b8658"
+          },
+          "source": "dev/active/b2c28ec1/criteria-ruling.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 309397,
+            "sha256": "8390813758c8b29b4851b2a089f72fd13ce60d20e6905ae48ec3f7523d9dc9e0"
+          },
+          "source": "dev/active/b697a3f7-one-mutation-path/breakdown.json"
+        },
+        {
+          "content_identity": {
+            "byte_size": 6274,
+            "sha256": "534e28888d8bad48924804d21a1bc49fcec34b23da8f8e602faad682b3fdb10a"
+          },
+          "source": "dev/active/b697a3f7-one-mutation-path/completion-report.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 18092,
+            "sha256": "db76b0b82101233995223dd5b998cf022ae431653858ff5730c4c359d0e06236"
+          },
+          "source": "dev/active/b697a3f7-one-mutation-path/investigation-read-concurrency.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 135729,
+            "sha256": "c20a2de073f3c0aba4a4fd14e3df677d449feb5c01f37d86b719083920eb7a74"
+          },
+          "source": "dev/active/b697a3f7-one-mutation-path/investigation.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 58952,
+            "sha256": "da722c8fa0f1e5ef2cfbe99484853c3c3f4c620ae79ae41d1ef3efc8cc892e70"
+          },
+          "source": "dev/active/b697a3f7-one-mutation-path/plan.md"
+        },
+        {
+          "content_identity": {
+            "byte_size": 51672,
+            "sha256": "1242554c0979eb31fb993f9d378427910e4e11cb97db5c02d1bc356c8b1facde"
+          },
+          "source": "dev/active/b697a3f7-one-mutation-path/progress.json"
+        },
+        {
+          "content_identity": {
+            "byte_size": 2079,
+            "sha256": "36c3e0d4923eeb4860afd4bc9dd90a312368e749884f7e0d05b42688137c5854"
+          },
+          "source": "dev/active/d4a20645/conflict-wrapper-audit.md"
+        }
+      ],
+      "publications": [
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 13547,
+            "sha256": "a24c201c32a87e9f67f6d568e5ef67f4d4b07f74e4b5a9fbc6bb3fd020a88fac"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/boundary-design-review-r1.md",
+          "source": "dev/active/5046408a/boundary-design-review-r1.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 15124,
+            "sha256": "fa490e9d5435fecebc2272e8946612e02561740c70014818574adb84ecf2aa22"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/boundary-design-review-r2.md",
+          "source": "dev/active/5046408a/boundary-design-review-r2.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 29122,
+            "sha256": "17e629d0535e76b8ce7cfd246b68ec71463c35ba3efacee84e7a5f726c65de37"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/boundary-proposal.md",
+          "source": "dev/active/5046408a/boundary-proposal.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 21344,
+            "sha256": "3f709144986ff489330e6c6dc3f1545d6f0f21289adb40ef23c7e01a38c72ff2"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/design-review-r1.md",
+          "source": "dev/active/5046408a/design-review-r1.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 10944,
+            "sha256": "091d7d68d1248602d42b932746e4bb68936f3cdcc10245b017f20c8b45a0ba5d"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/design-review-r2.md",
+          "source": "dev/active/5046408a/design-review-r2.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 7156,
+            "sha256": "b359bdf6a7ffb0b3d50bc35b86b351eaeadc6f2070b45c429e4a77a928f242af"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/design-review-r3.md",
+          "source": "dev/active/5046408a/design-review-r3.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 23593,
+            "sha256": "1b200d4c929c6544b806624f2081b0ed01e8f829e4481ce826a8a4f854908358"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/design.md",
+          "source": "dev/active/5046408a/design.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 9996,
+            "sha256": "3be13174d26d8c4eed477a341760134f565863c46aad925a11be3c198edb538c"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/diagnostics-design-review-r1.md",
+          "source": "dev/active/5046408a/diagnostics-design-review-r1.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 6083,
+            "sha256": "6a84be3b84ff2e9c85f90cb856d7f7333155fe56400f7654a55b12c69dfb11a9"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/diagnostics-design-review-r2.md",
+          "source": "dev/active/5046408a/diagnostics-design-review-r2.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 20922,
+            "sha256": "4e83dfa505d3de1b3c012cd55eb7b6b9fccf9b31ca785e67cb927aba8c32cafe"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/diagnostics-proposal.md",
+          "source": "dev/active/5046408a/diagnostics-proposal.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 1427,
+            "sha256": "f2e72c27c6adaa719fd8077154997e18e17c28ffd5f0a221a4058000fb4fdc1c"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/693a2fdd/criteria-ruling.md",
+          "source": "dev/active/693a2fdd/criteria-ruling.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 4199,
+            "sha256": "58e376a3ba9445ca2c144a825bdd83b9dc10302bbc4806a195eae7bdcc7addfc"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/783b33fa/plan.md",
+          "source": "dev/active/783b33fa/plan.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 2590,
+            "sha256": "5e2e54548cea2b29c967e839e213fcd678617e223b9ce2caa465391974ee95d1"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/863fd652/discovery-derivations.md",
+          "source": "dev/active/863fd652/discovery-derivations.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 2297,
+            "sha256": "9ba888d9dd7e6a937f20f0d530cbb2f7f282e446188d42b41ba5076f06b1b51c"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/b1d7a600/lease-writer-audit.md",
+          "source": "dev/active/b1d7a600/lease-writer-audit.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 1234,
+            "sha256": "ed72094601f05f0d683acabba6cc150571fc746d12a04e7398891046eb9b8658"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/b2c28ec1/criteria-ruling.md",
+          "source": "dev/active/b2c28ec1/criteria-ruling.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 309397,
+            "sha256": "8390813758c8b29b4851b2a089f72fd13ce60d20e6905ae48ec3f7523d9dc9e0"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/b697a3f7-one-mutation-path/breakdown.json",
+          "source": "dev/active/b697a3f7-one-mutation-path/breakdown.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 6274,
+            "sha256": "534e28888d8bad48924804d21a1bc49fcec34b23da8f8e602faad682b3fdb10a"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/b697a3f7-one-mutation-path/completion-report.md",
+          "source": "dev/active/b697a3f7-one-mutation-path/completion-report.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 18092,
+            "sha256": "db76b0b82101233995223dd5b998cf022ae431653858ff5730c4c359d0e06236"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/b697a3f7-one-mutation-path/investigation-read-concurrency.md",
+          "source": "dev/active/b697a3f7-one-mutation-path/investigation-read-concurrency.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 135729,
+            "sha256": "c20a2de073f3c0aba4a4fd14e3df677d449feb5c01f37d86b719083920eb7a74"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/b697a3f7-one-mutation-path/investigation.md",
+          "source": "dev/active/b697a3f7-one-mutation-path/investigation.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 58952,
+            "sha256": "da722c8fa0f1e5ef2cfbe99484853c3c3f4c620ae79ae41d1ef3efc8cc892e70"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/b697a3f7-one-mutation-path/plan.md",
+          "source": "dev/active/b697a3f7-one-mutation-path/plan.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 51672,
+            "sha256": "1242554c0979eb31fb993f9d378427910e4e11cb97db5c02d1bc356c8b1facde"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/b697a3f7-one-mutation-path/progress.json",
+          "source": "dev/active/b697a3f7-one-mutation-path/progress.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 15299,
+            "sha256": "19abf767c6e90dae60c156b70beb6af0c0043f10411d8d1965f681371be95ab6"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/c140921c/revision-producer-plan.md",
+          "source": "dev/active/c140921c/revision-producer-plan.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 2079,
+            "sha256": "36c3e0d4923eeb4860afd4bc9dd90a312368e749884f7e0d05b42688137c5854"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/d4a20645/conflict-wrapper-audit.md",
+          "source": "dev/active/d4a20645/conflict-wrapper-audit.md"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 117700,
+            "sha256": "3733d58911751584caf299e71cecdb7c237d8d7454dcb7dfd84f5e75ec831000"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/active/f4d9502a-git-cli-module/progress.json",
+          "source": "dev/active/f4d9502a-git-cli-module/progress.json"
+        },
+        {
+          "adopted": false,
+          "content_identity": {
+            "byte_size": 37,
+            "sha256": "3a8e668d75469aa0dcfff4bdf27c79245321306a1f48e7b440d6d09d117ddf84"
+          },
+          "destination": "dev/archive/b697a3f7-one-mutation-path/.jit-container",
+          "source": null
+        }
+      ],
+      "reconciling": false,
+      "reference_changes": [
+        {
+          "document_index": 0,
+          "from_path": "dev/active/b697a3f7-one-mutation-path/investigation.md",
+          "issue": "0dc73711-07fb-49c3-8eda-996516b19bd1",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/b697a3f7-one-mutation-path/investigation.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/b697a3f7-one-mutation-path/plan.md",
+          "issue": "0dc73711-07fb-49c3-8eda-996516b19bd1",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/b697a3f7-one-mutation-path/plan.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/b697a3f7-one-mutation-path/breakdown.json",
+          "issue": "0dc73711-07fb-49c3-8eda-996516b19bd1",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/b697a3f7-one-mutation-path/breakdown.json"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/5046408a/design.md",
+          "issue": "5046408a-9706-4ca0-9302-54d20e2088aa",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/design.md"
+        },
+        {
+          "document_index": 1,
+          "from_path": "dev/active/5046408a/design-review-r1.md",
+          "issue": "5046408a-9706-4ca0-9302-54d20e2088aa",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/design-review-r1.md"
+        },
+        {
+          "document_index": 2,
+          "from_path": "dev/active/5046408a/design-review-r2.md",
+          "issue": "5046408a-9706-4ca0-9302-54d20e2088aa",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/design-review-r2.md"
+        },
+        {
+          "document_index": 3,
+          "from_path": "dev/active/5046408a/design-review-r3.md",
+          "issue": "5046408a-9706-4ca0-9302-54d20e2088aa",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/design-review-r3.md"
+        },
+        {
+          "document_index": 4,
+          "from_path": "dev/active/5046408a/diagnostics-proposal.md",
+          "issue": "5046408a-9706-4ca0-9302-54d20e2088aa",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/diagnostics-proposal.md"
+        },
+        {
+          "document_index": 5,
+          "from_path": "dev/active/5046408a/diagnostics-design-review-r1.md",
+          "issue": "5046408a-9706-4ca0-9302-54d20e2088aa",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/diagnostics-design-review-r1.md"
+        },
+        {
+          "document_index": 6,
+          "from_path": "dev/active/5046408a/diagnostics-design-review-r2.md",
+          "issue": "5046408a-9706-4ca0-9302-54d20e2088aa",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/diagnostics-design-review-r2.md"
+        },
+        {
+          "document_index": 7,
+          "from_path": "dev/active/5046408a/boundary-proposal.md",
+          "issue": "5046408a-9706-4ca0-9302-54d20e2088aa",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/boundary-proposal.md"
+        },
+        {
+          "document_index": 8,
+          "from_path": "dev/active/5046408a/boundary-design-review-r1.md",
+          "issue": "5046408a-9706-4ca0-9302-54d20e2088aa",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/boundary-design-review-r1.md"
+        },
+        {
+          "document_index": 9,
+          "from_path": "dev/active/5046408a/boundary-design-review-r2.md",
+          "issue": "5046408a-9706-4ca0-9302-54d20e2088aa",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/5046408a/boundary-design-review-r2.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/693a2fdd/criteria-ruling.md",
+          "issue": "693a2fdd-18cc-477d-97a6-e4a8f52fcd3f",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/693a2fdd/criteria-ruling.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/783b33fa/plan.md",
+          "issue": "783b33fa-6fdf-4cf4-a9f2-323a90c27734",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/783b33fa/plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/863fd652/discovery-derivations.md",
+          "issue": "863fd652-8ced-4b2f-ba90-b8743fac4a41",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/863fd652/discovery-derivations.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/b1d7a600/lease-writer-audit.md",
+          "issue": "b1d7a600-1d9c-493d-a203-3ff674e81784",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/b1d7a600/lease-writer-audit.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/b2c28ec1/criteria-ruling.md",
+          "issue": "b2c28ec1-4178-4e77-9153-b86aefae1056",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/b2c28ec1/criteria-ruling.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/b697a3f7-one-mutation-path/completion-report.md",
+          "issue": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/b697a3f7-one-mutation-path/completion-report.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/c140921c/revision-producer-plan.md",
+          "issue": "c140921c-0730-4983-8e77-c6a46bbdca5a",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/c140921c/revision-producer-plan.md"
+        },
+        {
+          "document_index": 0,
+          "from_path": "dev/active/d4a20645/conflict-wrapper-audit.md",
+          "issue": "d4a20645-d6fa-4e00-a85e-3d3be63c7a11",
+          "to_path": "dev/archive/b697a3f7-one-mutation-path/active/d4a20645/conflict-wrapper-audit.md"
+        }
+      ],
+      "target": {
+        "id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
+        "kind": "container"
+      }
+    }
+  ],
+  "target": {
+    "id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
+    "kind": "container"
+  }
+}

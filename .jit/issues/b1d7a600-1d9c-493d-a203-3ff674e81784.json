@@ -11,7 +11,7 @@
       "doc_type": "report",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/b1d7a600/lease-writer-audit.md"
+      "path": "dev/archive/b697a3f7-one-mutation-path/active/b1d7a600/lease-writer-audit.md"
     }
   ],
   "done_at": "2026-11-09T04:12:56.404346762Z",
@@ -45,5 +45,5 @@
   "priority": "high",
   "state": "done",
   "title": "Asset rescans check the issue's lease in session",
-  "updated_at": "2026-11-09T04:12:56.404346762Z"
+  "updated_at": "2026-11-09T04:47:37.307242600Z"
 }

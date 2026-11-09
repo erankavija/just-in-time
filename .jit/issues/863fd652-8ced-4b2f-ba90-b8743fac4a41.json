@@ -11,7 +11,7 @@
       "doc_type": "report",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/863fd652/discovery-derivations.md"
+      "path": "dev/archive/b697a3f7-one-mutation-path/active/863fd652/discovery-derivations.md"
     }
   ],
   "done_at": "2026-11-09T03:07:41.531633551Z",
@@ -48,5 +48,5 @@
   "priority": "high",
   "state": "done",
   "title": "Gate evidence capture consumes discovery's document set",
-  "updated_at": "2026-11-09T03:07:41.531633551Z"
+  "updated_at": "2026-11-09T04:47:37.307242600Z"
 }
