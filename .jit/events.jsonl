@@ -26156,3 +26156,8 @@
 {"from":"in_progress","id":"3b998b79-6635-422d-bfb0-93b1e049fb88","issue_id":"350062e4-ff51-4b6a-bac8-e13056fdcaad","timestamp":"2026-11-09T01:32:37.847780391Z","to":"done","type":"issue_state_changed"}
 {"from":"backlog","id":"d6ef46cc-b570-40f6-b065-6b345c4f868f","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T01:32:37.847780391Z","to":"ready","type":"issue_state_changed"}
 {"id":"84ebaf0b-fb9c-4686-a4a4-7f5ca5686dbf","issue_id":"350062e4-ff51-4b6a-bac8-e13056fdcaad","timestamp":"2026-11-09T01:32:37.847780391Z","type":"issue_completed"}
+{"id":"dae8cf17-4f60-4eab-b028-63a1162db94c","issue_id":"c69e07b2-3158-440c-9138-5abf6d2f585f","priority":"high","timestamp":"2026-11-09T01:41:03.567902951Z","title":"Gate evaluation and declaration reads carry their decode and derivation outcomes","type":"issue_created"}
+{"from":"ready","id":"9a4d5f28-e79f-4b5c-afe4-671918a03b5d","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T01:41:03.953037997Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"572b3b69-1403-4ca5-a884-12c4f68a6ba4","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T01:41:03.953037997Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"22abe094-1200-4d88-86b9-2ecfb108ac96","issue_id":"c69e07b2-3158-440c-9138-5abf6d2f585f","timestamp":"2026-11-09T01:41:04.142841975Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"b773ea52-b3a0-4d9b-9279-ed1b3c665f41","issue_id":"c69e07b2-3158-440c-9138-5abf6d2f585f","timestamp":"2026-11-09T01:41:04.142841975Z","type":"issue_claimed"}

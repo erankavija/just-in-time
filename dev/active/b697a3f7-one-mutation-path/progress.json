@@ -459,7 +459,8 @@
       "to": "just-in-time-d5",
       "issue": "d675102c",
       "subject": "r4 REQ-04 failed-decode repeat + D-20 advisory; propose one sonnet task",
-      "status": "open"
+      "status": "resolved",
+      "decision": "d5: one sonnet task c69e07b2 for F1 (carry decode outcome) + F2 (return final derivation) + .ok() sweep; next re-checkpoint; any further once-per-image instance goes to d5 before filing (possible v1.1 sweep)"
     }
   ],
   "rework_counts": {
