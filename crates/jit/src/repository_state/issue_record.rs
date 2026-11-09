@@ -1,6 +1,6 @@
 //! Decoding of captured issue records.
 
-use super::{CaptureError, VirtualPath};
+use super::{CaptureError, RepositoryImage, VirtualPath};
 use crate::domain::identity::IssueId;
 use crate::domain::Issue;
 use serde::de::{Deserializer, MapAccess, SeqAccess, Visitor};
@@ -171,6 +171,18 @@ pub enum IssueRecordsError {
         VirtualPath::issue_record(expected).repository_relative()
     )]
     MismatchedId { expected: IssueId, found: IssueId },
+}
+
+/// The bytes of `image`'s issue records, for [`parse_issue_records`]: each read
+/// is the one decode of that record.
+pub(crate) fn image_issue_bytes<'a>(
+    image: &'a RepositoryImage,
+) -> impl Fn(&VirtualPath) -> Result<Option<&'a [u8]>, CaptureError> {
+    move |path| {
+        #[cfg(test)]
+        crate::resolution_counts::count_issue_in_image(image, path);
+        image.file_bytes(path)
+    }
 }
 
 /// Parse the record of each listed issue id from `read`, in listing order,

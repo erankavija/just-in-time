@@ -51,6 +51,7 @@ pub use initialize::{
     render_repo_config, structural_minimum_config, GitattributesClaim, GitattributesStatus,
     InitializationError, InitializationScaffold, FRESH_CONFIG_SCHEMA_VERSION,
 };
+pub(crate) use issue_record::image_issue_bytes;
 pub use issue_record::{
     decode_issue_record, parse_issue_records, IssueRecordsError, MalformedIssueRecordError,
 };

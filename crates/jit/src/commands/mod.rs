@@ -2527,20 +2527,36 @@ fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> R
     captured_issues(image, &crate::repository_state::captured_issue_ids(image)?)
 }
 
+/// [`captured_active_issues`] beside the JSON value each record decoded from.
+fn captured_active_records(
+    image: &crate::repository_state::RepositoryImage,
+) -> Result<Vec<(Issue, serde_json::Value)>> {
+    captured_records(image, &crate::repository_state::captured_issue_ids(image)?)
+}
+
 /// Parse the captured records of `ids`, in the order given, reporting a
 /// missing record as issue-not-found.
 fn captured_issues(
     image: &crate::repository_state::RepositoryImage,
     ids: &[crate::domain::identity::IssueId],
 ) -> Result<Vec<Issue>> {
+    captured_records(image, ids)
+        .map(|records| records.into_iter().map(|(issue, _)| issue).collect())
+}
+
+/// [`captured_issues`] beside the JSON value each record decoded from.
+fn captured_records(
+    image: &crate::repository_state::RepositoryImage,
+    ids: &[crate::domain::identity::IssueId],
+) -> Result<Vec<(Issue, serde_json::Value)>> {
     use crate::repository_state::{parse_issue_records, IssueRecordsError};
 
-    parse_issue_records(ids, |path| image.file_bytes(path))
-        .map(|records| records.into_iter().map(|(issue, _)| issue).collect())
-        .map_err(|error| match error {
+    parse_issue_records(ids, crate::repository_state::image_issue_bytes(image)).map_err(|error| {
+        match error {
             IssueRecordsError::Missing(id) => crate::storage::IssueNotFoundError::new(id).into(),
             error => error.into(),
-        })
+        }
+    })
 }
 
 /// Each required gate of `issue` paired with the record path of the run its
@@ -3082,16 +3098,18 @@ impl<S: IssueStore> CommandExecutor<S> {
                 precheck: None,
             }));
         };
-        let issues = base.issues;
+        let records = (base.issues, base.values);
         let declarations =
             crate::repository_state::declarations_seeded(&light.image, base.config, base.gates)?;
         let enforcement_mode = declarations.config().enforcement_mode();
         let config = declarations.config;
         let registry = declarations.gates;
         let issue = project(
-            issues
-                .into_iter()
+            records
+                .0
+                .iter()
                 .find(|issue| issue.id == target)
+                .cloned()
                 .ok_or_else(|| crate::storage::IssueNotFoundError::new(target.clone()))?,
             &registry,
         )?;
@@ -3102,6 +3120,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 config,
                 vec![issue],
                 &registry,
+                records,
             )?
             .and_then(|preflights| preflights.into_iter().next())
             .map(|precheck| StateChangePreflight {
@@ -3113,7 +3132,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Plan the prechecks of each `planned` issue, growing `image`, a mutation
     /// base read with those issues as precheck targets, to what they read;
-    /// `config` is the configuration assembled from `image`.
+    /// `config` is the configuration assembled from `image`, and `records`
+    /// its issues with their JSON values, which every later reader shares.
     fn capture_precheck_preflights(
         &self,
         session: &mut (dyn crate::storage::RepositoryReadSession + '_),
@@ -3121,6 +3141,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         config: crate::config::JitConfig,
         planned: Vec<Issue>,
         registry: &crate::declarations::GateRegistry,
+        records: validate::ParsedRecords,
     ) -> Result<Option<Vec<PrecheckPreflight>>>
     where
         S: crate::storage::RepositoryStateStore,
@@ -3140,15 +3161,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         let broad = planned
             .iter()
             .any(|issue| has_broad_precheck(issue, registry));
-        let (image, config) = match broad || !unread_prompts.is_empty() {
-            false => (image, config),
-            true => match self.capture_proposed_base(
+        let (image, config, records) = match broad || !unread_prompts.is_empty() {
+            false => (image, config, records),
+            true => match self.capture_proposed_base_decoded(
                 session,
-                &std::collections::BTreeMap::new(),
                 &unread_prompts,
                 Some(image),
+                Some((Ok(records.0), records.1)),
             )? {
-                Some((image, config)) => (image, config?),
+                Some((image, config, (issues, values))) => (image, config?, (issues?, values)),
                 None => return Ok(None),
             },
         };
@@ -3161,8 +3182,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             })
         });
         let validated_issues = match validates_repository {
-            true => validate::validation_issues(&image),
-            false => Vec::new(),
+            true => &records.0[..],
+            false => &[],
         };
         let Some(image) = grow_discovering(session, image, |image, spec| {
             planned.iter().try_for_each(|issue| {
@@ -3170,7 +3191,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     image,
                     spec,
                     issue,
-                    &validated_issues,
+                    validated_issues,
                     &precheck_gates(issue, registry),
                     &config,
                 )
@@ -3182,11 +3203,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         let history = validates_repository
             .then(|| validate::RepositoryHistory::read(session))
             .transpose()?;
+        let records = crate::validation::DecodedRecords::new(records.0, records.1);
         let issues = std::sync::Arc::new(crate::domain::queries::IndexedIssues::new(
-            captured_active_issues(&image)?,
+            std::sync::Arc::clone(&records.issues),
         ));
         let repository = std::cell::OnceCell::new();
-        let validation = std::sync::Arc::new(gate_check::SharedValidation::new(history));
+        let validation =
+            std::sync::Arc::new(gate_check::SharedValidation::new(history, Some(records)));
         planned
             .into_iter()
             .map(|issue| {
