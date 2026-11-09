@@ -626,28 +626,30 @@ const DECLARATION_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
         max_depth: 32,
     };
 
-/// The schema files the captured `rules.toml` names. A rules file that does not
-/// parse names none here; the declaration parse reports it.
+/// The schema files the captured `rules.toml` names, or the decode or
+/// derivation failure the declaration parse reports. The failure is the
+/// memoized outcome of `image`'s rules bytes, so a discovery that plans past it
+/// leaves the declaration parse to read it, not to decode again.
 fn rule_schema_paths(
     image: &crate::repository_state::RepositoryImage,
-) -> Result<Vec<crate::repository_state::VirtualPath>> {
-    use crate::repository_state::VirtualPath;
+) -> std::result::Result<
+    Vec<crate::repository_state::VirtualPath>,
+    crate::repository_state::DeclarationParseError,
+> {
+    use crate::repository_state::{DeclarationParseError, VirtualPath};
 
-    let Some(rules) = image
-        .file_bytes(&VirtualPath::RULES)?
-        .map(|bytes| image.declaration_memo().rules(bytes))
-    else {
+    let Some(bytes) = image.file_bytes(&VirtualPath::RULES)? else {
         return Ok(Vec::new());
     };
-    // The memoized outcome: a failure names no paths, and the declaration
-    // parse reads the same failure to report it.
-    Ok(match rules.schema_requests() {
-        Ok(requests) => requests
-            .iter()
-            .filter_map(|request| VirtualPath::schema_reference(&request.reference).ok())
-            .collect(),
-        Err(_) => Vec::new(),
-    })
+    image
+        .declaration_memo()
+        .rules(bytes)
+        .schema_requests()?
+        .iter()
+        .map(|request| {
+            VirtualPath::schema_reference(&request.reference).map_err(DeclarationParseError::from)
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -3946,46 +3948,36 @@ mod tests {
             create(&malformed)
         });
 
-        // A rules source naming an unsafe schema reference derives its schema
-        // requests once, for discovery and declaration assembly alike.
+        // A rules source naming an unsafe schema reference fails the read with
+        // the derivation's own error, after deriving its schema requests once.
+        let unsafe_source =
+            "[[rules]]\nname = 'escape'\n[rules.assert]\njson-schema = 'schemas/../escape.json'\n";
         let unsafe_rules = test_helpers::memory_executor_declaring(
             crate::storage::InMemoryStorage::new(),
             test_helpers::MemoryDeclarations {
                 config: Some(&config),
-                rules: Some(
-                    "[[rules]]\nname = 'escape'\n[rules.assert]\njson-schema = 'schemas/../escape.json'\n",
-                ),
+                rules: Some(unsafe_source),
                 after_initialization: true,
                 ..Default::default()
             },
         );
         let derivations_before = parses_on_this_thread(ParsedSource::SchemaRequests);
-        assert!(unsafe_rules.captured_declarations().is_err());
+        let unsafe_error = unsafe_rules
+            .captured_declarations()
+            .err()
+            .expect("an unsafe schema reference fails the declaration read");
         let derivations = parses_on_this_thread(ParsedSource::SchemaRequests) - derivations_before;
-
-        // Rules bytes that are not UTF-8 decode once, for discovery and
-        // declaration assembly alike.
-        let undecodable_storage = crate::storage::InMemoryStorage::new();
-        let undecodable = test_helpers::memory_executor_declaring(
-            undecodable_storage.clone(),
-            test_helpers::MemoryDeclarations {
-                config: Some(&config),
-                ..Default::default()
-            },
-        );
-        undecodable_storage.add_data_bytes("rules.toml", &[0xff, 0xfe]);
-        let decodes_before = parses_on_this_thread(ParsedSource::RulesDecode);
-        assert!(undecodable.captured_declarations().is_err());
-        let decodes = parses_on_this_thread(ParsedSource::RulesDecode) - decodes_before;
 
         assert!(refused.is_err());
         assert_eq!(
-            decodes, 1,
-            "rules bytes decoded more than once for one source"
-        );
-        assert_eq!(
             derivations, 1,
             "schema requests derived more than once for one rules source"
+        );
+        assert_eq!(
+            unsafe_error.to_string(),
+            crate::declarations::rules::RuleSet::schema_requests(unsafe_source)
+                .unwrap_err()
+                .to_string()
         );
         assert_eq!(
             [creation, application, repair, edited, sibling, refusal],

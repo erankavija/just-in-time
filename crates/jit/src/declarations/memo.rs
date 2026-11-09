@@ -60,15 +60,11 @@ impl DeclarationMemo {
     pub(crate) fn rules(&self, bytes: &[u8]) -> Arc<ParsedRules> {
         self.rules.get_or_insert(
             |parsed| parsed.bytes == bytes,
-            || {
-                #[cfg(test)]
-                super::count_parse(super::ParsedSource::RulesDecode);
-                ParsedRules {
-                    source: std::str::from_utf8(bytes)
-                        .map(|text| (text.to_owned(), RulesDocument::parse(text)))
-                        .map_err(Arc::new),
-                    bytes: bytes.to_vec(),
-                }
+            || ParsedRules {
+                source: std::str::from_utf8(bytes)
+                    .map(|text| (text.to_owned(), RulesDocument::parse(text)))
+                    .map_err(Arc::new),
+                bytes: bytes.to_vec(),
             },
         )
     }

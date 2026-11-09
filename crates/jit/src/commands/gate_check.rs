@@ -347,10 +347,9 @@ struct BoundGateEvaluation {
     issue: Issue,
     registry: crate::declarations::GateRegistry,
     gate: crate::declarations::GateDefinition,
-    /// The outcome of decoding the issue records `image` holds, taken once by
-    /// the validation base a built-in checker judges; `None` when no base was
-    /// decoded.
-    records: Option<crate::validation::DecodeOutcome>,
+    /// The issue records `image` holds, decoded once by the validation base a
+    /// built-in checker judges; `None` when no base was decoded.
+    records: Option<crate::validation::DecodedRecords>,
 }
 
 impl BoundGateEvaluation {
@@ -1027,7 +1026,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Ok(None);
         };
         let Some(initial) = super::grow_discovering(session, extended, |image, spec| {
-            Ok(spec.discover_paths(super::rule_schema_paths(image)?)?)
+            // A built-in checker records unloadable declarations as an error
+            // run, so the evaluation plans past the failure and
+            // `validation_declarations_with_config` reads its memoized outcome.
+            Ok(spec.discover_paths(super::rule_schema_paths(image).unwrap_or_default())?)
         })?
         else {
             return Ok(None);
@@ -1051,9 +1053,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 Some((image, config, (issues, values))) => (
                     image,
                     config?,
-                    Some(
-                        issues.map(|issues| crate::validation::DecodedRecords::new(issues, values)),
-                    ),
+                    // A record that does not decode ends the evaluation with its
+                    // error: validation never judges this base.
+                    Some(crate::validation::DecodedRecords::new(
+                        issues.map_err(super::captured_records_error)?,
+                        values,
+                    )),
                 ),
                 None => return Ok(None),
             }
@@ -1061,7 +1066,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             (initial, config, None)
         };
         let validated_issues = match (checker, &records) {
-            (GateChecker::RepositoryValidation, Some(Ok(records))) => &records.issues[..],
+            (GateChecker::RepositoryValidation, Some(records)) => &records.issues[..],
             _ => &[],
         };
         let Some(image) = super::grow_discovering(session, image, |image, spec| {
@@ -1137,7 +1142,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         let mutation = super::production_mutation_context();
         let run_id = mutation.gate_run_id_at(0);
         let run_paths = super::gate_run_record_paths(&mutation, issue_id, 0..1);
-        let (bound, records, issues, captured, history, input_warnings) =
+        let (bound, issues, captured, history, input_warnings) =
             with_mutation_attempts("gate evaluation inputs", || {
                 let claims_guard =
                     super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
@@ -1156,13 +1161,8 @@ impl<S: IssueStore> GateOps<'_, S> {
                     std::slice::from_ref(&bound.issue.id),
                     claims_guard.as_ref(),
                 )?;
-                let records = bound
-                    .records
-                    .clone()
-                    .transpose()
-                    .map_err(super::captured_records_error)?;
                 let issues = crate::domain::queries::IndexedIssues::new(
-                    match (&records, super::is_broad_builtin_gate(&bound.gate)) {
+                    match (&bound.records, super::is_broad_builtin_gate(&bound.gate)) {
                         (Some(records), true) => std::sync::Arc::clone(&records.issues),
                         (None, true) => super::captured_active_issues(&bound.image)?.into(),
                         (_, false) => std::iter::once(bound.issue.clone())
@@ -1188,7 +1188,6 @@ impl<S: IssueStore> GateOps<'_, S> {
                 .transpose()?;
                 Ok(AttemptOutcome::Done((
                     bound,
-                    records,
                     issues,
                     captured,
                     history,
@@ -1202,6 +1201,7 @@ impl<S: IssueStore> GateOps<'_, S> {
             issue,
             gate,
             registry,
+            records,
             ..
         } = &bound;
         let target_id = &issue.id;

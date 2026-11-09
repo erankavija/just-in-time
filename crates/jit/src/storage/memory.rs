@@ -369,14 +369,9 @@ impl InMemoryStorage {
     /// a mutation session captures, so seeded state and session-published state
     /// share one store.
     pub fn add_data_file(&self, relative: impl AsRef<std::path::Path>, content: &str) {
-        self.add_data_bytes(relative, content.as_bytes());
-    }
-
-    /// [`Self::add_data_file`] over bytes that need not be UTF-8.
-    pub fn add_data_bytes(&self, relative: impl AsRef<std::path::Path>, content: &[u8]) {
         let path = VirtualPath::data(relative)
             .expect("add_data_file requires a canonical data-root-relative path");
-        self.insert_repo_file(path, content)
+        self.insert_repo_file(path, content.as_bytes())
             .expect("add_data_file requires a canonical repository path");
     }
 
