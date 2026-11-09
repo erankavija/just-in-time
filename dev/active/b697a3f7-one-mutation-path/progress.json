@@ -447,6 +447,12 @@
       "subject": "final rework scope; F3 memo lifetime design: per-command unbounded memo",
       "status": "resolved",
       "decision": "d5: option (a) final attempt on opus: per-command unbounded memo handle, fresh per server request, plus F1/F2 routing; one owning parse-once test, one server two-request test; on code-review failure stop and send findings"
+    },
+    {
+      "to": "just-in-time-d5",
+      "issue": "d675102c",
+      "subject": "r3 REQ-04 built-in validation double issue decode; propose seeded CapturedValidation task",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -914,7 +920,8 @@
       "effort": "high",
       "sandbox": "read-only",
       "commit": "f56763036",
-      "brief": "scratchpad/brief-d675102c-r3.md"
+      "brief": "scratchpad/brief-d675102c-r3.md",
+      "result": "REQ-01..03 MET; REQ-04 UNMET: built-in validation evaluations decode issues twice per image (gate_check.rs ~136/~159 via CapturedValidation::with_config load_issues; precheck commands/mod.rs:3186). Forwarded to d5."
     }
   ]
 }
