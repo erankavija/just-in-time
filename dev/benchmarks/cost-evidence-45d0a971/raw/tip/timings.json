@@ -1,0 +1,482 @@
+[
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "bulk/N500-M10",
+  "wall_ns": 106504615
+ },
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "bulk/N500-M160",
+  "wall_ns": 1435279450
+ },
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 362826190
+ },
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 5368511953
+ },
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "archive/C10",
+  "wall_ns": 369808990
+ },
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "archive/C40",
+  "wall_ns": 1418113352
+ },
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "dep/minimal",
+  "wall_ns": 5723032
+ },
+ {
+  "round": 0,
+  "binary": "base",
+  "point": "dep/inflated",
+  "wall_ns": 25104993
+ },
+ {
+  "round": 0,
+  "binary": "tip",
+  "point": "bulk/N500-M10",
+  "wall_ns": 19938013
+ },
+ {
+  "round": 0,
+  "binary": "tip",
+  "point": "bulk/N500-M160",
+  "wall_ns": 46621655
+ },
+ {
+  "round": 0,
+  "binary": "tip",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 48227344
+ },
+ {
+  "round": 0,
+  "binary": "tip",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 72449241
+ },
+ {
+  "round": 0,
+  "binary": "tip",
+  "point": "archive/C10",
+  "wall_ns": 106934507
+ },
+ {
+  "round": 0,
+  "binary": "tip",
+  "point": "archive/C40",
+  "wall_ns": 317076851
+ },
+ {
+  "round": 0,
+  "binary": "tip",
+  "point": "dep/minimal",
+  "wall_ns": 6086355
+ },
+ {
+  "round": 0,
+  "binary": "tip",
+  "point": "dep/inflated",
+  "wall_ns": 19673032
+ },
+ {
+  "round": 1,
+  "binary": "tip",
+  "point": "bulk/N500-M10",
+  "wall_ns": 17964802
+ },
+ {
+  "round": 1,
+  "binary": "tip",
+  "point": "bulk/N500-M160",
+  "wall_ns": 45880991
+ },
+ {
+  "round": 1,
+  "binary": "tip",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 45757860
+ },
+ {
+  "round": 1,
+  "binary": "tip",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 81681324
+ },
+ {
+  "round": 1,
+  "binary": "tip",
+  "point": "archive/C10",
+  "wall_ns": 111503993
+ },
+ {
+  "round": 1,
+  "binary": "tip",
+  "point": "archive/C40",
+  "wall_ns": 315590882
+ },
+ {
+  "round": 1,
+  "binary": "tip",
+  "point": "dep/minimal",
+  "wall_ns": 5714532
+ },
+ {
+  "round": 1,
+  "binary": "tip",
+  "point": "dep/inflated",
+  "wall_ns": 18317474
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "bulk/N500-M10",
+  "wall_ns": 105284278
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "bulk/N500-M160",
+  "wall_ns": 1436969709
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 362261457
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 5376935869
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "archive/C10",
+  "wall_ns": 370152771
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "archive/C40",
+  "wall_ns": 1427954787
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "dep/minimal",
+  "wall_ns": 6422137
+ },
+ {
+  "round": 1,
+  "binary": "base",
+  "point": "dep/inflated",
+  "wall_ns": 25187323
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "bulk/N500-M10",
+  "wall_ns": 105681990
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "bulk/N500-M160",
+  "wall_ns": 1437343581
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 367326896
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 5418365463
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "archive/C10",
+  "wall_ns": 382822694
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "archive/C40",
+  "wall_ns": 1446867965
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "dep/minimal",
+  "wall_ns": 5563642
+ },
+ {
+  "round": 2,
+  "binary": "base",
+  "point": "dep/inflated",
+  "wall_ns": 27173244
+ },
+ {
+  "round": 2,
+  "binary": "tip",
+  "point": "bulk/N500-M10",
+  "wall_ns": 18257394
+ },
+ {
+  "round": 2,
+  "binary": "tip",
+  "point": "bulk/N500-M160",
+  "wall_ns": 48592656
+ },
+ {
+  "round": 2,
+  "binary": "tip",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 45071875
+ },
+ {
+  "round": 2,
+  "binary": "tip",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 74211842
+ },
+ {
+  "round": 2,
+  "binary": "tip",
+  "point": "archive/C10",
+  "wall_ns": 112135257
+ },
+ {
+  "round": 2,
+  "binary": "tip",
+  "point": "archive/C40",
+  "wall_ns": 316401156
+ },
+ {
+  "round": 2,
+  "binary": "tip",
+  "point": "dep/minimal",
+  "wall_ns": 5690372
+ },
+ {
+  "round": 2,
+  "binary": "tip",
+  "point": "dep/inflated",
+  "wall_ns": 18976218
+ },
+ {
+  "round": 3,
+  "binary": "tip",
+  "point": "bulk/N500-M10",
+  "wall_ns": 17993392
+ },
+ {
+  "round": 3,
+  "binary": "tip",
+  "point": "bulk/N500-M160",
+  "wall_ns": 46752356
+ },
+ {
+  "round": 3,
+  "binary": "tip",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 46256403
+ },
+ {
+  "round": 3,
+  "binary": "tip",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 76319653
+ },
+ {
+  "round": 3,
+  "binary": "tip",
+  "point": "archive/C10",
+  "wall_ns": 109144600
+ },
+ {
+  "round": 3,
+  "binary": "tip",
+  "point": "archive/C40",
+  "wall_ns": 312671655
+ },
+ {
+  "round": 3,
+  "binary": "tip",
+  "point": "dep/minimal",
+  "wall_ns": 5854643
+ },
+ {
+  "round": 3,
+  "binary": "tip",
+  "point": "dep/inflated",
+  "wall_ns": 18029453
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "bulk/N500-M10",
+  "wall_ns": 113164083
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "bulk/N500-M160",
+  "wall_ns": 1443471406
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 361179881
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 5267405185
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "archive/C10",
+  "wall_ns": 366257849
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "archive/C40",
+  "wall_ns": 1426983661
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "dep/minimal",
+  "wall_ns": 5587072
+ },
+ {
+  "round": 3,
+  "binary": "base",
+  "point": "dep/inflated",
+  "wall_ns": 26845242
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "bulk/N500-M10",
+  "wall_ns": 107355359
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "bulk/N500-M160",
+  "wall_ns": 1436553045
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 365311324
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 5380278594
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "archive/C10",
+  "wall_ns": 369901879
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "archive/C40",
+  "wall_ns": 1429064133
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "dep/minimal",
+  "wall_ns": 6008615
+ },
+ {
+  "round": 4,
+  "binary": "base",
+  "point": "dep/inflated",
+  "wall_ns": 26916563
+ },
+ {
+  "round": 4,
+  "binary": "tip",
+  "point": "bulk/N500-M10",
+  "wall_ns": 19495981
+ },
+ {
+  "round": 4,
+  "binary": "tip",
+  "point": "bulk/N500-M160",
+  "wall_ns": 46374154
+ },
+ {
+  "round": 4,
+  "binary": "tip",
+  "point": "bulk/N2000-M10",
+  "wall_ns": 46037282
+ },
+ {
+  "round": 4,
+  "binary": "tip",
+  "point": "bulk/N2000-M160",
+  "wall_ns": 73890969
+ },
+ {
+  "round": 4,
+  "binary": "tip",
+  "point": "archive/C10",
+  "wall_ns": 109157039
+ },
+ {
+  "round": 4,
+  "binary": "tip",
+  "point": "archive/C40",
+  "wall_ns": 316046434
+ },
+ {
+  "round": 4,
+  "binary": "tip",
+  "point": "dep/minimal",
+  "wall_ns": 5868192
+ },
+ {
+  "round": 4,
+  "binary": "tip",
+  "point": "dep/inflated",
+  "wall_ns": 18385395
+ }
+]
