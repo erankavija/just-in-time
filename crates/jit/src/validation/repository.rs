@@ -81,23 +81,42 @@ impl DecodedRecords {
     }
 }
 
+/// `image`'s parsed index and gate registry, resolved once for every
+/// [`CapturedValidation::with_config`] over it. A registry that fails to
+/// resolve is left to each validation to report.
+#[derive(Debug, Clone)]
+pub(crate) struct ImageInputs {
+    index: std::result::Result<RepositoryIndex, Arc<anyhow::Error>>,
+    gates: Option<GateRegistry>,
+}
+
+impl ImageInputs {
+    pub(crate) fn load(image: &RepositoryImage) -> Self {
+        Self {
+            index: records_pass(load_index(image)),
+            gates: crate::repository_state::captured_gates(image).ok(),
+        }
+    }
+}
+
 impl<'a> CapturedValidation<'a> {
     /// Parse `image`'s index and issue records.
     pub fn from_image(image: &'a RepositoryImage) -> Self {
-        Self::loaded(image, None)
+        Self::loaded(image, None, None)
     }
 
     /// [`Self::from_image`] with `config`, the configuration already
-    /// assembled from `image`, and `decoded`, the records `image` holds when
-    /// the caller has decoded them.
+    /// assembled from `image`, `decoded`, the records `image` holds when
+    /// the caller has decoded them, and `inputs`, its index and registry.
     pub(crate) fn with_config(
         image: &'a RepositoryImage,
         config: JitConfig,
         decoded: Option<&DecodedRecords>,
+        inputs: ImageInputs,
     ) -> Self {
         match decoded {
-            Some(decoded) => Self::seeded(image, decoded, Ok(config)),
-            None => Self::loaded(image, Some(Ok(config))),
+            Some(decoded) => Self::seeded(image, decoded, Ok(config), inputs),
+            None => Self::loaded(image, Some(Ok(config)), Some(inputs)),
         }
     }
 
@@ -105,29 +124,32 @@ impl<'a> CapturedValidation<'a> {
         image: &'a RepositoryImage,
         decoded: &DecodedRecords,
         config: std::result::Result<JitConfig, crate::repository_state::ProducerError>,
+        inputs: ImageInputs,
     ) -> Self {
         Self {
-            index: records_pass(load_index(image)),
+            index: inputs.index,
             issues: Ok(Arc::clone(&decoded.issues)),
             values: Arc::clone(&decoded.values),
             image: Cow::Borrowed(image),
             declarations: crate::repository_state::DeferredDeclarations::new(
                 crate::repository_state::validation_declarations_seeded,
                 Some(config),
-            ),
+            )
+            .with_gates(inputs.gates),
         }
     }
 
     fn loaded(
         image: &'a RepositoryImage,
         config: Option<std::result::Result<JitConfig, crate::repository_state::ProducerError>>,
+        inputs: Option<ImageInputs>,
     ) -> Self {
         match load_issues(image) {
             Ok(records) => {
                 let (issues, values) = records.into_iter().unzip();
-                Self::new(Cow::Borrowed(image), Ok(issues), values, config)
+                Self::new(Cow::Borrowed(image), Ok(issues), values, config, inputs)
             }
-            Err(error) => Self::new(Cow::Borrowed(image), Err(error), Vec::new(), config),
+            Err(error) => Self::new(Cow::Borrowed(image), Err(error), Vec::new(), config, inputs),
         }
     }
 
@@ -136,16 +158,22 @@ impl<'a> CapturedValidation<'a> {
         issues: Result<Vec<Issue>>,
         values: Vec<serde_json::Value>,
         config: Option<std::result::Result<JitConfig, crate::repository_state::ProducerError>>,
+        inputs: Option<ImageInputs>,
     ) -> Self {
-        Self {
+        let ImageInputs { index, gates } = inputs.unwrap_or_else(|| ImageInputs {
             index: records_pass(load_index(&image)),
+            gates: None,
+        });
+        Self {
+            index,
             issues: records_pass(issues).map(Arc::from),
             values: values.into(),
-            image,
             declarations: crate::repository_state::DeferredDeclarations::new(
                 crate::repository_state::validation_declarations_seeded,
                 config,
-            ),
+            )
+            .with_gates(gates),
+            image,
         }
     }
 
@@ -170,7 +198,7 @@ impl CapturedValidation<'static> {
         values: Vec<serde_json::Value>,
         config: std::result::Result<JitConfig, crate::repository_state::ProducerError>,
     ) -> Self {
-        Self::new(Cow::Owned(image), issues, values, Some(config))
+        Self::new(Cow::Owned(image), issues, values, Some(config), None)
     }
 }
 

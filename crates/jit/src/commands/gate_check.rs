@@ -105,6 +105,8 @@ struct CapturedGateExecution<'a> {
 pub(super) struct SharedValidation {
     history: Option<super::validate::RepositoryHistory>,
     records: Option<crate::validation::DecodedRecords>,
+    /// The image's index and gate registry, read by both validations.
+    inputs: std::sync::OnceLock<crate::validation::ImageInputs>,
     captured: std::sync::OnceLock<crate::validation::ValidationReport>,
     whole: std::sync::OnceLock<std::result::Result<Judgement, std::sync::Arc<anyhow::Error>>>,
 }
@@ -126,6 +128,15 @@ impl SharedValidation {
         }
     }
 
+    fn inputs(
+        &self,
+        image: &crate::repository_state::RepositoryImage,
+    ) -> crate::validation::ImageInputs {
+        self.inputs
+            .get_or_init(|| crate::validation::ImageInputs::load(image))
+            .clone()
+    }
+
     fn whole_judgement(
         &self,
         image: &crate::repository_state::RepositoryImage,
@@ -142,6 +153,7 @@ impl SharedValidation {
                         image,
                         config.clone(),
                         self.records.as_ref(),
+                        self.inputs(image),
                     );
                     let inputs = crate::validation::ReportInputs {
                         now: chrono::Utc::now(),
@@ -169,6 +181,7 @@ impl SharedValidation {
                     image,
                     config.clone(),
                     self.records.as_ref(),
+                    self.inputs(image),
                 ),
                 &crate::validation::ReportInputs {
                     now: chrono::Utc::now(),
@@ -5104,6 +5117,35 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             )
             .unwrap();
 
+        let mixed = add_builtin_gate(
+            &executor,
+            &"mixed-whole".parse().unwrap(),
+            GateChecker::RepositoryValidation,
+            Vec::new(),
+        );
+        let selected_key: GateKey = "mixed-selected".parse().unwrap();
+        add_builtin_gate(
+            &executor,
+            &selected_key,
+            GateChecker::IssueValidation,
+            Vec::new(),
+        );
+        let mut mixed_issue = executor.storage.load_issue(&mixed).unwrap();
+        mixed_issue.gates_required.push(selected_key.clone());
+        seed_issue(executor.storage(), mixed_issue);
+        for key in ["mixed-whole", "mixed-selected"] {
+            executor
+                .gates()
+                .update_gate(
+                    &key.parse().unwrap(),
+                    GateUpdate {
+                        stage: Some(GateStage::Precheck),
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+        }
+
         reset();
         executor
             .gates()
@@ -5114,6 +5156,10 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         reset();
         start_work_updating_gates(&executor, &prechecked, Default::default()).ok();
         let validated_precheck =
+            resolutions(&[Resolution::Issue, Resolution::Registry, Resolution::Index]);
+        reset();
+        start_work_updating_gates(&executor, &mixed, Default::default()).ok();
+        let mixed_precheck =
             resolutions(&[Resolution::Issue, Resolution::Registry, Resolution::Index]);
 
         reset();
@@ -5139,6 +5185,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             ("precheck", precheck_counts),
             ("validation manual", validated_manual),
             ("validation precheck", validated_precheck),
+            ("whole and selected validation precheck", mixed_precheck),
         ] {
             for (kind, per_source) in counts {
                 assert!(!per_source.is_empty(), "{case} {kind:?} never resolved");
