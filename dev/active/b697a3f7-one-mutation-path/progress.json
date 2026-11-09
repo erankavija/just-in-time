@@ -569,7 +569,8 @@
     "6b22ce6d (2bcbe63c6, 8b7b674fb, 3aa41ecd8; merge 2c064d1bc): cargo-ci and code-review PASSED; closed done. Owning REQ-12 test test_gate_evaluation_resolves_its_inputs_once_per_captured_image fails with fixes reverted (documents [2,1], precheck registry [2,2]). Advisory F1 (pre-existing, out of criteria): template application resolves its registry twice for the final image (template.rs:514 then :386); forwarded to d5.",
     "a8c4223b (7dde33013, merge 7c8c28f7e): cargo-ci and code-review PASSED, no findings; closed done. Template apply seeded with discovery's registry; pre-fix assertion failure [1, 2].",
     "350062e4 (441ea7ebd, c0fb71bbb; merge c119c76be): cargo-ci passed; code-review FAILED: F1 selected-validation precheck resolves registry twice (ImageInputs::load repository.rs:97 after preflight binding); F2 bulk precheck re-decodes issues after extend_mutation_base (bulk_update.rs:528 vs 443-452). Rework 1 dispatched (fix-forward).",
-    "350062e4 rework 1 (b44c1eef0, merge 18c64fa7e): cargo-ci passed; code-review FAILED F1 low: duplicate storage-readback assertion in owning test (gate_check.rs ~5129). Rework 2 (final) dispatched."
+    "350062e4 rework 1 (b44c1eef0, merge 18c64fa7e): cargo-ci passed; code-review FAILED F1 low: duplicate storage-readback assertion in owning test (gate_check.rs ~5129). Rework 2 (final) dispatched.",
+    "350062e4 rework 2 (3ff5f6250, merge 09c1b86cb): cargo-ci and code-review PASSED; closed done."
   ],
   "story_checkpoints": [
     {

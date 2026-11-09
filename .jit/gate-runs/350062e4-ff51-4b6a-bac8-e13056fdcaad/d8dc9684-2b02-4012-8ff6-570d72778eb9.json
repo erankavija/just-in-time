@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "09c1b86cbc5ae93d521d0d3164c96a04656b7194",
+  "completed_at": "2026-11-09T01:32:21.531229768Z",
+  "duration_ms": 183026,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Prior F1 is resolved; no unresolved issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "350062e4-ff51-4b6a-bac8-e13056fdcaad",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d8dc9684-2b02-4012-8ff6-570d72778eb9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-09T01:29:18.505063929Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:350062e4 — 4a44bcf, 441ea7e, c0fb71b, 182e9b4, 79c8986, b44c1ee, 05324e0, 3ff5f62; individual patches inspected\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/issue/350062e4/requirement/REQ-01, REQ-02, REQ-03, REQ-04 → issue description; @/issue/b697a3f7/requirement/REQ-12 → parent description; @/invariant/orthogonal-tests, essential-code-prose, architecture-dependency-direction, convention-convergence, shared-test-contracts, semantic-test-assertions → .jit/invariants.toml; @/gate/cargo-ci, code-review, jit-validate → .jit/gates.toml\nGate evidence: cargo-ci passed, exit 0, 2026-11-09T01:23:22.074788066Z; supplied ancestry covers six tagged commits, excluding 05324e0 and 3ff5f62; latest prior code-review failed, exit 1, with F1 now resolved; no gates rerun\nTruncation recovery: initial combined output recovered through narrower commit/path reads; historical transcript omissions excluded under records-of-the-past policy\n\nNo findings. The duplicate storage assertion identified by prior F1 is removed. Current code shares decoded records through manual evaluation, single-issue prechecks, and bulk prechecks; the owning test checks their resolution counts.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Prior F1 is resolved; no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
