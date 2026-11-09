@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7c8c28f7e2b66d6561d91e7a6bb771ea533d9136",
+  "completed_at": "2026-11-09T00:37:14.241767746Z",
+  "duration_ms": 128764,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact defects found; static review supports REQ-01–04. Cargo CI remains pending.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a8c4223b-bef4-4e62-a41a-5e61955605d1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "dbb8c181-c998-483d-9255-3abbc7f624e1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-09T00:35:05.476814731Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:a8c4223b` — `59a3cc0b`, `7dde3301`\nPolicy sources: `AGENTS.md`; `.jit/reference/content-standards.md`\nResolved items: `@/charter/D-20` → `dev/vision/9db27a3a-charter.md`; `@/issue/b697a3f7/requirement/REQ-12` → issue description; `@/inv/orthogonal-tests`, `@/inv/essential-code-prose`, `@/inv/shared-test-contracts`, `@/inv/semantic-test-assertions`, `@/inv/architecture-dependency-direction`, `@/inv/convention-convergence` → `.jit/invariants.toml`; `@/gate/cargo-ci`, `@/gate/jit-validate` → `.jit/gates.toml`\nGate evidence: cargo-ci=pending, exit_code=null, last_run_at=null; ancestry unavailable; prior review runs=none\nTruncation recovery: narrower reads recovered relevant caller, test, registry, and policy evidence; unrelated filesystem-discovery and CI-reference matches excluded as outside the issue’s impact cone.\n\nNo findings. Static inspection supports REQ-01–04: template derivation consumes discovery’s registry with final-image identity checking (`template.rs:284, 491`); remaining callers avoid duplicate registry resolution; the existing owning test contains the single added assertion (`commands/mod.rs:3921`). Output derivation and gate judgment logic remain unchanged.\n\nExecutable checks were not run under the read-only boundary; cargo-ci remains unverified.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects found; static review supports REQ-01–04. Cargo CI remains pending.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

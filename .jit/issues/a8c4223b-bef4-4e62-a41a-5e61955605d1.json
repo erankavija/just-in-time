@@ -6,12 +6,26 @@
   "dependencies": [],
   "description": "Make every caller that runs discovery before deriving declarations consume discovery's gate registry, so each captured image resolves its registry once.\n\n## Background\n\n- `crates/jit/src/commands/template.rs`: template apply's discovery calls `captured_gates` (~514), and its derivation then calls `declarations_with_config` (~386) without carrying that registry, so the final image resolves its registry twice.\n- `6b22ce6d` code-review advisory F1 (2026-11-09). `6b22ce6d` threaded discovery's registry into mutation and precheck bases through `declarations_seeded` / `validation_declarations_seeded`.\n- Steward ruling (just-in-time-d5, 2026-11-09): in scope under story `d675102c`, since every caller of the discovery path takes the registry from one resolution (`6b22ce6d` ruling 1); same `@/charter/D-20` shape.\n- Epic criterion: `b697a3f7` REQ-12.\n\n## Success Criteria\n\n- [hard] REQ-01: Template apply's derivation takes the registry its discovery resolved for the final image through the `declarations_seeded` pattern.\n- [hard] REQ-02: Every other caller of `declarations_with_config` or `validation_declarations_with_config` that runs discovery first is seeded the same way; for any one captured image `captured_gates` runs once, from discovery or from a read path with no discovery.\n- [hard] REQ-03: \"Template apply resolves the registry once per image\" is asserted once: in the owning REQ-12 test if template apply is a gate evaluation input, otherwise as one assertion in the existing parse-once owning test. No per-path test is added.\n- [hard] REQ-04: Template output and gate verdicts are unchanged.\n",
   "documents": [],
+  "done_at": "2026-11-09T00:37:26.812382798Z",
   "first_ready_at": "2026-11-09T00:27:25.093763997Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "6f94416e-87b1-4901-b45f-667a3b740ca7",
+      "status": "passed",
+      "updated_at": "2026-11-09T00:36:30.851204706Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "dbb8c181-c998-483d-9255-3abbc7f624e1",
+      "status": "passed",
+      "updated_at": "2026-11-09T00:37:14.243245904Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a8c4223b-bef4-4e62-a41a-5e61955605d1",
   "labels": [
     "epic:one-mutation-path",
@@ -24,7 +38,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Every discovery caller consumes discovery's gate registry",
-  "updated_at": "2026-11-09T00:27:33.943224707Z"
+  "updated_at": "2026-11-09T00:37:26.812382798Z"
 }
