@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "34f8ecdc1c0c708401c5c3199c7b339175e06653",
+  "completed_at": "2026-11-09T02:41:05.179269606Z",
+  "duration_ms": 184001,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact defects found; prior F1 is addressed and the scoped criteria are satisfied under the recorded rulings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c69e07b2-3158-440c-9138-5abf6d2f585f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "dd2021b0-c523-45a1-9ea0-cead2ba711a5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-09T02:38:01.177687863Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:c69e07b2` commits `9b9177b2`, `ab5a871c`, `babf797b`, `ab251c7d`, `a4ed2bf8`, `d979b401`, `546aa159`, `1ad804f9`, `ed1c48ba`, `e8aa9427`, `e0987754`; individual patches inspected; uncommitted changes excluded.\nPolicy sources: `AGENTS.md`; no applicable subtree policies.\nResolved items: `@/charter/D-18`, `@/charter/D-20` → `dev/vision/9db27a3a-charter.md`; `@/inv/orthogonal-tests`, `@/inv/essential-code-prose`, `@/inv/shared-test-contracts`, `@/inv/semantic-test-assertions`, `@/inv/architecture-dependency-direction`, `@/inv/convention-convergence` → `.jit/invariants.toml`; `@/issue/c69e07b2/requirement/REQ-01`–`REQ-05`, `@/issue/b697a3f7/requirement/REQ-10`, `@/issue/b697a3f7/requirement/REQ-12` → respective issue descriptions; `@/gate/cargo-ci`, `@/gate/jit-validate` → `.jit/gates.toml`.\nGate evidence: `cargo-ci` passed, exit 0, `2026-11-09T02:33:36.796833697+00:00`; supplied ancestry covers every tagged commit except test-assertion commit `e0987754`. Prior `code-review` failed, exit 1; its blocking finding is addressed. No gates rerun.\nTruncation recovery: Narrower configuration and source reads recovered relevant evidence; unrelated investigation matches and historical transcript omissions excluded.\n\nNo findings. Issue-decode failures now terminate evaluation without repeating the decode (`commands/gate_check.rs:1059`). Declaration reads return the final discovery derivation (`commands/mod.rs:2825`). Rules discovery propagates typed failures, addressing prior F1; validation paths that continue retain memoized outcomes.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects found; prior F1 is addressed and the scoped criteria are satisfied under the recorded rulings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
