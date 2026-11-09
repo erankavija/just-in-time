@@ -609,7 +609,8 @@
     "d4a20645 closed done: code-review PASSED with REQ-02 inventory linked; cargo-ci passed on 5b463ef09.",
     "Epic repo-validate re-run PASSED after d4a20645; holistic-review gate started.",
     "b1d7a600 (56ac259cc, 5265f7051; merge f8593f1dd): cargo-ci and code-review PASSED; closed done. Rescan checks lease in session; claim sync covered by claims lock spanning the publish (revised d5 ruling); audit linked.",
-    "86d76e01 (5fe9e25d9, merge 6382a1eba): cargo-ci and code-review PASSED; closed done. Graph-rule smoke: standard 1.003, graph-rule 1.043, validate.py --smoke PASS; default fixtures byte-identical; 6a19e93f evidence line appended."
+    "86d76e01 (5fe9e25d9, merge 6382a1eba): cargo-ci and code-review PASSED; closed done. Graph-rule smoke: standard 1.003, graph-rule 1.043, validate.py --smoke PASS; default fixtures byte-identical; 6a19e93f evidence line appended.",
+    "Epic gates: repo-validate PASSED; holistic-review PASSED (run 2, 2026-11-09T04:44Z). Completion report written and linked; epic transitioned to done."
   ],
   "story_checkpoints": [
     {
@@ -1033,5 +1034,6 @@
       "commit": "03ba8cd94",
       "result": "FAILED: F1 rescan lease bypass (REQ-04) -> b1d7a600; F2 graph-rule smoke prose-only (6a19e93f REQ-03) -> 86d76e01 per d5 option (a); F3 plan.md superseded wording fixed 8e5a42a5d."
     }
-  ]
+  ],
+  "status": "done"
 }
