@@ -102,6 +102,17 @@ impl From<CapabilityFsError> for RepositoryStateStoreError {
     }
 }
 
+/// Whether `error` is the retryable conflict, whose own text describes the
+/// condition and which callers pass through without added context.
+pub(crate) fn is_retryable_conflict(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<RepositoryStateStoreError>(),
+            Some(RepositoryStateStoreError::RetryableConflict { .. })
+        )
+    })
+}
+
 /// Whether session open failed on the leftover redo record: it did not parse,
 /// or applying it failed.
 pub(crate) fn is_leftover_record_failure(error: &anyhow::Error) -> bool {
