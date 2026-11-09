@@ -275,14 +275,16 @@ impl<S: IssueStore> TemplateOps<'_, S> {
         with_mutation_attempts("template apply", || {
             let claims_guard = super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
             let mut session = self.exec.storage.open_mutation_session(layout.clone())?;
-            let Some((image, config)) =
+            let Some((image, config, gates)) =
                 capture_template_image(&mut *session, &context, &request, container_id)?
             else {
                 return Ok(AttemptOutcome::Retry);
             };
+            let declarations =
+                crate::repository_state::declarations_seeded(&image, Ok(config), gates)?;
             let mut captured = derive_captured_template_apply(
                 &image,
-                config,
+                declarations,
                 &request,
                 container_id,
                 anchor_bindings,
@@ -376,14 +378,13 @@ struct CapturedTemplateApply {
 
 fn derive_captured_template_apply(
     image: &RepositoryImage,
-    config: crate::config::JitConfig,
+    declarations: crate::repository_state::CapturedRepositoryDeclarations,
     request: &TemplateRequest<'_>,
     container_id: &IssueId,
     anchor_bindings: &BTreeMap<String, IssueId>,
     force: bool,
     context: &MutationContext,
 ) -> Result<CapturedTemplateApply> {
-    let declarations = crate::repository_state::declarations_with_config(image, Ok(config))?;
     let config = declarations.config();
     let template = request.resolve(config)?;
     let bindings = captured_anchor_bindings(request, config, container_id, anchor_bindings);
@@ -432,18 +433,29 @@ fn template_fixed_paths() -> Vec<VirtualPath> {
     ]
 }
 
-/// Capture the template image with the configuration its discovery assembled.
+/// Capture the template image with the configuration its discovery assembled
+/// and, when discovery resolved it from the final image, the gate registry.
 fn capture_template_image(
     session: &mut dyn crate::storage::RepositoryMutationSession,
     context: &MutationContext,
     request: &TemplateRequest<'_>,
     container_id: &IssueId,
-) -> Result<Option<(RepositoryImage, crate::config::JitConfig)>> {
+) -> Result<
+    Option<(
+        RepositoryImage,
+        crate::config::JitConfig,
+        Option<crate::declarations::GateRegistry>,
+    )>,
+> {
     let presets_dir = VirtualPath::GATE_PRESETS;
     let mut spec = CaptureSpec::new(template_fixed_paths(), TEMPLATE_CAPTURE_BUDGET)?;
     spec.discover_tail(VirtualPath::EVENTS)?;
     spec.discover_listings([presets_dir.clone(), VirtualPath::ISSUES])?;
     let mut configuration = super::ConfigurationParse::captured();
+    let mut resolved_gates = None::<(
+        crate::repository_state::ImageToken,
+        crate::declarations::GateRegistry,
+    )>;
     let Some(image) = capture_discovering(session, spec, |image, spec| {
         let issue_records = crate::repository_state::captured_issue_ids(image)?
             .iter()
@@ -461,9 +473,12 @@ fn capture_template_image(
             .all(|path| image.capture_spec().contains_path(path));
         spec.discover_paths(declarations)?;
         if declarations_read {
+            let gates = crate::repository_state::captured_gates(image)?;
+            resolved_gates = Some((image.token(), gates.clone()));
             spec.discover_paths(template_operation_capture_paths(
                 image,
                 config,
+                &gates,
                 context,
                 request,
                 container_id,
@@ -475,7 +490,10 @@ fn capture_template_image(
         return Ok(None);
     };
     let config = configuration.into_config(&image)?;
-    Ok(Some((image, config)))
+    let gates = resolved_gates
+        .filter(|(token, _)| *token == image.token())
+        .map(|(_, gates)| gates);
+    Ok(Some((image, config, gates)))
 }
 
 fn template_declaration_closure(
@@ -498,6 +516,7 @@ fn template_declaration_closure(
 fn template_operation_capture_paths(
     image: &RepositoryImage,
     config: &crate::config::JitConfig,
+    gates: &crate::declarations::GateRegistry,
     context: &MutationContext,
     request: &TemplateRequest<'_>,
     container_id: &IssueId,
@@ -511,7 +530,7 @@ fn template_operation_capture_paths(
     let prerequisites_met = require_template_prerequisites(
         &template,
         config,
-        &crate::repository_state::captured_gates(image)?,
+        gates,
         GatePresetCatalog::from_image(image)?.definitions(),
     )
     .is_ok();

@@ -3793,7 +3793,8 @@ mod tests {
     /// Every capture of an executor reuses the parse of declaration sources
     /// (configuration, rules, gates) an earlier capture parsed, failed or not,
     /// however many distinct sources it parsed since, and a source no capture
-    /// parsed yet parses once.
+    /// parsed yet parses once. Template application resolves each captured
+    /// image's gate registry once.
     #[test]
     fn test_configuration_parse_parses_each_distinct_source_once_across_captures() {
         use crate::declarations::{parses_on_this_thread, ParsedSource};
@@ -3843,12 +3844,15 @@ mod tests {
         };
 
         let (container, creation) = parses(|| create(&executor).unwrap().issue.id);
+        crate::resolution_counts::reset();
         let (_, application) = parses(|| {
             executor
                 .templates()
                 .apply_template_with(&template, &container, &Default::default(), false)
                 .unwrap()
         });
+        let registry_resolutions =
+            crate::resolution_counts::per_source(crate::resolution_counts::Resolution::Registry);
         // The fix attempt and the report of its result capture one image each.
         let (_, repair) = parses(|| executor.validation().validate_with_fix(false).unwrap());
         crate::test_harness::seed_memory_repository_file(
@@ -3913,6 +3917,10 @@ mod tests {
                 [0, 0, 0],
                 [1, 1, 0]
             ]
+        );
+        assert!(
+            !registry_resolutions.is_empty() && registry_resolutions.iter().all(|count| *count == 1),
+            "template apply resolved a captured image's gate registry more than once: {registry_resolutions:?}"
         );
         assert_eq!(first_visits, [[0, 0, 1]; 5]);
         assert_eq!(revisits, [[0, 0, 0]; 5]);
