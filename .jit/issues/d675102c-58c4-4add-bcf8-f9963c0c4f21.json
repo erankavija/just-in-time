@@ -33,7 +33,7 @@
     "per:@/charter/D-20"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Configuration and gate declarations come from captured images",
-  "updated_at": "2026-11-09T02:49:55.372642920Z"
+  "updated_at": "2026-11-09T03:07:41.531633551Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0483f2105da5ebf5f57eb1c61b4a71c37a314259",
+  "completed_at": "2026-11-09T03:07:23.608653877Z",
+  "duration_ms": 132003,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are supported; document derivations are threaded into evidence capture, and the linked enumeration resolves prior F1.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "863fd652-8ced-4b2f-ba90-b8743fac4a41",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "40e46c40-d454-49eb-9c2d-088fa576ccc8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-09T03:05:11.605253791Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:863fd652` — `b3eade172`, `3fd55b8e9`, `5118dca16`, `bbd27afb1`, `0483f2105`; individual patches inspected.\nPolicy sources: `AGENTS.md`; no applicable subtree policies.\nResolved items: `@/charter/D-20` → `dev/vision/9db27a3a-charter.md`; `@/issue/863fd652/requirement/REQ-01`, `@/issue/863fd652/requirement/REQ-02`, `@/issue/863fd652/requirement/REQ-03`, `@/issue/863fd652/requirement/REQ-04`, `@/issue/b697a3f7/requirement/REQ-12` → respective issue descriptions; `@/invariant/orthogonal-tests`, `@/invariant/essential-code-prose`, `@/invariant/architecture-dependency-direction`, `@/invariant/semantic-test-assertions`, `@/invariant/shared-test-contracts`, `@/invariant/convention-convergence` → `.jit/invariants.toml`; `@/gate/cargo-ci`, `@/gate/jit-validate` → `.jit/gates.toml`.\nGate evidence: `cargo-ci` passed, exit 0, timestamp `2026-11-09T03:01:26.174738098+00:00`; wrapper ancestry confirms coverage of both implementation-era commits, excluding the three later documentation/record commits. Prior `code-review` failed, exit 1; its sole structured finding is addressed. No gates rerun.\nTruncation recovery: reread the validation patch, progress patch, and issue/event/gate-run patches separately; historical transcript excerpts were unnecessary because structured findings are authoritative.\n\nNo findings. Discovery’s document sets reach manual and automatic evidence capture, including final-image comparisons. The counter at `crates/jit/src/commands/document.rs:1525` now observes discovery’s derivation, and the owning test at `crates/jit/src/commands/gate_check.rs:5187` requires one derivation per image for both exec cases. Evidence construction and verdict behavior remain consistent.\n\nPrior F1 is resolved by the enumeration linked at `dev/active/863fd652/discovery-derivations.md:3`.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are supported; document derivations are threaded into evidence capture, and the linked enumeration resolves prior F1.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

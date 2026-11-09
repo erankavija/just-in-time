@@ -590,7 +590,8 @@
     "c69e07b2 (ab5a871c5, ab251c7de; merge 4fce31f2f): cargo-ci passed; code-review FAILED F1: REQ-04 sweep incomplete: rule_schema_paths .ok() on schema_requests() (commands/mod.rs:644, validate.rs:761) repeats schema-reference validation at assembly (repository_state/mod.rs:523). Rework 1 dispatched.",
     "c69e07b2 rework 1 (d979b401d, merge bc5703b33): cargo-ci passed; code-review FAILED F1: rule_schema_paths from_utf8(bytes).ok() (commands/mod.rs:638) then assembly repeats UTF-8 decode (repository_state/mod.rs:519). Rework 2 (final) dispatched.",
     "c69e07b2 rework 2 (ed1c48bab, e8aa9427b, e0987754b; merge 34f8ecdc1): cargo-ci and code-review PASSED; closed done. Discovery propagates decode/derivation failures; rules memo keyed by bytes; multi-error paths (jit validate, built-in gate evaluation Error run) keep carried outcomes. An interrupted gate run on 273386c89 (before e0987754b landed) is in the record.",
-    "863fd652 (3fd55b8e9, merge d925018b7): cargo-ci passed; code-review FAILED F1: REQ-03 enumeration not in evidence (worker report not linked). Lead committed dev/active/863fd652/discovery-derivations.md (5118dca16) from the worker's report, linked via jit doc add; rerunning code-review."
+    "863fd652 (3fd55b8e9, merge d925018b7): cargo-ci passed; code-review FAILED F1: REQ-03 enumeration not in evidence (worker report not linked). Lead committed dev/active/863fd652/discovery-derivations.md (5118dca16) from the worker's report, linked via jit doc add; rerunning code-review.",
+    "863fd652: code-review PASSED after REQ-03 enumeration linked; cargo-ci passed on d925018b7 (later changes docs/.jit only); closed done."
   ],
   "story_checkpoints": [
     {
