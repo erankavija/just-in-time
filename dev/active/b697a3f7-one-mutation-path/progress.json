@@ -498,7 +498,8 @@
     "e5d7bc11": 2,
     "350062e4": 2,
     "c69e07b2": 2,
-    "863fd652": 1
+    "863fd652": 1,
+    "d4a20645": 1
   },
   "surfaced_pitfalls": [
     {
@@ -603,7 +604,8 @@
     "d675102c closed done after r6 (81804ff39) under d5 six-round cap; v1.1 follow-up 57129f99 (duplicated dependency decode).",
     "45d0a971 closed done: tip record on 1d8d1497c (sha256 c35a80d9...), all four verdicts pass (bulk 0.993, archive 0.196, dep 0.593, profile 0.305); validate.py PASS; start load 1.77/end 1.33 under harness 2.0 gate, accepted by d5 as protocol deviation (no rerun). Merge 4ed51efd8; README linked 49ee6a79c; cargo-ci and code-review PASSED.",
     "0672b087 closed done after REQ-21 amended to D-25 in story and epic; REQ-22/23 MET at checkpoint.",
-    "Epic close: surfaced_pitfalls reconciled; repo-validate gate PASSED; holistic-review held pending d5 routing of the configuration_store diagnostic advisory."
+    "Epic close: surfaced_pitfalls reconciled; repo-validate gate PASSED; holistic-review held pending d5 routing of the configuration_store diagnostic advisory.",
+    "d4a20645 (ad4fb78f5, merge 5b463ef09): cargo-ci passed; code-review FAILED F1: REQ-02 report not in evidence. Lead committed conflict-wrapper-audit.md (d5caa69e9) from the worker report and linked it; rerunning code-review. Lead trap: link any report a criterion requires before review."
   ],
   "story_checkpoints": [
     {
