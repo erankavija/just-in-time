@@ -819,6 +819,11 @@ pub(crate) struct CapturedAnswers {
 pub(crate) struct ImageToken(u64);
 
 impl ImageToken {
+    #[cfg(test)]
+    pub(crate) fn id(self) -> usize {
+        self.0 as usize
+    }
+
     fn mint() -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         Self(NEXT.fetch_add(1, Ordering::Relaxed))

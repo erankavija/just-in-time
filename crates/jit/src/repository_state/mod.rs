@@ -470,7 +470,17 @@ pub(crate) fn declarations_with_config(
     image: &RepositoryImage,
     config: Result<crate::config::JitConfig, ProducerError>,
 ) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
-    let mut declarations = validation_declarations_with_config(image, config)?;
+    declarations_seeded(image, config, None)
+}
+
+/// [`declarations_with_config`] over `gates`, the registry discovery already
+/// resolved from `image`, when it did.
+pub(crate) fn declarations_seeded(
+    image: &RepositoryImage,
+    config: Result<crate::config::JitConfig, ProducerError>,
+    gates: Option<GateRegistry>,
+) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
+    let mut declarations = validation_declarations_seeded(image, config, gates)?;
     match declarations.take_rules_load_error() {
         Some(error) => Err(error),
         None => Ok(declarations),
@@ -487,9 +497,22 @@ pub(crate) fn validation_declarations_with_config(
     image: &RepositoryImage,
     config: Result<crate::config::JitConfig, ProducerError>,
 ) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
+    validation_declarations_seeded(image, config, None)
+}
+
+/// [`validation_declarations_with_config`] over `gates`, the registry
+/// discovery already resolved from `image`, when it did.
+pub(crate) fn validation_declarations_seeded(
+    image: &RepositoryImage,
+    config: Result<crate::config::JitConfig, ProducerError>,
+    gates: Option<GateRegistry>,
+) -> Result<CapturedRepositoryDeclarations, DeclarationParseError> {
     let config = config?;
     let namespaces = crate::config_manager::namespaces_from_config(&config);
-    let gates = captured_gates(image)?;
+    let gates = match gates {
+        Some(gates) => gates,
+        None => captured_gates(image)?,
+    };
     let rules = match image.file_bytes(&VirtualPath::RULES)? {
         Some(bytes) => (|| -> Result<RuleSet, DeclarationParseError> {
             let document = image.declaration_memo().rules(std::str::from_utf8(bytes)?);
@@ -532,6 +555,8 @@ pub(crate) fn validation_declarations_with_config(
 pub(crate) fn captured_gates(
     image: &RepositoryImage,
 ) -> Result<GateRegistry, DeclarationParseError> {
+    #[cfg(test)]
+    crate::resolution_counts::count_in_image(crate::resolution_counts::Resolution::Registry, image);
     Ok(match image.file_bytes(&VirtualPath::GATES)? {
         Some(bytes) => image.declaration_memo().gates(bytes).to_registry()?,
         None => GateRegistry::default(),
@@ -539,11 +564,12 @@ pub(crate) fn captured_gates(
 }
 
 /// How a configuration assembly of an image becomes its declarations:
-/// [`declarations_with_config`] or [`validation_declarations_with_config`].
+/// [`declarations_seeded`] or [`validation_declarations_seeded`].
 pub(crate) type DeclarationParse =
     fn(
         &RepositoryImage,
         Result<crate::config::JitConfig, ProducerError>,
+        Option<GateRegistry>,
     ) -> Result<CapturedRepositoryDeclarations, DeclarationParseError>;
 
 /// The declarations of one captured image, parsed on first use from the
@@ -555,6 +581,8 @@ pub(crate) struct DeferredDeclarations {
     /// The capture's assembly, until the parse takes it; `None` assembles
     /// from the image.
     config: std::sync::Mutex<Option<Result<crate::config::JitConfig, ProducerError>>>,
+    /// The registry discovery resolved from the image, until the parse takes it.
+    gates: std::sync::Mutex<Option<GateRegistry>>,
     parsed: std::sync::OnceLock<
         Result<CapturedRepositoryDeclarations, std::sync::Arc<DeclarationParseError>>,
     >,
@@ -570,7 +598,17 @@ impl DeferredDeclarations {
         Self {
             parse,
             config: std::sync::Mutex::new(config),
+            gates: std::sync::Mutex::new(None),
             parsed: std::sync::OnceLock::new(),
+        }
+    }
+
+    /// These declarations over `gates`, the registry discovery resolved from
+    /// the image, so the parse does not resolve it again.
+    pub(crate) fn with_gates(self, gates: Option<GateRegistry>) -> Self {
+        Self {
+            gates: std::sync::Mutex::new(gates),
+            ..self
         }
     }
 
@@ -587,7 +625,12 @@ impl DeferredDeclarations {
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .take()
                     .unwrap_or_else(|| materialize::assemble_config(image));
-                (self.parse)(image, config).map_err(std::sync::Arc::new)
+                let gates = self
+                    .gates
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .take();
+                (self.parse)(image, config, gates).map_err(std::sync::Arc::new)
             })
             .as_ref()
             .map_err(std::sync::Arc::clone)
@@ -1241,7 +1284,7 @@ mod tests {
                 .build();
             let config = assemble_config(&image);
             (
-                DeferredDeclarations::new(declarations_with_config, Some(config)),
+                DeferredDeclarations::new(declarations_seeded, Some(config)),
                 image,
             )
         };

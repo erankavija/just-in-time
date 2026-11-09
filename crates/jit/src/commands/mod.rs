@@ -875,7 +875,8 @@ fn precheck_prompt_paths(
         .collect()
 }
 
-/// The precheck-stage gates `issue` requires that `registry` declares.
+/// The precheck-stage gates `issue` requires that `registry` declares; a
+/// filter over the resolved registry, resolving nothing.
 fn precheck_gates<'a>(
     issue: &Issue,
     registry: &'a crate::declarations::GateRegistry,
@@ -3083,7 +3084,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         let issues = base.issues;
         let declarations =
-            crate::repository_state::declarations_with_config(&light.image, base.config)?;
+            crate::repository_state::declarations_seeded(&light.image, base.config, base.gates)?;
         let enforcement_mode = declarations.config().enforcement_mode();
         let config = declarations.config;
         let registry = declarations.gates;

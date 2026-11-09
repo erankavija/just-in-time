@@ -86,6 +86,8 @@ struct CapturedGateExecution<'a> {
     issues: &'a crate::domain::queries::IndexedIssues,
     gate: &'a crate::declarations::GateDefinition,
     runs: &'a [GateRunResult],
+    /// The issue's documents as the evidence capture resolved them from `image`.
+    documents: &'a [crate::domain::DocumentReference],
     prompt: Option<&'a str>,
     /// The validation reports of `image` its built-in checkers share.
     validation: &'a SharedValidation,
@@ -297,10 +299,12 @@ impl GateEvidence {
     }
 }
 
-/// [`GateEvidence`] with the prompt each automatic gate passes its checker
-/// and the issue's latest run of each gate a checker reads as history.
+/// [`GateEvidence`] with the prompt each automatic gate passes its checker,
+/// the issue's latest run of each gate a checker reads as history, and the
+/// documents resolved from the image for an exec checker.
 pub(super) struct CapturedGateEvidence {
     pub(super) evidence: GateEvidence,
+    pub(super) documents: Vec<crate::domain::DocumentReference>,
     pub(super) prompts: HashMap<GateKey, String>,
     pub(super) runs: Vec<GateRunResult>,
 }
@@ -334,6 +338,8 @@ fn captured_issue_record(
 ) -> Result<Option<Issue>> {
     use crate::repository_state::{RepositoryEntry, VirtualPath};
 
+    #[cfg(test)]
+    crate::resolution_counts::count_in_image(crate::resolution_counts::Resolution::Issue, image);
     let path = VirtualPath::issue_record(issue_id);
     match image.entry(&path)? {
         RepositoryEntry::File { content, .. } => {
@@ -668,12 +674,13 @@ pub(super) fn captured_gate_evidence_sharing(
         .any(|(_, checker)| matches!(checker, GateChecker::Exec { .. }))
     {
         super::document::captured_issue_documents(image, issue, config)?
-            .iter()
-            .map(crate::document::DocumentReferenceRequests::for_reference)
-            .collect::<std::result::Result<Vec<_>, _>>()?
     } else {
         Vec::new()
     };
+    let document_requests = documents
+        .iter()
+        .map(crate::document::DocumentReferenceRequests::for_reference)
+        .collect::<std::result::Result<Vec<_>, _>>()?;
     let prompts = checkers
         .iter()
         .filter_map(|(key, checker)| match checker {
@@ -713,7 +720,7 @@ pub(super) fn captured_gate_evidence_sharing(
     paths.extend(issue.dependencies.iter().map(VirtualPath::issue_record));
     paths.extend(runs.inputs);
     paths.extend(
-        documents
+        document_requests
             .iter()
             .filter_map(|requests| requests.worktree())
             .cloned(),
@@ -727,7 +734,7 @@ pub(super) fn captured_gate_evidence_sharing(
                 .map(|entry| (path, entry.identity().cloned()))
         })
         .collect::<std::result::Result<Vec<_>, _>>()?;
-    let wanted_pinned = documents
+    let wanted_pinned = document_requests
         .iter()
         .map(|requests| {
             let (revision, path) = requests.pinned();
@@ -741,6 +748,7 @@ pub(super) fn captured_gate_evidence_sharing(
         .map(|(key, value)| (key.clone(), value.clone()))
         .collect::<BTreeMap<_, _>>();
     Ok(CapturedGateEvidence {
+        documents,
         evidence: GateEvidence {
             gates: gates.iter().map(|gate| (*gate).clone()).collect(),
             inputs,
@@ -1176,6 +1184,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 issues: &issues,
                 gate,
                 runs: &captured.runs,
+                documents: &captured.documents,
                 prompt: captured.prompts.get(&gate.key).map(String::as_str),
                 validation: &SharedValidation::new(history.clone()),
             })?,
@@ -1568,12 +1577,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         match checker {
             crate::declarations::GateChecker::Exec { .. } => {
-                let documents = super::document::captured_issue_documents(
-                    input.image,
-                    input.issue,
-                    input.config,
-                )?;
-                let context = self.build_captured_gate_context(checker, &input, &documents)?;
+                let context = self.build_captured_gate_context(checker, &input, input.documents)?;
                 let head = self
                     .require_worktree_paths()?
                     .code_checkout()
@@ -1587,7 +1591,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         &working_dir,
                         head.as_ref(),
                         context.as_ref(),
-                        &documents,
+                        input.documents,
                     )
                 })
             }
@@ -1748,6 +1752,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         issues,
                         gate,
                         runs: checker_history,
+                        documents: &captured.documents,
                         prompt: captured.prompts.get(gate_key).map(String::as_str),
                         validation,
                     }) {
@@ -5028,6 +5033,55 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             local,
             false,
         )
+    }
+
+    /// A manual `check_gate` and an automatic precheck each resolve the
+    /// issue, the gate registry with its gate definition, and the issue's
+    /// documents once per captured image.
+    #[test]
+    fn test_gate_evaluation_resolves_its_inputs_once_per_captured_image() {
+        use crate::resolution_counts::{per_source, reset, Resolution};
+        let resolutions = |kinds: &[Resolution]| {
+            kinds
+                .iter()
+                .map(|kind| (*kind, per_source(*kind)))
+                .collect::<Vec<_>>()
+        };
+        let executor = setup();
+        let manual = seed_issue_requiring_exec_gates(
+            &executor,
+            State::InProgress,
+            &[("manual-exec", "true")],
+        );
+        let (precheck, _) = seed_ready_issue_with_failing_precheck(&executor, true);
+
+        reset();
+        executor
+            .gates()
+            .check_gate(&manual, &"manual-exec".parse().unwrap())
+            .unwrap();
+        let manual_counts = resolutions(&[
+            Resolution::Issue,
+            Resolution::Registry,
+            Resolution::Documents,
+        ]);
+        reset();
+        start_work_updating_gates(&executor, &precheck, Default::default()).unwrap_err();
+        let precheck_counts = resolutions(&[
+            Resolution::Issue,
+            Resolution::Registry,
+            Resolution::Documents,
+        ]);
+
+        for (case, counts) in [("manual", manual_counts), ("precheck", precheck_counts)] {
+            for (kind, per_source) in counts {
+                assert!(!per_source.is_empty(), "{case} {kind:?} never resolved");
+                assert!(
+                    per_source.iter().all(|count| *count == 1),
+                    "{case} {kind:?} resolved more than once per source: {per_source:?}"
+                );
+            }
+        }
     }
 
     #[test]

@@ -27,6 +27,8 @@ pub mod process;
 pub mod profile;
 pub mod query_engine;
 pub mod repository_state;
+#[cfg(test)]
+pub(crate) mod resolution_counts;
 pub mod runtime_defaults;
 pub mod schema;
 pub mod search;
