@@ -927,6 +927,16 @@
       "commit": "f56763036",
       "brief": "scratchpad/brief-d675102c-r3.md",
       "result": "REQ-01..03 MET; REQ-04 UNMET: built-in validation evaluations decode issues twice per image (gate_check.rs ~136/~159 via CapturedValidation::with_config load_issues; precheck commands/mod.rs:3186). Forwarded to d5."
+    },
+    {
+      "issue": "d675102c",
+      "kind": "checkpoint-r4",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "sandbox": "read-only",
+      "commit": "b098a6bd6",
+      "brief": "scratchpad/brief-d675102c-r4.md"
     }
   ]
 }
