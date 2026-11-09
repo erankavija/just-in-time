@@ -13,15 +13,15 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "run_id": "16098cb0-64f0-40e8-9c30-0e2839ee3e5b",
+      "run_id": "e27e9ac1-6dd6-4a65-a3d6-04531539479e",
       "status": "passed",
-      "updated_at": "2026-11-09T01:08:35.988224604Z",
+      "updated_at": "2026-11-09T01:24:58.474645992Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "c51fd74a-73bf-451d-8e10-59c2951f17d2",
+      "run_id": "4ea7d522-98f7-41ad-954d-de6b2cdfc262",
       "status": "failed",
-      "updated_at": "2026-11-09T01:10:31.956233532Z",
+      "updated_at": "2026-11-09T01:27:00.438733432Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "A built-in validation gate evaluation decodes each issue once per captured image",
-  "updated_at": "2026-11-09T01:10:31.956233532Z"
+  "updated_at": "2026-11-09T01:27:00.438733432Z"
 }

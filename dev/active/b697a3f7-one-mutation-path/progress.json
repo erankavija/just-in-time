@@ -475,7 +475,7 @@
     "6a19e93f": 3,
     "86a183c2": 2,
     "e5d7bc11": 2,
-    "350062e4": 1
+    "350062e4": 2
   },
   "surfaced_pitfalls": [
     {
@@ -568,7 +568,8 @@
     "86a183c2 r3 (e97d1fd06, merge dd637516d): cargo-ci and code-review PASSED; d5 accepted config-set whole-assembly deviation (error names failing file, verified; CHANGELOG cb46a6659). REQ-04 smoke on e97d1fd06 (sha256 1ad06281\u2026, harness M in {10,160}, load 1.46->1.13): dep base D 19.762 ms, tip D 12.529 ms, ratio 0.634 PASS; bulk 0.992, archive 0.193, profile 0.305 all pass. 86a183c2 and e5d7bc11 closed done.",
     "6b22ce6d (2bcbe63c6, 8b7b674fb, 3aa41ecd8; merge 2c064d1bc): cargo-ci and code-review PASSED; closed done. Owning REQ-12 test test_gate_evaluation_resolves_its_inputs_once_per_captured_image fails with fixes reverted (documents [2,1], precheck registry [2,2]). Advisory F1 (pre-existing, out of criteria): template application resolves its registry twice for the final image (template.rs:514 then :386); forwarded to d5.",
     "a8c4223b (7dde33013, merge 7c8c28f7e): cargo-ci and code-review PASSED, no findings; closed done. Template apply seeded with discovery's registry; pre-fix assertion failure [1, 2].",
-    "350062e4 (441ea7ebd, c0fb71bbb; merge c119c76be): cargo-ci passed; code-review FAILED: F1 selected-validation precheck resolves registry twice (ImageInputs::load repository.rs:97 after preflight binding); F2 bulk precheck re-decodes issues after extend_mutation_base (bulk_update.rs:528 vs 443-452). Rework 1 dispatched (fix-forward)."
+    "350062e4 (441ea7ebd, c0fb71bbb; merge c119c76be): cargo-ci passed; code-review FAILED: F1 selected-validation precheck resolves registry twice (ImageInputs::load repository.rs:97 after preflight binding); F2 bulk precheck re-decodes issues after extend_mutation_base (bulk_update.rs:528 vs 443-452). Rework 1 dispatched (fix-forward).",
+    "350062e4 rework 1 (b44c1eef0, merge 18c64fa7e): cargo-ci passed; code-review FAILED F1 low: duplicate storage-readback assertion in owning test (gate_check.rs ~5129). Rework 2 (final) dispatched."
   ],
   "story_checkpoints": [
     {
