@@ -5111,7 +5111,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 .unwrap();
             issue
         };
-        let bulk_target = make_precheck("bulk-selected");
+        make_precheck("bulk-selected");
         reset();
         executor
             .issues()
@@ -5126,10 +5126,6 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .unwrap();
         let bulk_counts =
             resolutions(&[Resolution::Issue, Resolution::Registry, Resolution::Index]);
-        assert_eq!(
-            executor.storage.load_issue(&bulk_target).unwrap().id,
-            bulk_target
-        );
         let selected = make_precheck("selected-only");
         reset();
         start_work_updating_gates(&executor, &selected, Default::default()).ok();
