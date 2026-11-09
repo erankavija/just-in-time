@@ -9,6 +9,7 @@
     "2195c98f-95a9-45d0-8582-d93c1d1fec45",
     "93e3f1ad-a392-4bf5-95d0-c58352296a33",
     "a991f42b-ce35-4891-ae10-1de17daad90e",
+    "d4a20645-d6fa-4e00-a85e-3d3be63c7a11",
     "d675102c-58c4-4add-bcf8-f9963c0c4f21",
     "dfb2f10d-c4fd-4b8d-b7b1-3df71749523a"
   ],
@@ -40,7 +41,7 @@
     "per:@/charter/D-22"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Converge previews and coupled derivations on the mutation session",
-  "updated_at": "2026-11-09T03:33:52.175005219Z"
+  "updated_at": "2026-11-09T03:34:13.688689207Z"
 }

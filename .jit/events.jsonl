@@ -26202,3 +26202,8 @@
 {"from":"backlog","id":"51f185a5-b849-4123-a9dd-949a7df0092c","issue_id":"b697a3f7-ef84-4452-9b13-c8274f6abe4a","timestamp":"2026-11-09T03:33:06.424232022Z","to":"ready","type":"issue_state_changed"}
 {"id":"7dec5b54-b1f0-47da-93fb-1adc370c0eb8","issue_id":"0672b087-60ab-44a3-b628-3a81cf6a8f0c","timestamp":"2026-11-09T03:33:06.424232022Z","type":"issue_completed"}
 {"gate_key":"repo-validate","id":"170d6ab1-cd8b-4c1e-940e-270866d5ef3f","issue_id":"b697a3f7-ef84-4452-9b13-c8274f6abe4a","timestamp":"2026-11-09T03:33:52.175005219Z","type":"gate_passed","updated_by":"auto:executor"}
+{"id":"6866bf43-52af-4dc1-9c1c-d1e9b1864c81","issue_id":"d4a20645-d6fa-4e00-a85e-3d3be63c7a11","priority":"high","timestamp":"2026-11-09T03:34:13.309207537Z","title":"A read's retryable conflict surfaces with its own message","type":"issue_created"}
+{"from":"ready","id":"f89047ff-449e-4369-ab6b-61617e7cf563","issue_id":"b697a3f7-ef84-4452-9b13-c8274f6abe4a","timestamp":"2026-11-09T03:34:13.688689207Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"fba3bccb-e226-47cb-a6e3-8565868cd0b8","issue_id":"b697a3f7-ef84-4452-9b13-c8274f6abe4a","timestamp":"2026-11-09T03:34:13.688689207Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"4cfcf1ac-487c-4d69-b0f0-2119d5a1cd1b","issue_id":"d4a20645-d6fa-4e00-a85e-3d3be63c7a11","timestamp":"2026-11-09T03:34:13.874819902Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"045367d0-3996-44f7-ba2d-748551ce6a47","issue_id":"d4a20645-d6fa-4e00-a85e-3d3be63c7a11","timestamp":"2026-11-09T03:34:13.874819902Z","type":"issue_claimed"}

@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-09T03:34:13.874819902Z",
+  "context": {},
+  "created_at": "2026-11-09T03:34:13.309207537Z",
+  "dependencies": [],
+  "description": "Make a read's retryable conflict surface with its own message, so a lock-free read beside a writer is not reported as a configuration read failure.\n\n## Background\n\n- `crates/jit/src/storage/configuration_store.rs` ~19: `load_configuration` wraps every `ConfigurationObservation::capture` failure, including the `@/charter/D-25` retryable conflict, in \"Failed to read configuration at '<root>'\".\n- Benchmark `bb596228`: 1,356 of 1,593 conflict failures (exit 12) beside a back-to-back writer carried that context although the writer never changed configuration.\n- Epic `b697a3f7` surfaced pitfall, routed by the steward (just-in-time-d5, 2026-11-09): pass the conflict through unchanged; the conflict error's own text is the one canonical description of the condition (`@/inv/convention-convergence`).\n\n## Success Criteria\n\n- [hard] REQ-01: A retryable conflict raised during configuration capture reaches the caller unwrapped, with its own typed message and exit code 12; \"Failed to read configuration at …\" is added only to configuration read failures that are not conflicts. No new conflict message is written at this site.\n- [hard] REQ-02: Every other `capture` wrapper on a read path that adds context over a retryable conflict follows the same rule; the worker's report lists each wrapper checked and its disposition.\n- [hard] REQ-03: One test shows a conflict raised during configuration capture surfaces as the conflict's own message with exit 12 and contains no configuration-read context.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-09T03:34:13.309207537Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "d4a20645-d6fa-4e00-a85e-3d3be63c7a11",
+  "labels": [
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "component:core",
+    "per:@/charter/D-25",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "A read's retryable conflict surfaces with its own message",
+  "updated_at": "2026-11-09T03:34:13.874819902Z"
+}

@@ -511,7 +511,8 @@
       "found_in": "bb596228 benchmark",
       "subject": "lock-free read conflicts under a continuous writer",
       "detail": "Tip doc check-links reads exit 12 (RETRYABLE_CONFLICT) in 5.1% of N=1 and 3.2% of N=8 reads beside a back-to-back writer; 1,356 of 1,593 failures report 'Failed to read configuration' although the writer never changes configuration. Reconcile against epic REQ-21 (bounded refused attempts, then locked fallback vs D-25 retryable conflict) before the epic gate; at minimum the diagnostic misattributes the cause.",
-      "status": "retryable half resolved by REQ-21 amendment to D-25; diagnostic misattribution (configuration_store.rs:19) forwarded to d5"
+      "status": "retryable half resolved by REQ-21 amendment to D-25; diagnostic misattribution routed by d5 to task d4a20645",
+      "owner": "d4a20645"
     },
     {
       "found_in": "030df4b1",
