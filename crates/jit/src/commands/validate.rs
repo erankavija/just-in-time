@@ -53,13 +53,15 @@ pub(crate) type DecodedBase = (
     ParsedIssues,
 );
 
-/// A captured base, its issues, the configuration its discovery assembled, and
-/// the gate registry discovery resolved from the base, when it resolved one.
+/// A captured base, its issues, the configuration its discovery assembled, the
+/// gate registry discovery resolved from the base, when it resolved one, and
+/// the planned issues' documents it derived.
 type CapturedBase = (
     crate::repository_state::RepositoryImage,
     ParsedIssues,
     std::result::Result<JitConfig, crate::repository_state::ProducerError>,
     Option<crate::declarations::GateRegistry>,
+    super::gate_check::DiscoveredDocuments,
 );
 
 /// The `--fix` count and messages and, unless the issue records do not parse,
@@ -443,7 +445,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             extra_paths,
             BaseCapturePurpose::Validation,
         )
-        .map(|captured| captured.map(|(image, _, config, _)| (image, config)))
+        .map(|captured| captured.map(|(image, _, config, _, _)| (image, config)))
     }
 
     /// [`Self::capture_proposed_base`] with the issue records its validation
@@ -467,7 +469,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 gates: None,
             },
         )
-        .map(|captured| captured.map(|(image, records, config, _)| (image, config, records)))
+        .map(|captured| captured.map(|(image, records, config, _, _)| (image, config, records)))
     }
 
     /// The base an issue mutation derives from: the registries, every issue,
@@ -541,8 +543,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         )
         .and_then(|captured| {
             captured
-                .map(|(image, (issues, values), config, gates)| {
-                    Ok(MutationBase::new(image, (issues?, values), config, gates))
+                .map(|(image, (issues, values), config, gates, documents)| {
+                    Ok(MutationBase::new(image, (issues?, values), config, gates)
+                        .with_documents(documents))
                 })
                 .transpose()
         })
@@ -599,7 +602,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 planned: &[],
             },
         )?
-        .map(|(image, (issues, values), config, gates)| {
+        .map(|(image, (issues, values), config, gates, _)| {
             Ok(MutationPreflight {
                 image,
                 target,
@@ -633,7 +636,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             &[],
             BaseCapturePurpose::Archive,
         )
-        .map(|captured| captured.map(|(image, _, config, _)| (image, config)))
+        .map(|captured| captured.map(|(image, _, config, _, _)| (image, config)))
     }
 
     /// One capture round of the base, from `start` when the caller has read
@@ -732,6 +735,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             .as_ref()
             .zip(known_gates)
             .map(|(image, gates)| (image.token(), gates));
+        let mut documents = super::gate_check::DiscoveredDocuments::default();
         let mut configuration = super::ConfigurationParse::new(|image: &RepositoryImage| {
             effective_configuration(image, overrides)
         });
@@ -842,6 +846,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     super::gate_check::discover_gate_inputs(
                         image,
                         spec,
+                        &mut documents,
                         issue,
                         parsed,
                         &super::precheck_gates(issue, gates),
@@ -864,7 +869,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             let gates = resolved_gates
                 .filter(|(token, _)| *token == image.token())
                 .map(|(_, gates)| gates);
-            (image, issues, config, gates)
+            (image, issues, config, gates, documents)
         }))
     }
 }
@@ -1022,7 +1027,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 &[],
                 BaseCapturePurpose::Validation,
             )?
-            .map(|(image, (issues, values), config, _)| {
+            .map(|(image, (issues, values), config, _, _)| {
                 crate::validation::CapturedValidation::with_records(
                     image,
                     issues.map_err(anyhow::Error::from),
@@ -1056,7 +1061,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 &[],
                 BaseCapturePurpose::Repair,
             )?
-            .map(|(image, _, config, _)| {
+            .map(|(image, _, config, _, _)| {
                 let declarations =
                     crate::repository_state::validation_declarations_with_config(&image, config);
                 (image, declarations)
@@ -1220,6 +1225,7 @@ pub(crate) struct MutationBase {
     /// The JSON value each of `issues` decoded from, in order.
     pub(crate) values: Vec<serde_json::Value>,
     declarations: crate::repository_state::DeferredDeclarations,
+    documents: super::gate_check::DiscoveredDocuments,
 }
 
 impl MutationBase {
@@ -1241,7 +1247,19 @@ impl MutationBase {
                 Some(config),
             )
             .with_gates(gates.map(Ok)),
+            documents: super::gate_check::DiscoveredDocuments::default(),
         }
+    }
+
+    /// This base over `documents`, the planned issues' document sets discovery
+    /// derived from `image`.
+    fn with_documents(self, documents: super::gate_check::DiscoveredDocuments) -> Self {
+        Self { documents, ..self }
+    }
+
+    /// The documents discovery derived from `image` for its planned issues.
+    pub(crate) fn documents(&self) -> &super::gate_check::DiscoveredDocuments {
+        &self.documents
     }
 
     /// The declarations of `image`, from its [`DeferredDeclarations`].

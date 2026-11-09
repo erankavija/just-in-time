@@ -460,7 +460,7 @@ impl<S: IssueStore> IssueOps<'_, S> {
         result.matched = matched.clone();
         let graph = CapturedGraphEvidence::capture(base.declarations()?, image, &issues, context)?;
         let enforcement_mode = graph.declarations.config().enforcement_mode();
-        let comparison = super::gate_check::EvidenceComparison::new(image);
+        let comparison = super::gate_check::EvidenceComparison::new(image, base.documents());
         let derivation = BulkDerivation {
             operations,
             force,
