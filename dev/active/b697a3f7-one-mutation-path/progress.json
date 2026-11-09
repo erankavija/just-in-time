@@ -454,6 +454,12 @@
       "subject": "r3 REQ-04 built-in validation double issue decode; propose seeded CapturedValidation task",
       "status": "resolved",
       "decision": "d5: new sonnet task 350062e4; reuse 6a19e93f decoded set if present else seed CapturedValidation with binding records; no cache; extend owning REQ-12 test; sweep all evaluation inputs"
+    },
+    {
+      "to": "just-in-time-d5",
+      "issue": "d675102c",
+      "subject": "r4 REQ-04 failed-decode repeat + D-20 advisory; propose one sonnet task",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -936,7 +942,8 @@
       "effort": "high",
       "sandbox": "read-only",
       "commit": "b098a6bd6",
-      "brief": "scratchpad/brief-d675102c-r4.md"
+      "brief": "scratchpad/brief-d675102c-r4.md",
+      "result": "REQ-01..03 MET; REQ-04 UNMET: F1 failed record decode repeated (gate_check.rs:1055 .ok() then fallback :1162). Advisory F2 D-20: captured_declarations_with derives final bundle twice (commands/mod.rs:2807/2814). Forwarded to d5."
     }
   ]
 }
