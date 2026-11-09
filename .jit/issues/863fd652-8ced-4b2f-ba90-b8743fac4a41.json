@@ -5,13 +5,34 @@
   "created_at": "2026-11-09T02:49:54.987446940Z",
   "dependencies": [],
   "description": "Make gate evidence capture consume the document set discovery derived for the final image, so an exec gate evaluation derives its issue documents once per captured image.\n\n## Background\n\n- `crates/jit/src/commands/document.rs` ~1549 and ~1578 compute the same document set: the final `grow_discovering` round (`crates/jit/src/commands/mod.rs` ~401) derives the issue's complete document set and returns the unchanged image, then evidence capture walks the same trees and derives it again. Manual exec evaluations and automatic exec prechecks both follow this sequence.\n- The owning test missed it: its document counter sits in `captured_issue_documents`, after discovery's computation.\n- Story `d675102c` sol re-checkpoint r5 (commit `3698a341b`), finding 1. Steward ruling (just-in-time-d5, 2026-11-09): option (a), using the threading `6b22ce6d` proved for the registry; the class closes for discovery by enumeration. If the r6 checkpoint finds another once-per-image instance, it is filed as a v1.1 follow-up and recorded as a stated deviation on `d675102c` REQ-04, and the story closes.\n- Epic criterion: `b697a3f7` REQ-12.\n\n## Success Criteria\n\n- [hard] REQ-01: Evidence capture for a manual exec evaluation and an automatic exec precheck takes the document set discovery derived for the final image and walks no document tree again for that image.\n- [hard] REQ-02: The document counter sits at the derivation point and counts discovery's computation; `test_gate_evaluation_resolves_its_inputs_once_per_captured_image` asserts one document derivation per image for both cases and fails on the parent commit.\n- [hard] REQ-03: The worker's report lists every value a `grow_discovering` callback derives per round (registry, declarations, documents and any other), each marked \"threaded into its consumer\" or \"not consumed after discovery\".\n- [hard] REQ-04: Gate verdicts and recorded evidence are unchanged.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "report",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/863fd652/discovery-derivations.md"
+    }
+  ],
   "first_ready_at": "2026-11-09T02:49:54.987446940Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "c454c372-d22a-45e8-81f8-9a970e7e0888",
+      "status": "passed",
+      "updated_at": "2026-11-09T03:03:23.788942631Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "39680aad-9bae-4e52-94c3-60b6547a591c",
+      "status": "failed",
+      "updated_at": "2026-11-09T03:04:31.147768204Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "863fd652-8ced-4b2f-ba90-b8743fac4a41",
   "labels": [
     "epic:one-mutation-path",
@@ -26,5 +47,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Gate evidence capture consumes discovery's document set",
-  "updated_at": "2026-11-09T02:49:55.560256961Z"
+  "updated_at": "2026-11-09T03:05:02.803278714Z"
 }
