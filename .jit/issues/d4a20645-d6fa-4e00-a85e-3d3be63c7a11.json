@@ -14,6 +14,7 @@
       "path": "dev/active/d4a20645/conflict-wrapper-audit.md"
     }
   ],
+  "done_at": "2026-11-09T03:45:58.865358943Z",
   "first_ready_at": "2026-11-09T03:34:13.309207537Z",
   "gates_required": [
     "cargo-ci",
@@ -27,9 +28,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "6a9b9037-2dd1-43ac-9317-75ce5bc0622b",
-      "status": "failed",
-      "updated_at": "2026-11-09T03:43:24.727609186Z",
+      "run_id": "c6c03895-9bb2-41e8-92e7-cea84d34d34e",
+      "status": "passed",
+      "updated_at": "2026-11-09T03:45:44.577927495Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,7 +43,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "A read's retryable conflict surfaces with its own message",
-  "updated_at": "2026-11-09T03:43:41.508322839Z"
+  "updated_at": "2026-11-09T03:45:58.865358943Z"
 }

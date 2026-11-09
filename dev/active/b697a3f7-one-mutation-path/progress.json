@@ -512,7 +512,7 @@
       "found_in": "bb596228 benchmark",
       "subject": "lock-free read conflicts under a continuous writer",
       "detail": "Tip doc check-links reads exit 12 (RETRYABLE_CONFLICT) in 5.1% of N=1 and 3.2% of N=8 reads beside a back-to-back writer; 1,356 of 1,593 failures report 'Failed to read configuration' although the writer never changes configuration. Reconcile against epic REQ-21 (bounded refused attempts, then locked fallback vs D-25 retryable conflict) before the epic gate; at minimum the diagnostic misattributes the cause.",
-      "status": "retryable half resolved by REQ-21 amendment to D-25; diagnostic misattribution routed by d5 to task d4a20645",
+      "status": "resolved: retryable half by REQ-21 amendment to D-25; diagnostic by d4a20645",
       "owner": "d4a20645"
     },
     {
@@ -605,7 +605,8 @@
     "45d0a971 closed done: tip record on 1d8d1497c (sha256 c35a80d9...), all four verdicts pass (bulk 0.993, archive 0.196, dep 0.593, profile 0.305); validate.py PASS; start load 1.77/end 1.33 under harness 2.0 gate, accepted by d5 as protocol deviation (no rerun). Merge 4ed51efd8; README linked 49ee6a79c; cargo-ci and code-review PASSED.",
     "0672b087 closed done after REQ-21 amended to D-25 in story and epic; REQ-22/23 MET at checkpoint.",
     "Epic close: surfaced_pitfalls reconciled; repo-validate gate PASSED; holistic-review held pending d5 routing of the configuration_store diagnostic advisory.",
-    "d4a20645 (ad4fb78f5, merge 5b463ef09): cargo-ci passed; code-review FAILED F1: REQ-02 report not in evidence. Lead committed conflict-wrapper-audit.md (d5caa69e9) from the worker report and linked it; rerunning code-review. Lead trap: link any report a criterion requires before review."
+    "d4a20645 (ad4fb78f5, merge 5b463ef09): cargo-ci passed; code-review FAILED F1: REQ-02 report not in evidence. Lead committed conflict-wrapper-audit.md (d5caa69e9) from the worker report and linked it; rerunning code-review. Lead trap: link any report a criterion requires before review.",
+    "d4a20645 closed done: code-review PASSED with REQ-02 inventory linked; cargo-ci passed on 5b463ef09."
   ],
   "story_checkpoints": [
     {

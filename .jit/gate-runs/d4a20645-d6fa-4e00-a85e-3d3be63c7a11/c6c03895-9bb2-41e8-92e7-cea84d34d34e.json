@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b2bdd2c100802145c4753592c8ccf6519febc9f6",
+  "completed_at": "2026-11-09T03:45:44.574458526Z",
+  "duration_ms": 114055,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "REQ-01 through REQ-03 are satisfied; the linked wrapper inventory resolves prior F1, and no blocking defects remain.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d4a20645-d6fa-4e00-a85e-3d3be63c7a11",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c6c03895-9bb2-41e8-92e7-cea84d34d34e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-09T03:43:50.519043472Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:d4a20645` — `e88218e341f1`, `ad4fb78f550f`, `d5caa69e9160`, `725bf7741cec`, `b2bdd2c10080`\nPolicy sources: `AGENTS.md`; `.jit/config.toml`; `.jit/reference/content-standards.md`; `dev/TESTING.md`\nResolved items: `@/charter/D-25` → `dev/vision/9db27a3a-charter.md`; `@/inv/{convention-convergence,orthogonal-tests,essential-code-prose,shared-test-contracts,semantic-test-assertions,architecture-dependency-direction}` → `.jit/invariants.toml`; `@/gate/jit-validate` → `.jit/gates.toml`; `@/issue/d4a20645/requirement/REQ-{01,02,03}` → issue description\nGate evidence: `cargo-ci` passed, exit 0, recorded 2026-11-09T03:40:57Z; supplied ancestry confirms implementation/test coverage, excludes three later documentation/evidence commits. Prior `code-review` failed, exit 1; its sole finding is resolved. No gates rerun.\nTruncation recovery: Narrower path and line-range reads recovered relevant policy, capture, caller, and test evidence; historical stderr and unrelated test-search tails excluded.\n\nNo findings. Configuration conflicts pass through unchanged (`configuration_store.rs:17–26`), and the regression test checks the canonical message and retryable exit classification (`repository_state_store_tests.rs:3298`). REQ-02’s linked wrapper inventory resolves prior F1; inspected read paths add no conflicting context.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"REQ-01 through REQ-03 are satisfied; the linked wrapper inventory resolves prior F1, and no blocking defects remain.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
