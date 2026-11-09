@@ -592,7 +592,8 @@
     "c69e07b2 rework 2 (ed1c48bab, e8aa9427b, e0987754b; merge 34f8ecdc1): cargo-ci and code-review PASSED; closed done. Discovery propagates decode/derivation failures; rules memo keyed by bytes; multi-error paths (jit validate, built-in gate evaluation Error run) keep carried outcomes. An interrupted gate run on 273386c89 (before e0987754b landed) is in the record.",
     "863fd652 (3fd55b8e9, merge d925018b7): cargo-ci passed; code-review FAILED F1: REQ-03 enumeration not in evidence (worker report not linked). Lead committed dev/active/863fd652/discovery-derivations.md (5118dca16) from the worker's report, linked via jit doc add; rerunning code-review.",
     "863fd652: code-review PASSED after REQ-03 enumeration linked; cargo-ci passed on d925018b7 (later changes docs/.jit only); closed done.",
-    "d675102c closed done after r6 (81804ff39) under d5 six-round cap; v1.1 follow-up 57129f99 (duplicated dependency decode)."
+    "d675102c closed done after r6 (81804ff39) under d5 six-round cap; v1.1 follow-up 57129f99 (duplicated dependency decode).",
+    "45d0a971 closed done: tip record on 1d8d1497c (sha256 c35a80d9...), all four verdicts pass (bulk 0.993, archive 0.196, dep 0.593, profile 0.305); validate.py PASS; start load 1.77/end 1.33 under harness 2.0 gate, accepted by d5 as protocol deviation (no rerun). Merge 4ed51efd8; README linked 49ee6a79c; cargo-ci and code-review PASSED."
   ],
   "story_checkpoints": [
     {

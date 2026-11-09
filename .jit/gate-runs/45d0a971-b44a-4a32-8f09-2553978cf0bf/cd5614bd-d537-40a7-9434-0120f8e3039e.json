@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "49ee6a79cfd1c2ab0f4ba4aeeae33626ccdc135e",
+  "completed_at": "2026-11-09T03:26:11.644794615Z",
+  "duration_ms": 198741,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard criteria are supported by the inspected implementation and recorded evidence. The read-only validator rederived four passing verdicts, and shell syntax validation passed. Cargo CI remains pending.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "45d0a971-b44a-4a32-8f09-2553978cf0bf",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cd5614bd-d537-40a7-9434-0120f8e3039e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-09T03:22:52.902832451Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:45d0a971` — 49ee6a79c, 039d4f29e, b4e7306c1, fc205d494, 5180958a2, bcc831a4c, 6e02e6ab6, de0ebd560, fabc4e729, c41d3b540, 75c433e70, e99773f1e, b8ffd1023, 45ded1fc5\nPolicy sources: `AGENTS.md`; no closer applicable policy files\nResolved items: @/charter/D-17, @/charter/D-19 → `dev/vision/9db27a3a-charter.md`; @/issue/b697a3f7/requirement/REQ-15, @/issue/b697a3f7/requirement/REQ-22 → issue description; @/invariant/essential-code-prose, @/invariant/orthogonal-tests → `.jit/invariants.toml`; @/gate/jit-validate → `.jit/gates.toml`\nGate evidence: cargo-ci pending, exit code none, run timestamp none; ancestry unavailable\nTruncation recovery: narrower configuration, commit, path, and description-diff reads completed; unrelated historical records excluded\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard criteria are supported by the inspected implementation and recorded evidence. The read-only validator rederived four passing verdicts, and shell syntax validation passed. Cargo CI remains pending.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

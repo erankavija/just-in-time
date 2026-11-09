@@ -9,6 +9,7 @@
   ],
   "description": "Aggregate the work that lets reads capture without the repository lock, makes every redo record append an event, and records the before-and-after cost of the epic's reductions.\n\n## Success Criteria\n\n- [hard] REQ-21: Archive preview and candidates, declaration reads, gate-preset reads, `jit validate` without `--fix` and with `--fix --dry-run`, `doc check-links` and profile plans and dry runs capture without the repository lock and are admitted only when no redo record was present and the event log did not grow; after bounded refusals they read under the lock, which completes a leftover record. A two-backend test shows eight readers admitted while a writer holds the lock, and a benchmark shows the reader and writer throughput ratios.\n- [hard] REQ-22: One harness measures bulk update at a fixed match count, archive candidate listing, declaration parsing per mutation and redo-apply directory opens against base `369d35a42`, and the tip record passes each ratio threshold.\n- [hard] REQ-23: Every redo record over a present data root appends at least one event. A mutation that derives no domain event appends one generic event naming the files it published, and a delta that writes repository state over a present data root without an event append is rejected before commit. The publication that creates an absent data root is exempt, because a reader observes the root's appearance.\n",
   "documents": [],
+  "first_ready_at": "2026-11-09T03:26:24.912293583Z",
   "gates_required": [],
   "gates_status": {},
   "id": "0672b087-60ab-44a3-b628-3a81cf6a8f0c",
@@ -26,7 +27,7 @@
     "per:@/charter/D-19"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Reads run beside writers, every commit appends an event, and the cost reductions are evidenced",
-  "updated_at": "2026-10-24T21:22:37.717854234Z"
+  "updated_at": "2026-11-09T03:26:24.912293583Z"
 }

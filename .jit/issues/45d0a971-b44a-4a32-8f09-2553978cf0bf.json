@@ -49,12 +49,26 @@
       "path": "dev/benchmarks/cost-evidence-45d0a971/README.md"
     }
   ],
+  "done_at": "2026-11-09T03:26:24.912293583Z",
   "first_ready_at": "2026-11-07T23:21:40.823043735Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "2fa52a60-c19e-408c-a4f1-bed5c3af5000",
+      "status": "passed",
+      "updated_at": "2026-11-09T03:23:09.610787617Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cd5614bd-d537-40a7-9434-0120f8e3039e",
+      "status": "passed",
+      "updated_at": "2026-11-09T03:26:11.647996133Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "45d0a971-b44a-4a32-8f09-2553978cf0bf",
   "labels": [
     "type:task",
@@ -67,7 +81,7 @@
     "satisfies:b697a3f7/REQ-22"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Cost evidence: the epic's four cost reductions against the base binary",
-  "updated_at": "2026-11-09T03:22:52.636392399Z"
+  "updated_at": "2026-11-09T03:26:24.912293583Z"
 }
