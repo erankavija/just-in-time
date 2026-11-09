@@ -461,6 +461,12 @@
       "subject": "r4 REQ-04 failed-decode repeat + D-20 advisory; propose one sonnet task",
       "status": "resolved",
       "decision": "d5: one sonnet task c69e07b2 for F1 (carry decode outcome) + F2 (return final derivation) + .ok() sweep; next re-checkpoint; any further once-per-image instance goes to d5 before filing (possible v1.1 sweep)"
+    },
+    {
+      "to": "just-in-time-d5",
+      "issue": "d675102c",
+      "subject": "r5 one more once-per-image instance (discovery documents); (a) one more task or (b) v1.1 sweep + stated deviation",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -958,7 +964,8 @@
       "effort": "high",
       "sandbox": "read-only",
       "commit": "3698a341b",
-      "brief": "scratchpad/brief-d675102c-r5.md"
+      "brief": "scratchpad/brief-d675102c-r5.md",
+      "result": "REQ-01..03 MET; REQ-04 UNMET: discovery derives issue document set twice per image (document.rs:1549/1578; grow_discovering mod.rs:401). Prior findings closed. Sent to d5 per rule (no filing)."
     }
   ]
 }
