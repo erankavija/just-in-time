@@ -52,5 +52,5 @@ pub use engine::{Finding, KeywordFactory, SchemaCompileError, SchemaEngine};
 pub use local::{evaluate_local, LocalEvalError, LocalEvaluation};
 pub use report::{ExplainReport, ReportedFinding, RuleOutcome, RuleReport};
 pub use repository::{report, CapturedValidation, HistoryVerdicts, ReportInputs, ValidationReport};
-pub(crate) use repository::{DecodedRecords, ImageInputs};
+pub(crate) use repository::{DecodeOutcome, DecodedRecords, ImageInputs};
 pub use strictness::Strictness;

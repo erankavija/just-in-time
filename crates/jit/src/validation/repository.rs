@@ -64,6 +64,10 @@ pub struct CapturedValidation<'a> {
     declarations: crate::repository_state::DeferredDeclarations,
 }
 
+/// The outcome of decoding one captured image's issue records: the records, or
+/// the failure that stopped it.
+pub(crate) type DecodeOutcome = std::result::Result<DecodedRecords, IssueRecordsError>;
+
 /// The issue records one captured image decoded, with the JSON value each
 /// decoded from, shared by every reader of that decode.
 #[derive(Debug, Clone)]

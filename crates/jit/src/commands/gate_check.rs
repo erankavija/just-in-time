@@ -347,10 +347,10 @@ struct BoundGateEvaluation {
     issue: Issue,
     registry: crate::declarations::GateRegistry,
     gate: crate::declarations::GateDefinition,
-    /// The issue records `image` holds, decoded once by the validation base a
-    /// built-in checker judges; `None` when no base was decoded or a record
-    /// does not parse.
-    records: Option<crate::validation::DecodedRecords>,
+    /// The outcome of decoding the issue records `image` holds, taken once by
+    /// the validation base a built-in checker judges; `None` when no base was
+    /// decoded.
+    records: Option<crate::validation::DecodeOutcome>,
 }
 
 impl BoundGateEvaluation {
@@ -1051,9 +1051,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                 Some((image, config, (issues, values))) => (
                     image,
                     config?,
-                    issues
-                        .ok()
-                        .map(|issues| crate::validation::DecodedRecords::new(issues, values)),
+                    Some(
+                        issues.map(|issues| crate::validation::DecodedRecords::new(issues, values)),
+                    ),
                 ),
                 None => return Ok(None),
             }
@@ -1061,7 +1061,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             (initial, config, None)
         };
         let validated_issues = match (checker, &records) {
-            (GateChecker::RepositoryValidation, Some(records)) => &records.issues[..],
+            (GateChecker::RepositoryValidation, Some(Ok(records))) => &records.issues[..],
             _ => &[],
         };
         let Some(image) = super::grow_discovering(session, image, |image, spec| {
@@ -1137,7 +1137,7 @@ impl<S: IssueStore> GateOps<'_, S> {
         let mutation = super::production_mutation_context();
         let run_id = mutation.gate_run_id_at(0);
         let run_paths = super::gate_run_record_paths(&mutation, issue_id, 0..1);
-        let (bound, issues, captured, history, input_warnings) =
+        let (bound, records, issues, captured, history, input_warnings) =
             with_mutation_attempts("gate evaluation inputs", || {
                 let claims_guard =
                     super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
@@ -1156,8 +1156,13 @@ impl<S: IssueStore> GateOps<'_, S> {
                     std::slice::from_ref(&bound.issue.id),
                     claims_guard.as_ref(),
                 )?;
+                let records = bound
+                    .records
+                    .clone()
+                    .transpose()
+                    .map_err(super::captured_records_error)?;
                 let issues = crate::domain::queries::IndexedIssues::new(
-                    match (&bound.records, super::is_broad_builtin_gate(&bound.gate)) {
+                    match (&records, super::is_broad_builtin_gate(&bound.gate)) {
                         (Some(records), true) => std::sync::Arc::clone(&records.issues),
                         (None, true) => super::captured_active_issues(&bound.image)?.into(),
                         (_, false) => std::iter::once(bound.issue.clone())
@@ -1183,6 +1188,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                 .transpose()?;
                 Ok(AttemptOutcome::Done((
                     bound,
+                    records,
                     issues,
                     captured,
                     history,
@@ -1195,7 +1201,6 @@ impl<S: IssueStore> GateOps<'_, S> {
             config,
             issue,
             gate,
-            records,
             registry,
             ..
         } = &bound;
@@ -5085,7 +5090,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
     /// A manual `check_gate` and an automatic precheck, over an exec gate and
     /// over a built-in validation gate, each resolve every issue record, the
     /// gate registry with its gate definition, and the issue's documents once
-    /// per captured image.
+    /// per captured image, an issue record that fails to decode included.
     #[test]
     fn test_gate_evaluation_resolves_its_inputs_once_per_captured_image() {
         use crate::resolution_counts::{per_source, reset, Resolution};
@@ -5232,9 +5237,33 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             Resolution::Documents,
         ]);
 
+        let malformed_key: GateKey = "validation-malformed".parse().unwrap();
+        let judged = add_builtin_gate(
+            &executor,
+            &malformed_key,
+            GateChecker::IssueValidation,
+            Vec::new(),
+        );
+        let malformed = crate::test_utils::issue_id(
+            0xffff_ffff_ffff_4fff_bfff_ffff_ffff_ffff_u128.rotate_right(96),
+        );
+        assert!(
+            malformed > judged,
+            "the malformed record sorts after the valid one"
+        );
+        seed_memory_repository_file(
+            executor.storage(),
+            &VirtualPath::issue_record(&malformed).repository_relative(),
+            "{ malformed",
+        );
+        reset();
+        let _ = executor.gates().check_gate(&judged, &malformed_key);
+        let malformed_counts = resolutions(&[Resolution::Issue, Resolution::Registry]);
+
         for (case, counts) in [
             ("manual", manual_counts),
             ("precheck", precheck_counts),
+            ("issue validation over a malformed issue", malformed_counts),
             ("validation manual", validated_manual),
             ("bulk selected-validation precheck", bulk_counts),
             ("selected-validation precheck", selected_counts),

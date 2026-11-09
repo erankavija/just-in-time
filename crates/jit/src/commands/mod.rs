@@ -2549,14 +2549,20 @@ fn captured_records(
     image: &crate::repository_state::RepositoryImage,
     ids: &[crate::domain::identity::IssueId],
 ) -> Result<Vec<(Issue, serde_json::Value)>> {
-    use crate::repository_state::{parse_issue_records, IssueRecordsError};
+    use crate::repository_state::parse_issue_records;
 
-    parse_issue_records(ids, crate::repository_state::image_issue_bytes(image)).map_err(|error| {
-        match error {
-            IssueRecordsError::Missing(id) => crate::storage::IssueNotFoundError::new(id).into(),
-            error => error.into(),
+    parse_issue_records(ids, crate::repository_state::image_issue_bytes(image))
+        .map_err(captured_records_error)
+}
+
+/// A captured-record decode failure, reporting a missing record as issue-not-found.
+fn captured_records_error(error: crate::repository_state::IssueRecordsError) -> anyhow::Error {
+    match error {
+        crate::repository_state::IssueRecordsError::Missing(id) => {
+            crate::storage::IssueNotFoundError::new(id).into()
         }
-    })
+        error => error.into(),
+    }
 }
 
 /// Each required gate of `issue` paired with the record path of the run its
@@ -2797,6 +2803,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         with_read_session(&self.storage, &layout, "declaration read", |session| {
             let spec =
                 CaptureSpec::new(VirtualPath::DECLARATION_FILES, DECLARATION_CAPTURE_BUDGET)?;
+            let mut derived = None;
             let Some(image) = capture_discovering(session, spec, |image, spec| {
                 let before = spec.clone();
                 spec.discover_paths(rule_schema_paths(image)?)?;
@@ -2805,13 +2812,16 @@ impl<S: IssueStore> CommandExecutor<S> {
                     return Ok(());
                 }
                 let declarations = crate::repository_state::declarations_from_image(image)?;
-                Ok(spec.discover_paths(sources(&declarations)?)?)
+                spec.discover_paths(sources(&declarations)?)?;
+                derived = Some(declarations);
+                Ok(())
             })?
             else {
                 return Ok(None);
             };
-            // The final round parsed these sources; the memo serves them without parsing again.
-            let declarations = crate::repository_state::declarations_from_image(&image)?;
+            // The final round derived from the returned image; no later round follows it.
+            let declarations = derived
+                .ok_or_else(|| anyhow!("declaration discovery ended without deriving a bundle"))?;
             Ok(Some((declarations, image)))
         })
     }
@@ -3819,8 +3829,8 @@ mod tests {
     /// Every capture of an executor reuses the parse of declaration sources
     /// (configuration, rules, gates) an earlier capture parsed, failed or not,
     /// however many distinct sources it parsed since, and a source no capture
-    /// parsed yet parses once. Template application resolves each captured
-    /// image's gate registry once.
+    /// parsed yet parses once. Template application and a declaration read
+    /// resolve each captured image's gate registry once.
     #[test]
     fn test_configuration_parse_parses_each_distinct_source_once_across_captures() {
         use crate::declarations::{parses_on_this_thread, ParsedSource};
@@ -3878,6 +3888,10 @@ mod tests {
                 .unwrap()
         });
         let registry_resolutions =
+            crate::resolution_counts::per_source(crate::resolution_counts::Resolution::Registry);
+        crate::resolution_counts::reset();
+        executor.captured_declarations().unwrap();
+        let read_resolutions =
             crate::resolution_counts::per_source(crate::resolution_counts::Resolution::Registry);
         // The fix attempt and the report of its result capture one image each.
         let (_, repair) = parses(|| executor.validation().validate_with_fix(false).unwrap());
@@ -3947,6 +3961,10 @@ mod tests {
         assert!(
             !registry_resolutions.is_empty() && registry_resolutions.iter().all(|count| *count == 1),
             "template apply resolved a captured image's gate registry more than once: {registry_resolutions:?}"
+        );
+        assert!(
+            !read_resolutions.is_empty() && read_resolutions.iter().all(|count| *count == 1),
+            "a declaration read resolved its final image's gate registry more than once: {read_resolutions:?}"
         );
         assert_eq!(first_visits, [[0, 0, 1]; 5]);
         assert_eq!(revisits, [[0, 0, 0]; 5]);
