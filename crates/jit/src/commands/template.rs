@@ -500,11 +500,8 @@ fn template_declaration_closure(
     image: &RepositoryImage,
     config: &crate::config::JitConfig,
 ) -> Result<Vec<VirtualPath>> {
-    let rules = image
-        .file_bytes(&VirtualPath::RULES)?
-        .map(std::str::from_utf8)
-        .transpose()?;
-    let schema_requests = crate::repository_state::schema_requests_of(image, rules)?;
+    let schema_requests =
+        crate::repository_state::schema_requests_of(image, image.file_bytes(&VirtualPath::RULES)?)?;
     Ok(render_capture_closure(
         image.layout(),
         config,

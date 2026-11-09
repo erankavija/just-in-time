@@ -516,7 +516,7 @@ pub(crate) fn validation_declarations_seeded(
     };
     let rules = match image.file_bytes(&VirtualPath::RULES)? {
         Some(bytes) => (|| -> Result<RuleSet, DeclarationParseError> {
-            let document = image.declaration_memo().rules(std::str::from_utf8(bytes)?);
+            let document = image.declaration_memo().rules(bytes);
             // An absent optional schema is skipped; the parse substitutes its
             // placeholder.
             let schemas = document

@@ -163,11 +163,12 @@ pub(crate) enum ParsedSource {
     Rules,
     Gates,
     SchemaRequests,
+    RulesDecode,
 }
 
 #[cfg(test)]
 thread_local! {
-    static PARSES: std::cell::Cell<[usize; 4]> = const { std::cell::Cell::new([0; 4]) };
+    static PARSES: std::cell::Cell<[usize; 5]> = const { std::cell::Cell::new([0; 5]) };
 }
 
 #[cfg(test)]

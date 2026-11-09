@@ -46,6 +46,10 @@ pub enum RuleConfigError {
     #[error(transparent)]
     Shared(Arc<RuleConfigError>),
 
+    /// The rules bytes are not valid UTF-8; decoded once and shared.
+    #[error(transparent)]
+    Utf8(Arc<std::str::Utf8Error>),
+
     /// The repository layout could not resolve a rules or schema path.
     #[error(transparent)]
     Layout(#[from] RepositoryLayoutError),

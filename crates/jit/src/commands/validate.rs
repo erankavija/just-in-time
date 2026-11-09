@@ -753,14 +753,17 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             let (config, default_schemas) = configuration.parse_or_default(image);
             let issue_ids =
                 crate::repository_state::overlaid_issue_ids(image, overrides).unwrap_or_default();
-            let rules_text = effective_virtual_path(image, &VirtualPath::RULES)?
-                .map(String::from_utf8)
-                .transpose()?;
-            // The memoized outcome: a failure plans no schema paths, and the
-            // declaration parse reads the same failure to report it.
+            let rules = effective_virtual_path(image, &VirtualPath::RULES)?;
+            // The memoized outcome: a parse failure plans no schema paths, and
+            // the declaration parse reads the same failure to report it. Bytes
+            // that do not decode fail the capture.
             let schema_requests =
-                crate::repository_state::schema_requests_of(image, rules_text.as_deref())
-                    .unwrap_or_default();
+                match crate::repository_state::schema_requests_of(image, rules.as_deref()) {
+                    Err(crate::repository_state::ProducerError::RuleConfig(
+                        error @ crate::declarations::rules::RuleConfigError::Utf8(_),
+                    )) => return Err(error.into()),
+                    outcome => outcome.unwrap_or_default(),
+                };
             let closure = validate_capture_closure(
                 image.layout(),
                 config,

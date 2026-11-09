@@ -768,15 +768,12 @@ pub(crate) fn profile_capture_closure(
     let config = super::materialize::assemble_config(&proposed)?;
     let rules = proposed
         .file_bytes(&VirtualPath::RULES)
-        .map_err(ProducerError::from)?
-        .map(|bytes| String::from_utf8(bytes.to_vec()))
-        .transpose()
         .map_err(ProducerError::from)?;
     Ok(super::materialize::render_capture_closure(
         proposed.layout(),
         &config,
         &[],
-        super::materialize::schema_requests_of(&proposed, rules.as_deref())?.as_deref(),
+        super::materialize::schema_requests_of(&proposed, rules)?.as_deref(),
     )?
     .into_iter()
     .collect::<BTreeSet<_>>()

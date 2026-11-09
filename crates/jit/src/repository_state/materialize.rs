@@ -121,13 +121,13 @@ pub(crate) fn configuration_overlaid<'a>(
 /// from the image's declaration memo.
 pub(crate) fn schema_requests_of(
     image: &RepositoryImage,
-    rules: Option<&str>,
+    rules: Option<&[u8]>,
 ) -> Result<Option<Vec<crate::declarations::rules::SchemaRequest>>, ProducerError> {
     Ok(rules
-        .map(|content| {
+        .map(|bytes| {
             image
                 .declaration_memo()
-                .rules(content)
+                .rules(bytes)
                 .schema_requests()
                 .map(<[_]>::to_vec)
         })
@@ -528,15 +528,17 @@ pub(crate) fn compose_default_ruleset(
     if !image.capture_spec().contains_path(&rules_path) {
         return Ok(Vec::new());
     }
-    let Some(current_rules) = read_text_at(image, &rules_path)? else {
+    let Some(rules_bytes) = image.file_bytes(&rules_path).map_err(ProducerError::from)? else {
         return Ok(Vec::new());
     };
+    let parsed_rules = image.declaration_memo().rules(rules_bytes);
+    let current_rules = parsed_rules.text().map_err(ProducerError::from)?;
     let namespaces = crate::config_manager::namespaces_from_config(config);
     let mut actions = Vec::new();
 
     // Name-keyed ownership requires unique rule names; a duplicate makes ownership
     // unprovable across the whole pass, so refuse before any add/drop/delete.
-    let identities = parse_rule_identities(&current_rules).map_err(ProducerError::RulesDocument)?;
+    let identities = parse_rule_identities(current_rules).map_err(ProducerError::RulesDocument)?;
     if let Some(dup) = first_duplicate_rule_name(&identities) {
         return Err(AmbiguousOwnershipError::DuplicateRuleName(dup.to_string()).into());
     }
@@ -550,12 +552,12 @@ pub(crate) fn compose_default_ruleset(
         .iter()
         .map(render_rule_block)
         .collect::<Result<_, _>>()?;
-    let spliced = splice_default_membership(&current_rules, &rendered_add, &diff.to_drop)
+    let spliced = splice_default_membership(current_rules, &rendered_add, &diff.to_drop)
         .map_err(ProducerError::RulesDocument)?;
     let serialized = serialized_default_ruleset(config)?;
     let expected_rules = rewrite_default_assertions(&spliced, &serialized.rules_toml)
         .map_err(ProducerError::RulesDocument)?;
-    if expected_rules != current_rules {
+    if expected_rules != *current_rules {
         actions.push(RepositoryAction::WriteFile {
             path: rules_path.clone(),
             owner: RepositoryActionOwner::DefaultRuleMembership,
@@ -610,9 +612,7 @@ pub(crate) fn compose_default_ruleset(
         .collect();
     let mut default_refs = std::collections::BTreeSet::new();
     let mut foreign_refs = std::collections::BTreeSet::new();
-    for req in image
-        .declaration_memo()
-        .rules(&current_rules)
+    for req in parsed_rules
         .schema_requests()
         .map_err(ProducerError::from)?
         .iter()

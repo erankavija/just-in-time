@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
-use super::rules::RulesDocument;
+use super::rules::{RuleConfigError, RuleSet, RulesDocument, SchemaRequest};
 use super::{
     ConfigurationAssemblyError, ConfigurationDocument, GateDeclarationError, GateRegistry,
 };
@@ -56,13 +56,19 @@ impl DeclarationMemo {
         )
     }
 
-    /// The parse of `rules.toml` content.
-    pub(crate) fn rules(&self, content: &str) -> Arc<ParsedRules> {
+    /// The decode and parse of `rules.toml` bytes.
+    pub(crate) fn rules(&self, bytes: &[u8]) -> Arc<ParsedRules> {
         self.rules.get_or_insert(
-            |parsed| parsed.content == content,
-            || ParsedRules {
-                document: RulesDocument::parse(content),
-                content: content.to_owned(),
+            |parsed| parsed.bytes == bytes,
+            || {
+                #[cfg(test)]
+                super::count_parse(super::ParsedSource::RulesDecode);
+                ParsedRules {
+                    source: std::str::from_utf8(bytes)
+                        .map(|text| (text.to_owned(), RulesDocument::parse(text)))
+                        .map_err(Arc::new),
+                    bytes: bytes.to_vec(),
+                }
             },
         )
     }
@@ -139,17 +145,40 @@ impl ParsedConfiguration {
     }
 }
 
-/// One parse of `rules.toml` content.
+/// One decode and parse of `rules.toml` bytes, its failure included.
 pub(crate) struct ParsedRules {
-    content: String,
-    document: RulesDocument,
+    bytes: Vec<u8>,
+    source: Result<(String, RulesDocument), Arc<std::str::Utf8Error>>,
 }
 
-impl std::ops::Deref for ParsedRules {
-    type Target = RulesDocument;
+impl ParsedRules {
+    fn document(&self) -> Result<&RulesDocument, RuleConfigError> {
+        self.source
+            .as_ref()
+            .map(|(_, document)| document)
+            .map_err(|error| RuleConfigError::Utf8(Arc::clone(error)))
+    }
 
-    fn deref(&self) -> &RulesDocument {
-        &self.document
+    /// The decoded text of the bytes.
+    pub(crate) fn text(&self) -> Result<&str, RuleConfigError> {
+        self.source
+            .as_ref()
+            .map(|(text, _)| text.as_str())
+            .map_err(|error| RuleConfigError::Utf8(Arc::clone(error)))
+    }
+
+    /// [`RulesDocument::schema_requests`] over the decoded bytes.
+    pub(crate) fn schema_requests(&self) -> Result<&[SchemaRequest], RuleConfigError> {
+        self.document()?.schema_requests()
+    }
+
+    /// [`RulesDocument::rule_set`] over the decoded bytes.
+    pub(crate) fn rule_set(
+        &self,
+        config: Option<&JitConfig>,
+        schemas: impl IntoIterator<Item = (String, Vec<u8>)>,
+    ) -> Result<RuleSet, RuleConfigError> {
+        self.document()?.rule_set(config, schemas)
     }
 }
 

@@ -317,14 +317,10 @@ fn capture_gate_preset_image(
         let closure = match projection_closure.as_deref_mut() {
             Some(configuration) => {
                 let config = configuration.parse(image)?;
-                let rules_text = super::image_virtual_bytes(
+                let schema_requests = crate::repository_state::schema_requests_of(
                     image,
-                    &crate::repository_state::VirtualPath::RULES,
-                )?
-                .map(String::from_utf8)
-                .transpose()?;
-                let schema_requests =
-                    crate::repository_state::schema_requests_of(image, rules_text.as_deref())?;
+                    image.file_bytes(&crate::repository_state::VirtualPath::RULES)?,
+                )?;
                 render_capture_closure(image.layout(), config, &[], schema_requests.as_deref())?
             }
             None => Vec::new(),
@@ -1056,12 +1052,6 @@ impl<S: IssueStore> GateOps<'_, S> {
                 let mut configuration = super::ConfigurationParse::captured();
                 let Some(image) = super::capture_discovering(session, spec, |image, spec| {
                     let config = configuration.parse(image)?;
-                    let rules_text = super::image_virtual_bytes(
-                        image,
-                        &crate::repository_state::VirtualPath::RULES,
-                    )?
-                    .map(String::from_utf8)
-                    .transpose()?;
                     let issue_paths = if leased_gate.is_some() {
                         crate::repository_state::captured_issue_ids(image)?
                             .into_iter()
@@ -1070,8 +1060,10 @@ impl<S: IssueStore> GateOps<'_, S> {
                     } else {
                         Vec::new()
                     };
-                    let schema_requests =
-                        crate::repository_state::schema_requests_of(image, rules_text.as_deref())?;
+                    let schema_requests = crate::repository_state::schema_requests_of(
+                        image,
+                        image.file_bytes(&crate::repository_state::VirtualPath::RULES)?,
+                    )?;
                     Ok(spec.discover_paths(issue_paths.into_iter().chain(
                         render_capture_closure(
                             image.layout(),

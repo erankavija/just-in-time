@@ -635,8 +635,7 @@ fn rule_schema_paths(
 
     let Some(rules) = image
         .file_bytes(&VirtualPath::RULES)?
-        .and_then(|bytes| std::str::from_utf8(bytes).ok())
-        .map(|content| image.declaration_memo().rules(content))
+        .map(|bytes| image.declaration_memo().rules(bytes))
     else {
         return Ok(Vec::new());
     };
@@ -3964,7 +3963,26 @@ mod tests {
         assert!(unsafe_rules.captured_declarations().is_err());
         let derivations = parses_on_this_thread(ParsedSource::SchemaRequests) - derivations_before;
 
+        // Rules bytes that are not UTF-8 decode once, for discovery and
+        // declaration assembly alike.
+        let undecodable_storage = crate::storage::InMemoryStorage::new();
+        let undecodable = test_helpers::memory_executor_declaring(
+            undecodable_storage.clone(),
+            test_helpers::MemoryDeclarations {
+                config: Some(&config),
+                ..Default::default()
+            },
+        );
+        undecodable_storage.add_data_bytes("rules.toml", &[0xff, 0xfe]);
+        let decodes_before = parses_on_this_thread(ParsedSource::RulesDecode);
+        assert!(undecodable.captured_declarations().is_err());
+        let decodes = parses_on_this_thread(ParsedSource::RulesDecode) - decodes_before;
+
         assert!(refused.is_err());
+        assert_eq!(
+            decodes, 1,
+            "rules bytes decoded more than once for one source"
+        );
         assert_eq!(
             derivations, 1,
             "schema requests derived more than once for one rules source"
