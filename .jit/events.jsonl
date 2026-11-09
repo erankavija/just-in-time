@@ -26189,3 +26189,4 @@
 {"fields":["description"],"id":"5b9332fb-57a3-494b-a644-839a05fb8dbe","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T03:15:03.033366085Z","type":"issue_updated","updated_by":"issue-update"}
 {"from":"ready","id":"a01dde4e-7072-4840-bcb5-c023b385ee67","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T03:15:03.140236242Z","to":"done","type":"issue_state_changed"}
 {"id":"81315148-1ee5-4b68-8cd0-7b3fd7b22f19","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T03:15:03.140236242Z","type":"issue_completed"}
+{"fields":["dependencies"],"id":"7e996e11-151b-492f-8e63-436b629982e0","issue_id":"0735879a-ed40-450e-9959-5cfe80653745","timestamp":"2026-11-09T03:17:39.957262821Z","type":"issue_updated","updated_by":"dependency-add"}
