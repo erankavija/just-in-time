@@ -146,12 +146,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ItemOps<'_, S> {
             let mut configuration = super::ConfigurationParse::captured();
             let Some(image) = capture_discovering(session, spec, |image, spec| {
                 let config = configuration.parse(image)?;
-                let rules_text = super::image_virtual_bytes(image, &VirtualPath::RULES)?
-                    .map(String::from_utf8)
-                    .transpose()?;
-                let schema_requests =
-                    crate::repository_state::schema_requests_of(image, rules_text.as_deref())
-                        .map_err(project_producer_error)?;
+                let schema_requests = crate::repository_state::schema_requests_of(
+                    image,
+                    image.file_bytes(&VirtualPath::RULES)?,
+                )
+                .map_err(project_producer_error)?;
                 let closure = render_capture_closure(
                     image.layout(),
                     config,
