@@ -3973,6 +3973,13 @@ mod tests {
             derivations, 1,
             "schema requests derived more than once for one rules source"
         );
+        assert!(
+            matches!(
+                unsafe_error.downcast_ref::<crate::repository_state::DeclarationParseError>(),
+                Some(crate::repository_state::DeclarationParseError::Rule(_))
+            ),
+            "{unsafe_error:?}"
+        );
         assert_eq!(
             unsafe_error.to_string(),
             crate::declarations::rules::RuleSet::schema_requests(unsafe_source)
