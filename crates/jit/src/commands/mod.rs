@@ -875,7 +875,8 @@ fn precheck_prompt_paths(
         .collect()
 }
 
-/// The precheck-stage gates `issue` requires that `registry` declares.
+/// The precheck-stage gates `issue` requires that `registry` declares; a
+/// filter over the resolved registry, resolving nothing.
 fn precheck_gates<'a>(
     issue: &Issue,
     registry: &'a crate::declarations::GateRegistry,

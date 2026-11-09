@@ -819,6 +819,11 @@ pub(crate) struct CapturedAnswers {
 pub(crate) struct ImageToken(u64);
 
 impl ImageToken {
+    #[cfg(test)]
+    pub(crate) fn id(self) -> usize {
+        self.0 as usize
+    }
+
     fn mint() -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         Self(NEXT.fetch_add(1, Ordering::Relaxed))
@@ -844,6 +849,8 @@ pub struct RepositoryImage {
     data: Arc<ImageData>,
     token: ImageToken,
     declarations: Arc<crate::declarations::DeclarationMemo>,
+    /// The gate registry of `data`, resolved once for the image and its clones.
+    gates: Arc<std::sync::OnceLock<crate::declarations::GateRegistry>>,
 }
 
 impl std::fmt::Debug for RepositoryImage {
@@ -984,7 +991,12 @@ impl RepositoryImage {
             }),
             token: ImageToken::mint(),
             declarations: Arc::clone(declarations),
+            gates: Arc::default(),
         })
+    }
+
+    pub(crate) fn resolved_gates(&self) -> &std::sync::OnceLock<crate::declarations::GateRegistry> {
+        &self.gates
     }
 
     /// The memo this image's declaration parses come from.

@@ -527,15 +527,21 @@ pub(crate) fn validation_declarations_with_config(
     Ok(declarations)
 }
 
-/// The gate registry of `image`, from its declaration memo; an absent
-/// `gates.toml` declares no gates.
+/// The gate registry of `image`, resolved from its declaration memo once per
+/// image; an absent `gates.toml` declares no gates.
 pub(crate) fn captured_gates(
     image: &RepositoryImage,
 ) -> Result<GateRegistry, DeclarationParseError> {
-    Ok(match image.file_bytes(&VirtualPath::GATES)? {
+    if let Some(registry) = image.resolved_gates().get() {
+        return Ok(registry.clone());
+    }
+    #[cfg(test)]
+    crate::resolution_counts::count_in_image(crate::resolution_counts::Resolution::Registry, image);
+    let registry = match image.file_bytes(&VirtualPath::GATES)? {
         Some(bytes) => image.declaration_memo().gates(bytes).to_registry()?,
         None => GateRegistry::default(),
-    })
+    };
+    Ok(image.resolved_gates().get_or_init(|| registry).clone())
 }
 
 /// How a configuration assembly of an image becomes its declarations:

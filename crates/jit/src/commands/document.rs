@@ -1562,6 +1562,11 @@ pub(super) fn captured_issue_documents(
     issue: &crate::domain::Issue,
     config: &crate::config::JitConfig,
 ) -> Result<Vec<crate::domain::DocumentReference>> {
+    #[cfg(test)]
+    crate::resolution_counts::count_in_image(
+        crate::resolution_counts::Resolution::Documents,
+        image,
+    );
     let declarations = DocumentDeclarations::from_config(config)?;
     let walk = walk_owned_trees(image, issue, &declarations)?;
     if !walk.kinds.is_empty() || !walk.listings.is_empty() {

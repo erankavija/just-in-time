@@ -688,6 +688,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 // record fidelity. Repair derives from the declarations alone and
                 // decodes no record.
                 let (parsed, values) = if mutation {
+                    #[cfg(test)]
+                    crate::resolution_counts::count_in_image(
+                        crate::resolution_counts::Resolution::Issue,
+                        image,
+                    );
                     (Ok(super::captured_active_issues(image)?), Vec::new())
                 } else if matches!(purpose, BaseCapturePurpose::Repair) {
                     (Ok(Vec::new()), Vec::new())
