@@ -19,7 +19,14 @@
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "run_id": "9c9da39d-6578-44b2-a8f9-ba16a672628a",
+      "status": "passed",
+      "updated_at": "2026-11-09T03:33:52.175005219Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
   "labels": [
     "epic:one-mutation-path",
@@ -35,5 +42,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Converge previews and coupled derivations on the mutation session",
-  "updated_at": "2026-11-09T03:33:06.424232022Z"
+  "updated_at": "2026-11-09T03:33:52.175005219Z"
 }
