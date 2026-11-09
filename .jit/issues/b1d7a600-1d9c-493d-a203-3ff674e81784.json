@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-09T03:57:16.769533167Z",
+  "context": {},
+  "created_at": "2026-11-09T03:57:15.713595300Z",
+  "dependencies": [],
+  "description": "Make `doc assets list --rescan` check the issue's lease inside its publishing session, as every other user-requested issue write does.\n\n## Background\n\n- `crates/jit/src/commands/document.rs` ~1030: the rescan publishes an issue update (`documents.assets`) through `with_mutation_session` without the lease check, and `crates/jit/src/cli.rs` ~3102 (`AssetCommands::coordinates_claims_first`) classifies it repository-first, so in strict mode it can overwrite another agent's leased issue.\n- Epic `b697a3f7` holistic-review (2026-11-09), finding 1. Steward ruling (just-in-time-d5, 2026-11-09): in scope; a covering exemption must already be recorded, none is created here.\n- Epic criterion: `b697a3f7` REQ-04 (every issue mutation checks leases inside its publishing session against captured claims evidence, through one check).\n\n## Success Criteria\n\n- [hard] REQ-01: `doc assets list --rescan` takes the claims guard first and checks the issue's lease inside its publishing session through the shared lease check; a strict-mode rescan of an issue leased by another agent is refused and writes nothing.\n- [hard] REQ-02: Every other `with_mutation_session` caller that writes an existing issue record either goes through the shared lease check or is covered by an exemption already recorded (the plan's `lease-checked-writes` entry or an existing ruling); the worker's report lists each caller with its check or the cited exemption, and a caller with neither gets the check.\n- [hard] REQ-03: One test shows the strict-mode refusal for the rescan, reusing the existing lease-check test fixtures; no per-command lease test is added beyond it.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-09T03:57:15.713595300Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "b1d7a600-1d9c-493d-a203-3ff674e81784",
+  "labels": [
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "component:core",
+    "satisfies:b697a3f7/REQ-04",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Asset rescans check the issue's lease in session",
+  "updated_at": "2026-11-09T03:57:16.769533167Z"
+}

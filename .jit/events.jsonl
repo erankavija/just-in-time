@@ -26215,3 +26215,13 @@
 {"from":"in_progress","id":"1aeac4dc-ba2f-476e-aa0c-d35ccce2ed56","issue_id":"d4a20645-d6fa-4e00-a85e-3d3be63c7a11","timestamp":"2026-11-09T03:45:58.865358943Z","to":"done","type":"issue_state_changed"}
 {"id":"9f042f30-929b-4a4d-bdf4-81a40356d7e2","issue_id":"d4a20645-d6fa-4e00-a85e-3d3be63c7a11","timestamp":"2026-11-09T03:45:58.865358943Z","type":"issue_completed"}
 {"gate_key":"repo-validate","id":"6b62f797-9006-4789-9ccf-3da563165137","issue_id":"b697a3f7-ef84-4452-9b13-c8274f6abe4a","timestamp":"2026-11-09T03:47:28.712369196Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"e412f1e2-4bb0-416c-9b3c-afd586636425","issue_id":"b697a3f7-ef84-4452-9b13-c8274f6abe4a","timestamp":"2026-11-09T03:55:57.217972318Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"05a8993e-60fa-4514-bc56-ba356b9f556f","issue_id":"b1d7a600-1d9c-493d-a203-3ff674e81784","priority":"high","timestamp":"2026-11-09T03:57:15.713595300Z","title":"Asset rescans check the issue's lease in session","type":"issue_created"}
+{"id":"0a7e499c-9640-4a1e-98dc-fb03b0408380","issue_id":"86d76e01-6405-40c8-b294-a9218828da83","priority":"high","timestamp":"2026-11-09T03:57:15.828599182Z","title":"The graph-rule bulk smoke is recorded as harness evidence","type":"issue_created"}
+{"from":"ready","id":"9993b205-1937-47de-9243-b0aa0914009b","issue_id":"b697a3f7-ef84-4452-9b13-c8274f6abe4a","timestamp":"2026-11-09T03:57:16.210882447Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"3b4bbf2c-7217-4282-acfc-25a2aebf5409","issue_id":"b697a3f7-ef84-4452-9b13-c8274f6abe4a","timestamp":"2026-11-09T03:57:16.210882447Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"7c357767-e00b-42d6-a0f1-341916295629","issue_id":"b697a3f7-ef84-4452-9b13-c8274f6abe4a","timestamp":"2026-11-09T03:57:16.581669248Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"4556268f-fef7-4cf2-affd-490b5f28ce41","issue_id":"b1d7a600-1d9c-493d-a203-3ff674e81784","timestamp":"2026-11-09T03:57:16.769533167Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"45afb6c8-a92f-4238-a045-e3e54bf46b86","issue_id":"b1d7a600-1d9c-493d-a203-3ff674e81784","timestamp":"2026-11-09T03:57:16.769533167Z","type":"issue_claimed"}
+{"from":"ready","id":"30ceca85-f27d-4620-90f8-1555e5b37884","issue_id":"86d76e01-6405-40c8-b294-a9218828da83","timestamp":"2026-11-09T03:57:16.957226945Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"efa453dd-838f-452a-83b6-0c55416b75c6","issue_id":"86d76e01-6405-40c8-b294-a9218828da83","timestamp":"2026-11-09T03:57:16.957226945Z","type":"issue_claimed"}

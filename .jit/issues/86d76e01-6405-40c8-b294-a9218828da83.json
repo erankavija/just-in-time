@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-09T03:57:16.957226945Z",
+  "context": {},
+  "created_at": "2026-11-09T03:57:15.828599182Z",
+  "dependencies": [],
+  "description": "Record the graph-rule bulk smoke that `6a19e93f` REQ-03 requires as reproducible raw evidence in the cost-evidence harness.\n\n## Background\n\n- `6a19e93f` REQ-03: scenario (a) of the `45d0a971` harness reports tip s(2000)/s(500) ≤ 1.5 in a smoke run, and so does a smoke variant whose fixture declares a graph rule; the lead records both runs' numbers. The numbers exist only in prose (`dev/active/b697a3f7-one-mutation-path/progress.json`), and the committed fixture (`scripts/benchmark-cost-evidence.sh` ~210) declares no graph rule.\n- Epic `b697a3f7` holistic-review (2026-11-09), finding 2. Steward ruling (just-in-time-d5, 2026-11-09): option (a); one run whose result stands, under the tip-record protocol; it is `6a19e93f` REQ-03 evidence, not a fifth epic verdict; intermediate smokes are not backfilled.\n\n## Success Criteria\n\n- [hard] REQ-01: An environment flag makes the harness's scenario (a) fixture declare a graph rule; without the flag, the generated fixtures and the committed `raw/base/` and `raw/tip/` records are unchanged, and `validate.py` still rederives the four recorded verdicts from them.\n- [hard] REQ-02: `dev/benchmarks/cost-evidence-45d0a971/raw/smoke-graph-rule/` holds one smoke run of scenario (a), standard and graph-rule, on the current tip, with binary hashes and host load; `validate.py` rederives both tip s(2000)/s(500) ratios against the ≤ 1.5 threshold.\n- [hard] REQ-03: The README labels that run as `6a19e93f` REQ-03 evidence, states the flag, and records both ratios and the host load.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-09T03:57:15.828599182Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "86d76e01-6405-40c8-b294-a9218828da83",
+  "labels": [
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "component:core",
+    "satisfies:b697a3f7/REQ-22",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "The graph-rule bulk smoke is recorded as harness evidence",
+  "updated_at": "2026-11-09T03:57:16.957226945Z"
+}

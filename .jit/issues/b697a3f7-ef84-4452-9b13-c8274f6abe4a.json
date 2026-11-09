@@ -7,8 +7,10 @@
     "0672b087-60ab-44a3-b628-3a81cf6a8f0c",
     "19404174-8d97-4e61-9d8a-b3efe06120c4",
     "2195c98f-95a9-45d0-8582-d93c1d1fec45",
+    "86d76e01-6405-40c8-b294-a9218828da83",
     "93e3f1ad-a392-4bf5-95d0-c58352296a33",
     "a991f42b-ce35-4891-ae10-1de17daad90e",
+    "b1d7a600-1d9c-493d-a203-3ff674e81784",
     "d4a20645-d6fa-4e00-a85e-3d3be63c7a11",
     "d675102c-58c4-4add-bcf8-f9963c0c4f21",
     "dfb2f10d-c4fd-4b8d-b7b1-3df71749523a"
@@ -21,6 +23,12 @@
     "holistic-review"
   ],
   "gates_status": {
+    "holistic-review": {
+      "run_id": "06e1f927-ddac-4748-9970-c5e120230c1f",
+      "status": "failed",
+      "updated_at": "2026-11-09T03:55:57.217972318Z",
+      "updated_by": "auto:executor"
+    },
     "repo-validate": {
       "run_id": "76ae29df-d11a-4867-bdbf-af08e221af3c",
       "status": "passed",
@@ -41,7 +49,7 @@
     "per:@/charter/D-22"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Converge previews and coupled derivations on the mutation session",
-  "updated_at": "2026-11-09T03:47:28.712369196Z"
+  "updated_at": "2026-11-09T03:57:16.581669248Z"
 }

@@ -710,6 +710,12 @@
       "by": "just-in-time-d5",
       "date": "2026-11-09",
       "decision": "six-round cap: r6 once-per-image findings go to v1.1 with a stated deviation on REQ-04; story closes"
+    },
+    {
+      "issue": "b697a3f7",
+      "by": "just-in-time-d5",
+      "date": "2026-11-09",
+      "decision": "holistic F1 in scope (existing exemptions only); F2 option (a): env-flag graph-rule variant, one smoke run under tip protocol, no backfill; F3 lead docs fix"
     }
   ],
   "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",
@@ -1022,7 +1028,8 @@
       "model": "gpt-6.1-sol",
       "effort": "high",
       "sandbox": "read-only",
-      "commit": "03ba8cd94"
+      "commit": "03ba8cd94",
+      "result": "FAILED: F1 rescan lease bypass (REQ-04) -> b1d7a600; F2 graph-rule smoke prose-only (6a19e93f REQ-03) -> 86d76e01 per d5 option (a); F3 plan.md superseded wording fixed 8e5a42a5d."
     }
   ]
 }

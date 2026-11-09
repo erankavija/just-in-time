@@ -1,0 +1,64 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "03ba8cd940524e8a62c9411969c8c6db8be81eeb",
+  "completed_at": "2026-11-09T03:55:57.216259329Z",
+  "duration_ms": 498566,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/document.rs",
+        "id": "F1",
+        "line": 1030,
+        "references": [
+          "@/issue/b697a3f7/requirement/REQ-04",
+          "@/inv/convention-convergence"
+        ],
+        "severity": "high",
+        "summary": "Document asset rescans publish existing issue records without the required in-session lease check."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/b697a3f7-one-mutation-path/progress.json",
+        "id": "F2",
+        "line": 579,
+        "references": [
+          "@/issue/6a19e93f/requirement/REQ-03"
+        ],
+        "severity": "medium",
+        "summary": "The required graph-rule bulk benchmark and intermediate smoke measurements have only self-attested results, without independent measurement artifacts."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/b697a3f7-one-mutation-path/plan.md",
+        "id": "F3",
+        "line": 48,
+        "references": [
+          "@/charter/D-25",
+          "@/issue/b697a3f7/requirement/REQ-21"
+        ],
+        "severity": "low",
+        "summary": "The linked plan still promises locked fallback and read-triggered recovery despite the D-25 cutover."
+      }
+    ],
+    "summary": "Lease enforcement misses asset rescans, and the required graph-rule benchmark lacks independent evidence; the linked plan also retains superseded recovery behavior.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "06e1f927-ddac-4748-9970-c5e120230c1f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-09T03:47:38.649415045Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 21641 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1be6b-3331-7a73-aa34-8038b5adfaec\n--------\nuser\n--- 21628 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Reviewed the tree, dependency closure, history, and gate records. Both committed benchmark validators pass.\n\n1. **F1 — High, blocking: asset rescans bypass lease enforcement.** `doc assets list --rescan` changes `documents.assets` and publishes an issue update without checking its lease ([document.rs:1030](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/document.rs:1030)). The CLI also classifies this path as repository-first ([cli.rs:3102](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:3102)). Thus a changed asset inventory can overwrite another agent’s leased issue in strict mode. No recorded exemption covers this user-requested mutation. REQ-04 remains unmet.\n\n2. **F2 — Medium, blocking: the required graph-rule benchmark is only narratively evidenced.** `6a19e93f` REQ-03 requires a bulk smoke run with a graph rule. Its reported ratio, `0.857`, appears in [progress.json:579](/home/vkaskivuo/Projects/just-in-time/dev/active/b697a3f7-one-mutation-path/progress.json:579), but no raw measurements or reproducible graph-rule variant substantiate it. The committed bulk fixture adds no graph rule ([benchmark-cost-evidence.sh:210](/home/vkaskivuo/Projects/just-in-time/scripts/benchmark-cost-evidence.sh:210)), so its passing validator cannot establish that criterion. Other intermediate performance claims, including the archive smoke’s `38.01`/`6.78 ms`, likewise remain self-attested.\n\n3. **F3 — Low, advisory: the linked plan describes superseded recovery behavior.** [plan.md:48](/home/vkaskivuo/Projects/just-in-time/dev/active/b697a3f7-one-mutation-path/plan.md:48) promises locked fallback and read-triggered recovery after refused attempts. Current code returns a retryable conflict, consistent with D-25 and amended REQ-21. Mark the obsolete contract as superseded or reconcile it with the delivered behavior.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Lease enforcement misses asset rescans, and the required graph-rule benchmark lacks independent evidence; the linked plan also retains superseded recovery behavior.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"summary\":\"Document asset rescans publish existing issue records without the required in-session lease check.\",\"file\":\"crates/jit/src/commands/document.rs\",\"line\":1030,\"references\":[\"@/issue/b697a3f7/requirement/REQ-04\",\"@/inv/convention-convergence\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"summary\":\"The required graph-rule bulk benchmark and intermediate smoke measurements have only self-attested results, without independent measurement artifacts.\",\"file\":\"dev/active/b697a3f7-one-mutation-path/progress.json\",\"line\":579,\"references\":[\"@/issue/6a19e93f/requirement/REQ-03\"]},{\"id\":\"F3\",\"severity\":\"low\",\"disposition\":\"advisory\",\"summary\":\"The linked plan still promises locked fallback and read-triggered recovery despite the D-25 cutover.\",\"file\":\"dev/active/b697a3f7-one-mutation-path/plan.md\",\"line\":48,\"references\":[\"@/charter/D-25\",\"@/issue/b697a3f7/requirement/REQ-21\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
