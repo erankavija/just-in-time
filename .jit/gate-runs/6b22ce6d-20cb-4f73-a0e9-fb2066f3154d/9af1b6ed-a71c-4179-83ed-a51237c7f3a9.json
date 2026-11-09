@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2c064d1bc5befd25f204b50bafa05d30309db65b",
+  "completed_at": "2026-11-09T00:25:25.536439421Z",
+  "duration_ms": 172063,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/commands/template.rs",
+        "id": "F1",
+        "line": 386,
+        "origin": "pre-existing",
+        "references": [
+          "@/charter/D-20"
+        ],
+        "severity": "low",
+        "summary": "Template discovery resolves the gate registry, but derivation resolves it again for the same final captured image instead of carrying it forward."
+      }
+    ],
+    "summary": "No unresolved issue-impact defects found; one pre-existing registry-resolution advisory.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6b22ce6d-20cb-4f73-a0e9-fb2066f3154d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9af1b6ed-a71c-4179-83ed-a51237c7f3a9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-09T00:22:33.473044693Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:6b22ce6d` — f07211c06, 33df6c141, e737f603f, 2bcbe63c6, 10c573f77, de2cc6d17, 8b7b674fb, 0c9465682, 3aa41ecd8; individual patches inspected.\nPolicy sources: `AGENTS.md`; linked testing guidance in `dev/TESTING.md`.\nResolved items: `@/issue/6b22ce6d/requirement/REQ-01`, `@/issue/6b22ce6d/requirement/REQ-02`, `@/issue/6b22ce6d/requirement/REQ-03` → issue description; `@/issue/b697a3f7/requirement/REQ-12` → epic description; `@/charter/D-20` → `dev/vision/9db27a3a-charter.md`; `@/invariant/orthogonal-tests`, `@/invariant/essential-code-prose`, `@/invariant/convention-convergence`, `@/invariant/shared-test-contracts`, `@/invariant/semantic-test-assertions`, `@/invariant/architecture-dependency-direction`, `@/invariant/derived-state-coherence` → `.jit/invariants.toml`; `@/gate/jit-validate`, `@/gate/cargo-ci` → `.jit/gates.toml`.\nGate evidence: `cargo-ci` pending; exit code null; last run null; wrapper ancestry unavailable.\nTruncation recovery: Tracker patches reread by commit and path; relevant policy and testing guidance recovered by line range. Unrelated build-topology and benchmark sections excluded.\n\nThe changed paths reuse captured documents for manual evaluations and prechecks. The owning counter test covers both paths and detects the parent’s duplicate calls by inspection. Issue validation and formatting checks passed; runtime tests and clippy were not run under the read-only boundary.\n\n1. **F1 — Low, advisory, pre-existing:** Template application still resolves its registry twice for the final captured image. Discovery calls `captured_gates` at `crates/jit/src/commands/template.rs:514`; derivation calls `declarations_with_config` at line 386 without carrying that registry forward. This predates the implementation and is reported under the option (b) ruling; it does not block this issue. Reference: `@/charter/D-20`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects found; one pre-existing registry-resolution advisory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Template discovery resolves the gate registry, but derivation resolves it again for the same final captured image instead of carrying it forward.\",\"file\":\"crates/jit/src/commands/template.rs\",\"line\":386,\"references\":[\"@/charter/D-20\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

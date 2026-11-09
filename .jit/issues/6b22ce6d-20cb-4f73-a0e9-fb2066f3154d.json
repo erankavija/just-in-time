@@ -8,12 +8,26 @@
   ],
   "description": "Make an exec gate evaluation reuse the issue documents it resolved during evidence capture, so each evaluation resolves them once per captured image.\n\n## Background\n\n- `crates/jit/src/commands/gate_check.rs`: evidence capture resolves the issue's documents (`captured_gate_evidence_sharing`, ~670), discards the set, and execution resolves them again from the same image (~1579). Automatic prechecks take the same path.\n- Story `d675102c` sol re-checkpoint review (commit `cea13616e`), finding 3. Steward ruling (just-in-time-d5, 2026-11-08): exec evaluation reuses the documents resolved at evidence capture. Sequenced after `86a183c2`, whose change also edits `gate_check.rs`.\n- Epic criterion: `b697a3f7` REQ-12 (each evaluation resolves its inputs once per captured image).\n\n## Success Criteria\n\n- [hard] REQ-01: An exec gate evaluation, manual or automatic precheck, resolves the issue's documents once per captured image; execution consumes the set resolved during evidence capture.\n- [hard] REQ-02: One test owns \"a gate evaluation, manual or precheck, resolves its issue, registry, gate definition and issue documents once per captured image\"; it fails on the parent commit.\n- [hard] REQ-03: Gate verdicts and recorded evidence are unchanged.\n\n## Rulings\n\n- Steward amendment (just-in-time-d5, 2026-11-09): REQ-02 replaced. No owning test existed for epic `b697a3f7` REQ-12's property, so the one test owns the whole property (one resolution of each evaluation input per evaluation): one `#[cfg(test)]` thread-local counter per resolution point, placed where the resolution happens, in the style of `graph::constructions_on_this_thread`; it covers a manual exec evaluation and an automatic precheck. On the parent, documents count 2; issue, registry and gate definition counting more than 1 is reported to the steward before any fix, as a regression in a closed task. Precheck resolving documents from `issue` rather than `projected_issue` is accepted: projection changes only gate state.\n\n\n- Steward amendment (just-in-time-d5, 2026-11-09), option A: the precheck path resolved the gate registry twice per captured image on the parent (via `capture_proposed_base_inner` → `captured_gates` and via `declarations_with_config` → `validation_declarations_with_config` → `captured_gates`). Precheck, and every other caller of `capture_proposed_base_inner`, takes the registry from the one `declarations_with_config` resolution its mutation base holds; no direct `captured_gates` call remains there. Gate-definition resolution is counted at the registry; `precheck_gates` is a pure filter over the resolved registry (one-line comment says so). The precheck issue counter sits at `capture_mutation_base`'s binding. The one REQ-02 test fails on the parent.\n\n- Steward ruling (just-in-time-d5, 2026-11-09), option (b): no cache on `RepositoryImage`. Discovery is the first registry resolver; its registry for the image is carried on the captured base, and `declarations_with_config` and `validation_declarations_with_config` consume it without calling `captured_gates` again for that image. The registry counter in `captured_gates` counts every call. A `declarations_with_config` caller without a captured base is reported, not cached. The owning test fails on the parent for both the precheck registry count and the documents count.",
   "documents": [],
+  "done_at": "2026-11-09T00:25:39.549603834Z",
   "first_ready_at": "2026-11-08T13:24:27.016905199Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "025581f2-84ac-4628-8606-a86d9926170f",
+      "status": "passed",
+      "updated_at": "2026-11-09T00:24:12.947238751Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9af1b6ed-a71c-4179-83ed-a51237c7f3a9",
+      "status": "passed",
+      "updated_at": "2026-11-09T00:25:25.537947060Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6b22ce6d-20cb-4f73-a0e9-fb2066f3154d",
   "labels": [
     "epic:one-mutation-path",
@@ -26,7 +40,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "An exec gate evaluation resolves its documents once per captured image",
-  "updated_at": "2026-11-09T00:16:43.657472896Z"
+  "updated_at": "2026-11-09T00:25:39.549603834Z"
 }
