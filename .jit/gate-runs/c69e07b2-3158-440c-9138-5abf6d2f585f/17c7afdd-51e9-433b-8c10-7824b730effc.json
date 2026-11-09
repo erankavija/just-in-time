@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bc5703b3348bc42c9b87e5dcc94c27092a9e9d2d",
+  "completed_at": "2026-11-09T02:18:28.329164386Z",
+  "duration_ms": 205037,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/mod.rs",
+        "id": "F1",
+        "line": 638,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c69e07b2/requirement/REQ-04",
+          "@/charter/D-20"
+        ],
+        "severity": "medium",
+        "summary": "Rules discovery discards a UTF-8 decode failure and declaration assembly decodes the same image again."
+      }
+    ],
+    "summary": "REQ-04 remains incomplete: rules discovery discards UTF-8 decode failures that declaration assembly recomputes for the same captured image.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c69e07b2-3158-440c-9138-5abf6d2f585f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "17c7afdd-51e9-433b-8c10-7824b730effc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-09T02:15:03.292118982Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6526 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1be16-6e2f-7f71-8d0f-b19755469dcb\n--------\nuser\n--- 6513 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:c69e07b2`: `9b9177b2`, `ab5a871c`, `babf797b`, `ab251c7d`, `a4ed2bf8`, `d979b401`; individual patches inspected; uncommitted changes excluded.\nPolicy sources: `AGENTS.md`; no subtree policies found.\nResolved items: `@/charter/D-18`, `@/charter/D-20` → `dev/vision/9db27a3a-charter.md`; `@/issue/c69e07b2/requirement/REQ-01` through `REQ-05`, `@/issue/b697a3f7/requirement/REQ-10`, `@/issue/b697a3f7/requirement/REQ-12` → respective issue descriptions; `@/inv/orthogonal-tests`, `@/inv/essential-code-prose`, `@/inv/shared-test-contracts`, `@/inv/semantic-test-assertions`, `@/inv/architecture-dependency-direction`, `@/inv/convention-convergence` → `.jit/invariants.toml`; `@/gate/cargo-ci`, `@/gate/jit-validate` → `.jit/gates.toml`.\nGate evidence: `cargo-ci` passed, exit 0, `2026-11-09T02:03:16.394579083+00:00`; supplied ancestry excludes `a4ed2bf8` and `d979b401`. Prior `code-review` failed, exit 1; its schema-request finding is addressed. No gates rerun.\nTruncation recovery: Narrower configuration, patch, and current-file reads recovered relevant evidence; unrelated breakdown text and historical transcript excerpts excluded.\n\n1. **F1 — Medium · blocking · issue-impact: REQ-04 still discards a decode failure that is recomputed.** At `crates/jit/src/commands/mod.rs:638`, `rule_schema_paths` converts `std::str::from_utf8(bytes)` to `Option`. With invalid UTF-8 in `rules.toml`, it returns no schema paths; `captured_declarations_with` then assembles declarations from that same image (`mod.rs:2810–2815`), repeating the UTF-8 decode at `crates/jit/src/repository_state/mod.rs:519`. Gate capture follows the same discovery/assembly sequence. The rules memo receives only successfully decoded strings, so the new schema-request cache cannot retain this failure. Carry or memoize the UTF-8 outcome through assembly while preserving the reported error. References: `@/issue/c69e07b2/requirement/REQ-04`, `@/charter/D-20`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-04 remains incomplete: rules discovery discards UTF-8 decode failures that declaration assembly recomputes for the same captured image.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Rules discovery discards a UTF-8 decode failure and declaration assembly decodes the same image again.\",\"file\":\"crates/jit/src/commands/mod.rs\",\"line\":638,\"references\":[\"@/issue/c69e07b2/requirement/REQ-04\",\"@/charter/D-20\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
