@@ -83,7 +83,7 @@ rustdoc. The tip's directory fsyncs above fall accordingly.
 
 ## Deviations
 
-- The tip run started at a 1-minute load of 1.77. The harness gated at its default
+- The tip run started at a 1-minute load of 1.77 and ended at 1.33. The harness gated at its default
   threshold of 2.0; the lead's protocol asked for below 1. The run was not repeated.
   Base and tip alternate within each round under the same load, and the tip passes
   every threshold with margin.
