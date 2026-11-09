@@ -468,6 +468,12 @@
       "subject": "r5 one more once-per-image instance (discovery documents); (a) one more task or (b) v1.1 sweep + stated deviation",
       "status": "resolved",
       "decision": "d5: option (a) task 863fd652; automatic cap: any r6 once-per-image instance -> v1.1 follow-up + stated deviation on d675102c REQ-04 + close story without escalating"
+    },
+    {
+      "to": "just-in-time-d5",
+      "issue": "0672b087",
+      "subject": "REQ-21 (story and epic) lock-fallback clause contradicts D-25; propose amending criteria",
+      "status": "open"
     }
   ],
   "rework_counts": {
@@ -998,7 +1004,8 @@
       "effort": "high",
       "sandbox": "read-only",
       "commit": "0968a1db0",
-      "brief": "scratchpad/brief-0672b087.md"
+      "brief": "scratchpad/brief-0672b087.md",
+      "result": "REQ-22, REQ-23 MET; REQ-21 UNMET: criterion text requires locked fallback after bounded refusals; code returns RetryableConflict per charter D-25 (supersedes D-22 fallback). Criteria-vs-charter conflict escalated to d5."
     }
   ]
 }
