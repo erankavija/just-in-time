@@ -3208,8 +3208,11 @@ impl<S: IssueStore> CommandExecutor<S> {
             std::sync::Arc::clone(&records.issues),
         ));
         let repository = std::cell::OnceCell::new();
-        let validation =
-            std::sync::Arc::new(gate_check::SharedValidation::new(history, Some(records)));
+        let validation = std::sync::Arc::new(gate_check::SharedValidation::new(
+            history,
+            Some(records),
+            Some(registry.clone()),
+        ));
         planned
             .into_iter()
             .map(|issue| {

@@ -28,6 +28,14 @@ pub(crate) type ParsedRecords = (Vec<Issue>, Vec<serde_json::Value>);
 /// reports as a finding; a repair decodes no record.
 pub(crate) type ParsedIssues = (Result<Vec<Issue>>, Vec<serde_json::Value>);
 
+/// What a capture's start image already resolved, which the capture hands
+/// back instead of resolving again.
+#[derive(Default)]
+struct KnownBase {
+    issues: Option<ParsedIssues>,
+    gates: Option<crate::declarations::GateRegistry>,
+}
+
 /// A proposed base and the configuration its discovery assembled.
 pub(crate) type ProposedBase = (
     crate::repository_state::RepositoryImage,
@@ -451,7 +459,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             &std::collections::BTreeMap::new(),
             extra_paths,
             BaseCapturePurpose::Validation,
-            known,
+            KnownBase {
+                issues: known,
+                gates: None,
+            },
         )
         .map(|captured| captured.map(|(image, records, config, _)| (image, config, records)))
     }
@@ -465,7 +476,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         extra_paths: &[crate::repository_state::VirtualPath],
         precheck_targets: &[IssueId],
     ) -> Result<Option<MutationBase>> {
-        self.capture_mutation_base_from(session, None, extra_paths, precheck_targets, &[])
+        self.capture_mutation_base_from(session, None, extra_paths, precheck_targets, &[], None)
     }
 
     /// [`Self::capture_mutation_base`] that also reads what the prechecks of
@@ -477,18 +488,28 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         precheck_targets: &[IssueId],
         planned: &[Issue],
     ) -> Result<Option<MutationBase>> {
-        self.capture_mutation_base_from(session, None, extra_paths, precheck_targets, planned)
+        self.capture_mutation_base_from(session, None, extra_paths, precheck_targets, planned, None)
     }
 
     /// [`Self::capture_mutation_base`] grown from `start`, an image this
-    /// session's round has read.
+    /// session's round has read, whose issues and gate registry `known`
+    /// already resolved.
     pub(crate) fn extend_mutation_base(
         &self,
         session: &mut (dyn crate::storage::RepositoryReadSession + '_),
         start: crate::repository_state::RepositoryImage,
         precheck_targets: &[IssueId],
+        known: ParsedRecords,
+        gates: crate::declarations::GateRegistry,
     ) -> Result<Option<MutationBase>> {
-        self.capture_mutation_base_from(session, Some(start), &[], precheck_targets, &[])
+        self.capture_mutation_base_from(
+            session,
+            Some(start),
+            &[],
+            precheck_targets,
+            &[],
+            Some((known, gates)),
+        )
     }
 
     fn capture_mutation_base_from(
@@ -498,8 +519,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         extra_paths: &[crate::repository_state::VirtualPath],
         precheck_targets: &[IssueId],
         planned: &[Issue],
+        known: Option<(ParsedRecords, crate::declarations::GateRegistry)>,
     ) -> Result<Option<MutationBase>> {
-        self.capture_proposed_base_inner(
+        let (known, known_gates) = known.unzip();
+        self.capture_proposed_base_known(
             session,
             start,
             &std::collections::BTreeMap::new(),
@@ -507,6 +530,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             BaseCapturePurpose::Mutation {
                 precheck_targets,
                 planned,
+            },
+            KnownBase {
+                issues: known.map(|(issues, values)| (Ok(issues), values)),
+                gates: known_gates,
             },
         )
         .and_then(|captured| {
@@ -628,11 +655,18 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         extra_paths: &[crate::repository_state::VirtualPath],
         purpose: BaseCapturePurpose<'_>,
     ) -> Result<Option<CapturedBase>> {
-        self.capture_proposed_base_known(session, start, overrides, extra_paths, purpose, None)
+        self.capture_proposed_base_known(
+            session,
+            start,
+            overrides,
+            extra_paths,
+            purpose,
+            KnownBase::default(),
+        )
     }
 
-    /// [`Self::capture_proposed_base_inner`] over `known`, the records `start`
-    /// already decoded, which it hands back instead of decoding again.
+    /// [`Self::capture_proposed_base_inner`] over `known`, what `start` already
+    /// decoded and resolved.
     fn capture_proposed_base_known(
         &self,
         session: &mut (dyn crate::storage::RepositoryReadSession + '_),
@@ -643,7 +677,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
         purpose: BaseCapturePurpose<'_>,
-        known: Option<ParsedIssues>,
+        known: KnownBase,
     ) -> Result<Option<CapturedBase>> {
         use crate::repository_state::{
             validate_capture_closure, CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath,
@@ -687,11 +721,14 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     None => super::image_virtual_bytes(image, path),
                 }
             };
-        let mut issues = known;
-        let mut resolved_gates = None::<(
-            crate::repository_state::ImageToken,
-            crate::declarations::GateRegistry,
-        )>;
+        let KnownBase {
+            mut issues,
+            gates: known_gates,
+        } = known;
+        let mut resolved_gates = start
+            .as_ref()
+            .zip(known_gates)
+            .map(|(image, gates)| (image.token(), gates));
         let mut configuration = super::ConfigurationParse::new(|image: &RepositoryImage| {
             effective_configuration(image, overrides)
         });
@@ -739,7 +776,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 return Ok(());
             }
             let gates = (!precheck_targets.is_empty() || !planned.is_empty())
-                .then(|| crate::repository_state::captured_gates(image))
+                .then(|| match &resolved_gates {
+                    Some((token, gates)) if *token == image.token() => Ok(gates.clone()),
+                    _ => crate::repository_state::captured_gates(image),
+                })
                 .transpose()?;
             resolved_gates = gates.clone().map(|gates| (image.token(), gates));
             if issues.is_none() {

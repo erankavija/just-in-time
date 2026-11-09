@@ -91,10 +91,11 @@ pub(crate) struct ImageInputs {
 }
 
 impl ImageInputs {
-    pub(crate) fn load(image: &RepositoryImage) -> Self {
+    /// `gates` is the registry the caller resolved from `image`, when it did.
+    pub(crate) fn load(image: &RepositoryImage, gates: Option<GateRegistry>) -> Self {
         Self {
             index: records_pass(load_index(image)),
-            gates: crate::repository_state::captured_gates(image).ok(),
+            gates: gates.or_else(|| crate::repository_state::captured_gates(image).ok()),
         }
     }
 }
