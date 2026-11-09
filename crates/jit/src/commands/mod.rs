@@ -897,8 +897,15 @@ fn captured_precheck_evidence(
     issue: &Issue,
     config: &crate::config::JitConfig,
     registry: &crate::declarations::GateRegistry,
+    documents: Option<Vec<crate::domain::DocumentReference>>,
 ) -> Result<gate_check::CapturedGateEvidence> {
-    gate_check::captured_gate_evidence(image, issue, config, &precheck_gates(issue, registry))
+    gate_check::captured_gate_evidence(
+        image,
+        issue,
+        config,
+        &precheck_gates(issue, registry),
+        documents,
+    )
 }
 
 fn claims_mutation_guard(
@@ -1188,7 +1195,14 @@ fn record_captured_prechecks(
     let inputs_moved = expected.evidence != cached.evidence
         || !cached.evidence.matches(comparison)?
         || !cached.evidence.is_broad()
-            && captured_precheck_evidence(comparison.image(), planned, config, registry)?.evidence
+            && captured_precheck_evidence(
+                comparison.image(),
+                planned,
+                config,
+                registry,
+                comparison.documents(planned),
+            )?
+            .evidence
                 != cached.evidence;
     let runs = cached
         .execution
@@ -3197,11 +3211,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             true => &records.0[..],
             false => &[],
         };
+        let mut documents = gate_check::DiscoveredDocuments::default();
         let Some(image) = grow_discovering(session, image, |image, spec| {
             planned.iter().try_for_each(|issue| {
                 gate_check::discover_gate_inputs(
                     image,
                     spec,
+                    &mut documents,
                     issue,
                     validated_issues,
                     &precheck_gates(issue, registry),
@@ -3234,6 +3250,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         &issue,
                         &config,
                         &precheck_gates(&issue, registry),
+                        documents.of(&image, &issue),
                         &repository,
                     )?,
                     image: image.clone(),
@@ -3435,7 +3452,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let recorded = record_captured_prechecks(
                 cached_precheck.as_ref(),
                 precheck.map(|precheck| &precheck.captured),
-                &gate_check::EvidenceComparison::new(image),
+                &gate_check::EvidenceComparison::new(image, base.documents()),
                 &projected.issue,
                 graph.declarations.config(),
                 &graph.declarations.gates,
@@ -3609,7 +3626,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let recorded = record_captured_prechecks(
                 cached_precheck.as_ref(),
                 precheck.as_ref().map(|precheck| &precheck.captured),
-                &gate_check::EvidenceComparison::new(image),
+                &gate_check::EvidenceComparison::new(image, base.documents()),
                 &issue,
                 declarations.config(),
                 &declarations.gates,
@@ -4552,6 +4569,7 @@ assert = {{ label-coverage = {{ container-from-label = "brackets", marker = "[ha
             issue,
             declarations.config(),
             &declarations.gates,
+            None,
         )
         .unwrap()
     }

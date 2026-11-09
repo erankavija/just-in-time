@@ -278,19 +278,31 @@ fn inputs_match(
 /// shared [`RepositoryEvidence`] once.
 pub(super) struct EvidenceComparison<'i> {
     image: &'i crate::repository_state::RepositoryImage,
+    documents: &'i DiscoveredDocuments,
     verdicts: std::cell::RefCell<Vec<(std::sync::Arc<RepositoryEvidence>, bool)>>,
 }
 
 impl<'i> EvidenceComparison<'i> {
-    pub(super) fn new(image: &'i crate::repository_state::RepositoryImage) -> Self {
+    /// A comparison against `image`, whose planned issues' documents discovery
+    /// derived into `documents`.
+    pub(super) fn new(
+        image: &'i crate::repository_state::RepositoryImage,
+        documents: &'i DiscoveredDocuments,
+    ) -> Self {
         Self {
             image,
+            documents,
             verdicts: std::cell::RefCell::new(Vec::new()),
         }
     }
 
     pub(super) fn image(&self) -> &'i crate::repository_state::RepositoryImage {
         self.image
+    }
+
+    /// `issue`'s documents as discovery derived them from the image, if it did.
+    pub(super) fn documents(&self, issue: &Issue) -> Option<Vec<crate::domain::DocumentReference>> {
+        self.documents.of(self.image, issue)
     }
 
     fn repository_matches(&self, evidence: &std::sync::Arc<RepositoryEvidence>) -> Result<bool> {
@@ -339,6 +351,46 @@ pub(super) struct CapturedGateEvidence {
     pub(super) runs: Vec<GateRunResult>,
 }
 
+/// The document sets a discovery round derived for the image it read, kept for
+/// the consumer of the image the discovery returns.
+///
+/// A round on another image replaces the sets, so they are held only for the
+/// image of the latest round, the one discovery returns. Each set belongs to
+/// the issue it was derived for, as that issue stood.
+#[derive(Default)]
+pub(crate) struct DiscoveredDocuments {
+    token: Option<crate::repository_state::ImageToken>,
+    sets: Vec<(Issue, Vec<crate::domain::DocumentReference>)>,
+}
+
+impl DiscoveredDocuments {
+    fn record(
+        &mut self,
+        image: &crate::repository_state::RepositoryImage,
+        issue: &Issue,
+        documents: Vec<crate::domain::DocumentReference>,
+    ) {
+        if self.token != Some(image.token()) {
+            self.token = Some(image.token());
+            self.sets.clear();
+        }
+        self.sets.retain(|(derived, _)| derived != issue);
+        self.sets.push((issue.clone(), documents));
+    }
+
+    /// `issue`'s document set derived from `image`, when discovery derived one.
+    pub(super) fn of(
+        &self,
+        image: &crate::repository_state::RepositoryImage,
+        issue: &Issue,
+    ) -> Option<Vec<crate::domain::DocumentReference>> {
+        (self.token == Some(image.token()))
+            .then(|| self.sets.iter().find(|(derived, _)| derived == issue))
+            .flatten()
+            .map(|(_, documents)| documents.clone())
+    }
+}
+
 /// An evaluation's captured image with its configuration, the bound issue, the
 /// gate registry and the required automated gate resolved from it.
 struct BoundGateEvaluation {
@@ -347,6 +399,8 @@ struct BoundGateEvaluation {
     issue: Issue,
     registry: crate::declarations::GateRegistry,
     gate: crate::declarations::GateDefinition,
+    /// The documents discovery derived from `image` for an exec gate.
+    documents: DiscoveredDocuments,
     /// The issue records `image` holds, decoded once by the validation base a
     /// built-in checker judges; `None` when no base was decoded.
     records: Option<crate::validation::DecodedRecords>,
@@ -426,10 +480,12 @@ fn checker_needs_validation_image(checker: &crate::declarations::GateChecker) ->
 /// its base: the dependency records a non-broad gate reads, an exec checker's
 /// documents and prompt file, the runs a history-consuming checker reads, and
 /// the history repository validation judges. `issues` holds the image's issues
-/// and `config` its configuration.
+/// and `config` its configuration. The documents derived from `image` are
+/// recorded in `documents`.
 pub(super) fn discover_gate_inputs(
     image: &crate::repository_state::RepositoryImage,
     spec: &mut crate::repository_state::CaptureSpec,
+    documents: &mut DiscoveredDocuments,
     issue: &Issue,
     issues: &[Issue],
     gates: &[&crate::declarations::GateDefinition],
@@ -456,7 +512,11 @@ pub(super) fn discover_gate_inputs(
         .iter()
         .any(|checker| matches!(checker, GateChecker::Exec { .. }))
     {
-        super::document::discover_issue_documents(image, spec, issue, config)?;
+        if let Some(derived) =
+            super::document::discover_issue_documents(image, spec, issue, config)?
+        {
+            documents.record(image, issue, derived);
+        }
     }
     spec.discover_paths(
         checkers
@@ -665,14 +725,22 @@ fn captured_gate_runs(
 ///
 /// An automatic exec checker contributes every document
 /// [`captured_issue_documents`](super::document::captured_issue_documents)
-/// discovers in `image`.
+/// discovers in `image`, or `documents`, the set discovery derived from it.
 pub(super) fn captured_gate_evidence(
     image: &crate::repository_state::RepositoryImage,
     issue: &Issue,
     config: &crate::config::JitConfig,
     gates: &[&crate::declarations::GateDefinition],
+    documents: Option<Vec<crate::domain::DocumentReference>>,
 ) -> Result<CapturedGateEvidence> {
-    captured_gate_evidence_sharing(image, issue, config, gates, &std::cell::OnceCell::new())
+    captured_gate_evidence_sharing(
+        image,
+        issue,
+        config,
+        gates,
+        documents,
+        &std::cell::OnceCell::new(),
+    )
 }
 
 /// [`captured_gate_evidence`] whose repository-wide part, when a gate is
@@ -682,6 +750,7 @@ pub(super) fn captured_gate_evidence_sharing(
     issue: &Issue,
     config: &crate::config::JitConfig,
     gates: &[&crate::declarations::GateDefinition],
+    discovered: Option<Vec<crate::domain::DocumentReference>>,
     repository: &std::cell::OnceCell<std::sync::Arc<RepositoryEvidence>>,
 ) -> Result<CapturedGateEvidence> {
     use crate::declarations::GateChecker;
@@ -706,7 +775,10 @@ pub(super) fn captured_gate_evidence_sharing(
         .iter()
         .any(|(_, checker)| matches!(checker, GateChecker::Exec { .. }))
     {
-        super::document::captured_issue_documents(image, issue, config)?
+        match discovered {
+            Some(documents) => documents,
+            None => super::document::captured_issue_documents(image, issue, config)?,
+        }
     } else {
         Vec::new()
     };
@@ -1069,8 +1141,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             (GateChecker::RepositoryValidation, Some(records)) => &records.issues[..],
             _ => &[],
         };
+        let mut documents = DiscoveredDocuments::default();
         let Some(image) = super::grow_discovering(session, image, |image, spec| {
-            discover_gate_inputs(image, spec, &issue, validated_issues, &[&gate], &config)
+            discover_gate_inputs(
+                image,
+                spec,
+                &mut documents,
+                &issue,
+                validated_issues,
+                &[&gate],
+                &config,
+            )
         })?
         else {
             return Ok(None);
@@ -1081,6 +1162,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             issue,
             registry,
             gate,
+            documents,
             records,
         }))
     }
@@ -1179,6 +1261,7 @@ impl<S: IssueStore> GateOps<'_, S> {
                     &bound.issue,
                     &bound.config,
                     &[&bound.gate],
+                    bound.documents.of(&bound.image, &bound.issue),
                 )?;
                 let history = matches!(
                     bound.gate.checker,
@@ -1279,6 +1362,9 @@ impl<S: IssueStore> GateOps<'_, S> {
                 &final_bound.issue,
                 &final_bound.config,
                 &[&final_bound.gate],
+                final_bound
+                    .documents
+                    .of(&final_bound.image, &final_bound.issue),
             )?;
             result.evaluation_stability = if final_captured.evidence == captured.evidence
                 && final_bound.resolves_as(&bound)
@@ -3275,9 +3361,15 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .capture_gate_evaluation_image(session.as_mut(), issue_id, gate_key, &run_paths)
             .unwrap()
             .unwrap();
-        super::captured_gate_evidence(&bound.image, &bound.issue, &bound.config, &[&bound.gate])
-            .unwrap()
-            .evidence
+        super::captured_gate_evidence(
+            &bound.image,
+            &bound.issue,
+            &bound.config,
+            &[&bound.gate],
+            None,
+        )
+        .unwrap()
+        .evidence
     }
 
     #[test]

@@ -1520,16 +1520,36 @@ fn walk_owned_trees(
     Ok(walk)
 }
 
+/// `issue`'s owned-tree walk of `image` and the documents derived from it
+/// under `config`; the one place the document set is derived.
+fn derive_issue_documents(
+    image: &crate::repository_state::RepositoryImage,
+    issue: &crate::domain::Issue,
+    config: &crate::config::JitConfig,
+) -> Result<(OwnedTreeWalk, Vec<crate::domain::DocumentReference>)> {
+    #[cfg(test)]
+    crate::resolution_counts::count_in_image(
+        crate::resolution_counts::Resolution::Documents,
+        image,
+    );
+    let declarations = DocumentDeclarations::from_config(config)?;
+    let walk = walk_owned_trees(image, issue, &declarations)?;
+    let documents = declarations.issue_documents(issue, &walk.files);
+    Ok((walk, documents))
+}
+
 /// Add to `spec` what [`captured_issue_documents`] reads of `issue` from
 /// `image`: the trees it owns and the references of every document it has.
+///
+/// Returns the document set when `image` already holds every tree `issue`
+/// owns, which is then what [`captured_issue_documents`] returns for `image`.
 pub(super) fn discover_issue_documents(
     image: &crate::repository_state::RepositoryImage,
     spec: &mut crate::repository_state::CaptureSpec,
     issue: &crate::domain::Issue,
     config: &crate::config::JitConfig,
-) -> Result<()> {
-    let declarations = DocumentDeclarations::from_config(config)?;
-    let walk = walk_owned_trees(image, issue, &declarations)?;
+) -> Result<Option<Vec<crate::domain::DocumentReference>>> {
+    let (walk, documents) = derive_issue_documents(image, issue, config)?;
     // The walk reads as many listings, as deep, as the owned trees hold; a
     // listing's children are one level below it.
     spec.widen_budget(crate::repository_state::CaptureBudget {
@@ -1543,12 +1563,11 @@ pub(super) fn discover_issue_documents(
             .max()
             .unwrap_or(0),
     });
+    let complete = walk.kinds.is_empty() && walk.listings.is_empty();
     spec.discover_kinds(walk.kinds)?;
     spec.discover_listings(walk.listings)?;
-    super::validate::discover_document_references(
-        &declarations.issue_documents(issue, &walk.files),
-        spec,
-    )
+    super::validate::discover_document_references(&documents, spec)?;
+    Ok(complete.then_some(documents))
 }
 
 /// `issue`'s documents as `image` holds them under `config`, the image's own
@@ -1562,20 +1581,14 @@ pub(super) fn captured_issue_documents(
     issue: &crate::domain::Issue,
     config: &crate::config::JitConfig,
 ) -> Result<Vec<crate::domain::DocumentReference>> {
-    #[cfg(test)]
-    crate::resolution_counts::count_in_image(
-        crate::resolution_counts::Resolution::Documents,
-        image,
-    );
-    let declarations = DocumentDeclarations::from_config(config)?;
-    let walk = walk_owned_trees(image, issue, &declarations)?;
+    let (walk, documents) = derive_issue_documents(image, issue, config)?;
     if !walk.kinds.is_empty() || !walk.listings.is_empty() {
         anyhow::bail!(
             "the captured image does not hold the artifact directories issue {} owns",
             issue.id
         );
     }
-    Ok(declarations.issue_documents(issue, &walk.files))
+    Ok(documents)
 }
 
 /// Capture and read every document reference at the version it names, in one
