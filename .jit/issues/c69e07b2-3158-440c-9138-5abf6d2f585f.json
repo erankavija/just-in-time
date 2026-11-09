@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "5d912275-99d9-4dd8-a23c-518fe7e8a2df",
+      "status": "passed",
+      "updated_at": "2026-11-09T02:05:02.891494968Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "4f95b745-346f-4f37-871e-88e927bd4460",
+      "status": "failed",
+      "updated_at": "2026-11-09T02:06:41.851420936Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c69e07b2-3158-440c-9138-5abf6d2f585f",
   "labels": [
     "epic:one-mutation-path",
@@ -26,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Gate evaluation and declaration reads carry their decode and derivation outcomes",
-  "updated_at": "2026-11-09T01:57:00.201032975Z"
+  "updated_at": "2026-11-09T02:06:41.851420936Z"
 }
