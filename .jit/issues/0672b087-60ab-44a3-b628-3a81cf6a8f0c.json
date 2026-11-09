@@ -7,8 +7,9 @@
     "45d0a971-b44a-4a32-8f09-2553978cf0bf",
     "bb596228-fad0-4415-a131-54db05df0ddd"
   ],
-  "description": "Aggregate the work that lets reads capture without the repository lock, makes every redo record append an event, and records the before-and-after cost of the epic's reductions.\n\n## Success Criteria\n\n- [hard] REQ-21: Archive preview and candidates, declaration reads, gate-preset reads, `jit validate` without `--fix` and with `--fix --dry-run`, `doc check-links` and profile plans and dry runs capture without the repository lock and are admitted only when no redo record was present and the event log did not grow; after bounded refusals they read under the lock, which completes a leftover record. A two-backend test shows eight readers admitted while a writer holds the lock, and a benchmark shows the reader and writer throughput ratios.\n- [hard] REQ-22: One harness measures bulk update at a fixed match count, archive candidate listing, declaration parsing per mutation and redo-apply directory opens against base `369d35a42`, and the tip record passes each ratio threshold.\n- [hard] REQ-23: Every redo record over a present data root appends at least one event. A mutation that derives no domain event appends one generic event naming the files it published, and a delta that writes repository state over a present data root without an event append is rejected before commit. The publication that creates an absent data root is exempt, because a reader observes the root's appearance.\n",
+  "description": "Aggregate the work that lets reads capture without the repository lock, makes every redo record append an event, and records the before-and-after cost of the epic's reductions.\n\n## Success Criteria\n\n- [hard] REQ-21: Archive preview and candidates, declaration reads, gate-preset reads, `jit validate` without `--fix` and with `--fix --dry-run`, `doc check-links` and profile plans and dry runs capture without the repository lock and are admitted only when no redo record was present and the event log did not grow; after a bounded number of refused attempts the read returns a typed retryable conflict and never takes the repository lock (`@/charter/D-25`); explicit recovery and the next mutation session complete a leftover redo record (`@/charter/D-17`, `@/charter/D-27`). A two-backend test shows eight readers admitted while a writer holds the lock, and a benchmark shows the reader and writer throughput ratios.\n- [hard] REQ-22: One harness measures bulk update at a fixed match count, archive candidate listing, declaration parsing per mutation and redo-apply directory opens against base `369d35a42`, and the tip record passes each ratio threshold.\n- [hard] REQ-23: Every redo record over a present data root appends at least one event. A mutation that derives no domain event appends one generic event naming the files it published, and a delta that writes repository state over a present data root without an event append is rejected before commit. The publication that creates an absent data root is exempt, because a reader observes the root's appearance.\n\n## Rulings\n\n- Steward ruling (just-in-time-d5, 2026-11-09): REQ-21 amended to D-25 (supersedes D-22's lock fallback); code already conforms (steward ruling).\n",
   "documents": [],
+  "done_at": "2026-11-09T03:33:06.424232022Z",
   "first_ready_at": "2026-11-09T03:26:24.912293583Z",
   "gates_required": [],
   "gates_status": {},
@@ -27,7 +28,7 @@
     "per:@/charter/D-19"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Reads run beside writers, every commit appends an event, and the cost reductions are evidenced",
-  "updated_at": "2026-11-09T03:26:24.912293583Z"
+  "updated_at": "2026-11-09T03:33:06.424232022Z"
 }
