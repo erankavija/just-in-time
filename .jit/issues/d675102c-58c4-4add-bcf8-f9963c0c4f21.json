@@ -4,6 +4,7 @@
   "context": {},
   "created_at": "2026-10-24T21:22:37.717854234Z",
   "dependencies": [
+    "350062e4-ff51-4b6a-bac8-e13056fdcaad",
     "42046050-895f-42bb-a486-383a47e39649",
     "6b22ce6d-20cb-4f73-a0e9-fb2066f3154d",
     "850eaad3-53a3-4d50-bd02-6a51a0c84208",
@@ -30,7 +31,7 @@
     "per:@/charter/D-20"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Configuration and gate declarations come from captured images",
-  "updated_at": "2026-11-09T00:37:26.812382798Z"
+  "updated_at": "2026-11-09T00:43:17.427379853Z"
 }

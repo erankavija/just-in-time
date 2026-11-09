@@ -1,0 +1,30 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-11-09T00:43:17.618162156Z",
+  "context": {},
+  "created_at": "2026-11-09T00:43:17.046710063Z",
+  "dependencies": [],
+  "description": "Make a built-in validation gate evaluation decode each issue of its captured image once, so validation reads the issue records the evaluation already decoded.\n\n## Background\n\n- `crates/jit/src/commands/gate_check.rs` ~136 and ~159: `SharedValidation` builds `CapturedValidation::with_config`, which reloads every issue (`load_issues`, `crates/jit/src/validation/repository.rs` ~83), after the explicit evaluation decoded the evaluated issue from the same final image (~1121). Automatic prechecks decode their final image at `crates/jit/src/commands/mod.rs` ~3186 and reload it during validation execution.\n- Story `d675102c` sol re-checkpoint r3 (commit `f56763036`), finding 1. Steward ruling (just-in-time-d5, 2026-11-09): one source of decoded records per image. If `6a19e93f`'s shared parsed records (the session's decoded issue set behind `IdIndex`) exist for the image on this path, both the evaluation's issue binding and `CapturedValidation` read from that set and nothing is added; otherwise `CapturedValidation` is seeded with the records the binding decoded and decodes only the rest. No cache, no `OnceLock`; a second binding path is ruled out.\n- Epic criterion: `b697a3f7` REQ-12.\n\n## Success Criteria\n\n- [hard] REQ-01: A built-in validation gate evaluation, manual or automatic precheck, decodes each issue of its captured image once; the evaluation's issue binding and its validation read one set of decoded records.\n- [hard] REQ-02: `test_gate_evaluation_resolves_its_inputs_once_per_captured_image` is extended with a built-in validation gate for a manual evaluation and a precheck, counting at the per-issue decode point; it fails on the parent commit. No new test file.\n- [hard] REQ-03: Validation findings, gate verdicts and recorded evidence are unchanged.\n- [hard] REQ-04: The worker's report lists every gate evaluation input (issue, registry, gate definition, documents, validation records) with its per-image resolution count on a manual evaluation and a precheck, and none exceeds one.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-09T00:43:17.046710063Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "350062e4-ff51-4b6a-bac8-e13056fdcaad",
+  "labels": [
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "story:configuration",
+    "component:core",
+    "component:gates",
+    "per:@/charter/D-20",
+    "satisfies:b697a3f7/REQ-12",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "A built-in validation gate evaluation decodes each issue once per captured image",
+  "updated_at": "2026-11-09T00:43:17.618162156Z"
+}

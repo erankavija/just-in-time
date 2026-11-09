@@ -452,7 +452,8 @@
       "to": "just-in-time-d5",
       "issue": "d675102c",
       "subject": "r3 REQ-04 built-in validation double issue decode; propose seeded CapturedValidation task",
-      "status": "open"
+      "status": "resolved",
+      "decision": "d5: new sonnet task 350062e4; reuse 6a19e93f decoded set if present else seed CapturedValidation with binding records; no cache; extend owning REQ-12 test; sweep all evaluation inputs"
     }
   ],
   "rework_counts": {

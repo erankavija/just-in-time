@@ -26141,3 +26141,8 @@
 {"from":"in_progress","id":"fdd44811-16a3-434e-9691-2940d6c77dcc","issue_id":"a8c4223b-bef4-4e62-a41a-5e61955605d1","timestamp":"2026-11-09T00:37:26.812382798Z","to":"done","type":"issue_state_changed"}
 {"from":"backlog","id":"beb1b56a-f264-4b4d-918e-8321aafac61c","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T00:37:26.812382798Z","to":"ready","type":"issue_state_changed"}
 {"id":"c7d02abd-6051-4d89-a81e-20613284af4d","issue_id":"a8c4223b-bef4-4e62-a41a-5e61955605d1","timestamp":"2026-11-09T00:37:26.812382798Z","type":"issue_completed"}
+{"id":"b0dc4ab9-7257-4487-9238-2eff20ca66c9","issue_id":"350062e4-ff51-4b6a-bac8-e13056fdcaad","priority":"high","timestamp":"2026-11-09T00:43:17.046710063Z","title":"A built-in validation gate evaluation decodes each issue once per captured image","type":"issue_created"}
+{"from":"ready","id":"1e4d5ea3-7f72-4ead-bd85-273ad9c8be89","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T00:43:17.427379853Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"c0b5b965-05a4-48bb-b492-f411cbb62c04","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T00:43:17.427379853Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"5180cc2b-40ee-4a02-a923-0e0c90b7b588","issue_id":"350062e4-ff51-4b6a-bac8-e13056fdcaad","timestamp":"2026-11-09T00:43:17.618162156Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"9728e268-afcd-4313-92ad-08f6ab8f7dfe","issue_id":"350062e4-ff51-4b6a-bac8-e13056fdcaad","timestamp":"2026-11-09T00:43:17.618162156Z","type":"issue_claimed"}
