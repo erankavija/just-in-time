@@ -26131,3 +26131,8 @@
 {"from":"in_progress","id":"8a033587-0adb-4746-8778-4854e986e767","issue_id":"6b22ce6d-20cb-4f73-a0e9-fb2066f3154d","timestamp":"2026-11-09T00:25:39.549603834Z","to":"done","type":"issue_state_changed"}
 {"from":"backlog","id":"8c4794d8-980e-42e7-95c0-32e9944268c7","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T00:25:39.549603834Z","to":"ready","type":"issue_state_changed"}
 {"id":"79b94fc7-70c8-4c60-ade7-b0ccc3be778a","issue_id":"6b22ce6d-20cb-4f73-a0e9-fb2066f3154d","timestamp":"2026-11-09T00:25:39.549603834Z","type":"issue_completed"}
+{"id":"4c6d6453-6bc8-48d4-9e62-abe63d002707","issue_id":"a8c4223b-bef4-4e62-a41a-5e61955605d1","priority":"high","timestamp":"2026-11-09T00:27:25.093763997Z","title":"Every discovery caller consumes discovery's gate registry","type":"issue_created"}
+{"from":"ready","id":"34ec651f-63b8-4585-a166-e80dd707eaa3","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T00:27:25.476740961Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"101caeb0-4594-4d08-aa3d-345c032c7aa3","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T00:27:25.476740961Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"0322e7f6-2a9d-43b3-8bc0-7888d2156a9e","issue_id":"a8c4223b-bef4-4e62-a41a-5e61955605d1","timestamp":"2026-11-09T00:27:33.943224707Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"48b4f56a-0d9a-4d4c-a66c-2efc99aaa10d","issue_id":"a8c4223b-bef4-4e62-a41a-5e61955605d1","timestamp":"2026-11-09T00:27:33.943224707Z","type":"issue_claimed"}

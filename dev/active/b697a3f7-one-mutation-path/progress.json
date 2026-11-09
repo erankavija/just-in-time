@@ -649,6 +649,12 @@
       "date": "2026-11-09",
       "decision": "REQ-01(a) M in {10,160}, s(N)=(t(160)-t(10))/150; N and 1.5 threshold unchanged; re-record base (must reproduce >=2.5), then one tip run whose verdict stands",
       "reason": "0.2 ms per-match slope below timing noise; instruction and syscall counts flat"
+    },
+    {
+      "issue": "a8c4223b",
+      "by": "just-in-time-d5",
+      "date": "2026-11-09",
+      "decision": "6b22ce6d advisory F1 in scope: new task a8c4223b under d675102c threads discovery registry through template apply and every discovery-first declarations caller; sonnet"
     }
   ],
   "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",
