@@ -1,0 +1,149 @@
+{
+  "label": "base",
+  "samples": 5,
+  "harness_head": "75c433e70503f7f28b485413af796e159a6ece86",
+  "logical_cpus": 24,
+  "cpu_model": "AMD Ryzen 9 5900X 12-Core Processor",
+  "kernel": "Linux 7.2.14-arch1-1",
+  "strace": "strace -- version 7.3",
+  "measurement_fs": "tmpfs",
+  "run_dir": "/dev/shm/jit-cost-evidence/run.rUNT7L/run",
+  "load_wait": {
+    "threshold": 2.0,
+    "timeout_s": 3600,
+    "waited_s": 0
+  },
+  "loadavg_at_start": [
+    "0.54",
+    "0.32",
+    "0.18"
+  ],
+  "loadavg_at_end": [
+    "1.55",
+    "0.77",
+    "0.36"
+  ],
+  "binaries": {
+    "base": {
+      "commit": "369d35a42f0ecc5067d930415c44908defdc0e36",
+      "sha256": "b5ba9298e54fda902b68858b8e7a930e6b29669df5e2fb11bb5f4420d126da4a",
+      "version": "jit 1.0.0 (profile release)"
+    }
+  },
+  "fixtures": {
+    "base": {
+      "bulk/N500-M10": {
+        "issues": 500,
+        "matches": 10
+      },
+      "bulk/N500-M160": {
+        "issues": 500,
+        "matches": 160
+      },
+      "bulk/N2000-M10": {
+        "issues": 2000,
+        "matches": 10
+      },
+      "bulk/N2000-M160": {
+        "issues": 2000,
+        "matches": 160
+      },
+      "archive/C10": {
+        "issues": 1550,
+        "terminal_containers": 10,
+        "event_lines": 18029
+      },
+      "archive/C40": {
+        "issues": 1610,
+        "terminal_containers": 40,
+        "event_lines": 18727
+      },
+      "dep/minimal": {
+        "namespaces": 0,
+        "added_rules": 0,
+        "from": "e903f85f-0865-4ad4-96b8-9f9bffd66f00",
+        "to": "afc3b1b1-f4d5-4840-bc9e-cfcecca395d4"
+      },
+      "dep/inflated": {
+        "namespaces": 2000,
+        "added_rules": 300,
+        "from": "b9d3cae4-5286-489c-b57d-8fe9ae77d718",
+        "to": "f15d2777-8d6d-429e-8f42-860003b1abe6"
+      },
+      "profile/package48": {
+        "package_files": 48,
+        "nested_directories": 4,
+        "archive": "/dev/shm/jit-cost-evidence/run.rUNT7L/package-base.jitprof",
+        "archive_sha256": "a27a1eb54e55e337cb93969880a503bf1efbd67c86464e3d4d5f523ea6c307ab"
+      }
+    }
+  },
+  "argv": {
+    "bulk/N500-M10": [
+      "issue",
+      "update",
+      "--filter",
+      "label:bench:match",
+      "--state",
+      "in_progress",
+      "--json"
+    ],
+    "bulk/N500-M160": [
+      "issue",
+      "update",
+      "--filter",
+      "label:bench:match",
+      "--state",
+      "in_progress",
+      "--json"
+    ],
+    "bulk/N2000-M10": [
+      "issue",
+      "update",
+      "--filter",
+      "label:bench:match",
+      "--state",
+      "in_progress",
+      "--json"
+    ],
+    "bulk/N2000-M160": [
+      "issue",
+      "update",
+      "--filter",
+      "label:bench:match",
+      "--state",
+      "in_progress",
+      "--json"
+    ],
+    "archive/C10": [
+      "archive",
+      "candidates",
+      "--json"
+    ],
+    "archive/C40": [
+      "archive",
+      "candidates",
+      "--json"
+    ],
+    "dep/minimal": [
+      "dep",
+      "add",
+      "e903f85f-0865-4ad4-96b8-9f9bffd66f00",
+      "afc3b1b1-f4d5-4840-bc9e-cfcecca395d4"
+    ],
+    "dep/inflated": [
+      "dep",
+      "add",
+      "b9d3cae4-5286-489c-b57d-8fe9ae77d718",
+      "f15d2777-8d6d-429e-8f42-860003b1abe6"
+    ],
+    "profile/package48": [
+      "profile",
+      "add",
+      "--archive",
+      "/dev/shm/jit-cost-evidence/run.rUNT7L/package-base.jitprof",
+      "--destination",
+      "packages/bench-package"
+    ]
+  }
+}
