@@ -564,6 +564,10 @@ pub(crate) fn captured_gates(
     })
 }
 
+/// The gate registry resolved from an image, its failure included, shared so
+/// no reader resolves it again.
+pub(crate) type GateOutcome = Result<GateRegistry, std::sync::Arc<DeclarationParseError>>;
+
 /// How a configuration assembly of an image becomes its declarations:
 /// [`declarations_seeded`] or [`validation_declarations_seeded`].
 pub(crate) type DeclarationParse =
@@ -583,7 +587,7 @@ pub(crate) struct DeferredDeclarations {
     /// from the image.
     config: std::sync::Mutex<Option<Result<crate::config::JitConfig, ProducerError>>>,
     /// The registry discovery resolved from the image, until the parse takes it.
-    gates: std::sync::Mutex<Option<GateRegistry>>,
+    gates: std::sync::Mutex<Option<GateOutcome>>,
     parsed: std::sync::OnceLock<
         Result<CapturedRepositoryDeclarations, std::sync::Arc<DeclarationParseError>>,
     >,
@@ -604,9 +608,9 @@ impl DeferredDeclarations {
         }
     }
 
-    /// These declarations over `gates`, the registry discovery resolved from
-    /// the image, so the parse does not resolve it again.
-    pub(crate) fn with_gates(self, gates: Option<GateRegistry>) -> Self {
+    /// These declarations over `gates`, the registry outcome discovery
+    /// resolved from the image, so the parse does not resolve it again.
+    pub(crate) fn with_gates(self, gates: Option<GateOutcome>) -> Self {
         Self {
             gates: std::sync::Mutex::new(gates),
             ..self
@@ -631,7 +635,14 @@ impl DeferredDeclarations {
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .take();
-                (self.parse)(image, config, gates).map_err(std::sync::Arc::new)
+                match (gates, config) {
+                    // A configuration failure precedes the registry's.
+                    (Some(Err(error)), Ok(_)) => Err(error),
+                    (Some(Ok(gates)), config) => {
+                        (self.parse)(image, config, Some(gates)).map_err(std::sync::Arc::new)
+                    }
+                    (_, config) => (self.parse)(image, config, None).map_err(std::sync::Arc::new),
+                }
             })
             .as_ref()
             .map_err(std::sync::Arc::clone)

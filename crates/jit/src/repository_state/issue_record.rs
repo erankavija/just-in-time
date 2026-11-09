@@ -10,17 +10,17 @@ use thiserror::Error;
 
 /// A captured issue record that does not decode, including a non-canonical id
 /// or dependency.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 #[error("malformed issue record at {path}: {source}")]
 pub struct MalformedIssueRecordError {
     path: String,
     #[source]
-    source: serde_json::Error,
+    source: std::sync::Arc<serde_json::Error>,
 }
 
 impl MalformedIssueRecordError {
     /// The JSON decode error, without the record path.
-    pub(crate) fn into_source(self) -> serde_json::Error {
+    pub(crate) fn into_source(self) -> std::sync::Arc<serde_json::Error> {
         self.source
     }
 }
@@ -46,7 +46,7 @@ fn decode_issue_value(
 ) -> Result<(Issue, Value), MalformedIssueRecordError> {
     let malformed = |source| MalformedIssueRecordError {
         path: path.relative().as_str().to_string(),
-        source,
+        source: std::sync::Arc::new(source),
     };
     let KeyedValue { value, repeated } = serde_json::from_slice(bytes).map_err(malformed)?;
     if repeated {
@@ -155,7 +155,7 @@ impl<'de> Visitor<'de> for KeyedValueVisitor {
 }
 
 /// A listed issue record that could not be read or parsed.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum IssueRecordsError {
     #[error(transparent)]
     Read(#[from] CaptureError),

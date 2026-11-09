@@ -26,7 +26,10 @@ pub(crate) type ParsedRecords = (Vec<Issue>, Vec<serde_json::Value>);
 
 /// A capture's [`ParsedRecords`], with the parse failure a validation base
 /// reports as a finding; a repair decodes no record.
-pub(crate) type ParsedIssues = (Result<Vec<Issue>>, Vec<serde_json::Value>);
+pub(crate) type ParsedIssues = (
+    std::result::Result<Vec<Issue>, crate::repository_state::IssueRecordsError>,
+    Vec<serde_json::Value>,
+);
 
 /// What a capture's start image already resolved, which the capture hands
 /// back instead of resolving again.
@@ -810,7 +813,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                             (Ok(issues), values)
                         }
                         Err(error) if matches!(purpose, BaseCapturePurpose::Validation) => {
-                            (Err(error.into()), Vec::new())
+                            (Err(error), Vec::new())
                         }
                         Err(error) => return Err(error.into()),
                     }
@@ -1016,7 +1019,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 BaseCapturePurpose::Validation,
             )?
             .map(|(image, (issues, values), config, _)| {
-                crate::validation::CapturedValidation::with_records(image, issues, values, config)
+                crate::validation::CapturedValidation::with_records(
+                    image,
+                    issues.map_err(anyhow::Error::from),
+                    values,
+                    config,
+                )
             }))
     }
 
@@ -1228,7 +1236,7 @@ impl MutationBase {
                 crate::repository_state::declarations_seeded,
                 Some(config),
             )
-            .with_gates(gates),
+            .with_gates(gates.map(Ok)),
         }
     }
 
