@@ -26185,3 +26185,7 @@
 {"from":"in_progress","id":"64cdcb43-784b-4fd4-bd6a-e02cc0b1f37b","issue_id":"863fd652-8ced-4b2f-ba90-b8743fac4a41","timestamp":"2026-11-09T03:07:41.531633551Z","to":"done","type":"issue_state_changed"}
 {"from":"backlog","id":"b1460a27-cd34-41a2-b3dd-2773f38d0f09","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T03:07:41.531633551Z","to":"ready","type":"issue_state_changed"}
 {"id":"289d5d7a-0156-4beb-95f9-466c11e9e947","issue_id":"863fd652-8ced-4b2f-ba90-b8743fac4a41","timestamp":"2026-11-09T03:07:41.531633551Z","type":"issue_completed"}
+{"id":"13b10eb3-5749-4fb7-9260-53849add45f6","issue_id":"57129f99-1533-4618-9452-752e1b706625","priority":"low","timestamp":"2026-11-09T03:15:02.915257195Z","title":"A gate evaluation decodes a duplicated dependency once per captured image","type":"issue_created"}
+{"fields":["description"],"id":"5b9332fb-57a3-494b-a644-839a05fb8dbe","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T03:15:03.033366085Z","type":"issue_updated","updated_by":"issue-update"}
+{"from":"ready","id":"a01dde4e-7072-4840-bcb5-c023b385ee67","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T03:15:03.140236242Z","to":"done","type":"issue_state_changed"}
+{"id":"81315148-1ee5-4b68-8cd0-7b3fd7b22f19","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T03:15:03.140236242Z","type":"issue_completed"}

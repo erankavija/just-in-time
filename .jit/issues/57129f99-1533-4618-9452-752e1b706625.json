@@ -1,0 +1,22 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-11-09T03:15:02.915257195Z",
+  "dependencies": [],
+  "description": "Make a gate evaluation resolve each direct dependency issue once per captured image when the issue lists a dependency more than once.\n\n## Background\n\n- `crates/jit/src/commands/gate_check.rs` ~462: `captured_direct_dependency_issues` iterates the issue's `dependencies` as authored; a repository-authored issue with `dependencies: [B, B]` deserializes unchanged (`crates/jit/src/domain/types.rs` ~460), so evaluating its exec gate (~1251) decodes B twice from the same image. Capture-path deduplication does not cover this iteration.\n- Story `d675102c` sol re-checkpoint r6 (commit `81804ff39`), finding 1 (low). Steward ruling (just-in-time-d5, 2026-11-09): after six checkpoint rounds, further once-per-image instances are filed for v1.1 and recorded as a stated deviation on `d675102c` REQ-04.\n\n## Success Criteria\n\n- [hard] REQ-01: A gate evaluation decodes each direct dependency issue once per captured image, including when the evaluated issue lists that dependency more than once.\n- [hard] REQ-02: `test_gate_evaluation_resolves_its_inputs_once_per_captured_image` covers a duplicated dependency and fails on the parent commit.\n",
+  "documents": [],
+  "first_ready_at": "2026-11-09T03:15:02.915257195Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "57129f99-1533-4618-9452-752e1b706625",
+  "labels": [
+    "type:task",
+    "component:core",
+    "component:gates",
+    "milestone:v1.1"
+  ],
+  "priority": "low",
+  "state": "ready",
+  "title": "A gate evaluation decodes a duplicated dependency once per captured image",
+  "updated_at": "2026-11-09T03:15:02.915257195Z"
+}
