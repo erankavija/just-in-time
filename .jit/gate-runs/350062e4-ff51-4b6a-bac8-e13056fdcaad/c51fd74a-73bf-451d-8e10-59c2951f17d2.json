@@ -1,0 +1,53 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c119c76be2d473a57f5b90c4d405d6a3d841cd81",
+  "completed_at": "2026-11-09T01:10:31.954545663Z",
+  "duration_ms": 228062,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/validation/repository.rs",
+        "id": "F1",
+        "line": 97,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/350062e4/requirement/REQ-04"
+        ],
+        "severity": "medium",
+        "summary": "Selected-validation prechecks resolve an already-bound gate registry again from the same captured image."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/bulk_update.rs",
+        "id": "F2",
+        "line": 528,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/350062e4/requirement/REQ-01"
+        ],
+        "severity": "medium",
+        "summary": "Bulk preflight extension discards the initial decoded records and decodes every issue again even when the captured image is unchanged."
+      }
+    ],
+    "summary": "Selected-validation and bulk prechecks still repeat resolutions required to occur once per captured image.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "350062e4-ff51-4b6a-bac8-e13056fdcaad",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c51fd74a-73bf-451d-8e10-59c2951f17d2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-09T01:06:43.892219338Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7170 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.166.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-6.1-sol\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1bdd7-e0f6-72c1-8e37-387f7b0ea0a8\n--------\nuser\n--- 7157 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:350062e4 — 4a44bcf, 441ea7e, c0fb71b, 182e9b4; individual patches inspected\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-20 → dev/vision/9db27a3a-charter.md; @/issue/350062e4/requirement/REQ-01, @/issue/350062e4/requirement/REQ-02, @/issue/350062e4/requirement/REQ-03, @/issue/350062e4/requirement/REQ-04 → issue description; @/issue/b697a3f7/requirement/REQ-12 → parent issue description; @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/convention-convergence, @/invariant/architecture-dependency-direction, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/gate-semantics → .jit/invariants.toml; @/gate/cargo-ci, @/gate/jit-validate → .jit/gates.toml\nGate evidence: cargo-ci pending, exit code none, run timestamp none; ancestry unavailable; execution results unavailable under the read-only boundary\nTruncation recovery: 441ea7e and c0fb71b patches recovered through narrower commit/path reads\n\n1. **F1 — Blocking, issue-impact, medium:** Selected-validation prechecks still resolve the registry twice. In [repository.rs:97](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/repository.rs:97), `ImageInputs::load` calls `captured_gates` despite preflight binding already resolving that registry. For an `IssueValidation` precheck without additional inputs, capture growth preserves the same image, making this the second resolution. Pass the resolved registry into `SharedValidation`; the added tests exercise repository validation, whose history capture can conceal this case by extending the image. This leaves REQ-04 unmet.\n\n2. **F2 — Blocking, issue-impact, medium:** Bulk prechecks still decode an already-read issue set again. [bulk_update.rs:528](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/bulk_update.rs:528) supplies records from `extend_mutation_base`, although the initial base already decoded those records at lines 443–452. Extension starts with no known records and parses them again. For an `IssueValidation` precheck without prompts or documents, extension adds no capture requests, so every issue is decoded twice from the same image. Carry the initial decoded records through extension to satisfy REQ-01.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Selected-validation and bulk prechecks still repeat resolutions required to occur once per captured image.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Selected-validation prechecks resolve an already-bound gate registry again from the same captured image.\",\"file\":\"crates/jit/src/validation/repository.rs\",\"line\":97,\"references\":[\"@/issue/350062e4/requirement/REQ-04\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Bulk preflight extension discards the initial decoded records and decodes every issue again even when the captured image is unchanged.\",\"file\":\"crates/jit/src/commands/bulk_update.rs\",\"line\":528,\"references\":[\"@/issue/350062e4/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

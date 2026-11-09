@@ -11,7 +11,20 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "16098cb0-64f0-40e8-9c30-0e2839ee3e5b",
+      "status": "passed",
+      "updated_at": "2026-11-09T01:08:35.988224604Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "c51fd74a-73bf-451d-8e10-59c2951f17d2",
+      "status": "failed",
+      "updated_at": "2026-11-09T01:10:31.956233532Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "350062e4-ff51-4b6a-bac8-e13056fdcaad",
   "labels": [
     "epic:one-mutation-path",
@@ -26,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "A built-in validation gate evaluation decodes each issue once per captured image",
-  "updated_at": "2026-11-09T01:06:36.767192037Z"
+  "updated_at": "2026-11-09T01:10:31.956233532Z"
 }
