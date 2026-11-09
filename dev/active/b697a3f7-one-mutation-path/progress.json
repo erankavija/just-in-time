@@ -606,7 +606,8 @@
     "0672b087 closed done after REQ-21 amended to D-25 in story and epic; REQ-22/23 MET at checkpoint.",
     "Epic close: surfaced_pitfalls reconciled; repo-validate gate PASSED; holistic-review held pending d5 routing of the configuration_store diagnostic advisory.",
     "d4a20645 (ad4fb78f5, merge 5b463ef09): cargo-ci passed; code-review FAILED F1: REQ-02 report not in evidence. Lead committed conflict-wrapper-audit.md (d5caa69e9) from the worker report and linked it; rerunning code-review. Lead trap: link any report a criterion requires before review.",
-    "d4a20645 closed done: code-review PASSED with REQ-02 inventory linked; cargo-ci passed on 5b463ef09."
+    "d4a20645 closed done: code-review PASSED with REQ-02 inventory linked; cargo-ci passed on 5b463ef09.",
+    "Epic repo-validate re-run PASSED after d4a20645; holistic-review gate started."
   ],
   "story_checkpoints": [
     {
@@ -1013,6 +1014,15 @@
       "commit": "0968a1db0",
       "brief": "scratchpad/brief-0672b087.md",
       "result": "REQ-22, REQ-23 MET; REQ-21 UNMET: criterion text requires locked fallback after bounded refusals; code returns RetryableConflict per charter D-25 (supersedes D-22 fallback). Criteria-vs-charter conflict escalated to d5."
+    },
+    {
+      "issue": "b697a3f7",
+      "kind": "holistic-review gate",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "sandbox": "read-only",
+      "commit": "03ba8cd94"
     }
   ]
 }
