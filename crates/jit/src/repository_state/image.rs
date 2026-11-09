@@ -849,8 +849,6 @@ pub struct RepositoryImage {
     data: Arc<ImageData>,
     token: ImageToken,
     declarations: Arc<crate::declarations::DeclarationMemo>,
-    /// The gate registry of `data`, resolved once for the image and its clones.
-    gates: Arc<std::sync::OnceLock<crate::declarations::GateRegistry>>,
 }
 
 impl std::fmt::Debug for RepositoryImage {
@@ -991,12 +989,7 @@ impl RepositoryImage {
             }),
             token: ImageToken::mint(),
             declarations: Arc::clone(declarations),
-            gates: Arc::default(),
         })
-    }
-
-    pub(crate) fn resolved_gates(&self) -> &std::sync::OnceLock<crate::declarations::GateRegistry> {
-        &self.gates
     }
 
     /// The memo this image's declaration parses come from.

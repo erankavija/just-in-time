@@ -30,11 +30,13 @@ pub(crate) type ProposedBase = (
     std::result::Result<JitConfig, crate::repository_state::ProducerError>,
 );
 
-/// A captured base, its issues, and the configuration its discovery assembled.
+/// A captured base, its issues, the configuration its discovery assembled, and
+/// the gate registry discovery resolved from the base, when it resolved one.
 type CapturedBase = (
     crate::repository_state::RepositoryImage,
     ParsedIssues,
     std::result::Result<JitConfig, crate::repository_state::ProducerError>,
+    Option<crate::declarations::GateRegistry>,
 );
 
 /// The `--fix` count and messages and, unless the issue records do not parse,
@@ -418,7 +420,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             extra_paths,
             BaseCapturePurpose::Validation,
         )
-        .map(|captured| captured.map(|(image, _, config)| (image, config)))
+        .map(|captured| captured.map(|(image, _, config, _)| (image, config)))
     }
 
     /// The base an issue mutation derives from: the registries, every issue,
@@ -476,7 +478,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         )
         .and_then(|captured| {
             captured
-                .map(|(image, (issues, _), config)| Ok(MutationBase::new(image, issues?, config)))
+                .map(|(image, (issues, _), config, gates)| {
+                    Ok(MutationBase::new(image, issues?, config, gates))
+                })
                 .transpose()
         })
     }
@@ -531,13 +535,14 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 planned: &[],
             },
         )?
-        .map(|(image, (issues, _), config)| {
+        .map(|(image, (issues, _), config, gates)| {
             Ok(MutationPreflight {
                 image,
                 target,
                 base: Some(PreflightBase {
                     issues: issues?,
                     config,
+                    gates,
                 }),
             })
         })
@@ -563,7 +568,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             &[],
             BaseCapturePurpose::Archive,
         )
-        .map(|captured| captured.map(|(image, _, config)| (image, config)))
+        .map(|captured| captured.map(|(image, _, config, _)| (image, config)))
     }
 
     /// One capture round of the base, from `start` when the caller has read
@@ -631,6 +636,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 }
             };
         let mut issues = None::<ParsedIssues>;
+        let mut resolved_gates = None::<(
+            crate::repository_state::ImageToken,
+            crate::declarations::GateRegistry,
+        )>;
         let mut configuration = super::ConfigurationParse::new(|image: &RepositoryImage| {
             effective_configuration(image, overrides)
         });
@@ -680,6 +689,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             let gates = (!precheck_targets.is_empty() || !planned.is_empty())
                 .then(|| crate::repository_state::captured_gates(image))
                 .transpose()?;
+            resolved_gates = gates.clone().map(|gates| (image.token(), gates));
             if issues.is_none() {
                 // A mutation derives from exactly these issues, so they are
                 // parsed once, with the strict reader, and handed back with the
@@ -754,7 +764,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         };
         Ok(image.zip(issues).map(|(image, issues)| {
             let config = configuration.into_config(&image);
-            (image, issues, config)
+            let gates = resolved_gates
+                .filter(|(token, _)| *token == image.token())
+                .map(|(_, gates)| gates);
+            (image, issues, config, gates)
         }))
     }
 }
@@ -912,7 +925,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 &[],
                 BaseCapturePurpose::Validation,
             )?
-            .map(|(image, (issues, values), config)| {
+            .map(|(image, (issues, values), config, _)| {
                 crate::validation::CapturedValidation::with_records(image, issues, values, config)
             }))
     }
@@ -941,7 +954,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> ValidationOps<'_, S> 
                 &[],
                 BaseCapturePurpose::Repair,
             )?
-            .map(|(image, _, config)| {
+            .map(|(image, _, config, _)| {
                 let declarations =
                     crate::repository_state::validation_declarations_with_config(&image, config);
                 (image, declarations)
@@ -1107,19 +1120,22 @@ pub(crate) struct MutationBase {
 
 impl MutationBase {
     /// The base over `image` and its `issues`, with `config`, the
-    /// configuration assembled from `image`.
+    /// configuration assembled from `image`, and `gates`, the registry
+    /// discovery resolved from it.
     pub(crate) fn new(
         image: crate::repository_state::RepositoryImage,
         issues: Vec<Issue>,
         config: std::result::Result<JitConfig, crate::repository_state::ProducerError>,
+        gates: Option<crate::declarations::GateRegistry>,
     ) -> Self {
         Self {
             image,
             issues,
             declarations: crate::repository_state::DeferredDeclarations::new(
-                crate::repository_state::declarations_with_config,
+                crate::repository_state::declarations_seeded,
                 Some(config),
-            ),
+            )
+            .with_gates(gates),
         }
     }
 
@@ -1154,6 +1170,8 @@ pub(crate) struct PreflightBase {
     pub(crate) issues: Vec<Issue>,
     /// The configuration the base discovery assembled from the image.
     pub(crate) config: std::result::Result<JitConfig, crate::repository_state::ProducerError>,
+    /// The gate registry the base discovery resolved from the image.
+    pub(crate) gates: Option<crate::declarations::GateRegistry>,
 }
 
 /// Request only the references a consuming pass selects.

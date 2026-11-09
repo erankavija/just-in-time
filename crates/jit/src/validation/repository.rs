@@ -101,7 +101,7 @@ impl<'a> CapturedValidation<'a> {
             values,
             image,
             declarations: crate::repository_state::DeferredDeclarations::new(
-                crate::repository_state::validation_declarations_with_config,
+                crate::repository_state::validation_declarations_seeded,
                 config,
             ),
         }
