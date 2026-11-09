@@ -905,6 +905,16 @@
       "sandbox": "read-only",
       "commit": "cea13616e",
       "verdict": "UNMET REQ-02, REQ-04; 3 blocking (item.rs:255 uncaptured registry reads; duplicate gate/rules parses in precheck/template/registry-edit; exec evaluation resolves documents twice)"
+    },
+    {
+      "issue": "d675102c",
+      "kind": "checkpoint-r3",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "sandbox": "read-only",
+      "commit": "f56763036",
+      "brief": "scratchpad/brief-d675102c-r3.md"
     }
   ]
 }
