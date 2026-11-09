@@ -1,24 +1,28 @@
 //! Read-only storage boundary for assembled repository configuration.
 
-use super::repository_state_store::ConfigurationObservation;
+use super::repository_state_store::{is_retryable_conflict, ConfigurationObservation};
 use crate::config::JitConfig;
 use crate::repository_state::RepositoryLayout;
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 /// Load and assemble one admitted set of repository declaration files.
 /// Missing files contribute empty declarations; capture and assembly failures
-/// retain their error types.
+/// retain their error types, and a retryable conflict passes through unchanged.
 /// The files parse through `memo`.
 pub fn load_configuration(
     layout: &RepositoryLayout,
     memo: &crate::declarations::DeclarationMemo,
 ) -> Result<JitConfig> {
     let observation =
-        ConfigurationObservation::capture(layout.data_root(), memo).with_context(|| {
-            format!(
-                "Failed to read configuration at '{}'",
-                layout.data_root().display()
-            )
+        ConfigurationObservation::capture(layout.data_root(), memo).map_err(|error| {
+            if is_retryable_conflict(&error) {
+                error
+            } else {
+                error.context(format!(
+                    "Failed to read configuration at '{}'",
+                    layout.data_root().display()
+                ))
+            }
         })?;
     Ok(observation.assemble()?)
 }

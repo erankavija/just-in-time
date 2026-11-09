@@ -3295,6 +3295,36 @@ fn test_configuration_read_with_held_writer_and_pending_record_conflicts_without
 }
 
 #[test]
+fn test_load_configuration_conflict_surfaces_its_own_message_with_exit_12() {
+    let backend = FileSessionBackend::seeded();
+    let _held = backend.open().unwrap();
+    backend.commit(&leftover_record());
+    let error = crate::storage::configuration_store::load_configuration(
+        &backend.layout,
+        &Default::default(),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error.downcast_ref::<RepositoryStateStoreError>(),
+        Some(RepositoryStateStoreError::RetryableConflict { .. })
+    ));
+    assert_eq!(
+        error.to_string(),
+        RepositoryStateStoreError::RetryableConflict {
+            path: "configuration selection".into()
+        }
+        .to_string()
+    );
+    assert_eq!(
+        crate::output::failure::classify(&error)
+            .error
+            .code
+            .exit_code(),
+        crate::output::ExitCode::RetryableConflict
+    );
+}
+
+#[test]
 fn test_initialized_configuration_discards_index_and_declarations_crossed_by_one_commit() {
     let backend = FileSessionBackend::seeded();
     let data = backend.layout.data_root();
