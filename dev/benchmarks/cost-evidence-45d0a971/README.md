@@ -87,3 +87,31 @@ rustdoc. The tip's directory fsyncs above fall accordingly.
   threshold of 2.0; the lead's protocol asked for below 1. The run was not repeated.
   Base and tip alternate within each round under the same load, and the tip passes
   every threshold with margin.
+
+## Graph-rule bulk smoke (jit:6a19e93f REQ-03 evidence, `raw/smoke-graph-rule/`)
+
+Evidence for `6a19e93f` REQ-03, not a fifth verdict: `summary.json` keeps its four
+verdicts and `validate.py --smoke` checks this record. One smoke run of scenario (a)
+alone, five samples, on the tip at `c34d395ef` (sha256
+`e9ac90c7393c0dba018cfda3226df5a35080f0fc640a3044dd3a44b355445459`), recorded as
+two harness invocations against the same base and tip binaries:
+
+```sh
+COST_BENCH_SCENARIOS=bulk COST_BENCH_RAW=<dir>/standard \
+  scripts/benchmark-cost-evidence.sh <tip-binary>
+COST_BENCH_GRAPH_RULE=1 COST_BENCH_SCENARIOS=bulk COST_BENCH_RAW=<dir>/graph-rule \
+  scripts/benchmark-cost-evidence.sh <tip-binary>
+```
+
+`COST_BENCH_GRAPH_RULE=1` makes each bulk fixture declare a `dependency-shape` rule
+(`bench-graph-rule`, warn) on `bench:match` issues and give every issue its own done
+`bench:dep` dependency, so the rule resolves one neighbour per matched issue on the
+`--state in_progress` transition. Unset, the fixtures are unchanged.
+
+| run | tip s(2000)/s(500) | base s(2000)/s(500) | threshold | loadavg at start | loadavg at end |
+|---|---|---|---|---|---|
+| `standard` | 1.0032 | 3.756 | tip <= 1.5 | 1.93 4.13 3.26 | 1.75 3.80 3.18 |
+| `graph-rule` | 1.0430 | 3.960 | tip <= 1.5 | 1.29 1.49 2.15 | 1.08 1.37 2.05 |
+
+Base binary sha256 `b5ba9298e54fda902b68858b8e7a930e6b29669df5e2fb11bb5f4420d126da4a`
+in both runs. Both ratios pass.

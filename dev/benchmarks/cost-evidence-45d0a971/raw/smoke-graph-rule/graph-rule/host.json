@@ -1,0 +1,116 @@
+{
+  "label": "tip",
+  "samples": 5,
+  "harness_head": "c34d395efb3c781847a1b6cd82176d37da9dbaba",
+  "logical_cpus": 24,
+  "cpu_model": "AMD Ryzen 9 5900X 12-Core Processor",
+  "kernel": "Linux 7.2.14-arch1-1",
+  "strace": "strace -- version 7.3",
+  "measurement_fs": "tmpfs",
+  "run_dir": "/dev/shm/jit-cost-evidence/run.XLjpSm/run",
+  "load_wait": {
+    "threshold": 2.0,
+    "timeout_s": 10800,
+    "waited_s": 0
+  },
+  "loadavg_at_start": [
+    "1.29",
+    "1.49",
+    "2.15"
+  ],
+  "loadavg_at_end": [
+    "1.08",
+    "1.37",
+    "2.05"
+  ],
+  "binaries": {
+    "base": {
+      "commit": "369d35a42f0ecc5067d930415c44908defdc0e36",
+      "sha256": "b5ba9298e54fda902b68858b8e7a930e6b29669df5e2fb11bb5f4420d126da4a",
+      "version": "jit 1.0.0 (profile release)"
+    },
+    "tip": {
+      "commit": null,
+      "sha256": "e9ac90c7393c0dba018cfda3226df5a35080f0fc640a3044dd3a44b355445459",
+      "version": "jit 1.0.0 (profile release)"
+    }
+  },
+  "graph_rule": true,
+  "scenarios": "bulk",
+  "fixtures": {
+    "base": {
+      "bulk/N500-M10": {
+        "issues": 500,
+        "matches": 10
+      },
+      "bulk/N500-M160": {
+        "issues": 500,
+        "matches": 160
+      },
+      "bulk/N2000-M10": {
+        "issues": 2000,
+        "matches": 10
+      },
+      "bulk/N2000-M160": {
+        "issues": 2000,
+        "matches": 160
+      }
+    },
+    "tip": {
+      "bulk/N500-M10": {
+        "issues": 500,
+        "matches": 10
+      },
+      "bulk/N500-M160": {
+        "issues": 500,
+        "matches": 160
+      },
+      "bulk/N2000-M10": {
+        "issues": 2000,
+        "matches": 10
+      },
+      "bulk/N2000-M160": {
+        "issues": 2000,
+        "matches": 160
+      }
+    }
+  },
+  "argv": {
+    "bulk/N500-M10": [
+      "issue",
+      "update",
+      "--filter",
+      "label:bench:match",
+      "--state",
+      "in_progress",
+      "--json"
+    ],
+    "bulk/N500-M160": [
+      "issue",
+      "update",
+      "--filter",
+      "label:bench:match",
+      "--state",
+      "in_progress",
+      "--json"
+    ],
+    "bulk/N2000-M10": [
+      "issue",
+      "update",
+      "--filter",
+      "label:bench:match",
+      "--state",
+      "in_progress",
+      "--json"
+    ],
+    "bulk/N2000-M160": [
+      "issue",
+      "update",
+      "--filter",
+      "label:bench:match",
+      "--state",
+      "in_progress",
+      "--json"
+    ]
+  }
+}

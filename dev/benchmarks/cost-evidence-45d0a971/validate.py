@@ -7,6 +7,9 @@ reproduce each cost in both runs and every tip verdict to pass.
 `validate.py --write` writes `summary.json` from `raw/`; the harness
 (`scripts/benchmark-cost-evidence.sh`) uses it, so the recorded summary and its
 check are one computation. `validate.py --raw <dir>` prints one run's derivation.
+`validate.py --smoke` checks `raw/smoke-graph-rule/` (jit:6a19e93f REQ-03 evidence, not
+one of the four verdicts): two scenario (a) runs, `standard` and `graph-rule`, each of
+whose tip s(2000)/s(500) it rederives against the bulk threshold.
 """
 
 from __future__ import annotations
@@ -32,6 +35,8 @@ THRESHOLDS = {
 }
 BULK_MATCHES = (10, 160)
 ARCHIVE_CANDIDATES = (10, 40)
+SMOKE = RAW / "smoke-graph-rule"
+SMOKE_RUNS = {"standard": False, "graph-rule": True}
 
 
 def load(path: Path) -> object:
@@ -69,6 +74,7 @@ def derive(raw: Path) -> dict[str, object]:
     for t in timings:
         wall.setdefault((t["binary"], t["point"]), []).append(t["wall_ns"] / 1e6)
     counted: dict[tuple[str, str], list[dict[str, int]]] = {}
+    bulk_only = host.get("scenarios") == "bulk"
     for t in traces:
         text = (raw / "traces" / t["trace"]).read_text(encoding="utf-8")
         rows = [line.split("\t", 3) for line in text.splitlines()]
@@ -93,13 +99,17 @@ def derive(raw: Path) -> dict[str, object]:
     for b in binaries:
         s500 = slope(b, f"bulk/N500-M{bulk_low}", f"bulk/N500-M{bulk_high}", bulk_span)
         s2000 = slope(b, f"bulk/N2000-M{bulk_low}", f"bulk/N2000-M{bulk_high}", bulk_span)
-        profile = {key: count(b, "profile/package48", key) for key in (
-            "dir_opens", "dir_opens_inside", "dir_opens_outside",
-            "fsyncs", "fsyncs_dir", "fsyncs_file")}
         metrics[b] = {
             "median_ms": {point: ms(b, point) for (binary, point) in sorted(wall)
                           if binary == b},
             "bulk": {"s500_ms": s500, "s2000_ms": s2000, "slope_ratio": ratio(s2000, s500)},
+        }
+        if bulk_only:
+            continue
+        profile = {key: count(b, "profile/package48", key) for key in (
+            "dir_opens", "dir_opens_inside", "dir_opens_outside",
+            "fsyncs", "fsyncs_dir", "fsyncs_file")}
+        metrics[b] |= {
             "archive": {
                 "per_candidate_ms": slope(b, f"archive/C{archive_low}", f"archive/C{archive_high}",
                                       archive_high - archive_low),
@@ -111,6 +121,9 @@ def derive(raw: Path) -> dict[str, object]:
         }
 
     base = metrics["base"]
+    if bulk_only:
+        return {"metrics": metrics, **({"ratios": {"bulk_tip_slope_ratio":
+                metrics["tip"]["bulk"]["slope_ratio"]}} if "tip" in metrics else {})}
     reproduction = {
         "bulk_slope_ratio_at_least_min": base["bulk"]["slope_ratio"] is not None
         and base["bulk"]["slope_ratio"] >= THRESHOLDS["bulk_base_slope_ratio_min"],
@@ -159,10 +172,35 @@ def recorded_summary() -> dict[str, object]:
         },
         "raw_sha256": {
             str(path.relative_to(EVIDENCE)): hashlib.sha256(path.read_bytes()).hexdigest()
-            for path in sorted(RAW.rglob("*"))
+            for label in runs
+            for path in sorted((RAW / label).rglob("*"))
             if path.is_file()
         },
     }
+
+
+def check_smoke() -> None:
+    """Both smoke runs were recorded as one scenario (a) protocol, the graph-rule run
+    with the rule declared and the standard run without, and each tip ratio passes."""
+    limit = THRESHOLDS["bulk_tip_slope_ratio_max"]
+    for name, graph_rule in SMOKE_RUNS.items():
+        host = load(SMOKE / name / "host.json")
+        assert host["label"] == "tip" and host["scenarios"] == "bulk", f"{name}: not scenario (a)"
+        assert host.get("graph_rule", False) is graph_rule, f"{name}: graph_rule flag mismatch"
+        assert host["samples"] == SAMPLES, f"{name}: recorded with {host['samples']} rounds"
+        assert host["load_wait"]["threshold"] == LOAD_MAX
+        assert float(host["loadavg_at_start"][0]) < LOAD_MAX
+        assert host["binaries"]["base"]["commit"] == BASE_COMMIT
+        derived = derive(SMOKE / name)
+        tip_ratio = derived["ratios"]["bulk_tip_slope_ratio"]
+        print(f"{name}: tip s(2000)/s(500) = {tip_ratio} (limit {limit}), "
+              f"base {derived['metrics']['base']['bulk']['slope_ratio']}, "
+              f"tip sha256 {host['binaries']['tip']['sha256']}, "
+              f"loadavg {host['loadavg_at_start']} -> {host['loadavg_at_end']}")
+        assert tip_ratio is not None and tip_ratio <= limit, f"{name}: tip ratio {tip_ratio}"
+    tips = {load(SMOKE / n / "host.json")["binaries"]["tip"]["sha256"] for n in SMOKE_RUNS}
+    assert len(tips) == 1, "the two smoke runs measured different tip binaries"
+    print("cost-evidence-45d0a971: smoke PASS")
 
 
 def check() -> None:
@@ -194,8 +232,10 @@ if __name__ == "__main__":
                                                encoding="utf-8")
         verdicts = derived["runs"].get("tip", {}).get("verdicts", {})
         print(f"cost-evidence-45d0a971: wrote summary, verdicts {verdicts or 'base-only'}")
+    elif sys.argv[1:] == ["--smoke"]:
+        check_smoke()
     elif len(sys.argv) == 3 and sys.argv[1] == "--raw":
         print(json.dumps(derive(Path(sys.argv[2])), indent=2))
     else:
-        assert sys.argv[1:] == [], "usage: validate.py [--write | --raw <dir>]"
+        assert sys.argv[1:] == [], "usage: validate.py [--write | --smoke | --raw <dir>]"
         check()
