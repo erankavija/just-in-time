@@ -87,11 +87,11 @@ impl DecodedRecords {
 
 /// `image`'s parsed index and gate registry, resolved once for every
 /// [`CapturedValidation::with_config`] over it. A registry that fails to
-/// resolve is left to each validation to report.
+/// resolve is kept as that failure, which each validation reports.
 #[derive(Debug, Clone)]
 pub(crate) struct ImageInputs {
     index: std::result::Result<RepositoryIndex, Arc<anyhow::Error>>,
-    gates: Option<GateRegistry>,
+    gates: Option<crate::repository_state::GateOutcome>,
 }
 
 impl ImageInputs {
@@ -99,7 +99,10 @@ impl ImageInputs {
     pub(crate) fn load(image: &RepositoryImage, gates: Option<GateRegistry>) -> Self {
         Self {
             index: records_pass(load_index(image)),
-            gates: gates.or_else(|| crate::repository_state::captured_gates(image).ok()),
+            gates: Some(match gates {
+                Some(gates) => Ok(gates),
+                None => crate::repository_state::captured_gates(image).map_err(Arc::new),
+            }),
         }
     }
 }

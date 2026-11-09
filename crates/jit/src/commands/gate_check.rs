@@ -5260,10 +5260,23 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let _ = executor.gates().check_gate(&judged, &malformed_key);
         let malformed_counts = resolutions(&[Resolution::Issue, Resolution::Registry]);
 
+        seed_memory_repository_file(executor.storage(), ".jit/gates.toml", "{ malformed");
+        let image = validation_image(&executor);
+        let config = crate::repository_state::assemble_config(&image).unwrap();
+        reset();
+        let shared = super::SharedValidation::default();
+        let _ = shared.report(&image, &config);
+        let _ = shared.whole_judgement(&image, &config);
+        let malformed_gates_counts = resolutions(&[Resolution::Registry]);
+
         for (case, counts) in [
             ("manual", manual_counts),
             ("precheck", precheck_counts),
             ("issue validation over a malformed issue", malformed_counts),
+            (
+                "validation over a malformed gate registry",
+                malformed_gates_counts,
+            ),
             ("validation manual", validated_manual),
             ("bulk selected-validation precheck", bulk_counts),
             ("selected-validation precheck", selected_counts),

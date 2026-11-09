@@ -1236,7 +1236,7 @@ impl MutationBase {
                 crate::repository_state::declarations_seeded,
                 Some(config),
             )
-            .with_gates(gates),
+            .with_gates(gates.map(Ok)),
         }
     }
 
