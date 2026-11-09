@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0dbedb4de57e99b3eb75a23c7dbb453c5ed7dc56",
+  "completed_at": "2026-11-09T04:44:31.165932035Z",
+  "duration_ms": 251250,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are verifiably met under the recorded rulings; prior findings are resolved and benchmark evidence validates.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a9c2e507-3c89-479d-ad21-02c0d0d64658",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-11-09T04:40:19.915057642Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Reviewed all 23 hard criteria against code, tests, dependency closure, git history, and recorded gate evidence, applying the recorded rulings. Prior findings are resolved. The cost, graph-rule smoke, and reader-concurrency evidence validators pass.\n\nNo blocking or advisory findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are verifiably met under the recorded rulings; prior findings are resolved and benchmark evidence validates.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
