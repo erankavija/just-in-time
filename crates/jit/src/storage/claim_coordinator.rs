@@ -761,6 +761,7 @@ impl ClaimCoordinator {
             })?
             .ok_or_else(|| anyhow::anyhow!("acquire left issue {issue_id} without a lease"))?;
 
+        // The claims lock spans the sync, so the publish needs no lease check; splitting this scope must add one.
         let synced = repository_sync(&lease)?;
         Ok((lease, synced))
     }

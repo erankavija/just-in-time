@@ -3099,7 +3099,7 @@ impl DocCommands {
 impl AssetCommands {
     fn coordinates_claims_first(&self) -> bool {
         match self {
-            Self::List { .. } => false,
+            Self::List { rescan, .. } => *rescan,
         }
     }
 }
@@ -3592,6 +3592,17 @@ mod recovery_dispatch_tests {
             );
             assert!(command.requires_recovery_dispatch());
         }
+
+        let assets = |extra: &[&'static str]| {
+            parsed_command(
+                &["jit", "doc", "assets", "list", "deadbeef", "docs/guide.md"]
+                    .into_iter()
+                    .chain(extra.iter().copied())
+                    .collect::<Vec<_>>(),
+            )
+        };
+        assert!(assets(&["--rescan"]).coordinates_claims_first());
+        assert!(!assets(&[]).coordinates_claims_first());
 
         let repository_first: &[(&str, &[&str])] = &[
             (

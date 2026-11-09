@@ -1020,6 +1020,7 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         use crate::repository_state::{finalize, MutationIntent, VirtualPath};
 
         let layout = self.exec.require_layout()?;
+        let claims_guard = super::claims_mutation_guard(self.exec.require_worktree_paths()?)?;
         let issue_path = VirtualPath::issue_record(issue_id);
         let document_path = VirtualPath::worktree(path)?;
         let source = DocumentScanSource::Worktree(document_path);
@@ -1027,54 +1028,65 @@ impl<S: IssueStore> DocumentOps<'_, S> {
         // Operation-scoped so a fresh-session retry cannot resample the update
         // timestamp or audit-event identity.
         let context = super::production_mutation_context();
-        with_mutation_session(&self.exec.storage, &layout, "document rescan", |session| {
-            let initial = document_scan_capture_spec(
-                [issue_path.clone()].into_iter().collect(),
-                &source,
-                &Default::default(),
-            )?;
-            let Some(image) = capture_discovering(session, initial, |image, spec| {
-                let scan = scan_document_source(&layout, image, path, &source)?;
-                discover_scan_assets(spec, &source, &scan.required_paths)
-            })?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            let mut issue = captured_issue(&image, &issue_path, issue_id)?;
-            let document = issue
-                .documents
-                .iter_mut()
-                .find(|document| document.path == path)
-                .ok_or_else(|| anyhow!("document '{path}' changed during rescan"))?;
-            let scan = scan_document_source(&layout, &image, path, &source)?;
-            if let Some(warning) = scan.warning {
-                warnings.push(warning.message().to_string());
-                return Ok(SessionStep::Done(match warning {
-                    DocumentScanWarning::Missing(_) => document.assets.clone(),
-                    DocumentScanWarning::Failed(_) => Vec::new(),
-                }));
-            }
-            let scanned = hydrate_document_scan(&layout, &image, &source, scan)?.assets;
-            if document.assets == scanned {
-                return Ok(SessionStep::Done(scanned));
-            }
-            document.assets = scanned.clone();
-            let intents = vec![
-                MutationIntent::UpdateIssue {
-                    issue: Box::new(issue),
-                },
-                MutationIntent::RecordEvent {
-                    phase: 1,
-                    event: Box::new(crate::domain::EventBody::draft_issue_updated(
-                        issue_id.clone(),
-                        "doc-rescan".to_string(),
-                        vec!["documents.assets".to_string()],
-                    )),
-                },
-            ];
-            let plan = finalize(&layout, &image, &context, &intents, None)?;
-            Ok(SessionStep::Apply(plan, scanned))
-        })
+        let mut lease_findings = Vec::new();
+        let assets =
+            with_mutation_session(&self.exec.storage, &layout, "document rescan", |session| {
+                let initial = document_scan_capture_spec(
+                    [VirtualPath::CONFIG, issue_path.clone()]
+                        .into_iter()
+                        .collect(),
+                    &source,
+                    &Default::default(),
+                )?;
+                let Some(image) = capture_discovering(session, initial, |image, spec| {
+                    let scan = scan_document_source(&layout, image, path, &source)?;
+                    discover_scan_assets(spec, &source, &scan.required_paths)
+                })?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                lease_findings = super::refuse_foreign_leases_held(
+                    crate::repository_state::assemble_config(&image)?.enforcement_mode(),
+                    std::slice::from_ref(issue_id),
+                    claims_guard.as_ref(),
+                )?;
+                let mut issue = captured_issue(&image, &issue_path, issue_id)?;
+                let document = issue
+                    .documents
+                    .iter_mut()
+                    .find(|document| document.path == path)
+                    .ok_or_else(|| anyhow!("document '{path}' changed during rescan"))?;
+                let scan = scan_document_source(&layout, &image, path, &source)?;
+                if let Some(warning) = scan.warning {
+                    warnings.push(warning.message().to_string());
+                    return Ok(SessionStep::Done(match warning {
+                        DocumentScanWarning::Missing(_) => document.assets.clone(),
+                        DocumentScanWarning::Failed(_) => Vec::new(),
+                    }));
+                }
+                let scanned = hydrate_document_scan(&layout, &image, &source, scan)?.assets;
+                if document.assets == scanned {
+                    return Ok(SessionStep::Done(scanned));
+                }
+                document.assets = scanned.clone();
+                let intents = vec![
+                    MutationIntent::UpdateIssue {
+                        issue: Box::new(issue),
+                    },
+                    MutationIntent::RecordEvent {
+                        phase: 1,
+                        event: Box::new(crate::domain::EventBody::draft_issue_updated(
+                            issue_id.clone(),
+                            "doc-rescan".to_string(),
+                            vec!["documents.assets".to_string()],
+                        )),
+                    },
+                ];
+                let plan = finalize(&layout, &image, &context, &intents, None)?;
+                Ok(SessionStep::Apply(plan, scanned))
+            })?;
+        warnings.extend(lease_findings);
+        Ok(assets)
     }
 
     fn validate_external_url(agent: &ureq::Agent, url: &str) -> bool {
@@ -2723,6 +2735,26 @@ mod tests {
         let error = executor
             .documents()
             .remove_document_reference(&issue_id, "docs/guide.md")
+            .unwrap_err();
+
+        assert!(
+            error
+                .downcast_ref::<crate::errors::ForeignLeaseError>()
+                .is_some(),
+            "{error:#}"
+        );
+        assert_eq!(executor.storage().load_issue(&issue_id).unwrap(), before);
+        assert!(executor.storage().read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_document_rescan_strict_refuses_another_agents_lease_without_writing() {
+        let (executor, issue_id, _) = document_lease_fixture("strict", true, true);
+        let before = executor.storage().load_issue(&issue_id).unwrap();
+
+        let error = executor
+            .documents()
+            .list_document_assets(&issue_id, "docs/guide.md", true)
             .unwrap_err();
 
         assert!(
