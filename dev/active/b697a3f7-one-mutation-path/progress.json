@@ -989,6 +989,16 @@
       "commit": "81804ff39",
       "brief": "scratchpad/brief-d675102c-r6.md",
       "result": "REQ-01..03 MET; REQ-04 MET except low advisory: duplicated direct dependency decoded twice (gate_check.rs:462). Per d5 six-round cap: v1.1 follow-up 57129f99, stated deviation on d675102c REQ-04, story closed."
+    },
+    {
+      "issue": "0672b087",
+      "kind": "checkpoint",
+      "vendor": "openai-codex",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "sandbox": "read-only",
+      "commit": "0968a1db0",
+      "brief": "scratchpad/brief-0672b087.md"
     }
   ]
 }
