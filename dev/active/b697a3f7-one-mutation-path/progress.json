@@ -466,7 +466,8 @@
       "to": "just-in-time-d5",
       "issue": "d675102c",
       "subject": "r5 one more once-per-image instance (discovery documents); (a) one more task or (b) v1.1 sweep + stated deviation",
-      "status": "open"
+      "status": "resolved",
+      "decision": "d5: option (a) task 863fd652; automatic cap: any r6 once-per-image instance -> v1.1 follow-up + stated deviation on d675102c REQ-04 + close story without escalating"
     }
   ],
   "rework_counts": {
@@ -684,6 +685,12 @@
       "by": "just-in-time-d5",
       "date": "2026-11-09",
       "decision": "6b22ce6d advisory F1 in scope: new task a8c4223b under d675102c threads discovery registry through template apply and every discovery-first declarations caller; sonnet"
+    },
+    {
+      "issue": "d675102c",
+      "by": "just-in-time-d5",
+      "date": "2026-11-09",
+      "decision": "six-round cap: r6 once-per-image findings go to v1.1 with a stated deviation on REQ-04; story closes"
     }
   ],
   "invoker": "session just-in-time-d5 (SendMessage); all escalations route there from 2026-11-08 01:10",

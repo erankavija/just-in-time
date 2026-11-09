@@ -26173,3 +26173,8 @@
 {"from":"in_progress","id":"9af45ffc-471b-4427-ba27-2b33cc5b2d36","issue_id":"c69e07b2-3158-440c-9138-5abf6d2f585f","timestamp":"2026-11-09T02:41:26.727252892Z","to":"done","type":"issue_state_changed"}
 {"from":"backlog","id":"67236594-db82-44c0-a249-c8d5a2973a0a","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T02:41:26.727252892Z","to":"ready","type":"issue_state_changed"}
 {"id":"556636fa-d756-4503-9fb3-7cdc097c5da0","issue_id":"c69e07b2-3158-440c-9138-5abf6d2f585f","timestamp":"2026-11-09T02:41:26.727252892Z","type":"issue_completed"}
+{"id":"a9399812-91a5-4af5-936b-d7f13bba138a","issue_id":"863fd652-8ced-4b2f-ba90-b8743fac4a41","priority":"high","timestamp":"2026-11-09T02:49:54.987446940Z","title":"Gate evidence capture consumes discovery's document set","type":"issue_created"}
+{"from":"ready","id":"cb57f8c6-66a3-44ad-9404-6c2ab6d17559","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T02:49:55.372642920Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"f1188672-1499-45fe-b3be-62bdb6c88c8c","issue_id":"d675102c-58c4-4add-bcf8-f9963c0c4f21","timestamp":"2026-11-09T02:49:55.372642920Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"f6b7c793-124e-4aab-be5a-caf350009968","issue_id":"863fd652-8ced-4b2f-ba90-b8743fac4a41","timestamp":"2026-11-09T02:49:55.560256961Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"6d969e59-2a0d-4a36-ad5c-234789c4ac9e","issue_id":"863fd652-8ced-4b2f-ba90-b8743fac4a41","timestamp":"2026-11-09T02:49:55.560256961Z","type":"issue_claimed"}
